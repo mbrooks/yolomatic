@@ -10,6 +10,7 @@
  * - github_set_comment: Add a comment to an issue
  * - github_set_status: Update issue state (open/close) and/or assignee
  * - github_set_labels: Add/remove labels on an issue
+ * - github_assigned_open_issues: Look up your username and query all open issues assigned to you across all repositories
  *
  * Requires GITHUB_TOKEN environment variable.
  */
@@ -43,6 +44,20 @@ interface GitHubIssueFull extends GitHubIssue {
 	comments?: GitHubComment[];
 	html_url: string;
 	assignees?: Array<{ login: string }>;
+}
+
+interface GitHubSearchIssue {
+	url: string;
+	repository_url: string;
+	html_url: string;
+	number: number;
+	title: string;
+	state: "open" | "closed";
+	labels: Array<{ name: string }>;
+	created_at: string;
+	updated_at: string;
+	repository: { full_name: string };
+	assignees: Array<{ login: string }>;
 }
 
 function parseDotEnv(content: string): Map<string, string> {
@@ -462,6 +477,77 @@ export default function githubIssuesExtension(pi: ExtensionAPI) {
 				return {
 					content: [{ type: "text", text: `Error updating labels: ${message}` }],
 					details: { labels: [], success: false, error: message },
+				};
+			}
+		},
+	});
+
+	// Tool 7: github_assigned_open_issues
+	pi.registerTool({
+		name: "github_assigned_open_issues",
+		label: "GitHub Assigned Open Issues",
+		description: "Look up your GitHub username and query all open issues across all repositories that are assigned to you",
+		parameters: Type.Object({}),
+		async execute(_toolCallId, _params, _signal, _onUpdate, ctx: ExtensionContext) {
+			try {
+				const octokit = await getOctokit(ctx.cwd);
+
+				// Get authenticated user
+				const userResponse = await octokit.users.getAuthenticated();
+				const username = userResponse.data.login;
+
+				// Search for all open issues assigned to the user across all repos
+				// Using GitHub search API: is:issue is:open assignee:username
+				const searchResponse = await octokit.search.issuesAndPullRequests({
+					q: `is:issue is:open assignee:${username}`,
+					sort: "updated",
+					order: "desc",
+					per_page: 100,
+				});
+
+				const issues: GitHubSearchIssue[] = searchResponse.data.items.map((issue) => ({
+					url: issue.url,
+					repository_url: issue.repository_url,
+					html_url: issue.html_url,
+					number: issue.number,
+					title: issue.title,
+					state: issue.state as "open" | "closed",
+					labels: issue.labels.map((label) => ({ name: label.name || "" })),
+					created_at: issue.created_at,
+					updated_at: issue.updated_at,
+					repository: { full_name: issue.repository_url.replace("https://api.github.com/repos/", "") },
+					assignees: issue.assignees?.map((a) => ({ login: a.login })) || [],
+				}));
+
+				// Group by repository for better readability
+				const byRepo = new Map<string, GitHubSearchIssue[]>();
+				for (const issue of issues) {
+					const repo = issue.repository.full_name;
+					if (!byRepo.has(repo)) {
+						byRepo.set(repo, []);
+					}
+					byRepo.get(repo)!.push(issue);
+				}
+
+				let summary = `Found ${issues.length} open issue(s) assigned to ${username}\n\n`;
+				for (const [repo, repoIssues] of byRepo.entries()) {
+					summary += `**${repo}** (${repoIssues.length} issues):\n`;
+					for (const issue of repoIssues) {
+						const labels = issue.labels.length > 0 ? ` [${issue.labels.map(l => l.name).join(", ")}]` : "";
+						summary += `  - #${issue.number}: ${issue.title}${labels}\n    ${issue.html_url}\n`;
+					}
+					summary += "\n";
+				}
+
+				return {
+					content: [{ type: "text", text: summary.trim() }],
+					details: { username, issues, byRepository: Object.fromEntries(byRepo), success: true },
+				};
+			} catch (error) {
+				const message = error instanceof Error ? error.message : "Unknown error";
+				return {
+					content: [{ type: "text", text: `Error fetching assigned issues: ${message}` }],
+					details: { username: "", issues: [], byRepository: {}, success: false, error: message },
 				};
 			}
 		},
