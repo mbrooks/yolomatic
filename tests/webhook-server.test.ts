@@ -36,9 +36,9 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
-				status: "waiting-feedback",
+				status: "waiting-feedback" as const,
 				sessionPath: "/tmp/sessions/tars-issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -50,16 +50,22 @@ describe("GitHubIssueHandlers", () => {
 				body: "Body",
 				status,
 				sessionPath: "/tmp/sessions/tars-issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
 			markSeeded: vi.fn(),
 		};
 		const workspaceManager = {
-			ensureWorkspace: vi.fn(),
-			getOrCreateBranch: vi.fn(async () => "tars/issue-42"),
-			commitAndPushBranch: vi.fn(async () => undefined),
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				branch: "tars/issue-42",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+			})),
+			commitAndPush: vi.fn(async () => undefined),
+			removeWorktree: vi.fn(),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -89,7 +95,7 @@ describe("GitHubIssueHandlers", () => {
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		expect(workspaceManager.commitAndPushBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42);
 
 		// Should add tars-pr-created on complete, not tars-complete
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
@@ -168,9 +174,9 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 		};
 		const workspaceManager = {
-			ensureWorkspace: vi.fn(),
-			getOrCreateBranch: vi.fn(),
-			commitAndPushBranch: vi.fn(),
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
 		};
 		const executor = {
 			execute: vi.fn(),
@@ -228,7 +234,7 @@ describe("GitHubIssueHandlers", () => {
 				body: "Body",
 				status: "pending" as const,
 				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -240,7 +246,7 @@ describe("GitHubIssueHandlers", () => {
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -252,16 +258,22 @@ describe("GitHubIssueHandlers", () => {
 				body: "Body",
 				status,
 				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
 		};
 		const workspaceManager = {
-			ensureWorkspace: vi.fn(async () => ({ path: "/tmp/workspaces/mbrooks-tars" })),
-			getOrCreateBranch: vi.fn(async () => "tars/issue-1"),
-			commitAndPushBranch: vi.fn(async () => undefined),
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => undefined),
+			removeWorktree: vi.fn(),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({

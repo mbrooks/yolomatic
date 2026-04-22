@@ -21,21 +21,163 @@ describe("WorkspaceManager", () => {
 	it("builds lowercase owner-repo keys and paths", () => {
 		const manager = new WorkspaceManager(createConfig("/tmp/workspaces"), vi.fn());
 
-		expect(manager.getWorkspaceKey("MBrooks", "CaseBot")).toBe("mbrooks-casebot");
-		expect(manager.getWorkspacePath("MBrooks", "CaseBot")).toBe(path.join("/tmp/workspaces", "mbrooks-casebot"));
+		expect(manager.getRepoKey("MBrooks", "CaseBot")).toBe("mbrooks-casebot");
+		expect(manager.getBareRepoPath("MBrooks", "CaseBot")).toBe(path.join("/tmp/workspaces", "mbrooks-casebot"));
+		expect(manager.getWorktreePath("MBrooks", "CaseBot", 42)).toBe(
+			path.join("/tmp/workspaces", "mbrooks-casebot", ".worktrees", "issue-42"),
+		);
+		expect(manager.getBranchName(42)).toBe("tars/issue-42");
 	});
 
-	it("creates predictable feature branches per issue", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-branch-"));
-		const repoPath = path.join(root, "mbrooks-tars");
-		const runCommand: CommandRunner = vi.fn(async () => {});
+	it("creates worktree by cloning bare repo and adding worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const branch = await manager.getOrCreateBranch("mbrooks", "tars", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
 
-		expect(branch).toBe("tars/issue-42");
-		expect(runCommand).toHaveBeenCalledWith("git", ["checkout", "-B", "tars/issue-42"], {
-			cwd: repoPath,
+		expect(worktree.branch).toBe("tars/issue-42");
+		expect(worktree.path).toBe(path.join(bareRepoPath, ".worktrees", "issue-42"));
+
+		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "clone",
+		);
+		expect(cloneCalls).toHaveLength(1);
+		expect(cloneCalls[0][1]).toContain("--bare");
+		expect(cloneCalls[0][1]).toContain(bareRepoPath);
+		expect(cloneCalls[0][1].some((arg) => arg.includes("github.com"))).toBe(true);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", worktree.path, "-b", "tars/issue-42"],
+			{ cwd: bareRepoPath },
+		);
+	});
+
+	it("returns existing worktree if already created", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		let worktreeCreated = false;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return {
+					stdout: worktreeCreated ? `${worktreePath}  abcd1234  [tars/issue-42]\n` : "",
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				worktreeCreated = true;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		// First call creates the worktree
+		const worktree1 = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		expect(worktree1.path).toBe(worktreePath);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", worktreePath, "-b", "tars/issue-42"],
+			{ cwd: bareRepoPath },
+		);
+
+		// Second call returns existing
+		const worktree2 = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		expect(worktree2.path).toBe(worktreePath);
+		expect(worktree2.branch).toBe("tars/issue-42");
+
+		// Should not call worktree add again
+		const worktreeAddCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "add",
+		);
+		expect(worktreeAddCalls).toHaveLength(1);
+	});
+
+	it("creates worktree from existing branch if branch already exists", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-existing-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				return { stdout: "abcd1234 refs/heads/tars/issue-42", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		expect(worktree.branch).toBe("tars/issue-42");
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", worktreePath, "tars/issue-42"],
+			{ cwd: bareRepoPath },
+		);
+	});
+
+	it("commits and pushes from worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-commit-"));
+		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.commitAndPush("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith("git", ["add", "-A"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["commit", "-m", "TARS: Changes for issue #42"],
+			{ cwd: worktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["push", "origin", "tars/issue-42"],
+			{ cwd: worktreePath },
+		);
+	});
+
+	it("removes worktree if it exists", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-remove-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: `${worktreePath}  abcd1234  [tars/issue-42]\n`, stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.removeWorktree("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", worktreePath], {
+			cwd: bareRepoPath,
 		});
 	});
 });
