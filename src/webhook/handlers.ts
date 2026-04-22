@@ -49,6 +49,7 @@ interface CommentPayload {
 		}[];
 	};
 	comment: {
+		id: number;
 		body: string;
 		user: {
 			login: string;
@@ -179,7 +180,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		this.inFlight.add(inFlightKey);
 		try {
 			await this.addLabels(owner, repo, issue.number, ["tars-working"]);
-			await this.postComment(owner, repo, issue.number, "Picked up by TARS. Working on it...");
+			await this.reactToIssue(owner, repo, issue.number, "eyes");
 			await this.runExecution(owner, repo, issue.number);
 		} finally {
 			this.inFlight.delete(inFlightKey);
@@ -235,7 +236,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-complete");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
 		await this.addLabels(owner, repo, issueNumber, ["tars-working"]);
-		await this.postComment(owner, repo, issueNumber, "Feedback received. Resuming work.");
+		await this.reactToComment(owner, repo, payload.comment.id, "rocket");
 		await this.runExecution(owner, repo, issueNumber, payload.comment.body);
 	}
 
@@ -374,6 +375,24 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				throw error;
 			}
 		}
+	}
+
+	private async reactToIssue(owner: string, repo: string, issueNumber: number, content: string): Promise<void> {
+		await this.octokit.reactions.createForIssue({
+			owner,
+			repo,
+			issue_number: issueNumber,
+			content,
+		});
+	}
+
+	private async reactToComment(owner: string, repo: string, commentId: number, content: string): Promise<void> {
+		await this.octokit.reactions.createForIssueComment({
+			owner,
+			repo,
+			comment_id: commentId,
+			content,
+		});
 	}
 
 	private async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
