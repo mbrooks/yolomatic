@@ -1,4 +1,5 @@
-import { createAgentSession, SessionManager as PiSessionManager } from "@mariozechner/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, SessionManager as PiSessionManager } from "@mariozechner/pi-coding-agent";
+import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
 import type { SessionState } from "../session/store.js";
@@ -35,6 +36,25 @@ function getLastAssistantText(session: { messages: Array<{ role?: string; conten
 		}
 	}
 	return "";
+}
+
+let soulContentCache: string | null = null;
+
+async function loadSoulContent(soulPath: string): Promise<string> {
+	if (soulContentCache !== null) {
+		return soulContentCache;
+	}
+	try {
+		const content = await readFile(soulPath, "utf-8");
+		soulContentCache = content;
+		process.stdout.write(`Loaded SOUL.md from ${soulPath}\n`);
+		return content;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stderr.write(`Warning: Failed to load SOUL.md from ${soulPath}: ${message}\n`);
+		soulContentCache = "";
+		return "";
+	}
 }
 
 function parseExecutionResult(rawResponse: string): ExecutionResult {
@@ -90,6 +110,12 @@ function buildFeedbackPrompt(comment: string): string {
 }
 
 export class PiAgentExecutor {
+	private readonly soulPath: string;
+
+	constructor(options: { soulPath: string }) {
+		this.soulPath = options.soulPath;
+	}
+
 	async execute(state: SessionState, newComment?: string): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
 
@@ -97,9 +123,23 @@ export class PiAgentExecutor {
 		logger.logPrompt(prompt);
 
 		const piSessionManager = PiSessionManager.open(state.sessionPath, undefined, state.workspacePath);
+
+		const soulContent = await loadSoulContent(this.soulPath);
+		const loader = new DefaultResourceLoader({
+			cwd: state.workspacePath,
+			agentsFilesOverride: (current) => ({
+				agentsFiles: [
+					...current.agentsFiles,
+					{ path: "/virtual/SOUL.md", content: soulContent },
+				],
+			}),
+		});
+		await loader.reload();
+
 		const { session } = await createAgentSession({
 			cwd: state.workspacePath,
 			sessionManager: piSessionManager,
+			resourceLoader: loader,
 		});
 
 		const unsubscribe = session.subscribe((event) => {
