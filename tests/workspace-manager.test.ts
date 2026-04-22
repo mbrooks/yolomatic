@@ -76,9 +76,14 @@ describe("WorkspaceManager", () => {
 			}
 			if (args[0] === "worktree" && args[1] === "list") {
 				return {
-					stdout: worktreeCreated ? `${worktreePath}  abcd1234  [tars/issue-42]\n` : "",
+					stdout: worktreeCreated
+						? `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/tars/issue-42\n`
+						: "",
 					stderr: "",
 				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "add") {
 				worktreeCreated = true;
@@ -117,6 +122,9 @@ describe("WorkspaceManager", () => {
 				return { stdout: "abcd1234 refs/heads/tars/issue-42", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
 				return { stdout: "", stderr: "" };
 			}
 			return { stdout: "", stderr: "" };
@@ -168,7 +176,13 @@ describe("WorkspaceManager", () => {
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "list") {
-				return { stdout: `${worktreePath}  abcd1234  [tars/issue-42]\n`, stderr: "" };
+				return {
+					stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/tars/issue-42\n`,
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
 			}
 			return { stdout: "", stderr: "" };
 		});
@@ -179,5 +193,64 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", worktreePath], {
 			cwd: bareRepoPath,
 		});
+	});
+
+	it("prunes stale worktrees before adding new worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-prune-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		// Verify prune is called before add
+		const calls = (runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
+		const pruneIndex = calls.findIndex(([cmd, args]) => cmd === "git" && args[0] === "worktree" && args[1] === "prune");
+		const addIndex = calls.findIndex(([cmd, args]) => cmd === "git" && args[0] === "worktree" && args[1] === "add");
+		expect(pruneIndex).toBeGreaterThanOrEqual(0);
+		expect(addIndex).toBeGreaterThanOrEqual(0);
+		expect(pruneIndex).toBeLessThan(addIndex);
+	});
+
+	it("throws diagnostic error when worktree add fails", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-error-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				return { stdout: "abcd1234 refs/heads/tars/issue-42", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				throw new Error("fatal: 'tars/issue-42' is already used by worktree");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+			"[workspace] ERROR: Cannot create worktree for tars/issue-42",
+		);
+		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+			"git worktree prune",
+		);
 	});
 });

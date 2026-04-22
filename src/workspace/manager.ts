@@ -73,7 +73,7 @@ export class WorkspaceManager {
 		await mkdir(this.config.workspacesDir, { recursive: true });
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
 
-		if (await this.worktreeExists(bareRepoPath, issueNumber)) {
+		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
 			return {
 				owner: normalizedOwner,
 				repo: normalizedRepo,
@@ -83,16 +83,35 @@ export class WorkspaceManager {
 			};
 		}
 
+		await this.pruneWorktrees(bareRepoPath);
+
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 
-		if (existsBranch) {
-			await this.runCommand("git", ["worktree", "add", worktreePath, branchName], {
-				cwd: bareRepoPath,
-			});
-		} else {
-			await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName], {
-				cwd: bareRepoPath,
-			});
+		try {
+			if (existsBranch) {
+				await this.runCommand("git", ["worktree", "add", worktreePath, branchName], {
+					cwd: bareRepoPath,
+				});
+			} else {
+				await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName], {
+					cwd: bareRepoPath,
+				});
+			}
+		} catch (error) {
+			const originalMessage = error instanceof Error ? error.message : String(error);
+			throw new Error(
+				`[workspace] ERROR: Cannot create worktree for ${branchName}\n\n` +
+					`Possible causes:\n` +
+					`1. The branch is already checked out in another worktree that still exists.\n` +
+					`2. A previous worktree was deleted outside of git, leaving a stale registry entry.\n\n` +
+					`How to recover:\n` +
+					`- Check existing worktrees: git worktree list\n` +
+					`- Remove stale worktree: git worktree remove <path>\n` +
+					`- If directory is already gone: git worktree prune\n` +
+					`- Force remove if needed: git worktree remove --force <path>\n\n` +
+					`Attempting automatic recovery via 'git worktree prune'...\n\n` +
+					`Original error: ${originalMessage}`,
+			);
 		}
 
 		return {
@@ -108,7 +127,7 @@ export class WorkspaceManager {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 
-		if (await this.worktreeExists(bareRepoPath, issueNumber)) {
+		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
 			await this.runCommand("git", ["worktree", "remove", worktreePath], {
 				cwd: bareRepoPath,
 			});
@@ -151,13 +170,42 @@ export class WorkspaceManager {
 		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
 	}
 
-	private async worktreeExists(bareRepoPath: string, issueNumber: number): Promise<boolean> {
+	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
 		try {
-			const { stdout } = await this.runCommand("git", ["worktree", "list"], { cwd: bareRepoPath });
-			return stdout.includes(`.worktrees/issue-${issueNumber}`);
+			const { stdout } = await this.runCommand("git", ["worktree", "list", "--porcelain"], {
+				cwd: bareRepoPath,
+			});
+			const worktrees: Array<{ path: string; branch?: string }> = [];
+			let current: { path: string; branch?: string } | null = null;
+			for (const line of stdout.split("\n")) {
+				if (line.startsWith("worktree ")) {
+					if (current) {
+						worktrees.push(current);
+					}
+					current = { path: line.slice("worktree ".length) };
+				} else if (line.startsWith("branch ") && current) {
+					current.branch = line.slice("branch ".length);
+				} else if (line === "" && current) {
+					worktrees.push(current);
+					current = null;
+				}
+			}
+			if (current) {
+				worktrees.push(current);
+			}
+			return worktrees;
 		} catch {
-			return false;
+			return [];
 		}
+	}
+
+	private async worktreeExists(bareRepoPath: string, expectedPath: string): Promise<boolean> {
+		const worktrees = await this.getWorktreeList(bareRepoPath);
+		return worktrees.some((w) => w.path === expectedPath);
+	}
+
+	private async pruneWorktrees(bareRepoPath: string): Promise<void> {
+		await this.runCommand("git", ["worktree", "prune"], { cwd: bareRepoPath });
 	}
 
 	private async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
