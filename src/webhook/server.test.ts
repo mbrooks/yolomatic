@@ -479,6 +479,9 @@ describe("GitHubIssueHandlers", () => {
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
 			},
+			reactions: {
+				createForIssueComment: vi.fn(async () => ({})),
+			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
