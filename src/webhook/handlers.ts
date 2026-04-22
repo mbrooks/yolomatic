@@ -90,6 +90,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubToken: string;
 			githubUsername: string;
 			autoStart: boolean;
+			defaultBranch: string;
 			octokit?: Octokit;
 		},
 	) {
@@ -271,6 +272,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			// Push branch so code is actually delivered
 			await this.deps.workspaceManager.commitAndPushBranch(owner, repo, issueNumber);
 
+			// Create PR via GitHub API
+			const prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
+
 			await this.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
 			await this.postComment(
 				owner,
@@ -279,8 +283,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				[
 					"**TARS Complete**",
 					"",
-					`Code generated on branch: \`tars/issue-${issueNumber}\``,
+					`PR created: ${prUrl}`,
 					"",
+					"Summary:",
 					result.summary || "No summary provided.",
 					"",
 					"Ready for review.",
@@ -304,6 +309,28 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		);
 
 		void updatedState;
+	}
+
+	private async createPR(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		title: string,
+		summary: string,
+	): Promise<string> {
+		const base = this.deps.defaultBranch;
+		const head = `tars/issue-${issueNumber}`;
+
+		const pr = await this.octokit.pulls.create({
+			owner,
+			repo,
+			title: `TARS: ${title}`,
+			body: `Fixes #${issueNumber}\n\n${summary}`,
+			head,
+			base,
+		});
+
+		return pr.data.html_url;
 	}
 
 	private async addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
