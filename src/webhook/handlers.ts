@@ -218,9 +218,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		const tarsLabels = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
 		const hasTarsLabel = hasAnyLabel(payload.issue.labels, tarsLabels);
-		if (!hasTarsLabel) {
+		const isMentioned = payload.comment.body.includes(`@${this.deps.githubUsername}`);
+
+		if (!hasTarsLabel && !isMentioned) {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label or mention\n`,
 			);
 			return;
 		}
@@ -228,6 +230,24 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issueNumber = payload.issue.number;
+
+		if (isMentioned) {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
+		} else {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has tars label\n`);
+		}
+
+		// Auto-label on mention so future comments pass via label gate
+		if (isMentioned && !hasTarsLabel) {
+			await this.octokit.issues.addLabels({
+				owner,
+				repo,
+				issue_number: issueNumber,
+				labels: ["tars"],
+			});
+			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
+		}
+
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
 
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-feedback-required");
