@@ -40,6 +40,7 @@ interface CommentPayload {
 		body: string;
 		user: {
 			login: string;
+			type?: string;
 		};
 	};
 	repository: {
@@ -52,6 +53,10 @@ interface CommentPayload {
 
 function hasLabel(labels: IssueLabel[] | undefined, label: string): boolean {
 	return (labels ?? []).some((item) => item.name === label);
+}
+
+function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: string[]): boolean {
+	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
 }
 
 export interface WebhookHandlers {
@@ -124,9 +129,19 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		if (!hasLabel(payload.issue.labels, "tars-feedback-required")) {
+		// Ignore bot comments (including our own)
+		if (payload.comment.user.type === "Bot") {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no feedback label\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: bot comment\n`,
+			);
+			return;
+		}
+
+		const tarsLabels = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
+		const hasTarsLabel = hasAnyLabel(payload.issue.labels, tarsLabels);
+		if (!hasTarsLabel) {
+			process.stdout.write(
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label\n`,
 			);
 			return;
 		}
@@ -137,8 +152,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
 
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-feedback-required");
-		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-complete");
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
 		await this.addLabels(owner, repo, issueNumber, ["tars-working"]);
 		await this.postComment(owner, repo, issueNumber, "Feedback received. Resuming work.");
 		await this.runExecution(owner, repo, issueNumber, payload.comment.body);
@@ -169,6 +185,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-feedback-required");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-complete");
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
 
 		if (result.status === "waiting-feedback") {
 			updatedState = await this.deps.sessionManager.updateStatus(repo, issueNumber, "waiting-feedback");
@@ -189,7 +206,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		if (result.status === "complete") {
 			updatedState = await this.deps.sessionManager.updateStatus(repo, issueNumber, "complete");
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
-			await this.addLabels(owner, repo, issueNumber, ["tars-complete"]);
+
+			// Push branch so code is actually delivered
+			await this.deps.workspaceManager.commitAndPushBranch(owner, repo, issueNumber);
+
+			await this.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
 			await this.postComment(
 				owner,
 				repo,
@@ -197,11 +218,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				[
 					"**TARS Complete**",
 					"",
-					"Code has been generated.",
+					`Code generated on branch: \`tars/issue-${issueNumber}\``,
 					"",
 					result.summary || "No summary provided.",
 					"",
-					"Note: PR creation is disabled. Review the session and apply changes manually.",
+					"Ready for review.",
 				].join("\n"),
 			);
 			return;

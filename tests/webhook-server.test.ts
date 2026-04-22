@@ -17,16 +17,11 @@ describe("verifySignature", () => {
 });
 
 describe("GitHubIssueHandlers", () => {
-	it("resumes a session only when feedback label is present", async () => {
+	it("resumes a session for any TARS label and pushes branch on complete", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
-				removeLabel: vi
-					.fn()
-					.mockRejectedValueOnce(Object.assign(new Error("missing"), { status: 404 }))
-					.mockRejectedValueOnce(Object.assign(new Error("missing"), { status: 404 }))
-					.mockRejectedValueOnce(Object.assign(new Error("missing"), { status: 404 }))
-					.mockResolvedValue({}),
+				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
 			},
 		};
@@ -61,6 +56,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			ensureWorkspace: vi.fn(),
 			getOrCreateBranch: vi.fn(async () => "tars/issue-42"),
+			commitAndPushBranch: vi.fn(async () => undefined),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -79,6 +75,7 @@ describe("GitHubIssueHandlers", () => {
 			octokit: octokit as never,
 		});
 
+		// Should resume on tars-feedback-required
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-feedback-required" }] },
@@ -86,11 +83,25 @@ describe("GitHubIssueHandlers", () => {
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 		});
 
-		expect(executor.execute).toHaveBeenCalled();
-		expect(octokit.issues.addLabels).toHaveBeenCalled();
-		expect(octokit.issues.removeLabel).toHaveBeenCalled();
-		expect(octokit.issues.createComment).toHaveBeenCalled();
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+		expect(workspaceManager.commitAndPushBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
 
+		// Should add tars-pr-created on complete, not tars-complete
+		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
+		const lastAddLabels = addLabelsCalls[addLabelsCalls.length - 1];
+		expect(lastAddLabels?.[0]?.labels).toContain("tars-pr-created");
+
+		// Should resume on tars-pr-created too
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
+			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
+
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+
+		// Should ignore non-TARS labels
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "bug" }] },
@@ -98,6 +109,16 @@ describe("GitHubIssueHandlers", () => {
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 		});
 
-		expect(executor.execute).toHaveBeenCalledTimes(1);
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+
+		// Should ignore bot comments
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
+			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
+
+		expect(executor.execute).toHaveBeenCalledTimes(2);
 	});
 });
