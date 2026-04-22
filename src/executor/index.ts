@@ -1,5 +1,6 @@
 import { createAgentSession, SessionManager as PiSessionManager } from "@mariozechner/pi-coding-agent";
 
+import { LlmLogger } from "../logging/llm-logger.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
@@ -88,13 +89,67 @@ function buildFeedbackPrompt(comment: string): string {
 
 export class PiAgentExecutor {
 	async execute(state: SessionState, newComment?: string): Promise<ExecutionResult> {
+		const logger = new LlmLogger(state.repo, state.issueNumber);
+
+		const prompt = newComment ? buildFeedbackPrompt(newComment) : buildIssuePrompt(state);
+		logger.logPrompt(prompt);
+
 		const piSessionManager = PiSessionManager.open(state.sessionPath, undefined, state.workspacePath);
 		const { session } = await createAgentSession({
 			cwd: state.workspacePath,
 			sessionManager: piSessionManager,
 		});
 
-		await session.prompt(newComment ? buildFeedbackPrompt(newComment) : buildIssuePrompt(state));
-		return parseExecutionResult(getLastAssistantText(session));
+		const unsubscribe = session.subscribe((event) => {
+			if (event.type === "message_update") {
+				if (event.assistantMessageEvent.type === "thinking_end") {
+					logger.logThought(event.assistantMessageEvent.content);
+				}
+			}
+
+			if (event.type === "tool_execution_start") {
+				logger.logToolCall(event.toolName, event.args as Record<string, unknown>);
+			}
+
+			if (event.type === "tool_execution_end") {
+				logger.logToolResult(event.toolName, event.result);
+			}
+
+			if (event.type === "auto_retry_start") {
+				logger.logError(
+					new Error(event.errorMessage),
+					`Auto-retry attempt ${event.attempt}/${event.maxAttempts}`,
+				);
+			}
+
+			if (event.type === "auto_retry_end" && !event.success && event.finalError) {
+				logger.logError(new Error(event.finalError), "Auto-retry failed");
+			}
+		});
+
+		try {
+			await session.prompt(prompt);
+		} catch (error) {
+			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
+			throw error;
+		} finally {
+			unsubscribe();
+		}
+
+		// Check for agent-level errors after the run completes
+		const lastMessage = session.messages[session.messages.length - 1];
+		if (lastMessage && typeof lastMessage === "object" && "role" in lastMessage && lastMessage.role === "assistant") {
+			const assistantMsg = lastMessage as { errorMessage?: string; stopReason?: string };
+			if (assistantMsg.errorMessage) {
+				logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
+			} else if (assistantMsg.stopReason === "error") {
+				logger.logError(new Error("Assistant stopped with error reason"), "Assistant error");
+			}
+		}
+
+		const rawResponse = getLastAssistantText(session);
+		logger.logResponse(rawResponse);
+
+		return parseExecutionResult(rawResponse);
 	}
 }
