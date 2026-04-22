@@ -78,7 +78,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should resume on tars-feedback-required
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-feedback-required" }] },
+			issue: { number: 42, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "mbrooks" }] },
 			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -95,7 +95,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should resume on tars-pr-created too
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
 			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -106,7 +106,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore non-TARS labels
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "bug" }] },
+			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "mbrooks" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -117,10 +117,21 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore bot comments
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
 			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+
+		// Should ignore comments on issues not assigned to TARS
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "someone-else" }] },
+			comment: { body: "Help", user: { login: "mbrooks" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
@@ -161,7 +172,7 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore issue events from self
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body" },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },
 		});
@@ -171,12 +182,134 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore comment events from self
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-working" }] },
+			issue: { number: 42, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
 			comment: { body: "Update", user: { login: "tars-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("only works on issues assigned to TARS", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			ensureWorkspace: vi.fn(async () => ({ path: "/tmp/workspaces/mbrooks-tars" })),
+			getOrCreateBranch: vi.fn(async () => "tars/issue-1"),
+			commitAndPushBranch: vi.fn(async () => undefined),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			octokit: octokit as never,
+		});
+
+		// Ignore opened issues not assigned to TARS
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+		expect(sessionManager.createSession).not.toHaveBeenCalled();
+
+		// Process opened issues already assigned to TARS
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+		expect(sessionManager.createSession).toHaveBeenCalledTimes(1);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+
+		// Process assignment to TARS
+		await handlers.handleIssueEvent({
+			action: "assigned",
+			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "tars-bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+
+		// Ignore assignment to someone else
+		await handlers.handleIssueEvent({
+			action: "assigned",
+			issue: { number: 3, title: "Test 3", body: "Body", assignee: { login: "other-user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+
+		// Pause work when TARS is unassigned
+		await handlers.handleIssueEvent({
+			action: "unassigned",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("tars", 1, "pending");
+		expect(octokit.issues.removeLabel).toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "TARS unassigned. Pausing work." }),
+		);
 	});
 });
