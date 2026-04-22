@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  tars:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tars
+    restart: unless-stopped
+    ports:
+      - "6767:6767"
+    env_file:
+      - .env
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - ollama
+    volumes:
+      - tars_sessions:/app/sessions
+      - tars_workspaces:/app/workspaces
+      - tars_pi:/home/tars/.pi/agent
+
+  ollama:
+    image: alpine/ollama:0.20.5
+    container_name: tars-ollama
+    restart: unless-stopped
+    volumes:
+      - tars_ollama:/root/.ollama
+
+volumes:
+  tars_sessions:
+  tars_workspaces:
+  tars_pi:
+  tars_ollama:
