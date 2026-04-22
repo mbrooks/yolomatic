@@ -159,6 +159,115 @@ describe("GitHubIssueHandlers", () => {
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 	});
 
+	it("ignores duplicate issue events targeting the same issue", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		let createCount = 0;
+		const sessionManager = {
+			createSession: vi.fn(async () => {
+				createCount++;
+				return {
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status: createCount === 1 ? ("pending" as const) : ("working" as const),
+					sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+			}),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/tars-issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		// Simulate an opened event immediately followed by an assigned event
+		const openedPromise = handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		const assignedPromise = handlers.handleIssueEvent({
+			action: "assigned",
+			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "tars-bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		await Promise.all([openedPromise, assignedPromise]);
+
+		// Should only execute once
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+		// Should comment for pickup and completion (2 total, not 4)
+		expect(octokit.issues.createComment).toHaveBeenCalledTimes(2);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Picked up by TARS. Working on it..." }),
+		);
+	});
+
 	it("ignores events triggered by the configured GitHub user", async () => {
 		const octokit = {
 			issues: {

@@ -81,6 +81,7 @@ export interface WebhookHandlers {
 
 export class GitHubIssueHandlers implements WebhookHandlers {
 	private readonly octokit: Octokit;
+	private readonly inFlight = new Set<string>();
 
 	public constructor(
 		private readonly deps: {
@@ -147,9 +148,15 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
+		const inFlightKey = `${owner}/${repo}#${issue.number}`;
+		if (this.inFlight.has(inFlightKey)) {
+			process.stdout.write(`[webhook] ${payload.action} ignored: ${inFlightKey} is already being processed\n`);
+			return;
+		}
+
 		const worktree = await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issue.number);
 
-		await this.deps.sessionManager.createSession(
+		const session = await this.deps.sessionManager.createSession(
 			owner,
 			repo,
 			issue.number,
@@ -158,15 +165,25 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			worktree.path,
 		);
 
+		if (session.status !== "pending") {
+			process.stdout.write(`[webhook] ${payload.action} ignored: ${inFlightKey} session status is ${session.status}\n`);
+			return;
+		}
+
 		if (!this.deps.autoStart) {
 			process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
 			return;
 		}
 
 		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
-		await this.addLabels(owner, repo, issue.number, ["tars-working"]);
-		await this.postComment(owner, repo, issue.number, "Picked up by TARS. Working on it...");
-		await this.runExecution(owner, repo, issue.number);
+		this.inFlight.add(inFlightKey);
+		try {
+			await this.addLabels(owner, repo, issue.number, ["tars-working"]);
+			await this.postComment(owner, repo, issue.number, "Picked up by TARS. Working on it...");
+			await this.runExecution(owner, repo, issue.number);
+		} finally {
+			this.inFlight.delete(inFlightKey);
+		}
 	}
 
 	async handleCommentEvent(rawPayload: unknown): Promise<void> {
