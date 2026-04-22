@@ -81,6 +81,7 @@ describe("GitHubIssueHandlers", () => {
 			issue: { number: 42, labels: [{ name: "tars-feedback-required" }] },
 			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -97,6 +98,7 @@ describe("GitHubIssueHandlers", () => {
 			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
 			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
@@ -107,6 +109,7 @@ describe("GitHubIssueHandlers", () => {
 			issue: { number: 42, labels: [{ name: "bug" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
@@ -117,8 +120,63 @@ describe("GitHubIssueHandlers", () => {
 			issue: { number: 42, labels: [{ name: "tars-pr-created" }] },
 			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "tars-bot" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
+	});
+
+	it("ignores events triggered by the configured GitHub user", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			ensureWorkspace: vi.fn(),
+			getOrCreateBranch: vi.fn(),
+			commitAndPushBranch: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			octokit: octokit as never,
+		});
+
+		// Ignore issue events from self
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "tars-bot" },
+		});
+
+		expect(sessionManager.createSession).not.toHaveBeenCalled();
+
+		// Ignore comment events from self
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars-working" }] },
+			comment: { body: "Update", user: { login: "tars-bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "tars-bot" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
 	});
 });

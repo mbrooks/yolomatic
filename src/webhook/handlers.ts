@@ -26,6 +26,9 @@ interface IssuePayload {
 			login: string;
 		};
 	};
+	sender: {
+		login: string;
+	};
 }
 
 interface CommentPayload {
@@ -48,6 +51,9 @@ interface CommentPayload {
 		owner: {
 			login: string;
 		};
+	};
+	sender: {
+		login: string;
 	};
 }
 
@@ -86,6 +92,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issue = payload.issue;
+
+		if (payload.sender.login === this.deps.githubUsername) {
+			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
+			return;
+		}
 
 		if (payload.action === "opened") {
 			process.stdout.write(`[webhook] issues.opened repo=${owner}/${repo} issue=#${issue.number}\n`);
@@ -126,6 +137,13 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const payload = rawPayload as CommentPayload;
 		if (payload.action !== "created") {
 			process.stdout.write(`[webhook] issue_comment action ignored: ${payload.action}\n`);
+			return;
+		}
+
+		if (payload.sender.login === this.deps.githubUsername) {
+			process.stdout.write(
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: event from ${this.deps.githubUsername}\n`,
+			);
 			return;
 		}
 
