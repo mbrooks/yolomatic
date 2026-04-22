@@ -1,26 +1,34 @@
 # pi-coding-agent
 
-Autonomous GitHub issue polling agent for `mbrooks/tars`.
+Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 
 ## Features
 
-- Polls GitHub issues on a schedule
-- Picks up one issue at a time
-- Applies workflow labels and comments
-- Delegates issue execution to `@mariozechner/pi-coding-agent`
-- Creates pull requests when execution completes
+- Receives `issues` and `issue_comment` GitHub webhooks in real time
+- Maintains one persistent pi session per issue at `SESSIONS_DIR/{repo}-issue-{number}.jsonl`
+- Keeps repository work isolated under `WORKSPACES_DIR/{owner}-{repo}`
+- Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-complete`
+- Posts issue comments at pickup, feedback resume, clarification, and completion
 
 ## Setup
 
 1. Install dependencies: `npm install`
 2. Copy `.env.example` to `.env`
-3. Fill in the GitHub and PI agent environment variables
-4. Run locally with `npm run dev`
+3. Fill in GitHub credentials, `WEBHOOK_SECRET`, and PI agent auth
+4. Run the receiver with `npm run dev`
+5. Expose the local server if needed, for example `ngrok http 3000`
+6. Point the GitHub webhook to `POST /webhook`
 
-## Workflow
+## Flow
 
-1. Fetch open issues that do not already need clarification or active work.
-2. Mark the issue with the working label and post a pickup comment.
-3. Execute the issue task through the PI coding agent adapter.
-4. If clarification is needed, switch labels and post the question.
-5. If complete, create a PR, label the issue, and post the PR URL.
+1. `issues.opened` creates or loads `sessions/{repo}-issue-{number}.jsonl`.
+2. If `AUTO_START=true`, TARS labels the issue `tars-working`, comments, and executes in the repo workspace.
+3. If the agent responds with `TARS_STATUS: waiting-feedback`, TARS switches the issue to `tars-feedback-required`.
+4. When `issue_comment.created` arrives on a feedback-blocked issue, TARS resumes the same session.
+5. If the agent responds with `TARS_STATUS: complete`, TARS adds `tars-complete` and posts a completion summary.
+
+## Notes
+
+- PR creation is intentionally disabled.
+- Multi-repo support is native: webhook payloads provide owner and repo, and both workspace and session paths are derived from that data.
+- See [WORKSPACES.md](WORKSPACES.md) for workspace checkout rules.
