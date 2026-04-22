@@ -19,12 +19,18 @@ interface IssuePayload {
 		assignee?: {
 			login: string;
 		} | null;
+		assignees?: {
+			login: string;
+		}[];
 	};
 	repository: {
 		name: string;
 		owner: {
 			login: string;
 		};
+	};
+	sender: {
+		login: string;
 	};
 }
 
@@ -35,6 +41,12 @@ interface CommentPayload {
 		title?: string;
 		body?: string | null;
 		labels?: IssueLabel[];
+		assignee?: {
+			login: string;
+		} | null;
+		assignees?: {
+			login: string;
+		}[];
 	};
 	comment: {
 		body: string;
@@ -48,6 +60,9 @@ interface CommentPayload {
 		owner: {
 			login: string;
 		};
+	};
+	sender: {
+		login: string;
 	};
 }
 
@@ -81,20 +96,51 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		this.octokit = deps.octokit ?? new Octokit({ auth: deps.githubToken });
 	}
 
+	private isAssignedToTars(issue: { assignee?: { login: string } | null; assignees?: { login: string }[] }): boolean {
+		if (issue.assignees && issue.assignees.some((a) => a.login === this.deps.githubUsername)) return true;
+		if (issue.assignee?.login === this.deps.githubUsername) return true;
+		return false;
+	}
+
 	async handleIssueEvent(rawPayload: unknown): Promise<void> {
 		const payload = rawPayload as IssuePayload;
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issue = payload.issue;
 
+		if (payload.sender.login === this.deps.githubUsername) {
+			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
+			return;
+		}
+
 		if (payload.action === "opened") {
-			process.stdout.write(`[webhook] issues.opened repo=${owner}/${repo} issue=#${issue.number}\n`);
+			if (!this.isAssignedToTars(issue)) {
+				process.stdout.write(`[webhook] issues.opened ignored: not assigned to ${this.deps.githubUsername}\n`);
+				return;
+			}
+			process.stdout.write(`[webhook] issues.opened repo=${owner}/${repo} issue=#${issue.number} (assigned)\n`);
 		} else if (payload.action === "assigned") {
-			if (!issue.assignee || issue.assignee.login !== this.deps.githubUsername) {
+			if (!this.isAssignedToTars(issue)) {
 				process.stdout.write(`[webhook] issues.assigned ignored: not assigned to ${this.deps.githubUsername}\n`);
 				return;
 			}
 			process.stdout.write(`[webhook] issues.assigned repo=${owner}/${repo} issue=#${issue.number} to=${this.deps.githubUsername}\n`);
+		} else if (payload.action === "unassigned") {
+			if (this.isAssignedToTars(issue)) {
+				process.stdout.write(`[webhook] issues.unassigned ignored: TARS still assigned to ${owner}/${repo}#${issue.number}\n`);
+				return;
+			}
+			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (TARS unassigned)\n`);
+			const state = await this.deps.sessionManager.getSession(repo, issue.number);
+			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
+				await this.deps.sessionManager.updateStatus(repo, issue.number, "pending");
+				await this.safeRemoveLabel(owner, repo, issue.number, "tars-working");
+				await this.safeRemoveLabel(owner, repo, issue.number, "tars-feedback-required");
+				await this.safeRemoveLabel(owner, repo, issue.number, "tars-pr-created");
+				await this.safeRemoveLabel(owner, repo, issue.number, "tars-complete");
+				await this.postComment(owner, repo, issue.number, "TARS unassigned. Pausing work.");
+			}
+			return;
 		} else {
 			process.stdout.write(`[webhook] issues action ignored: ${payload.action}\n`);
 			return;
@@ -129,10 +175,25 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
+		if (payload.sender.login === this.deps.githubUsername) {
+			process.stdout.write(
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: event from ${this.deps.githubUsername}\n`,
+			);
+			return;
+		}
+
 		// Ignore bot comments (including our own)
 		if (payload.comment.user.type === "Bot") {
 			process.stdout.write(
 				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: bot comment\n`,
+			);
+			return;
+		}
+
+		// Only process comments on issues assigned to TARS
+		if (!this.isAssignedToTars(payload.issue)) {
+			process.stdout.write(
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: not assigned to ${this.deps.githubUsername}\n`,
 			);
 			return;
 		}
