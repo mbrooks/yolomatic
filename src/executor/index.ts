@@ -67,6 +67,8 @@ function buildIssuePrompt(state: SessionState): string {
 		"When you mark TARS_STATUS: complete, commit all changes and push to the branch:",
 		`  git add -A && git commit -m "TARS: ${state.title}" && git push origin tars/issue-${state.issueNumber}`,
 		"",
+		"The system will automatically create a Pull Request for your branch after you complete.",
+		"",
 		`Title: ${state.title}`,
 		"Description:",
 		state.body.trim() || "(no description provided)",

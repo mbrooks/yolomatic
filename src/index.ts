@@ -26,6 +26,7 @@ async function main(): Promise<void> {
 		githubToken: config.githubToken,
 		githubUsername: config.githubUsername,
 		autoStart: config.autoStart,
+		defaultBranch: config.defaultBranch,
 	});
 
 	const server = createWebhookServer(config.webhookSecret, handlers);
