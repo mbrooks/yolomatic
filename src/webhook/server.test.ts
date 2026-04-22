@@ -2,8 +2,8 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { verifySignature } from "../src/webhook/server.js";
-import { GitHubIssueHandlers } from "../src/webhook/handlers.js";
+import { verifySignature } from "./server.js";
+import { GitHubIssueHandlers } from "./handlers.js";
 
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {

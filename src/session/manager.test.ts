@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SessionManager } from "../src/session/manager.js";
-import { SessionStore } from "../src/session/store.js";
+import { SessionManager } from "./manager.js";
+import { SessionStore } from "./store.js";
 
 describe("SessionManager", () => {
 	it("creates 1:1 issue session paths with repo name", async () => {
