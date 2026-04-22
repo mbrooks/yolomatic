@@ -7,8 +7,11 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 - Receives `issues` and `issue_comment` GitHub webhooks in real time
 - Maintains one persistent pi session per issue at `SESSIONS_DIR/{repo}-issue-{number}.jsonl`
 - Keeps repository work isolated under `WORKSPACES_DIR/{owner}-{repo}`
-- Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-complete`
+- Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-pr-created`, `tars-complete`
 - Posts issue comments at pickup, feedback resume, clarification, and completion
+- Accepts `issue_comment` on any TARS-labeled issue (not just feedback-blocked)
+- Ignores bot comments, including its own
+- Commits, pushes branch, and labels `tars-pr-created` when work is complete
 
 ## Setup
 
@@ -24,8 +27,8 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 1. `issues.opened` creates or loads `sessions/{repo}-issue-{number}.jsonl`.
 2. If `AUTO_START=true`, TARS labels the issue `tars-working`, comments, and executes in the repo workspace.
 3. If the agent responds with `TARS_STATUS: waiting-feedback`, TARS switches the issue to `tars-feedback-required`.
-4. When `issue_comment.created` arrives on a feedback-blocked issue, TARS resumes the same session.
-5. If the agent responds with `TARS_STATUS: complete`, TARS adds `tars-complete` and posts a completion summary.
+4. When `issue_comment.created` arrives on any TARS-labeled issue, TARS resumes the same session (ignores bot comments).
+5. If the agent responds with `TARS_STATUS: complete`, TARS commits changes, pushes the branch, adds `tars-pr-created`, and posts a completion summary.
 
 ## Notes
 
