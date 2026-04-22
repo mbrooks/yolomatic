@@ -9,6 +9,7 @@ export interface AppConfig {
 	githubToken: string;
 	githubUsername: string;
 	workspacesDir: string;
+	soulPath: string;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -29,5 +30,6 @@ export function getConfig(): AppConfig {
 		githubToken: requireEnv("GITHUB_TOKEN"),
 		githubUsername: requireEnv("GITHUB_USERNAME"),
 		workspacesDir: path.resolve(process.env.WORKSPACES_DIR?.trim() || path.join(process.cwd(), "workspaces")),
+		soulPath: path.resolve(process.env.SOUL_PATH?.trim() || path.join(process.cwd(), "SOUL.md")),
 	};
 }
