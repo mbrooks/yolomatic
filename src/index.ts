@@ -18,7 +18,7 @@ async function main(): Promise<void> {
 		githubToken: config.githubToken,
 		defaultBranch: config.defaultBranch,
 	});
-	const executor = new PiAgentExecutor();
+	const executor = new PiAgentExecutor({ soulPath: config.soulPath });
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,
