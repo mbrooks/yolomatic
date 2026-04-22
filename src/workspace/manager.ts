@@ -126,6 +126,37 @@ export class WorkspaceManager {
 		await this.runCommand("git", ["pull", "--ff-only", "origin", branch], { cwd: workspacePath });
 	}
 
+	async hasChanges(workspacePath: string, cached = false): Promise<boolean> {
+		try {
+			const args = cached ? ["diff", "--cached", "--quiet"] : ["diff", "--quiet"];
+			await this.runCommand("git", args, { cwd: workspacePath });
+			return false;
+		} catch {
+			return true;
+		}
+	}
+
+	async commitAndPushBranch(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const workspace = await this.ensureWorkspace(owner, repo);
+		const branchName = `tars/issue-${issueNumber}`;
+
+		await this.runCommand("git", ["add", "-A"], { cwd: workspace.path });
+
+		if (await this.hasChanges(workspace.path, true)) {
+			await this.runCommand(
+				"git",
+				["commit", "-m", `TARS: Changes for issue #${issueNumber}`],
+				{ cwd: workspace.path },
+			);
+		}
+
+		try {
+			await this.runCommand("git", ["push", "origin", branchName], { cwd: workspace.path });
+		} catch {
+			// Push may fail for benign reasons (already up to date, etc.).
+		}
+	}
+
 	private async pathExists(targetPath: string): Promise<boolean> {
 		try {
 			await stat(targetPath);
