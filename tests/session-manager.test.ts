@@ -22,13 +22,13 @@ describe("SessionManager", () => {
 			"/tmp/workspaces/mbrooks-casebot",
 		);
 
-		expect(session.sessionPath).toBe(path.join(sessionsDir, "casebot-issue-17.jsonl"));
+		expect(session.sessionPath).toBe(path.join(sessionsDir, "mbrooks-casebot-issue-17.jsonl"));
 		expect(session.status).toBe("pending");
 
 		const persisted = JSON.parse(
-			await readFile(path.join(sessionsDir, "casebot-issue-17.state.json"), "utf8"),
+			await readFile(path.join(sessionsDir, "mbrooks-casebot-issue-17.state.json"), "utf8"),
 		) as { sessionPath: string; workspacePath: string };
-		expect(persisted.sessionPath).toBe(path.join(sessionsDir, "casebot-issue-17.jsonl"));
+		expect(persisted.sessionPath).toBe(path.join(sessionsDir, "mbrooks-casebot-issue-17.jsonl"));
 		expect(persisted.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
 	});
 });
