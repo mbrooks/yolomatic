@@ -402,7 +402,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			owner,
 			repo,
 			issue_number: issueNumber,
-			content,
+			content: content as never,
 		});
 	}
 
@@ -411,7 +411,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			owner,
 			repo,
 			comment_id: commentId,
-			content,
+			content: content as never,
 		});
 	}
 
