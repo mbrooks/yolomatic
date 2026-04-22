@@ -147,7 +147,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		const workspace = await this.deps.workspaceManager.ensureWorkspace(owner, repo);
+		const worktree = await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issue.number);
 
 		await this.deps.sessionManager.createSession(
 			owner,
@@ -155,7 +155,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			issue.number,
 			issue.title,
 			issue.body ?? "",
-			workspace.path,
+			worktree.path,
 		);
 
 		if (!this.deps.autoStart) {
@@ -223,6 +223,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 	}
 
 	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string): Promise<void> {
+		await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
+
 		let state = await this.deps.sessionManager.getSession(repo, issueNumber);
 		if (!state) {
 			throw new Error(`No session found for ${repo}-issue-${issueNumber}`);
@@ -231,7 +233,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath}\n`,
 		);
 
-		await this.deps.workspaceManager.getOrCreateBranch(owner, repo, issueNumber);
 		state = await this.deps.sessionManager.updateStatus(repo, issueNumber, "working");
 
 		const result = await this.deps.executor.execute(state, comment);
@@ -270,7 +271,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
 
 			// Push branch so code is actually delivered
-			await this.deps.workspaceManager.commitAndPushBranch(owner, repo, issueNumber);
+			await this.deps.workspaceManager.commitAndPush(owner, repo, issueNumber);
 
 			// Create PR via GitHub API
 			const prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
