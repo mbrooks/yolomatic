@@ -133,9 +133,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				return;
 			}
 			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (TARS unassigned)\n`);
-			const state = await this.deps.sessionManager.getSession(repo, issue.number);
+			const state = await this.deps.sessionManager.getSession(owner, repo, issue.number);
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
-				await this.deps.sessionManager.updateStatus(repo, issue.number, "pending");
+				await this.deps.sessionManager.updateStatus(owner, repo, issue.number, "pending");
 				await this.safeRemoveLabel(owner, repo, issue.number, "tars-working");
 				await this.safeRemoveLabel(owner, repo, issue.number, "tars-feedback-required");
 				await this.safeRemoveLabel(owner, repo, issue.number, "tars-pr-created");
@@ -171,11 +171,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		if (!this.deps.autoStart) {
-			process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
+			process.stdout.write(`[webhook] auto-start disabled for ${owner}/${repo}#${issue.number}\n`);
 			return;
 		}
 
-		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
+		process.stdout.write(`[webhook] auto-starting ${owner}/${repo}#${issue.number}\n`);
 		this.inFlight.add(inFlightKey);
 		try {
 			await this.addLabels(owner, repo, issue.number, ["tars-working"]);
@@ -230,6 +230,20 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const issueNumber = payload.issue.number;
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
 
+		// Fallback: auto-create session if it doesn't exist (e.g., assignment event was missed)
+		let session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (!session) {
+			const worktree = await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
+			session = await this.deps.sessionManager.createSession(
+				owner,
+				repo,
+				issueNumber,
+				payload.issue.title ?? "",
+				payload.issue.body ?? "",
+				worktree.path,
+			);
+		}
+
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-feedback-required");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-complete");
@@ -242,15 +256,15 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string): Promise<void> {
 		await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
 
-		let state = await this.deps.sessionManager.getSession(repo, issueNumber);
+		let state = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
 		if (!state) {
-			throw new Error(`No session found for ${repo}-issue-${issueNumber}`);
+			throw new Error(`No session found for ${owner}/${repo}#${issueNumber}`);
 		}
 		process.stdout.write(
 			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath}\n`,
 		);
 
-		state = await this.deps.sessionManager.updateStatus(repo, issueNumber, "working");
+		state = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 
 		const result = await this.deps.executor.execute(state, comment);
 		process.stdout.write(
@@ -259,7 +273,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		let updatedState: SessionState;
 
 		if (!state.seeded && !comment) {
-			await this.deps.sessionManager.markSeeded(repo, issueNumber);
+			await this.deps.sessionManager.markSeeded(owner, repo, issueNumber);
 		}
 
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
@@ -268,7 +282,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
 
 		if (result.status === "waiting-feedback") {
-			updatedState = await this.deps.sessionManager.updateStatus(repo, issueNumber, "waiting-feedback");
+			updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "waiting-feedback");
 			process.stdout.write(`[webhook] waiting for feedback on ${repo}#${issueNumber}\n`);
 			await this.addLabels(owner, repo, issueNumber, ["tars-feedback-required"]);
 			await this.postComment(
@@ -284,7 +298,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		if (result.status === "complete") {
-			updatedState = await this.deps.sessionManager.updateStatus(repo, issueNumber, "complete");
+			updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
 
 			// Push branch so code is actually delivered
@@ -312,7 +326,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		updatedState = await this.deps.sessionManager.updateStatus(repo, issueNumber, "working");
+		updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 		process.stdout.write(`[webhook] left in working state ${repo}#${issueNumber}\n`);
 		await this.addLabels(owner, repo, issueNumber, ["tars-working"]);
 		await this.postComment(
