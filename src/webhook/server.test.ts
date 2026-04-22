@@ -27,10 +27,6 @@ describe("GitHubIssueHandlers", () => {
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
 			},
-			reactions: {
-				createForIssue: vi.fn(async () => ({})),
-				createForIssueComment: vi.fn(async () => ({})),
-			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
@@ -93,7 +89,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "mbrooks" }] },
-			comment: { id: 101, body: "Here is the missing detail", user: { login: "mbrooks" } },
+			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -122,7 +118,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
-			comment: { id: 102, body: "Can you also add tests?", user: { login: "mbrooks" } },
+			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -133,7 +129,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "mbrooks" }] },
-			comment: { id: 103, body: "Just chatting", user: { login: "mbrooks" } },
+			comment: { body: "Just chatting", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -144,7 +140,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
-			comment: { id: 104, body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
+			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },
 		});
@@ -155,7 +151,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "someone-else" }] },
-			comment: { id: 105, body: "Help", user: { login: "mbrooks" } },
+			comment: { body: "Help", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -172,10 +168,6 @@ describe("GitHubIssueHandlers", () => {
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
-			},
-			reactions: {
-				createForIssue: vi.fn(async () => ({})),
-				createForIssueComment: vi.fn(async () => ({})),
 			},
 		};
 		let createCount = 0;
@@ -269,11 +261,10 @@ describe("GitHubIssueHandlers", () => {
 
 		// Should only execute once
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		// Should react for pickup and comment for completion (2 total interactions, not 4 comments)
-		expect(octokit.issues.createComment).toHaveBeenCalledTimes(1);
-		expect(octokit.reactions.createForIssue).toHaveBeenCalledTimes(1);
-		expect(octokit.reactions.createForIssue).toHaveBeenCalledWith(
-			expect.objectContaining({ content: "eyes" }),
+		// Should comment for pickup and completion (2 total, not 4)
+		expect(octokit.issues.createComment).toHaveBeenCalledTimes(2);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Picked up by TARS. Working on it..." }),
 		);
 	});
 
@@ -283,10 +274,6 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
-			},
-			reactions: {
-				createForIssue: vi.fn(async () => ({})),
-				createForIssueComment: vi.fn(async () => ({})),
 			},
 		};
 		const sessionManager = {
@@ -328,7 +315,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
-			comment: { id: 201, body: "Update", user: { login: "tars-bot" } },
+			comment: { body: "Update", user: { login: "tars-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },
 		});
@@ -345,10 +332,6 @@ describe("GitHubIssueHandlers", () => {
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
-			},
-			reactions: {
-				createForIssue: vi.fn(async () => ({})),
-				createForIssueComment: vi.fn(async () => ({})),
 			},
 		};
 		const sessionManager = {
@@ -478,9 +461,6 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
-			},
-			reactions: {
-				createForIssueComment: vi.fn(async () => ({})),
 			},
 		};
 		const sessionManager = {
