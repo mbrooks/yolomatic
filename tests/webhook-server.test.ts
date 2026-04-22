@@ -24,6 +24,9 @@ describe("GitHubIssueHandlers", () => {
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
 			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
@@ -72,6 +75,7 @@ describe("GitHubIssueHandlers", () => {
 			githubToken: "token",
 			githubUsername: "mbrooks",
 			autoStart: true,
+			defaultBranch: "main",
 			octokit: octokit as never,
 		});
 
@@ -91,6 +95,18 @@ describe("GitHubIssueHandlers", () => {
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
 		const lastAddLabels = addLabelsCalls[addLabelsCalls.length - 1];
 		expect(lastAddLabels?.[0]?.labels).toContain("tars-pr-created");
+
+		// Should create a PR via the GitHub API
+		expect(octokit.pulls.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				owner: "mbrooks",
+				repo: "tars",
+				title: "TARS: Title",
+				body: "Fixes #42\n\nDone.",
+				head: "tars/issue-42",
+				base: "main",
+			}),
+		);
 
 		// Should resume on tars-pr-created too
 		await handlers.handleCommentEvent({
@@ -166,6 +182,7 @@ describe("GitHubIssueHandlers", () => {
 			githubToken: "token",
 			githubUsername: "tars-bot",
 			autoStart: true,
+			defaultBranch: "main",
 			octokit: octokit as never,
 		});
 
@@ -197,6 +214,9 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
 			},
 		};
 		const sessionManager = {
@@ -257,6 +277,7 @@ describe("GitHubIssueHandlers", () => {
 			githubToken: "token",
 			githubUsername: "tars-bot",
 			autoStart: true,
+			defaultBranch: "main",
 			octokit: octokit as never,
 		});
 
