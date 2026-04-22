@@ -7,12 +7,12 @@ import type { WorkspaceConfig } from "./config.js";
 
 const execFileAsync = promisify(execFile);
 
-export interface Workspace {
+export interface WorktreeInfo {
 	owner: string;
 	repo: string;
+	issueNumber: number;
 	path: string;
 	branch: string;
-	lastCheckout: Date;
 }
 
 export interface CommandRunner {
@@ -22,7 +22,7 @@ export interface CommandRunner {
 		options?: {
 			cwd?: string;
 		},
-	): Promise<void>;
+	): Promise<{ stdout: string; stderr: string }>;
 }
 
 function normalizeSegment(value: string, label: string): string {
@@ -37,93 +37,138 @@ function normalizeSegment(value: string, label: string): string {
 }
 
 export class WorkspaceManager {
-	private readonly workspaces = new Map<string, Workspace>();
-
 	public constructor(
 		private readonly config: WorkspaceConfig,
 		private readonly runCommand: CommandRunner = async (command, args, options) => {
-			await execFileAsync(command, args, {
+			return execFileAsync(command, args, {
 				cwd: options?.cwd,
 				env: process.env,
 			});
 		},
 	) {}
 
-	getWorkspaceKey(owner: string, repo: string): string {
+	getRepoKey(owner: string, repo: string): string {
 		return `${normalizeSegment(owner, "owner")}-${normalizeSegment(repo, "repo")}`.toLowerCase();
 	}
 
-	getWorkspacePath(owner: string, repo: string): string {
-		return path.join(this.config.workspacesDir, this.getWorkspaceKey(owner, repo));
+	getBareRepoPath(owner: string, repo: string): string {
+		return path.join(this.config.workspacesDir, this.getRepoKey(owner, repo));
 	}
 
-	async ensureWorkspace(owner: string, repo: string, branch = this.config.defaultBranch): Promise<Workspace> {
+	getWorktreePath(owner: string, repo: string, issueNumber: number): string {
+		return path.join(this.getBareRepoPath(owner, repo), ".worktrees", `issue-${issueNumber}`);
+	}
+
+	getBranchName(issueNumber: number): string {
+		return `tars/issue-${issueNumber}`;
+	}
+
+	async createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<WorktreeInfo> {
 		const normalizedOwner = normalizeSegment(owner, "owner");
 		const normalizedRepo = normalizeSegment(repo, "repo");
-		const key = this.getWorkspaceKey(normalizedOwner, normalizedRepo);
-		const workspacePath = this.getWorkspacePath(normalizedOwner, normalizedRepo);
+		const bareRepoPath = this.getBareRepoPath(normalizedOwner, normalizedRepo);
+		const worktreePath = this.getWorktreePath(normalizedOwner, normalizedRepo, issueNumber);
+		const branchName = this.getBranchName(issueNumber);
 
 		await mkdir(this.config.workspacesDir, { recursive: true });
+		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
 
-		if (await this.pathExists(workspacePath)) {
-			await this.fetch(workspacePath);
-		} else {
-			await this.clone(normalizedOwner, normalizedRepo, workspacePath);
+		if (await this.worktreeExists(bareRepoPath, issueNumber)) {
+			return {
+				owner: normalizedOwner,
+				repo: normalizedRepo,
+				issueNumber,
+				path: worktreePath,
+				branch: branchName,
+			};
 		}
 
-		await this.checkoutBranch(workspacePath, branch);
-		await this.pull(workspacePath, branch);
+		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 
-		const workspace: Workspace = {
+		if (existsBranch) {
+			await this.runCommand("git", ["worktree", "add", worktreePath, branchName], {
+				cwd: bareRepoPath,
+			});
+		} else {
+			await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName], {
+				cwd: bareRepoPath,
+			});
+		}
+
+		return {
 			owner: normalizedOwner,
 			repo: normalizedRepo,
-			path: workspacePath,
-			branch,
-			lastCheckout: new Date(),
+			issueNumber,
+			path: worktreePath,
+			branch: branchName,
 		};
-
-		this.workspaces.set(key, workspace);
-		return workspace;
 	}
 
-	async getOrCreateBranch(owner: string, repo: string, issueNumber: number): Promise<string> {
-		if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
-			throw new Error(`Invalid issue number: ${issueNumber}`);
+	async removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const bareRepoPath = this.getBareRepoPath(owner, repo);
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+
+		if (await this.worktreeExists(bareRepoPath, issueNumber)) {
+			await this.runCommand("git", ["worktree", "remove", worktreePath], {
+				cwd: bareRepoPath,
+			});
+		}
+	}
+
+	async commitAndPush(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		const branchName = this.getBranchName(issueNumber);
+
+		await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
+
+		if (await this.hasChanges(worktreePath, true)) {
+			await this.runCommand(
+				"git",
+				["commit", "-m", `TARS: Changes for issue #${issueNumber}`],
+				{ cwd: worktreePath },
+			);
 		}
 
-		const workspace = await this.ensureWorkspace(owner, repo);
-		const branchName = `tars/issue-${issueNumber}`;
-
-		await this.runCommand("git", ["checkout", "-B", branchName], { cwd: workspace.path });
-
-		const updatedWorkspace: Workspace = {
-			...workspace,
-			branch: branchName,
-			lastCheckout: new Date(),
-		};
-
-		this.workspaces.set(this.getWorkspaceKey(owner, repo), updatedWorkspace);
-		return branchName;
+		try {
+			await this.runCommand("git", ["push", "origin", branchName], { cwd: worktreePath });
+		} catch {
+			// Push may fail for benign reasons (already up to date, etc.).
+		}
 	}
 
-	private async clone(owner: string, repo: string, workspacePath: string): Promise<void> {
+	private async ensureBareRepo(owner: string, repo: string): Promise<void> {
+		const bareRepoPath = this.getBareRepoPath(owner, repo);
+
+		if (await this.pathExists(bareRepoPath)) {
+			await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
+			return;
+		}
+
 		const encodedUsername = encodeURIComponent(this.config.githubUsername);
 		const encodedToken = encodeURIComponent(this.config.githubToken);
 		const url = `https://${encodedUsername}:${encodedToken}@github.com/${owner}/${repo}.git`;
 
-		await this.runCommand("git", ["clone", url, workspacePath]);
+		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
 	}
 
-	private async fetch(workspacePath: string): Promise<void> {
-		await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: workspacePath });
+	private async worktreeExists(bareRepoPath: string, issueNumber: number): Promise<boolean> {
+		try {
+			const { stdout } = await this.runCommand("git", ["worktree", "list"], { cwd: bareRepoPath });
+			return stdout.includes(`.worktrees/issue-${issueNumber}`);
+		} catch {
+			return false;
+		}
 	}
 
-	private async checkoutBranch(workspacePath: string, branch: string): Promise<void> {
-		await this.runCommand("git", ["checkout", branch], { cwd: workspacePath });
-	}
-
-	private async pull(workspacePath: string, branch: string): Promise<void> {
-		await this.runCommand("git", ["pull", "--ff-only", "origin", branch], { cwd: workspacePath });
+	private async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
+		try {
+			await this.runCommand("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {
+				cwd: bareRepoPath,
+			});
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	async hasChanges(workspacePath: string, cached = false): Promise<boolean> {
@@ -133,27 +178,6 @@ export class WorkspaceManager {
 			return false;
 		} catch {
 			return true;
-		}
-	}
-
-	async commitAndPushBranch(owner: string, repo: string, issueNumber: number): Promise<void> {
-		const workspace = await this.ensureWorkspace(owner, repo);
-		const branchName = `tars/issue-${issueNumber}`;
-
-		await this.runCommand("git", ["add", "-A"], { cwd: workspace.path });
-
-		if (await this.hasChanges(workspace.path, true)) {
-			await this.runCommand(
-				"git",
-				["commit", "-m", `TARS: Changes for issue #${issueNumber}`],
-				{ cwd: workspace.path },
-			);
-		}
-
-		try {
-			await this.runCommand("git", ["push", "origin", branchName], { cwd: workspace.path });
-		} catch {
-			// Push may fail for benign reasons (already up to date, etc.).
 		}
 	}
 
