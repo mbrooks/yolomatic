@@ -250,6 +250,20 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
 
+		// Fallback: auto-create session if it doesn't exist (e.g., assignment event was missed)
+		let session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (!session) {
+			const worktree = await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
+			session = await this.deps.sessionManager.createSession(
+				owner,
+				repo,
+				issueNumber,
+				payload.issue.title ?? "",
+				payload.issue.body ?? "",
+				worktree.path,
+			);
+		}
+
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-feedback-required");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-complete");
