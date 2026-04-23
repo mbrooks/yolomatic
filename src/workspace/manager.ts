@@ -86,6 +86,7 @@ export class WorkspaceManager {
 		await this.pruneWorktrees(bareRepoPath);
 
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
+		await this.updateDefaultBranch(bareRepoPath);
 
 		try {
 			if (existsBranch) {
@@ -93,7 +94,7 @@ export class WorkspaceManager {
 					cwd: bareRepoPath,
 				});
 			} else {
-				await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName], {
+				await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName, this.config.defaultBranch], {
 					cwd: bareRepoPath,
 				});
 			}
@@ -227,6 +228,12 @@ export class WorkspaceManager {
 		} catch {
 			return true;
 		}
+	}
+
+	private async updateDefaultBranch(bareRepoPath: string): Promise<void> {
+		await this.runCommand("git", ["fetch", "origin", `+${this.config.defaultBranch}:${this.config.defaultBranch}`], {
+			cwd: bareRepoPath,
+		});
 	}
 
 	private async pathExists(targetPath: string): Promise<boolean> {
