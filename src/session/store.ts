@@ -14,6 +14,8 @@ export interface SessionState {
 	workspacePath: string;
 	lastActivity: string;
 	seeded: boolean;
+	summary?: string;
+	prUrl?: string;
 }
 
 export class SessionStore {
@@ -22,15 +24,15 @@ export class SessionStore {
 	public constructor(private readonly sessionsDir: string) {}
 
 	getSessionKey(owner: string, repo: string, issueNumber: number): string {
-		return `${owner.toLowerCase()}-${repo.toLowerCase()}-issue-${issueNumber}`;
+		return `github-${owner}-${repo}-issue-${issueNumber}`;
 	}
 
 	getSessionPath(owner: string, repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `${this.getSessionKey(owner, repo, issueNumber)}.jsonl`);
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.jsonl`);
 	}
 
 	getStatePath(owner: string, repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `${this.getSessionKey(owner, repo, issueNumber)}.state.json`);
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
 	}
 
 	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
@@ -52,9 +54,9 @@ export class SessionStore {
 	}
 
 	async set(state: SessionState): Promise<SessionState> {
-		await mkdir(this.sessionsDir, { recursive: true });
-		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
 		const statePath = this.getStatePath(state.owner, state.repo, state.issueNumber);
+		await mkdir(path.dirname(statePath), { recursive: true });
+		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
 		this.sessions.set(key, state);
 		await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 		return state;
