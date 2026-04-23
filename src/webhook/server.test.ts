@@ -2,8 +2,8 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { verifySignature } from "../src/webhook/server.js";
-import { GitHubIssueHandlers } from "../src/webhook/handlers.js";
+import { verifySignature } from "./server.js";
+import { GitHubIssueHandlers } from "./handlers.js";
 
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {
@@ -34,14 +34,13 @@ describe("GitHubIssueHandlers", () => {
 				title,
 				body,
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-99.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
 				workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => {
 				getSessionCallCount++;
-				// Return null on first call, then a session on subsequent calls
 				return getSessionCallCount === 1
 					? null
 					: {
@@ -51,20 +50,20 @@ describe("GitHubIssueHandlers", () => {
 							title: "Fallback title",
 							body: "Fallback body",
 							status: "pending" as const,
-							sessionPath: "/tmp/sessions/mbrooks-tars-issue-99.jsonl",
+							sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
 							workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
 							lastActivity: new Date().toISOString(),
 							seeded: false,
 						};
 			}),
-			updateStatus: vi.fn(async (_owner, _repo, _issue, status) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 99,
 				repo: "tars",
 				owner: "mbrooks",
 				title: "Fallback title",
 				body: "Fallback body",
 				status,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-99.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -146,19 +145,19 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-42.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			updateStatus: vi.fn(async (_owner, _repo, _issue, status) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 42,
 				repo: "tars",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-42.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
@@ -290,7 +289,7 @@ describe("GitHubIssueHandlers", () => {
 					title: "Title",
 					body: "Body",
 					status: createCount === 1 ? ("pending" as const) : ("working" as const),
-					sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
@@ -303,7 +302,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -315,7 +314,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -451,7 +450,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -463,7 +462,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -475,7 +474,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/mbrooks-tars-issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -562,5 +561,101 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "TARS unassigned. Pausing work." }),
 		);
+	});
+
+	it("processes comments that @mention the bot even without a tars label", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 7,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/tars-issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
+				issueNumber: 7,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/tars-issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				branch: "tars/issue-7",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 7,
+			})),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "waiting-feedback" as const,
+				summary: "Need clarification.",
+				rawResponse: "TARS_STATUS: waiting-feedback\nNeed clarification.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		// No tars labels, but @mention should allow processing
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 7, labels: [], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Hey @tars-bot can you help?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+
+		// Should auto-add the tars label once
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars"] }),
+		);
+
+		// Second comment now has a tars label; mention gate is no longer needed
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 7, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Thanks!", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledTimes(2);
+		// Should NOT add tars label again because hasTarsLabel is true
+		const tarsAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
+		expect(tarsAdds.filter((call) => call[0].labels.includes("tars"))).toHaveLength(1);
 	});
 });

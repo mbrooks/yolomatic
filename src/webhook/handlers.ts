@@ -171,11 +171,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		if (!this.deps.autoStart) {
-			process.stdout.write(`[webhook] auto-start disabled for ${owner}/${repo}#${issue.number}\n`);
+			process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
 			return;
 		}
 
-		process.stdout.write(`[webhook] auto-starting ${owner}/${repo}#${issue.number}\n`);
+		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
 		this.inFlight.add(inFlightKey);
 		try {
 			await this.addLabels(owner, repo, issue.number, ["tars-working"]);
@@ -218,9 +218,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		const tarsLabels = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
 		const hasTarsLabel = hasAnyLabel(payload.issue.labels, tarsLabels);
-		if (!hasTarsLabel) {
+		const isMentioned = payload.comment.body.includes(`@${this.deps.githubUsername}`);
+
+		if (!hasTarsLabel && !isMentioned) {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label or mention\n`,
 			);
 			return;
 		}
@@ -228,6 +230,24 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issueNumber = payload.issue.number;
+
+		if (isMentioned) {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
+		} else {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has tars label\n`);
+		}
+
+		// Auto-label on mention so future comments pass via label gate
+		if (isMentioned && !hasTarsLabel) {
+			await this.octokit.issues.addLabels({
+				owner,
+				repo,
+				issue_number: issueNumber,
+				labels: ["tars"],
+			});
+			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
+		}
+
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
 
 		// Fallback: auto-create session if it doesn't exist (e.g., assignment event was missed)
@@ -258,7 +278,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		let state = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
 		if (!state) {
-			throw new Error(`No session found for ${owner}/${repo}#${issueNumber}`);
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
 		process.stdout.write(
 			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath}\n`,

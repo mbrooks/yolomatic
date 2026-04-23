@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-
 import type { SessionStore, SessionState, SessionStatus } from "./store.js";
 
 export class SessionManager {
@@ -29,8 +27,6 @@ export class SessionManager {
 			return existing;
 		}
 
-		await mkdir(this.sessionsDir, { recursive: true });
-
 		const state: SessionState = {
 			issueNumber,
 			repo,
@@ -51,12 +47,28 @@ export class SessionManager {
 		return this.store.get(owner, repo, issueNumber);
 	}
 
+	async resumeSession(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		newComment?: string,
+	): Promise<SessionState> {
+		const state = await this.store.get(owner, repo, issueNumber);
+		if (!state) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		state.status = "working";
+		state.lastActivity = new Date().toISOString();
+		return this.store.set(state);
+	}
+
 	async updateStatus(
 		owner: string,
 		repo: string,
 		issueNumber: number,
 		status: SessionStatus,
-		updates: Partial<Omit<SessionState, "owner" | "repo" | "issueNumber" | "sessionPath">> = {},
+		updates: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">> = {},
 	): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {

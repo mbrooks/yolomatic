@@ -7,7 +7,10 @@
     "dev": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "guardrail:test": "npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.66.1",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

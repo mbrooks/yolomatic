@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LlmLogger } from "../src/logging/llm-logger.js";
+import { LlmLogger } from "./llm-logger.js";
 
 describe("LlmLogger", () => {
 	beforeEach(() => {
