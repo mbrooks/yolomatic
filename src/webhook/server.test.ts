@@ -17,6 +17,114 @@ describe("verifySignature", () => {
 });
 
 describe("GitHubIssueHandlers", () => {
+	it("creates a session on comment if one does not exist (fallback)", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		let getSessionCallCount = 0;
+		const sessionManager = {
+			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
+				issueNumber: 99,
+				repo: "tars",
+				owner: "mbrooks",
+				title,
+				body,
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
+				workspacePath,
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => {
+				getSessionCallCount++;
+				return getSessionCallCount === 1
+					? null
+					: {
+							issueNumber: 99,
+							repo: "tars",
+							owner: "mbrooks",
+							title: "Fallback title",
+							body: "Fallback body",
+							status: "pending" as const,
+							sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
+							workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+							lastActivity: new Date().toISOString(),
+							seeded: false,
+						};
+			}),
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+				issueNumber: 99,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Fallback title",
+				body: "Fallback body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+				branch: "tars/issue-99",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 99,
+			})),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "waiting-feedback" as const,
+				summary: "Need clarification.",
+				rawResponse: "TARS_STATUS: waiting-feedback\nNeed clarification.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: {
+				number: 99,
+				labels: [{ name: "tars-working" }],
+				assignees: [{ login: "tars-bot" }],
+				title: "Test issue",
+				body: "Test body",
+			},
+			comment: { body: "What is the status?", user: { login: "mbrooks" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "mbrooks" },
+		});
+
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(sessionManager.createSession).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			"Test issue",
+			"Test body",
+			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+		);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+	});
+
 	it("resumes a session for any TARS label and pushes branch on complete", async () => {
 		const octokit = {
 			issues: {
