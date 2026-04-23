@@ -57,7 +57,7 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktree.path, "-b", "tars/issue-42"],
+			["worktree", "add", worktree.path, "-b", "tars/issue-42", "main"],
 			{ cwd: bareRepoPath },
 		);
 	});
@@ -97,7 +97,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "main"],
 			{ cwd: bareRepoPath },
 		);
 
@@ -217,13 +217,16 @@ describe("WorkspaceManager", () => {
 
 		await manager.createOrGetWorktree("mbrooks", "tars", 42);
 
-		// Verify prune is called before add
+		// Verify prune and fetch are called before add
 		const calls = (runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
 		const pruneIndex = calls.findIndex(([cmd, args]) => cmd === "git" && args[0] === "worktree" && args[1] === "prune");
+		const fetchIndex = calls.findIndex(([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin");
 		const addIndex = calls.findIndex(([cmd, args]) => cmd === "git" && args[0] === "worktree" && args[1] === "add");
 		expect(pruneIndex).toBeGreaterThanOrEqual(0);
+		expect(fetchIndex).toBeGreaterThanOrEqual(0);
 		expect(addIndex).toBeGreaterThanOrEqual(0);
 		expect(pruneIndex).toBeLessThan(addIndex);
+		expect(fetchIndex).toBeLessThan(addIndex);
 	});
 
 	it("throws diagnostic error when worktree add fails", async () => {
@@ -251,6 +254,43 @@ describe("WorkspaceManager", () => {
 		);
 		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
 			"git worktree prune",
+		);
+	});
+
+	it("updates the default branch before creating a new worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-fetch-default-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ workspacesDir: root, githubUsername: "mbrooks", githubToken: "secret", defaultBranch: "master" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["fetch", "origin", "+master:master"],
+			{ cwd: bareRepoPath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "master"],
+			{ cwd: bareRepoPath },
 		);
 	});
 });
