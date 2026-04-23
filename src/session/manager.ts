@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-
 import type { SessionStore, SessionState, SessionStatus } from "./store.js";
 
 export class SessionManager {
@@ -8,12 +6,12 @@ export class SessionManager {
 		private readonly store: SessionStore,
 	) {}
 
-	getSessionKey(repo: string, issueNumber: number): string {
-		return this.store.getSessionKey(repo, issueNumber);
+	getSessionKey(owner: string, repo: string, issueNumber: number): string {
+		return this.store.getSessionKey(owner, repo, issueNumber);
 	}
 
-	getSessionPath(repo: string, issueNumber: number): string {
-		return this.store.getSessionPath(repo, issueNumber);
+	getSessionPath(owner: string, repo: string, issueNumber: number): string {
+		return this.store.getSessionPath(owner, repo, issueNumber);
 	}
 
 	async createSession(
@@ -24,12 +22,10 @@ export class SessionManager {
 		body: string,
 		workspacePath: string,
 	): Promise<SessionState> {
-		const existing = await this.store.get(repo, issueNumber);
+		const existing = await this.store.get(owner, repo, issueNumber);
 		if (existing) {
 			return existing;
 		}
-
-		await mkdir(this.sessionsDir, { recursive: true });
 
 		const state: SessionState = {
 			issueNumber,
@@ -38,7 +34,7 @@ export class SessionManager {
 			title,
 			body,
 			status: "pending",
-			sessionPath: this.getSessionPath(repo, issueNumber),
+			sessionPath: this.getSessionPath(owner, repo, issueNumber),
 			workspacePath,
 			lastActivity: new Date().toISOString(),
 			seeded: false,
@@ -47,19 +43,36 @@ export class SessionManager {
 		return this.store.set(state);
 	}
 
-	async getSession(repo: string, issueNumber: number): Promise<SessionState | null> {
-		return this.store.get(repo, issueNumber);
+	async getSession(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
+		return this.store.get(owner, repo, issueNumber);
+	}
+
+	async resumeSession(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		newComment?: string,
+	): Promise<SessionState> {
+		const state = await this.store.get(owner, repo, issueNumber);
+		if (!state) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		state.status = "working";
+		state.lastActivity = new Date().toISOString();
+		return this.store.set(state);
 	}
 
 	async updateStatus(
+		owner: string,
 		repo: string,
 		issueNumber: number,
 		status: SessionStatus,
 		updates: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">> = {},
 	): Promise<SessionState> {
-		const existing = await this.store.get(repo, issueNumber);
+		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {
-			throw new Error(`No session for ${repo}-issue-${issueNumber}`);
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
 
 		return this.store.set({
@@ -70,10 +83,10 @@ export class SessionManager {
 		});
 	}
 
-	async markSeeded(repo: string, issueNumber: number): Promise<SessionState> {
-		const existing = await this.store.get(repo, issueNumber);
+	async markSeeded(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {
-			throw new Error(`No session for ${repo}-issue-${issueNumber}`);
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
 
 		return this.store.set({
