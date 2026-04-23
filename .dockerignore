@@ -1,0 +1,12 @@
+.git
+.githooks
+.pi/npm/node_modules
+.pi/extensions/*.map
+pi/
+sessions/
+workspaces/
+coverage
+dist
+node_modules
+.env
+.env.example
