@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkspaceConfig } from "../src/workspace/config.js";
-import type { CommandRunner } from "../src/workspace/manager.js";
-import { WorkspaceManager } from "../src/workspace/manager.js";
+import type { WorkspaceConfig } from "./config.js";
+import type { CommandRunner } from "./manager.js";
+import { WorkspaceManager } from "./manager.js";
 
 function createConfig(workspacesDir: string): WorkspaceConfig {
 	return {

@@ -14,6 +14,8 @@ export interface SessionState {
 	workspacePath: string;
 	lastActivity: string;
 	seeded: boolean;
+	summary?: string;
+	prUrl?: string;
 }
 
 export class SessionStore {
@@ -21,26 +23,26 @@ export class SessionStore {
 
 	public constructor(private readonly sessionsDir: string) {}
 
-	getSessionKey(repo: string, issueNumber: number): string {
-		return `${repo.toLowerCase()}-issue-${issueNumber}`;
+	getSessionKey(owner: string, repo: string, issueNumber: number): string {
+		return `github-${owner}-${repo}-issue-${issueNumber}`;
 	}
 
-	getSessionPath(repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `${this.getSessionKey(repo, issueNumber)}.jsonl`);
+	getSessionPath(owner: string, repo: string, issueNumber: number): string {
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.jsonl`);
 	}
 
-	getStatePath(repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `${this.getSessionKey(repo, issueNumber)}.state.json`);
+	getStatePath(owner: string, repo: string, issueNumber: number): string {
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
 	}
 
-	async get(repo: string, issueNumber: number): Promise<SessionState | null> {
-		const key = this.getSessionKey(repo, issueNumber);
+	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
+		const key = this.getSessionKey(owner, repo, issueNumber);
 		const cached = this.sessions.get(key);
 		if (cached) {
 			return cached;
 		}
 
-		const statePath = this.getStatePath(repo, issueNumber);
+		const statePath = this.getStatePath(owner, repo, issueNumber);
 		try {
 			const raw = await readFile(statePath, "utf8");
 			const parsed = JSON.parse(raw) as SessionState;
@@ -52,17 +54,17 @@ export class SessionStore {
 	}
 
 	async set(state: SessionState): Promise<SessionState> {
-		await mkdir(this.sessionsDir, { recursive: true });
-		const key = this.getSessionKey(state.repo, state.issueNumber);
-		const statePath = this.getStatePath(state.repo, state.issueNumber);
+		const statePath = this.getStatePath(state.owner, state.repo, state.issueNumber);
+		await mkdir(path.dirname(statePath), { recursive: true });
+		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
 		this.sessions.set(key, state);
 		await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 		return state;
 	}
 
-	async exists(repo: string, issueNumber: number): Promise<boolean> {
+	async exists(owner: string, repo: string, issueNumber: number): Promise<boolean> {
 		try {
-			await access(this.getStatePath(repo, issueNumber));
+			await access(this.getStatePath(owner, repo, issueNumber));
 			return true;
 		} catch {
 			return false;
