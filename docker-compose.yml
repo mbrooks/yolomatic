@@ -11,8 +11,6 @@ services:
       - "6767:6767"
     env_file:
       - .env
-    environment:
-      OLLAMA_HOST: http://ollama:11434
     depends_on:
       - ollama
     volumes:

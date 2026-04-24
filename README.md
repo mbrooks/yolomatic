@@ -62,7 +62,6 @@ DEFAULT_BRANCH=main
 AUTO_START=true
 PORT=6767
 NODE_ENV=production
-OLLAMA_HOST=http://ollama:11434
 ```
 
 #### Docker Services
