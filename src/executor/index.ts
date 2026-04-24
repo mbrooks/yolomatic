@@ -1,4 +1,10 @@
-import { createAgentSession, DefaultResourceLoader, SessionManager as PiSessionManager } from "@mariozechner/pi-coding-agent";
+import {
+	AuthStorage,
+	createAgentSession,
+	DefaultResourceLoader,
+	ModelRegistry,
+	SessionManager as PiSessionManager,
+} from "@mariozechner/pi-coding-agent";
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
@@ -8,6 +14,16 @@ export interface ExecutionResult {
 	status: "working" | "waiting-feedback" | "complete";
 	summary: string;
 	rawResponse: string;
+}
+
+interface ModelReference {
+	provider: string;
+	id: string;
+}
+
+interface ModelLookup<TModel extends ModelReference> {
+	find(provider: string, modelId: string): TModel | undefined;
+	getAll(): TModel[];
 }
 
 function extractText(content: unknown): string {
@@ -109,6 +125,39 @@ function buildFeedbackPrompt(comment: string): string {
 	].join("\n");
 }
 
+export function resolveConfiguredModel<TModel extends ModelReference>(
+	registry: ModelLookup<TModel>,
+	env: NodeJS.ProcessEnv = process.env,
+): TModel | undefined {
+	const configuredModel = env.PI_AGENT_MODEL?.trim();
+	if (!configuredModel) {
+		return undefined;
+	}
+
+	const configuredProvider = env.PI_AGENT_PROVIDER?.trim();
+	if (configuredProvider) {
+		return registry.find(configuredProvider, configuredModel);
+	}
+
+	const exactMatches = registry
+		.getAll()
+		.filter((model) => model.id === configuredModel || `${model.provider}/${model.id}` === configuredModel);
+	if (exactMatches.length === 1) {
+		return exactMatches[0];
+	}
+
+	const slashIndex = configuredModel.indexOf("/");
+	if (slashIndex > 0) {
+		const provider = configuredModel.slice(0, slashIndex).trim();
+		const modelId = configuredModel.slice(slashIndex + 1).trim();
+		if (provider && modelId) {
+			return registry.find(provider, modelId);
+		}
+	}
+
+	return undefined;
+}
+
 export class PiAgentExecutor {
 	private readonly soulPath: string;
 
@@ -136,10 +185,22 @@ export class PiAgentExecutor {
 		});
 		await loader.reload();
 
+		const authStorage = AuthStorage.create();
+		const modelRegistry = ModelRegistry.create(authStorage);
+		const configuredModel = resolveConfiguredModel(modelRegistry);
+		if (process.env.PI_AGENT_MODEL?.trim() && !configuredModel) {
+			process.stderr.write(
+				`Warning: PI_AGENT_MODEL=${process.env.PI_AGENT_MODEL} did not resolve to a configured Pi model; falling back to Pi defaults.\n`,
+			);
+		}
+
 		const { session } = await createAgentSession({
 			cwd: state.workspacePath,
 			sessionManager: piSessionManager,
 			resourceLoader: loader,
+			authStorage,
+			modelRegistry,
+			model: configuredModel,
 		});
 
 		const unsubscribe = session.subscribe((event) => {

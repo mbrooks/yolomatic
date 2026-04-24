@@ -1,5 +1,4 @@
-# Dockerfile
-FROM node:20-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -13,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # Runtime stage
-FROM node:20-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 WORKDIR /app
 
@@ -46,6 +45,9 @@ COPY --chown=tars:tars --from=build /app/.pi ./.pi
 COPY --from=build /app/AGENTS.md ./AGENTS.md
 COPY --from=build /app/SOUL.md ./SOUL.md
 COPY --from=build /app/WORKSPACES.md ./WORKSPACES.md
+
+# Copy models.json to agent directory
+COPY --from=build /app/models.json /home/tars/.pi/agent/models.json
 
 # Install pi packages (like CASE does)
 RUN cd /app/.pi/npm \
