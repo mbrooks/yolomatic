@@ -292,6 +292,45 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
+	it("processes comment on issue/PR created by TARS without assignee or mention", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "pending" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [], assignees: [], user: { login: "tars-bot" } },
+			comment: { body: "Just a comment", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
+		expect(executor.execute).toHaveBeenCalled();
+	});
+
 	it("ignores unassigned issue comments without a TARS mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
