@@ -1041,7 +1041,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "tars",
 				title: expect.stringContaining("TARS self-report"),
-				labels: ["enhancement", "self-monitoring", "reliability"],
+				labels: ["tars-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
