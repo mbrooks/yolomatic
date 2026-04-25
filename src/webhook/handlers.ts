@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-import type { PiAgentExecutor } from "../executor/index.js";
+import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
@@ -286,7 +286,17 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		state = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 
-		const result = await this.deps.executor.execute(state, comment);
+		let result: ExecutionResult;
+		try {
+			result = await this.deps.executor.execute(state, comment);
+		} catch (error) {
+			const context = comment ? "Resuming from comment" : "Processing issue";
+			await this.postFailureComment(owner, repo, issueNumber, error, context);
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
+			await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+			await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+			throw error;
+		}
 		process.stdout.write(
 			`[webhook] execution result repo=${repo} issue=#${issueNumber} status=${result.status}\n`,
 		);
@@ -408,6 +418,32 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				throw error;
 			}
 		}
+	}
+
+	private async postFailureComment(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		error: unknown,
+		context: string,
+	): Promise<void> {
+		const message = error instanceof Error ? error.message : String(error);
+		const stack = error instanceof Error ? error.stack ?? "" : "";
+		const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
+
+		const body = [
+			"**TARS failed.**",
+			"",
+			`Context: ${context}`,
+			`Error: ${message}`,
+			"",
+			"<details>",
+			"<summary>Full trace</summary>",
+			`<pre>${truncatedStack}</pre>`,
+			"</details>",
+		].join("\n");
+
+		await this.postComment(owner, repo, issueNumber, body);
 	}
 
 	private async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
