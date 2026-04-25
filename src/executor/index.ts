@@ -9,6 +9,7 @@ import {
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
+import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
@@ -205,6 +206,8 @@ export class PiAgentExecutor {
 			model: configuredModel,
 		});
 
+		const selfMonitor = new SelfMonitor(state.workspacePath);
+
 		const unsubscribe = session.subscribe((event) => {
 			if (event.type === "message_update") {
 				if (event.assistantMessageEvent.type === "thinking_end") {
@@ -218,6 +221,10 @@ export class PiAgentExecutor {
 
 			if (event.type === "tool_execution_end") {
 				logger.logToolResult(event.toolName, event.result);
+				selfMonitor.recordToolEnd(event.toolName, event.result, event.isError);
+				if (selfMonitor.hasFatalError()) {
+					void session.abort();
+				}
 			}
 
 			if (event.type === "auto_retry_start") {
@@ -236,9 +243,16 @@ export class PiAgentExecutor {
 			await session.prompt(prompt);
 		} catch (error) {
 			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
+			if (selfMonitor.hasFatalError()) {
+				throw await selfMonitor.createFatalSystemError();
+			}
 			throw error;
 		} finally {
 			unsubscribe();
+		}
+
+		if (selfMonitor.hasFatalError()) {
+			throw await selfMonitor.createFatalSystemError();
 		}
 
 		// Check for agent-level errors after the run completes
