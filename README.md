@@ -148,6 +148,10 @@ docker exec tars curl http://ollama:11434/api/tags
 
 TARS logs all LLM output, webhook events, and executor status to **stdout** — no log files, no log volumes. Docker captures stdout, accessible via `docker logs -f tars`.
 
+### Auto-Update (Cron)
+
+For production deployments, wire `scripts/update-tars-if-needed.sh` into cron to poll for upstream changes every 15 minutes. See [CRON.md](CRON.md) for install instructions.
+
 ## Flow
 
 1. `issues.opened` creates or loads `sessions/{repo}-issue-{number}.jsonl`.
