@@ -2,6 +2,7 @@ import {
 	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
+	getAgentDir,
 	ModelRegistry,
 	SessionManager as PiSessionManager,
 } from "@mariozechner/pi-coding-agent";
@@ -176,6 +177,7 @@ export class PiAgentExecutor {
 		const soulContent = await loadSoulContent(this.soulPath);
 		const loader = new DefaultResourceLoader({
 			cwd: state.workspacePath,
+			agentDir: getAgentDir(),
 			agentsFilesOverride: (current) => ({
 				agentsFiles: [
 					...current.agentsFiles,
