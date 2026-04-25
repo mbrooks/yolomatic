@@ -90,4 +90,65 @@ describe("SessionManager", () => {
 			"No session for mbrooks/tars#999",
 		);
 	});
+
+	it("gets an existing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 5, "Title", "Body", "/tmp/ws");
+		const session = await manager.getSession("mbrooks", "tars", 5);
+		expect(session).not.toBeNull();
+		expect(session?.title).toBe("Title");
+	});
+
+	it("returns null for missing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const session = await manager.getSession("mbrooks", "tars", 999);
+		expect(session).toBeNull();
+	});
+
+	it("updates status and partial fields of an existing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 6, "Title", "Body", "/tmp/ws");
+		const updated = await manager.updateStatus("mbrooks", "tars", 6, "complete", { summary: "Done." });
+		expect(updated.status).toBe("complete");
+		expect(updated.summary).toBe("Done.");
+	});
+
+	it("throws when updating status of a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.updateStatus("mbrooks", "tars", 999, "working")).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("marks session as seeded", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 7, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markSeeded("mbrooks", "tars", 7);
+		expect(updated.seeded).toBe(true);
+	});
+
+	it("throws when marking a non-existent session as seeded", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.markSeeded("mbrooks", "tars", 999)).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
 });
