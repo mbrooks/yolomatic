@@ -400,4 +400,89 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.getSession).not.toHaveBeenCalled();
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
+
+	it("processes comment on unassigned issue with @tars mention", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "pending" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [], assignees: [] },
+			comment: { body: "Hey @tars can you help?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, labels: ["tars"] }),
+		);
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-working"] }),
+		);
+	});
+
+	it("processes comment on unassigned issue with @tarsmbrooks mention", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "pending" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [], assignees: [] },
+			comment: { body: "Hey @tars-bot can you help?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, labels: ["tars"] }),
+		);
+	});
 });
