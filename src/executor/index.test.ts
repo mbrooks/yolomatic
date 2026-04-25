@@ -27,6 +27,7 @@ vi.mock("../logging/llm-logger.js", () => ({
 import {
 	buildFeedbackPrompt,
 	buildIssuePrompt,
+	buildPRReviewPrompt,
 	extractText,
 	getLastAssistantText,
 	parseExecutionResult,
@@ -248,6 +249,69 @@ describe("buildFeedbackPrompt", () => {
 		const prompt = buildFeedbackPrompt("  trim me  ");
 		expect(prompt).toContain("trim me");
 		expect(prompt).not.toContain("  trim me  ");
+	});
+});
+
+describe("buildPRReviewPrompt", () => {
+	it("includes PR and issue metadata", () => {
+		const state = {
+			issueNumber: 56,
+			owner: "mbrooks",
+			repo: "tars",
+			workspacePath: "/tmp/ws",
+			title: "Fix bug",
+			body: "Description here",
+		} as never;
+		const prompt = buildPRReviewPrompt(state, [{ body: "Fix typo", user: "reviewer", path: "src/foo.ts", line: 42 }]);
+		expect(prompt).toContain("PR review feedback received");
+		expect(prompt).toContain("issue #56");
+		expect(prompt).toContain("mbrooks/tars");
+		expect(prompt).toContain("tars/issue-56");
+		expect(prompt).toContain("Fix typo");
+		expect(prompt).toContain("src/foo.ts:42");
+	});
+
+	it("includes review body when provided", () => {
+		const state = {
+			issueNumber: 1,
+			owner: "x",
+			repo: "y",
+			workspacePath: "/tmp",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildPRReviewPrompt(state, [], "Please add tests");
+		expect(prompt).toContain("Overall review comment:");
+		expect(prompt).toContain("Please add tests");
+	});
+
+	it("handles comments without line info", () => {
+		const state = {
+			issueNumber: 2,
+			owner: "a",
+			repo: "b",
+			workspacePath: "/tmp",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildPRReviewPrompt(state, [{ body: "LGTM", user: "user" }]);
+		expect(prompt).toContain("@user: LGTM");
+		expect(prompt).not.toContain("undefined");
+	});
+
+	it("handles empty comments and no review body", () => {
+		const state = {
+			issueNumber: 3,
+			owner: "a",
+			repo: "b",
+			workspacePath: "/tmp",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildPRReviewPrompt(state, []);
+		expect(prompt).toContain("Address the review feedback");
+		expect(prompt).not.toContain("Overall review comment:");
+		expect(prompt).not.toContain("Review comments:");
 	});
 });
 

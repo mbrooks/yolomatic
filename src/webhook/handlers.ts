@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
 import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
+import { PRReviewHandler } from "../pr-review/handler.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
@@ -78,11 +79,14 @@ function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: string[]): 
 export interface WebhookHandlers {
 	handleIssueEvent(payload: unknown): Promise<void>;
 	handleCommentEvent(payload: unknown): Promise<void>;
+	handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
+	handlePullRequestReviewEvent(payload: unknown): Promise<void>;
 }
 
 export class GitHubIssueHandlers implements WebhookHandlers {
 	private readonly octokit: Octokit;
 	private readonly inFlight = new Set<string>();
+	private readonly prReviewHandler: PRReviewHandler;
 
 	public constructor(
 		private readonly deps: {
@@ -94,10 +98,20 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			autoStart: boolean;
 			defaultBranch: string;
 			selfReportEnabled: boolean;
+			maxIterations?: number;
 			octokit?: Octokit;
 		},
 	) {
 		this.octokit = deps.octokit ?? new Octokit({ auth: deps.githubToken });
+		this.prReviewHandler = new PRReviewHandler({
+			sessionManager: deps.sessionManager,
+			workspaceManager: deps.workspaceManager,
+			executor: deps.executor,
+			githubToken: deps.githubToken,
+			githubUsername: deps.githubUsername,
+			maxIterations: deps.maxIterations ?? 3,
+			octokit: this.octokit,
+		});
 	}
 
 	private isAssignedToTars(issue: { assignee?: { login: string } | null; assignees?: { login: string }[] }): boolean {
@@ -409,6 +423,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			base,
 		});
 
+		await this.deps.sessionManager.associatePR(owner, repo, issueNumber, pr.data.number, pr.data.html_url);
+
 		return pr.data.html_url;
 	}
 
@@ -435,22 +451,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				throw error;
 			}
 		}
-	}
-
-	private async fileSelfReport(error: FatalSystemError): Promise<string> {
-		const { owner, repo } = SelfMonitor.getTargetRepo();
-		const body = SelfMonitor.formatBugReportBody(error.evidence);
-		const title = SelfMonitor.getIssueTitle(error.evidence);
-
-		const response = await this.octokit.issues.create({
-			owner,
-			repo,
-			title,
-			body,
-			labels: ["enhancement", "self-monitoring", "reliability"],
-		});
-
-		return response.data.html_url;
 	}
 
 	private async postFailureComment(
@@ -486,5 +486,29 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			issue_number: issueNumber,
 			body,
 		});
+	}
+
+	private async fileSelfReport(error: FatalSystemError): Promise<string> {
+		const { owner, repo } = SelfMonitor.getTargetRepo();
+		const body = SelfMonitor.formatBugReportBody(error.evidence);
+		const title = SelfMonitor.getIssueTitle(error.evidence);
+
+		const response = await this.octokit.issues.create({
+			owner,
+			repo,
+			title,
+			body,
+			labels: ["tars-self-report", "bug"],
+		});
+
+		return response.data.html_url;
+	}
+
+	async handlePullRequestReviewCommentEvent(payload: unknown): Promise<void> {
+		return this.prReviewHandler.handlePullRequestReviewCommentEvent(payload);
+	}
+
+	async handlePullRequestReviewEvent(payload: unknown): Promise<void> {
+		return this.prReviewHandler.handlePullRequestReviewEvent(payload);
 	}
 }

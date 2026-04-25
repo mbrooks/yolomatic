@@ -16,6 +16,8 @@ export interface SessionState {
 	seeded: boolean;
 	summary?: string;
 	prUrl?: string;
+	prNumber?: number;
+	iterationCount?: number;
 }
 
 export class SessionStore {
