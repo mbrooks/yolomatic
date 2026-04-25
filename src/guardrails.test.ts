@@ -174,10 +174,9 @@ describe("runGuardrail", () => {
 	});
 
 	it("returns failure when test is missing", async () => {
-		const exists = vi.fn().mockReturnValue(false);
 		const result = await runGuardrail(
 			["src/thing.ts"],
-			COVERAGE_SUMMARY_FILE,
+			"/nonexistent/coverage-summary.json",
 			MINIMUM_COVERAGE,
 		);
 		expect(result.ok).toBe(false);

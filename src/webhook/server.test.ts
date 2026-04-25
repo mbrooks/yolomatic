@@ -1,8 +1,9 @@
 import { createHmac } from "node:crypto";
+import http from "node:http";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { verifySignature } from "./server.js";
+import { createWebhookServer, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
 describe("verifySignature", () => {
@@ -657,5 +658,357 @@ describe("GitHubIssueHandlers", () => {
 		// Should NOT add tars label again because hasTarsLabel is true
 		const tarsAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
 		expect(tarsAdds.filter((call) => call[0].labels.includes("tars"))).toHaveLength(1);
+	});
+
+	it("posts failure comment when execution throws", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => {
+				throw new Error("Boom");
+			}),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "opened",
+				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+				repository: { name: "tars", owner: { login: "mbrooks" } },
+				sender: { login: "other-user" },
+			}),
+		).rejects.toThrow("Boom");
+
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.stringContaining("TARS failed"),
+			}),
+		);
+	});
+
+	it("handles 404 during safeRemoveLabel gracefully", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockRejectedValue({ status: 404 }),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = { execute: vi.fn() };
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "unassigned",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(octokit.issues.removeLabel).toHaveBeenCalled();
+	});
+
+	it("throws when safeRemoveLabel encounters non-404 error", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockRejectedValue({ status: 500 }),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = { execute: vi.fn() };
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			octokit: octokit as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "unassigned",
+				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
+				repository: { name: "tars", owner: { login: "mbrooks" } },
+				sender: { login: "other-user" },
+			}),
+		).rejects.toThrow();
+	});
+});
+
+describe("createWebhookServer", () => {
+	function makeRequest(
+		port: number,
+		options: http.RequestOptions,
+		body?: string,
+	): Promise<{ statusCode: number; body: string }> {
+		return new Promise((resolve, reject) => {
+			const req = http.request({ hostname: "127.0.0.1", port, ...options }, (res) => {
+				let data = "";
+				res.on("data", (chunk) => {
+					data += chunk;
+				});
+				res.on("end", () => {
+					resolve({ statusCode: res.statusCode ?? 0, body: data });
+				});
+			});
+			req.on("error", reject);
+			if (body) req.write(body);
+			req.end();
+		});
+	}
+
+	it("returns 404 for non-POST or non-/webhook routes", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const getRes = await makeRequest(port, { method: "GET", path: "/webhook" });
+		expect(getRes.statusCode).toBe(404);
+
+		const postRes = await makeRequest(port, { method: "POST", path: "/" });
+		expect(postRes.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("returns 401 for invalid signature", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/webhook",
+			headers: {
+				"x-hub-signature-256": "sha256=invalid",
+				"x-github-event": "issues",
+			},
+		});
+		expect(response.statusCode).toBe(401);
+
+		server.close();
+	});
+
+	it("calls handleIssueEvent for valid issues webhook", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "opened" });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "issues",
+					"x-github-delivery": "123",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handleIssueEvent).toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 500 when handler throws", async () => {
+		const handlers = {
+			handleIssueEvent: vi.fn(async () => {
+				throw new Error("boom");
+			}),
+			handleCommentEvent: vi.fn(),
+		};
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "opened" });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "issues",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(500);
+
+		server.close();
+	});
+
+	it("ignores unsupported events and returns 200", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "published" });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "release",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
+		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
+
+		server.close();
 	});
 });
