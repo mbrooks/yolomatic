@@ -93,6 +93,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: true,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
@@ -118,6 +119,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: true,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
@@ -156,6 +158,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: true,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
@@ -197,6 +200,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: true,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
@@ -237,6 +241,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: true,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
@@ -273,6 +278,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			autoStart: false,
 			defaultBranch: "main",
 			maxIterations: 3,
+			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
