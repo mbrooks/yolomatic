@@ -14,6 +14,8 @@ vi.mock("./config.js", () => ({
 		githubUsername: "tars-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
+		maxIterations: 3,
+		selfReportEnabled: true,
 	})),
 }));
 
@@ -54,6 +56,8 @@ vi.mock("./webhook/handlers.js", () => ({
 	GitHubIssueHandlers: vi.fn(() => ({
 		handleIssueEvent: vi.fn(),
 		handleCommentEvent: vi.fn(),
+		handlePullRequestReviewCommentEvent: vi.fn(),
+		handlePullRequestReviewEvent: vi.fn(),
 	})),
 }));
 

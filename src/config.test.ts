@@ -16,6 +16,8 @@ describe("getConfig", () => {
 		delete process.env.GITHUB_USERNAME;
 		delete process.env.WORKSPACES_DIR;
 		delete process.env.SOUL_PATH;
+		delete process.env.TARS_SELF_REPORT_ENABLED;
+		delete process.env.MAX_ITERATIONS;
 	});
 
 	afterEach(() => {
@@ -35,6 +37,7 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBeTruthy();
 		expect(config.soulPath).toBeTruthy();
 		expect(config.selfReportEnabled).toBe(true);
+		expect(config.maxIterations).toBe(3);
 	});
 
 	it("reads environment variables", () => {
@@ -47,6 +50,7 @@ describe("getConfig", () => {
 		process.env.GITHUB_USERNAME = "user";
 		process.env.WORKSPACES_DIR = "/tmp/workspaces";
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
+		process.env.MAX_ITERATIONS = "5";
 
 		const config = getConfig();
 		expect(config.port).toBe(8080);
@@ -59,6 +63,7 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
 		expect(config.selfReportEnabled).toBe(true);
+		expect(config.maxIterations).toBe(5);
 	});
 
 	it("reads TARS_SELF_REPORT_ENABLED", () => {

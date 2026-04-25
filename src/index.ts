@@ -28,6 +28,7 @@ export async function main(): Promise<void> {
 		autoStart: config.autoStart,
 		defaultBranch: config.defaultBranch,
 		selfReportEnabled: config.selfReportEnabled,
+		maxIterations: config.maxIterations,
 	});
 
 	const server = createWebhookServer(config.webhookSecret, handlers);
