@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete";
+export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed";
 
 export interface SessionState {
 	issueNumber: number;
