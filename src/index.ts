@@ -8,7 +8,7 @@ import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { createWebhookServer } from "./webhook/server.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
 	const config = getConfig();
 	const sessionStore = new SessionStore(config.sessionsDir);
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
@@ -35,8 +35,12 @@ async function main(): Promise<void> {
 	});
 }
 
-main().catch((error) => {
-	const message = error instanceof Error ? error.stack ?? error.message : String(error);
-	process.stderr.write(`${message}\n`);
-	process.exitCode = 1;
-});
+/* c8 ignore start */
+if (import.meta.url === `file://${process.argv[1]}`) {
+	main().catch((error) => {
+		const message = error instanceof Error ? error.stack ?? error.message : String(error);
+		process.stderr.write(`${message}\n`);
+		process.exitCode = 1;
+	});
+}
+/* c8 ignore stop */

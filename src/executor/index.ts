@@ -27,7 +27,7 @@ interface ModelLookup<TModel extends ModelReference> {
 	getAll(): TModel[];
 }
 
-function extractText(content: unknown): string {
+export function extractText(content: unknown): string {
 	if (typeof content === "string") {
 		return content;
 	}
@@ -45,7 +45,7 @@ function extractText(content: unknown): string {
 	return "";
 }
 
-function getLastAssistantText(session: { messages: Array<{ role?: string; content?: unknown }> }): string {
+export function getLastAssistantText(session: { messages: Array<{ role?: string; content?: unknown }> }): string {
 	for (let index = session.messages.length - 1; index >= 0; index -= 1) {
 		const message = session.messages[index];
 		if (message.role === "assistant") {
@@ -74,7 +74,7 @@ async function loadSoulContent(soulPath: string): Promise<string> {
 	}
 }
 
-function parseExecutionResult(rawResponse: string): ExecutionResult {
+export function parseExecutionResult(rawResponse: string): ExecutionResult {
 	const trimmed = rawResponse.trim();
 	const lines = trimmed.split(/\r?\n/u);
 	const firstLine = lines[0]?.trim() || "";
@@ -88,7 +88,7 @@ function parseExecutionResult(rawResponse: string): ExecutionResult {
 	};
 }
 
-function buildIssuePrompt(state: SessionState): string {
+export function buildIssuePrompt(state: SessionState): string {
 	return [
 		`You are working on GitHub issue #${state.issueNumber} in ${state.owner}/${state.repo}.`,
 		`Workspace: ${state.workspacePath}`,
@@ -112,7 +112,7 @@ function buildIssuePrompt(state: SessionState): string {
 	].join("\n");
 }
 
-function buildFeedbackPrompt(comment: string): string {
+export function buildFeedbackPrompt(comment: string): string {
 	return [
 		"Human feedback received. Continue from the existing session context.",
 		"",

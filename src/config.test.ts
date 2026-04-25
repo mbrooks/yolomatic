@@ -1,0 +1,82 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { getConfig } from "./config.js";
+
+describe("getConfig", () => {
+	const originalEnv = process.env;
+
+	beforeEach(() => {
+		process.env = { ...originalEnv };
+		delete process.env.PORT;
+		delete process.env.AUTO_START;
+		delete process.env.WEBHOOK_SECRET;
+		delete process.env.SESSIONS_DIR;
+		delete process.env.DEFAULT_BRANCH;
+		delete process.env.GITHUB_TOKEN;
+		delete process.env.GITHUB_USERNAME;
+		delete process.env.WORKSPACES_DIR;
+		delete process.env.SOUL_PATH;
+	});
+
+	afterEach(() => {
+		process.env = originalEnv;
+	});
+
+	it("returns defaults for optional values", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+
+		const config = getConfig();
+		expect(config.port).toBe(3000);
+		expect(config.autoStart).toBe(false);
+		expect(config.defaultBranch).toBe("main");
+		expect(config.sessionsDir).toBeTruthy();
+		expect(config.workspacesDir).toBeTruthy();
+		expect(config.soulPath).toBeTruthy();
+	});
+
+	it("reads environment variables", () => {
+		process.env.PORT = "8080";
+		process.env.AUTO_START = "true";
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.SESSIONS_DIR = "/tmp/sessions";
+		process.env.DEFAULT_BRANCH = "develop";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.WORKSPACES_DIR = "/tmp/workspaces";
+		process.env.SOUL_PATH = "/tmp/SOUL.md";
+
+		const config = getConfig();
+		expect(config.port).toBe(8080);
+		expect(config.autoStart).toBe(true);
+		expect(config.webhookSecret).toBe("secret");
+		expect(config.sessionsDir).toBe("/tmp/sessions");
+		expect(config.defaultBranch).toBe("develop");
+		expect(config.githubToken).toBe("token");
+		expect(config.githubUsername).toBe("user");
+		expect(config.workspacesDir).toBe("/tmp/workspaces");
+		expect(config.soulPath).toBe("/tmp/SOUL.md");
+	});
+
+	it("throws when WEBHOOK_SECRET is missing", () => {
+		process.env.WEBHOOK_SECRET = "";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		expect(() => getConfig()).toThrow("WEBHOOK_SECRET environment variable is required");
+	});
+
+	it("throws when GITHUB_TOKEN is missing", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "";
+		process.env.GITHUB_USERNAME = "user";
+		expect(() => getConfig()).toThrow("GITHUB_TOKEN environment variable is required");
+	});
+
+	it("throws when GITHUB_USERNAME is missing", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "";
+		expect(() => getConfig()).toThrow("GITHUB_USERNAME environment variable is required");
+	});
+});
