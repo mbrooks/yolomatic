@@ -226,23 +226,24 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		// Only process comments on issues assigned to TARS
-		if (!this.isAssignedToTars(payload.issue)) {
+		const isAssigned = this.isAssignedToTars(payload.issue);
+		const isMentioned =
+			payload.comment.body.includes(`@${this.deps.githubUsername}`) ||
+			payload.comment.body.toLowerCase().includes("@tars");
+		const hasTarsLabel = hasAnyLabel(payload.issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(payload.issue.labels, "tars");
+
+		if (!isAssigned && !isMentioned) {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: not assigned to ${this.deps.githubUsername}\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: not assigned to ${this.deps.githubUsername} and no TARS mention\n`,
 			);
 			return;
 		}
 
-		const isMentioned = payload.comment.body.includes(`@${this.deps.githubUsername}`);
-		const hasTarsLabel = hasAnyLabel(payload.issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(payload.issue.labels, "tars");
-		if (!hasTarsLabel) {
-			if (!isMentioned) {
+		if (isAssigned && !hasTarsLabel && !isMentioned) {
 			process.stdout.write(
 				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label or mention\n`,
 			);
 			return;
-			}
 		}
 
 		const owner = payload.repository.owner.login;
