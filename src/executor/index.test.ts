@@ -355,4 +355,56 @@ describe("PiAgentExecutor", () => {
 		await expect(executor.execute(state)).rejects.toThrow("prompt failed");
 		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
+
+	it("throws FatalSystemError when a fatal tool error is detected", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		let subscribeCallback: ((event: unknown) => void) | undefined;
+		const abort = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn((cb: (event: unknown) => void) => {
+				subscribeCallback = cb;
+				return unsubscribe;
+			}),
+			prompt: vi.fn(async () => {
+				subscribeCallback?.({
+					type: "tool_execution_end",
+					toolName: "bash",
+					result: { output: "npm ERR! code EACCES\nnpm ERR! syscall mkdir", exitCode: 1 },
+					isError: true,
+				});
+			}),
+			abort,
+			messages: [],
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 3,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: dir,
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		await expect(executor.execute(state)).rejects.toThrow(/Fatal system error: permission_denied/);
+		expect(abort).toHaveBeenCalled();
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
 });

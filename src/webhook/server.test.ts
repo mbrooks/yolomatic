@@ -97,6 +97,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -191,6 +192,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "mbrooks",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -348,6 +350,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -407,6 +410,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -508,6 +512,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -626,6 +631,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -734,6 +740,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -803,6 +810,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -855,6 +863,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
@@ -867,9 +876,137 @@ describe("GitHubIssueHandlers", () => {
 			}),
 		).rejects.toThrow();
 	});
+
+	it("files a self-report and posts a comment on fatal system error", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/issues/999" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title,
+				body,
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath,
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "T",
+				body: "B",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "T",
+				body: "B",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+
+		const { FatalSystemError, SelfMonitor } = await import("../self-monitor/index.js");
+		const evidence = {
+			toolHistory: [],
+			fatalError: { category: "disk_full" as const, message: "ENOSPC", toolName: "bash" },
+			systemEvidence: {
+				whoami: "tars",
+				pwd: "/tmp",
+				workspacePath: "/tmp/ws",
+				lsWorkspace: "total 0",
+				gitStatus: "",
+				gitBranch: "main",
+				nodeVersion: "v20",
+				timestamp: "2024-01-01T00:00:00Z",
+			},
+		};
+		const fatalError = new FatalSystemError(evidence);
+
+		const executor = {
+			execute: vi.fn(async () => {
+				throw fatalError;
+			}),
+		};
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "opened",
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Body",
+					assignees: [{ login: "tars-bot" }],
+				},
+				repository: { name: "tars", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			}),
+		).resolves.toBeUndefined();
+
+		expect(octokit.issues.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				owner: "mbrooks",
+				repo: "tars",
+				title: expect.stringContaining("TARS self-report"),
+				labels: ["enhancement", "self-monitoring", "reliability"],
+			}),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				owner: "mbrooks",
+				repo: "tars",
+				issue_number: 1,
+				body: expect.stringContaining("fatal system error"),
+			}),
+		);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+	});
 });
 
-describe("createWebhookServer", () => {
+
 	function makeRequest(
 		port: number,
 		options: http.RequestOptions,
@@ -891,6 +1028,7 @@ describe("createWebhookServer", () => {
 		});
 	}
 
+describe("createWebhookServer", () => {
 	it("returns 404 for non-POST or non-/webhook routes", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers);

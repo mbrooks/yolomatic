@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
+import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
@@ -92,6 +93,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubUsername: string;
 			autoStart: boolean;
 			defaultBranch: string;
+			selfReportEnabled: boolean;
 			octokit?: Octokit;
 		},
 	) {
@@ -290,6 +292,21 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		try {
 			result = await this.deps.executor.execute(state, comment);
 		} catch (error) {
+			if (error instanceof FatalSystemError && this.deps.selfReportEnabled) {
+				const issueUrl = await this.fileSelfReport(error);
+				await this.postComment(
+					owner,
+					repo,
+					issueNumber,
+					`⛔ TARS stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+				);
+				await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
+				await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+				await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+				process.stdout.write(`[webhook] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
+				return;
+			}
+
 			const context = comment ? "Resuming from comment" : "Processing issue";
 			await this.postFailureComment(owner, repo, issueNumber, error, context);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
@@ -418,6 +435,22 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				throw error;
 			}
 		}
+	}
+
+	private async fileSelfReport(error: FatalSystemError): Promise<string> {
+		const { owner, repo } = SelfMonitor.getTargetRepo();
+		const body = SelfMonitor.formatBugReportBody(error.evidence);
+		const title = SelfMonitor.getIssueTitle(error.evidence);
+
+		const response = await this.octokit.issues.create({
+			owner,
+			repo,
+			title,
+			body,
+			labels: ["enhancement", "self-monitoring", "reliability"],
+		});
+
+		return response.data.html_url;
 	}
 
 	private async postFailureComment(
