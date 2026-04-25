@@ -293,4 +293,45 @@ describe("WorkspaceManager", () => {
 			{ cwd: bareRepoPath },
 		);
 	});
+
+	it("does nothing when removing a non-existent worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-remove-missing-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-99");
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.removeWorktree("mbrooks", "tars", 99);
+		// git worktree remove should NOT be called
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(0);
+	});
+
+	it("detects no changes when git diff exits cleanly", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-changes-"));
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const hasChanges = await manager.hasChanges(root);
+		expect(hasChanges).toBe(false);
+		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--quiet"], { cwd: root });
+	});
+
+	it("detects no cached changes when git diff --cached exits cleanly", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-cached-"));
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const hasChanges = await manager.hasChanges(root, true);
+		expect(hasChanges).toBe(false);
+		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
+	});
 });
