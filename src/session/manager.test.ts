@@ -151,4 +151,47 @@ describe("SessionManager", () => {
 			"No session for mbrooks/tars#999",
 		);
 	});
+
+	it("associates a PR with an existing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
+		const updated = await manager.associatePR("mbrooks", "tars", 10, 99, "https://github.com/mbrooks/tars/pull/99");
+		expect(updated.prNumber).toBe(99);
+		expect(updated.prUrl).toBe("https://github.com/mbrooks/tars/pull/99");
+	});
+
+	it("throws when associating PR with a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.associatePR("mbrooks", "tars", 999, 1, "url")).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("increments iteration count on an existing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 11, "Title", "Body", "/tmp/ws");
+		const first = await manager.incrementIterationCount("mbrooks", "tars", 11);
+		expect(first.iterationCount).toBe(1);
+		const second = await manager.incrementIterationCount("mbrooks", "tars", 11);
+		expect(second.iterationCount).toBe(2);
+	});
+
+	it("throws when incrementing iteration count for a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.incrementIterationCount("mbrooks", "tars", 999)).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
 });

@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 
 import type { WebhookHandlers } from "./handlers.js";
 
-async function readBody(request: IncomingMessage): Promise<Buffer> {
+export async function readBody(request: IncomingMessage): Promise<Buffer> {
 	const chunks: Buffer[] = [];
 	for await (const chunk of request) {
 		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -47,9 +47,7 @@ export function createWebhookServer(secret: string, handlers: WebhookHandlers) {
 		}
 
 		const body = await readBody(request);
-		const signature = Array.isArray(request.headers["x-hub-signature-256"])
-			? request.headers["x-hub-signature-256"][0]
-			: request.headers["x-hub-signature-256"];
+		const signature = request.headers["x-hub-signature-256"] as string | undefined;
 
 		if (!verifySignature(secret, body, signature)) {
 			process.stdout.write("[webhook] rejected request: invalid signature\n");
@@ -57,12 +55,8 @@ export function createWebhookServer(secret: string, handlers: WebhookHandlers) {
 			return;
 		}
 
-		const event = Array.isArray(request.headers["x-github-event"])
-			? request.headers["x-github-event"][0]
-			: request.headers["x-github-event"];
-		const delivery = Array.isArray(request.headers["x-github-delivery"])
-			? request.headers["x-github-delivery"][0]
-			: request.headers["x-github-delivery"];
+		const event = request.headers["x-github-event"] as string | undefined;
+		const delivery = request.headers["x-github-delivery"] as string | undefined;
 
 		const payload = JSON.parse(body.toString("utf8")) as unknown;
 		process.stdout.write(
@@ -74,6 +68,10 @@ export function createWebhookServer(secret: string, handlers: WebhookHandlers) {
 				await handlers.handleIssueEvent(payload);
 			} else if (event === "issue_comment") {
 				await handlers.handleCommentEvent(payload);
+			} else if (event === "pull_request_review_comment") {
+				await handlers.handlePullRequestReviewCommentEvent(payload);
+			} else if (event === "pull_request_review") {
+				await handlers.handlePullRequestReviewEvent(payload);
 			} else {
 				process.stdout.write(`[webhook] ignored unsupported event=${event ?? "unknown"}\n`);
 			}
