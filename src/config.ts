@@ -10,6 +10,7 @@ export interface AppConfig {
 	githubUsername: string;
 	workspacesDir: string;
 	soulPath: string;
+	selfReportEnabled: boolean;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -31,5 +32,6 @@ export function getConfig(): AppConfig {
 		githubUsername: requireEnv("GITHUB_USERNAME"),
 		workspacesDir: path.resolve(process.env.WORKSPACES_DIR?.trim() || path.join(process.cwd(), "workspaces")),
 		soulPath: path.resolve(process.env.SOUL_PATH?.trim() || path.join(process.cwd(), "SOUL.md")),
+		selfReportEnabled: process.env.TARS_SELF_REPORT_ENABLED !== "false",
 	};
 }

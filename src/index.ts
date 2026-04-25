@@ -27,6 +27,7 @@ export async function main(): Promise<void> {
 		githubUsername: config.githubUsername,
 		autoStart: config.autoStart,
 		defaultBranch: config.defaultBranch,
+		selfReportEnabled: config.selfReportEnabled,
 	});
 
 	const server = createWebhookServer(config.webhookSecret, handlers);
