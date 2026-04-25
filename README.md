@@ -5,7 +5,7 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 ## Features
 
 - Receives `issues` and `issue_comment` GitHub webhooks in real time
-- Maintains one persistent pi session per issue at `SESSIONS_DIR/{repo}-issue-{number}.jsonl`
+- Maintains one persistent pi session per issue at `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`
 - Keeps repository work isolated under `WORKSPACES_DIR/{owner}-{repo}`
 - Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-pr-created`, `tars-complete`
 - Posts issue comments at pickup, feedback resume, clarification, and completion
@@ -154,7 +154,7 @@ For production deployments, wire `scripts/update-tars-if-needed.sh` into cron to
 
 ## Flow
 
-1. `issues.opened` creates or loads `sessions/{repo}-issue-{number}.jsonl`.
+1. `issues.opened` creates or loads `sessions/github-{owner}-{repo}/issue-{number}.jsonl`.
 2. If `AUTO_START=true`, TARS labels the issue `tars-working`, comments, and executes in the repo workspace.
 3. If the agent responds with `TARS_STATUS: waiting-feedback`, TARS switches the issue to `tars-feedback-required`.
 4. When `issue_comment.created` arrives on any TARS-labeled issue, TARS resumes the same session (ignores bot comments).
@@ -162,6 +162,6 @@ For production deployments, wire `scripts/update-tars-if-needed.sh` into cron to
 
 ## Notes
 
-- PR creation is intentionally disabled.
+- TARS commits, pushes, and creates the PR from the host process after the agent reports `TARS_STATUS: complete`.
 - Multi-repo support is native: webhook payloads provide owner and repo, and both workspace and session paths are derived from that data.
 - See [WORKSPACES.md](WORKSPACES.md) for workspace checkout rules.

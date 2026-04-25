@@ -76,6 +76,8 @@ function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: string[]): 
 	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
 }
 
+const TARS_WORKFLOW_LABELS = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
+
 export interface WebhookHandlers {
 	handleIssueEvent(payload: unknown): Promise<void>;
 	handleCommentEvent(payload: unknown): Promise<void>;
@@ -232,15 +234,15 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		const tarsLabels = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
-		const hasTarsLabel = hasAnyLabel(payload.issue.labels, tarsLabels);
 		const isMentioned = payload.comment.body.includes(`@${this.deps.githubUsername}`);
-
-		if (!hasTarsLabel && !isMentioned) {
+		const hasTarsLabel = hasAnyLabel(payload.issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(payload.issue.labels, "tars");
+		if (!hasTarsLabel) {
+			if (!isMentioned) {
 			process.stdout.write(
 				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: no tars label or mention\n`,
 			);
 			return;
+			}
 		}
 
 		const owner = payload.repository.owner.login;

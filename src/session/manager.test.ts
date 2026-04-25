@@ -61,6 +61,19 @@ describe("SessionManager", () => {
 		expect(second.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
 	});
 
+	it("isolates sessions across owners for the same repo name", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const first = await manager.createSession("mbrooks", "shared", 5, "One", "Body", "/tmp/workspaces/mbrooks-shared");
+		const second = await manager.createSession("acme", "shared", 5, "Two", "Body", "/tmp/workspaces/acme-shared");
+
+		expect(first.sessionPath).not.toBe(second.sessionPath);
+		expect(await manager.getSession("mbrooks", "shared", 5)).toMatchObject({ owner: "mbrooks", title: "One" });
+		expect(await manager.getSession("acme", "shared", 5)).toMatchObject({ owner: "acme", title: "Two" });
+	});
+
 	it("resumes an existing session and updates status to working", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);
