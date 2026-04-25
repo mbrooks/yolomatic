@@ -1,12 +1,21 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceConfig } from "./config.js";
 import type { CommandRunner } from "./manager.js";
 import { WorkspaceManager } from "./manager.js";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:fs/promises")>();
+	return {
+		...actual,
+		stat: vi.fn((...args: Parameters<typeof actual.stat>) => actual.stat(...args)),
+		rm: vi.fn((...args: Parameters<typeof actual.rm>) => actual.rm(...args)),
+	};
+});
 
 function createConfig(workspacesDir: string): WorkspaceConfig {
 	return {
@@ -18,6 +27,9 @@ function createConfig(workspacesDir: string): WorkspaceConfig {
 }
 
 describe("WorkspaceManager", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
 	it("builds lowercase owner-repo keys and paths", () => {
 		const manager = new WorkspaceManager(createConfig("/tmp/workspaces"), vi.fn());
 
@@ -333,5 +345,55 @@ describe("WorkspaceManager", () => {
 		const hasChanges = await manager.hasChanges(root, true);
 		expect(hasChanges).toBe(false);
 		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
+	});
+
+	it("removes foreign-owned node_modules during sanitization", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-foreign-node-modules-"));
+		const worktreePath = path.join(root, "worktree");
+		await mkdir(path.join(worktreePath, "node_modules"), { recursive: true });
+
+		vi.spyOn(process, "getuid").mockReturnValue(1000);
+		vi.mocked(stat).mockResolvedValueOnce({
+			isDirectory: () => true,
+			uid: 0,
+		} as unknown as Awaited<ReturnType<typeof stat>>);
+
+		const manager = new WorkspaceManager(createConfig(root), vi.fn());
+		await (manager as unknown as { sanitizeNodeModules: (p: string) => Promise<void> }).sanitizeNodeModules(
+			worktreePath,
+		);
+
+		expect(rm).toHaveBeenCalledTimes(1);
+		expect(rm).toHaveBeenCalledWith(path.join(worktreePath, "node_modules"), { recursive: true, force: true });
+	});
+
+	it("preserves user-owned node_modules during sanitization", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-user-node-modules-"));
+		const worktreePath = path.join(root, "worktree");
+		const nodeModulesPath = path.join(worktreePath, "node_modules");
+		await mkdir(nodeModulesPath, { recursive: true });
+
+		vi.spyOn(process, "getuid").mockReturnValue(process.getuid?.() ?? 1000);
+
+		const manager = new WorkspaceManager(createConfig(root), vi.fn());
+		await (manager as unknown as { sanitizeNodeModules: (p: string) => Promise<void> }).sanitizeNodeModules(
+			worktreePath,
+		);
+
+		expect(rm).not.toHaveBeenCalled();
+		// Verify directory still exists
+		const stats = await stat(nodeModulesPath);
+		expect(stats.isDirectory()).toBe(true);
+	});
+
+	it("handles missing node_modules gracefully during sanitization", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-missing-node-modules-"));
+		const worktreePath = path.join(root, "worktree");
+
+		const manager = new WorkspaceManager(createConfig(root), vi.fn());
+		await expect(
+			(manager as unknown as { sanitizeNodeModules: (p: string) => Promise<void> }).sanitizeNodeModules(worktreePath),
+		).resolves.toBeUndefined();
+		expect(rm).not.toHaveBeenCalled();
 	});
 });

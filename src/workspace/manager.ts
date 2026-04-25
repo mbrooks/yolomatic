@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -74,6 +74,7 @@ export class WorkspaceManager {
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
 
 		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
+			await this.sanitizeNodeModules(worktreePath);
 			return {
 				owner: normalizedOwner,
 				repo: normalizedRepo,
@@ -114,6 +115,8 @@ export class WorkspaceManager {
 					`Original error: ${originalMessage}`,
 			);
 		}
+
+		await this.sanitizeNodeModules(worktreePath);
 
 		return {
 			owner: normalizedOwner,
@@ -242,6 +245,26 @@ export class WorkspaceManager {
 			return true;
 		} catch {
 			return false;
+		}
+	}
+
+	private async sanitizeNodeModules(worktreePath: string): Promise<void> {
+		const nodeModulesPath = path.join(worktreePath, "node_modules");
+		try {
+			const stats = await stat(nodeModulesPath);
+			if (!stats.isDirectory()) {
+				return;
+			}
+
+			const currentUid = process.getuid?.();
+			if (currentUid !== undefined && stats.uid !== currentUid) {
+				process.stdout.write(
+					`[workspace] Removing foreign-owned node_modules (uid=${stats.uid}, current=${currentUid}) at ${nodeModulesPath}\n`,
+				);
+				await rm(nodeModulesPath, { recursive: true, force: true });
+			}
+		} catch {
+			// node_modules doesn't exist or is inaccessible; nothing to sanitize
 		}
 	}
 }
