@@ -54,7 +54,7 @@ When an issue is picked up:
 2. TARS clones the repo into `WORKSPACES_DIR/{owner}-{repo}` if needed.
 3. If the workspace already exists, TARS fetches latest remote refs and updates the requested base branch.
 4. TARS creates or resets the issue branch `tars/issue-{number}`.
-5. TARS maps the issue to `SESSIONS_DIR/{repo}-issue-{number}.jsonl`.
+5. TARS maps the issue to `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`.
 6. TARS launches pi-agent with `cwd` set to that workspace and persists session state across webhook events.
 
 ## Isolation

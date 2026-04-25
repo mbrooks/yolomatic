@@ -33,6 +33,9 @@ describe("WorkspaceManager", () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
 			if (args[0] === "show-ref") {
 				const error = new Error("not found") as Error & { code?: number };
 				error.code = 1;
@@ -57,7 +60,7 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktree.path, "-b", "tars/issue-42", "main"],
+			["worktree", "add", worktree.path, "-b", "tars/issue-42", "origin/main"],
 			{ cwd: bareRepoPath },
 		);
 	});
@@ -69,6 +72,9 @@ describe("WorkspaceManager", () => {
 
 		let worktreeCreated = false;
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
 			if (args[0] === "show-ref") {
 				const error = new Error("not found") as Error & { code?: number };
 				error.code = 1;
@@ -97,7 +103,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "main"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/main"],
 			{ cwd: bareRepoPath },
 		);
 
@@ -118,6 +124,9 @@ describe("WorkspaceManager", () => {
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
 			if (args[0] === "show-ref") {
 				return { stdout: "abcd1234 refs/heads/tars/issue-42", stderr: "" };
 			}
@@ -136,7 +145,12 @@ describe("WorkspaceManager", () => {
 		expect(worktree.branch).toBe("tars/issue-42");
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "tars/issue-42"],
+			["branch", "-f", "tars/issue-42", "origin/main"],
+			{ cwd: bareRepoPath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", "--force", worktreePath, "tars/issue-42"],
 			{ cwd: bareRepoPath },
 		);
 	});
@@ -200,6 +214,9 @@ describe("WorkspaceManager", () => {
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
 			if (args[0] === "show-ref") {
 				const error = new Error("not found") as Error & { code?: number };
 				error.code = 1;
@@ -233,6 +250,9 @@ describe("WorkspaceManager", () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-error-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
 			if (args[0] === "show-ref") {
 				return { stdout: "abcd1234 refs/heads/tars/issue-42", stderr: "" };
 			}
@@ -289,7 +309,7 @@ describe("WorkspaceManager", () => {
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "master"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/master"],
 			{ cwd: bareRepoPath },
 		);
 	});

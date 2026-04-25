@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -36,7 +36,7 @@ describe("SelfMonitor", () => {
 		const error = await monitor.createFatalSystemError();
 		expect(error).toBeInstanceOf(FatalSystemError);
 		expect(error.evidence.systemEvidence.whoami).toBeTruthy();
-		expect(error.evidence.systemEvidence.pwd).toBe(dir);
+		expect(await realpath(error.evidence.systemEvidence.pwd)).toBe(await realpath(dir));
 		expect(error.evidence.systemEvidence.lsWorkspace).toContain("file.txt");
 		expect(error.evidence.systemEvidence.gitBranch).toBeTruthy();
 		expect(error.evidence.systemEvidence.nodeVersion).toContain("v");

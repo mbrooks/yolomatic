@@ -72,6 +72,7 @@ export class WorkspaceManager {
 
 		await mkdir(this.config.workspacesDir, { recursive: true });
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
+		await this.ensureBaseBranch(bareRepoPath);
 
 		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
 			return {
@@ -90,13 +91,18 @@ export class WorkspaceManager {
 
 		try {
 			if (existsBranch) {
-				await this.runCommand("git", ["worktree", "add", worktreePath, branchName], {
+				await this.runCommand("git", ["branch", "-f", branchName, this.getBaseRef()], { cwd: bareRepoPath });
+				await this.runCommand("git", ["worktree", "add", "--force", worktreePath, branchName], {
 					cwd: bareRepoPath,
 				});
 			} else {
-				await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName, this.config.defaultBranch], {
-					cwd: bareRepoPath,
-				});
+				await this.runCommand(
+					"git",
+					["worktree", "add", worktreePath, "-b", branchName, this.getBaseRef()],
+					{
+						cwd: bareRepoPath,
+					},
+				);
 			}
 		} catch (error) {
 			const originalMessage = error instanceof Error ? error.message : String(error);
@@ -169,6 +175,16 @@ export class WorkspaceManager {
 		const url = `https://${encodedUsername}:${encodedToken}@github.com/${owner}/${repo}.git`;
 
 		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
+	}
+
+	private getBaseRef(): string {
+		return `origin/${this.config.defaultBranch}`;
+	}
+
+	private async ensureBaseBranch(bareRepoPath: string): Promise<void> {
+		await this.runCommand("git", ["rev-parse", "--verify", this.getBaseRef()], {
+			cwd: bareRepoPath,
+		});
 	}
 
 	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
