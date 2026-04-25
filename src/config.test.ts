@@ -34,6 +34,7 @@ describe("getConfig", () => {
 		expect(config.sessionsDir).toBeTruthy();
 		expect(config.workspacesDir).toBeTruthy();
 		expect(config.soulPath).toBeTruthy();
+		expect(config.selfReportEnabled).toBe(true);
 	});
 
 	it("reads environment variables", () => {
@@ -57,6 +58,17 @@ describe("getConfig", () => {
 		expect(config.githubUsername).toBe("user");
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
+		expect(config.selfReportEnabled).toBe(true);
+	});
+
+	it("reads TARS_SELF_REPORT_ENABLED", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.TARS_SELF_REPORT_ENABLED = "false";
+
+		const config = getConfig();
+		expect(config.selfReportEnabled).toBe(false);
 	});
 
 	it("throws when WEBHOOK_SECRET is missing", () => {
