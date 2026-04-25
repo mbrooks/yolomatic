@@ -334,4 +334,64 @@ describe("WorkspaceManager", () => {
 		expect(hasChanges).toBe(false);
 		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
 	});
+
+	it("returns touched file names from getDiffNames", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-diff-names-"));
+		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--name-only") {
+				return { stdout: "src/foo.ts\nsrc/bar.ts\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const names = await manager.getDiffNames("mbrooks", "tars", 42);
+		expect(names).toEqual(["src/foo.ts", "src/bar.ts"]);
+		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--name-only"], { cwd: worktreePath });
+	});
+
+	it("returns empty array when getDiffNames fails", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-diff-fail-"));
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--name-only") {
+				throw new Error("not a git repo");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const names = await manager.getDiffNames("mbrooks", "tars", 42);
+		expect(names).toEqual([]);
+	});
+
+	it("returns git status summary", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-git-status-"));
+		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "status" && args[1] === "--short") {
+				return { stdout: " M src/foo.ts\n?? src/bar.ts\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const status = await manager.getGitStatus("mbrooks", "tars", 42);
+		expect(status).toBe(" M src/foo.ts\n?? src/bar.ts");
+		expect(runCommand).toHaveBeenCalledWith("git", ["status", "--short"], { cwd: worktreePath });
+	});
+
+	it("returns empty string when getGitStatus fails", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-status-fail-"));
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "status" && args[1] === "--short") {
+				throw new Error("not a git repo");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const status = await manager.getGitStatus("mbrooks", "tars", 42);
+		expect(status).toBe("");
+	});
 });

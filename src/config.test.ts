@@ -16,6 +16,7 @@ describe("getConfig", () => {
 		delete process.env.GITHUB_USERNAME;
 		delete process.env.WORKSPACES_DIR;
 		delete process.env.SOUL_PATH;
+		delete process.env.TARS_SESSION_TIMEOUT_MINUTES;
 	});
 
 	afterEach(() => {
@@ -34,6 +35,7 @@ describe("getConfig", () => {
 		expect(config.sessionsDir).toBeTruthy();
 		expect(config.workspacesDir).toBeTruthy();
 		expect(config.soulPath).toBeTruthy();
+		expect(config.sessionTimeoutMinutes).toBe(30);
 	});
 
 	it("reads environment variables", () => {
@@ -46,6 +48,7 @@ describe("getConfig", () => {
 		process.env.GITHUB_USERNAME = "user";
 		process.env.WORKSPACES_DIR = "/tmp/workspaces";
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
+		process.env.TARS_SESSION_TIMEOUT_MINUTES = "15";
 
 		const config = getConfig();
 		expect(config.port).toBe(8080);
@@ -57,6 +60,34 @@ describe("getConfig", () => {
 		expect(config.githubUsername).toBe("user");
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
+		expect(config.sessionTimeoutMinutes).toBe(15);
+	});
+
+	it("clamps TARS_SESSION_TIMEOUT_MINUTES below 5", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.TARS_SESSION_TIMEOUT_MINUTES = "2";
+		const config = getConfig();
+		expect(config.sessionTimeoutMinutes).toBe(5);
+	});
+
+	it("clamps TARS_SESSION_TIMEOUT_MINUTES above 60", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.TARS_SESSION_TIMEOUT_MINUTES = "90";
+		const config = getConfig();
+		expect(config.sessionTimeoutMinutes).toBe(60);
+	});
+
+	it("defaults TARS_SESSION_TIMEOUT_MINUTES for invalid values", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.TARS_SESSION_TIMEOUT_MINUTES = "invalid";
+		const config = getConfig();
+		expect(config.sessionTimeoutMinutes).toBe(30);
 	});
 
 	it("throws when WEBHOOK_SECRET is missing", () => {

@@ -9,6 +9,7 @@ import {
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
+import { SessionTimer, TimeoutError } from "../session/timer.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
@@ -166,8 +167,13 @@ export class PiAgentExecutor {
 		this.soulPath = options.soulPath;
 	}
 
-	async execute(state: SessionState, newComment?: string): Promise<ExecutionResult> {
+	async execute(state: SessionState, newComment?: string, options?: { timeoutMinutes?: number }): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
+
+		const timer = options?.timeoutMinutes !== undefined ? new SessionTimer(options.timeoutMinutes) : undefined;
+		if (timer) {
+			timer.start();
+		}
 
 		const prompt = newComment ? buildFeedbackPrompt(newComment) : buildIssuePrompt(state);
 		logger.logPrompt(prompt);
@@ -205,7 +211,36 @@ export class PiAgentExecutor {
 			model: configuredModel,
 		});
 
+		let timeoutReached = false;
+		let timeoutError: TimeoutError | undefined;
+		let checkInterval: ReturnType<typeof setInterval> | undefined;
+
+		if (timer) {
+			checkInterval = setInterval(() => {
+				if (timer.isExpired() && !timeoutReached) {
+					timeoutReached = true;
+					timeoutError = new TimeoutError(timer.elapsedMs(), timer.limitMs);
+					process.stderr.write(`[session] ${timeoutError.message} — aborting session.\n`);
+					void session.abort();
+				}
+			}, 1000);
+		}
+
 		const unsubscribe = session.subscribe((event) => {
+			if (timer && event.type === "tool_execution_start") {
+				const { status, warnings } = timer.check();
+				if (status === "expired" && !timeoutReached) {
+					timeoutReached = true;
+					timeoutError = new TimeoutError(timer.elapsedMs(), timer.limitMs);
+					process.stderr.write(`[session] ${timeoutError.message} — aborting session.\n`);
+					void session.abort();
+					return;
+				}
+				for (const warning of warnings) {
+					process.stdout.write(`[session] ${warning}\n`);
+				}
+			}
+
 			if (event.type === "message_update") {
 				if (event.assistantMessageEvent.type === "thinking_end") {
 					logger.logThought(event.assistantMessageEvent.content);
@@ -235,10 +270,18 @@ export class PiAgentExecutor {
 		try {
 			await session.prompt(prompt);
 		} catch (error) {
+			if (timeoutReached && timeoutError) {
+				throw timeoutError;
+			}
 			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
 			throw error;
 		} finally {
+			if (checkInterval) clearInterval(checkInterval);
 			unsubscribe();
+		}
+
+		if (timeoutReached && timeoutError) {
+			throw timeoutError;
 		}
 
 		// Check for agent-level errors after the run completes

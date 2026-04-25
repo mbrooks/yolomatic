@@ -124,6 +124,26 @@ export class WorkspaceManager {
 		};
 	}
 
+	async getDiffNames(owner: string, repo: string, issueNumber: number): Promise<string[]> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["diff", "--name-only"], { cwd: worktreePath });
+			return stdout.split("\n").filter((line) => line.trim() !== "");
+		} catch {
+			return [];
+		}
+	}
+
+	async getGitStatus(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["status", "--short"], { cwd: worktreePath });
+			return stdout.trimEnd();
+		} catch {
+			return "";
+		}
+	}
+
 	async removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);

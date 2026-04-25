@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
+import { TimeoutError } from "../session/timer.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
@@ -74,6 +75,24 @@ function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: string[]): 
 	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
 }
 
+function extractTimeoutFromLabels(labels: IssueLabel[] | undefined, baseTimeout: number): number {
+	const match = (labels ?? [])
+		.map((l) => l.name ?? "")
+		.find((name) => /^tars-timeout:\d+$/u.test(name));
+	if (!match) return baseTimeout;
+	const minutes = Number(match.slice("tars-timeout:".length));
+	if (!Number.isFinite(minutes)) return baseTimeout;
+	if (minutes < 5) {
+		process.stderr.write(`[webhook] Label timeout ${minutes} is below minimum 5, clamped to 5.\n`);
+		return 5;
+	}
+	if (minutes > 60) {
+		process.stderr.write(`[webhook] Label timeout ${minutes} exceeds maximum 60, clamped to 60.\n`);
+		return 60;
+	}
+	return minutes;
+}
+
 export interface WebhookHandlers {
 	handleIssueEvent(payload: unknown): Promise<void>;
 	handleCommentEvent(payload: unknown): Promise<void>;
@@ -92,6 +111,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubUsername: string;
 			autoStart: boolean;
 			defaultBranch: string;
+			sessionTimeoutMinutes: number;
 			octokit?: Octokit;
 		},
 	) {
@@ -180,7 +200,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		try {
 			await this.addLabels(owner, repo, issue.number, ["tars-working"]);
 			await this.postComment(owner, repo, issue.number, "Picked up by TARS. Working on it...");
-			await this.runExecution(owner, repo, issue.number);
+		await this.runExecution(owner, repo, issue.number, undefined, extractTimeoutFromLabels(issue.labels, this.deps.sessionTimeoutMinutes));
 		} finally {
 			this.inFlight.delete(inFlightKey);
 		}
@@ -270,10 +290,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
 		await this.addLabels(owner, repo, issueNumber, ["tars-working"]);
 		await this.postComment(owner, repo, issueNumber, "Feedback received. Resuming work.");
-		await this.runExecution(owner, repo, issueNumber, payload.comment.body);
+		await this.runExecution(owner, repo, issueNumber, payload.comment.body, extractTimeoutFromLabels(payload.issue.labels, this.deps.sessionTimeoutMinutes));
 	}
 
-	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string): Promise<void> {
+	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string, resolvedTimeout?: number): Promise<void> {
+		const timeoutMinutes = resolvedTimeout ?? this.deps.sessionTimeoutMinutes;
 		await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
 
 		let state = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
@@ -281,15 +302,19 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
 		process.stdout.write(
-			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath}\n`,
+			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath} timeout=${timeoutMinutes}m\n`,
 		);
 
 		state = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 
 		let result: ExecutionResult;
 		try {
-			result = await this.deps.executor.execute(state, comment);
+			result = await this.deps.executor.execute(state, comment, { timeoutMinutes });
 		} catch (error) {
+			if (error instanceof TimeoutError) {
+				await this.handleTimeout(owner, repo, issueNumber, state, error);
+				return;
+			}
 			const context = comment ? "Resuming from comment" : "Processing issue";
 			await this.postFailureComment(owner, repo, issueNumber, error, context);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
@@ -418,6 +443,42 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				throw error;
 			}
 		}
+	}
+
+	private async handleTimeout(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		state: SessionState,
+		error: TimeoutError,
+	): Promise<void> {
+		process.stdout.write(`[webhook] timeout reached for ${repo}#${issueNumber}: ${error.message}\n`);
+
+		const diffNames = await this.deps.workspaceManager.getDiffNames(owner, repo, issueNumber);
+		const gitStatus = await this.deps.workspaceManager.getGitStatus(owner, repo, issueNumber);
+
+		const elapsedMinutes = Math.round(error.elapsedMs / 60000);
+
+		const body = [
+			"**⏱️ Session timed out.**",
+			"",
+			`${error.message}.`,
+			"",
+			"TARS attempted the following before stopping:",
+			`- ${state.title}`,
+			"",
+			diffNames.length > 0
+				? `Files touched:\n${diffNames.map((name) => `- \`${name}\``).join("\n")}`
+				: "No files were modified.",
+			gitStatus ? `\n\nGit status:\n\`\`\`\n${gitStatus}\n\`\`\`` : "",
+			"",
+			"The session hit its configured time limit and stopped to avoid wasting resources. If more time is needed, remove and re-add the \`tars-working\` label or mention @tars-bot.",
+		].join("\n");
+
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+		await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
+		await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+		await this.postComment(owner, repo, issueNumber, body);
 	}
 
 	private async postFailureComment(

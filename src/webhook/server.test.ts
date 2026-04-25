@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebhookServer, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
+import { TimeoutError } from "../session/timer.js";
 
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {
@@ -21,6 +22,7 @@ describe("GitHubIssueHandlers", () => {
 	it("creates a session on comment if one does not exist (fallback)", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -97,6 +99,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -129,6 +132,7 @@ describe("GitHubIssueHandlers", () => {
 	it("resumes a session for any TARS label and pushes branch on complete", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -191,6 +195,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "mbrooks",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -271,6 +276,7 @@ describe("GitHubIssueHandlers", () => {
 	it("ignores duplicate issue events targeting the same issue", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -348,6 +354,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -380,6 +387,7 @@ describe("GitHubIssueHandlers", () => {
 	it("ignores events triggered by the configured GitHub user", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -407,6 +415,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -435,6 +444,7 @@ describe("GitHubIssueHandlers", () => {
 	it("only works on issues assigned to TARS", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -508,6 +518,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -567,6 +578,7 @@ describe("GitHubIssueHandlers", () => {
 	it("processes comments that @mention the bot even without a tars label", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -626,6 +638,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -663,6 +676,7 @@ describe("GitHubIssueHandlers", () => {
 	it("posts failure comment when execution throws", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
@@ -734,6 +748,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -756,6 +771,7 @@ describe("GitHubIssueHandlers", () => {
 	it("handles 404 during safeRemoveLabel gracefully", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockRejectedValue({ status: 404 }),
 				createComment: vi.fn(async () => ({})),
@@ -803,6 +819,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -819,6 +836,7 @@ describe("GitHubIssueHandlers", () => {
 	it("throws when safeRemoveLabel encounters non-404 error", async () => {
 		const octokit = {
 			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockRejectedValue({ status: 500 }),
 				createComment: vi.fn(async () => ({})),
@@ -855,6 +873,7 @@ describe("GitHubIssueHandlers", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
 			octokit: octokit as never,
 		});
 
@@ -866,6 +885,313 @@ describe("GitHubIssueHandlers", () => {
 				sender: { login: "other-user" },
 			}),
 		).rejects.toThrow();
+	});
+	it("handles timeout gracefully and posts a summary comment", async () => {
+		const octokit = {
+			issues: {
+			pulls: { create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })) },
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			getDiffNames: vi.fn(async () => ["src/foo.ts", "src/bar.ts"]),
+			getGitStatus: vi.fn(async () => " M src/foo.ts\n?? src/bar.ts"),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => {
+				throw new TimeoutError(15 * 60 * 1000, 30 * 60 * 1000);
+			}),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledWith(
+			expect.any(Object),
+			undefined,
+			expect.objectContaining({ timeoutMinutes: 30 }),
+		);
+
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.stringContaining("Session timed out"),
+			}),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.stringContaining("src/foo.ts"),
+			}),
+		);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+	});
+
+	it("respects tars-timeout label override", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			getDiffNames: vi.fn(async () => []),
+			getGitStatus: vi.fn(async () => ""),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: {
+				number: 1,
+				title: "Test",
+				body: "Body",
+				assignees: [{ login: "tars-bot" }],
+				labels: [{ name: "tars-timeout:15" }],
+			},
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledWith(
+			expect.any(Object),
+			undefined,
+			expect.objectContaining({ timeoutMinutes: 15 }),
+		);
+	});
+
+	it("clamps tars-timeout label to 60", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			getDiffNames: vi.fn(async () => []),
+			getGitStatus: vi.fn(async () => ""),
+			commitAndPush: vi.fn(),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			sessionTimeoutMinutes: 30,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: {
+				number: 1,
+				title: "Test",
+				body: "Body",
+				assignees: [{ login: "tars-bot" }],
+				labels: [{ name: "tars-timeout:120" }],
+			},
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(executor.execute).toHaveBeenCalledWith(
+			expect.any(Object),
+			undefined,
+			expect.objectContaining({ timeoutMinutes: 60 }),
+		);
 	});
 });
 

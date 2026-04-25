@@ -35,6 +35,7 @@ import {
 } from "./index.js";
 
 import { createAgentSession, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { TimeoutError } from "../session/timer.js";
 
 interface TestModel {
 	provider: string;
@@ -354,5 +355,159 @@ describe("PiAgentExecutor", () => {
 
 		await expect(executor.execute(state)).rejects.toThrow("prompt failed");
 		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
+	it("throws TimeoutError when session timer expires", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		let subscribeCallback: ((event: unknown) => void) | undefined;
+		let promptResolve: (() => void) | undefined;
+		const abort = vi.fn(() => {
+			promptResolve?.();
+		});
+		const mockSession = {
+			subscribe: vi.fn((cb: (event: unknown) => void) => {
+				subscribeCallback = cb;
+				return unsubscribe;
+			}),
+			prompt: vi.fn(async () => {
+				await new Promise<void>((resolve) => {
+					promptResolve = resolve;
+				});
+			}),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: complete\nDone." },
+			],
+			abort,
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 1,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const executePromise = executor.execute(state, undefined, { timeoutMinutes: 5 });
+
+		// Let the executor initialize
+		await vi.advanceTimersByTimeAsync(100);
+
+		// Jump past the 5-minute timeout
+		vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
+
+		// Fire a tool event to trigger the timer check
+		if (subscribeCallback) {
+			subscribeCallback({ type: "tool_execution_start", toolName: "read", args: {} });
+		}
+
+		// Flush microtasks so the resolved prompt propagates
+		await Promise.resolve();
+
+		await expect(executePromise).rejects.toThrow(TimeoutError);
+		expect(abort).toHaveBeenCalled();
+		expect(unsubscribe).toHaveBeenCalledOnce();
+
+		vi.useRealTimers();
+	});
+
+	it("emits timer warnings via tool_execution_start events", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		let subscribeCallback: ((event: unknown) => void) | undefined;
+		let promptResolve: (() => void) | undefined;
+		const mockSession = {
+			subscribe: vi.fn((cb: (event: unknown) => void) => {
+				subscribeCallback = cb;
+				return unsubscribe;
+			}),
+			prompt: vi.fn(async () => {
+				await new Promise<void>((resolve) => {
+					promptResolve = resolve;
+				});
+			}),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: complete\nDone." },
+			],
+			abort: vi.fn(() => {
+				promptResolve?.();
+			}),
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 1,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		const executePromise = executor.execute(state, undefined, { timeoutMinutes: 10 });
+
+		// Let the executor initialize
+		await vi.advanceTimersByTimeAsync(100);
+
+		// Jump to 50% budget
+		vi.setSystemTime(Date.now() + 5 * 60 * 1000);
+		if (subscribeCallback) {
+			subscribeCallback({ type: "tool_execution_start", toolName: "read", args: {} });
+		}
+
+		// Jump to 90% budget
+		vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+		if (subscribeCallback) {
+			subscribeCallback({ type: "tool_execution_start", toolName: "read", args: {} });
+		}
+
+		// Resolve the prompt so execute() can finish
+		promptResolve?.();
+		await Promise.resolve();
+
+		await executePromise;
+
+		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining("Half of session budget used"));
+		expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining("10% budget remaining"));
+
+		stdoutSpy.mockRestore();
+		vi.useRealTimers();
 	});
 });

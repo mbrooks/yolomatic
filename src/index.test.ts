@@ -14,6 +14,7 @@ vi.mock("./config.js", () => ({
 		githubUsername: "tars-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
+		sessionTimeoutMinutes: 30,
 	})),
 }));
 
