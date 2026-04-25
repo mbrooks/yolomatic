@@ -49,6 +49,9 @@ interface CommentPayload {
 		assignees?: {
 			login: string;
 		}[];
+		user?: {
+			login: string;
+		};
 	};
 	comment: {
 		body: string;
@@ -227,14 +230,15 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		const isAssigned = this.isAssignedToTars(payload.issue);
+		const isCreatedByTars = payload.issue.user?.login === this.deps.githubUsername;
 		const isMentioned =
 			payload.comment.body.includes(`@${this.deps.githubUsername}`) ||
 			payload.comment.body.toLowerCase().includes("@tars");
 		const hasTarsLabel = hasAnyLabel(payload.issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(payload.issue.labels, "tars");
 
-		if (!isAssigned && !isMentioned) {
+		if (!isAssigned && !isCreatedByTars && !isMentioned) {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: not assigned to ${this.deps.githubUsername} and no TARS mention\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: not assigned to ${this.deps.githubUsername}, not created by ${this.deps.githubUsername}, and no TARS mention\n`,
 			);
 			return;
 		}
@@ -252,6 +256,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		if (isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
+		} else if (isCreatedByTars) {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: created by ${this.deps.githubUsername}\n`);
 		} else {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has tars label\n`);
 		}
