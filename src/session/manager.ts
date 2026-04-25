@@ -95,4 +95,31 @@ export class SessionManager {
 			lastActivity: new Date().toISOString(),
 		});
 	}
+
+	async associatePR(owner: string, repo: string, issueNumber: number, prNumber: number, prUrl: string): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			prNumber,
+			prUrl,
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async incrementIterationCount(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			iterationCount: (existing.iterationCount ?? 0) + 1,
+			lastActivity: new Date().toISOString(),
+		});
+	}
 }

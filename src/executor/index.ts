@@ -127,6 +127,53 @@ export function buildFeedbackPrompt(comment: string): string {
 	].join("\n");
 }
 
+export interface PRReviewComment {
+	body: string;
+	user: string;
+	path?: string;
+	line?: number;
+}
+
+export function buildPRReviewPrompt(state: SessionState, comments: PRReviewComment[], reviewBody?: string): string {
+	const lines = [
+		`PR review feedback received for PR associated with issue #${state.issueNumber} in ${state.owner}/${state.repo}.`,
+		`Workspace: ${state.workspacePath}`,
+		`Branch: tars/issue-${state.issueNumber}`,
+		"",
+		"Status protocol:",
+		"- First line must be exactly one of:",
+		"  TARS_STATUS: working",
+		"  TARS_STATUS: waiting-feedback",
+		"  TARS_STATUS: complete",
+		"- If complete, commit all changes and push to the branch:",
+		`  git add -A && git commit -m "TARS: Iteration on PR for issue #${state.issueNumber}" && git push origin tars/issue-${state.issueNumber}`,
+		"- Do NOT force-push. Append commits to the existing PR branch.",
+		"",
+	];
+
+	if (reviewBody) {
+		lines.push("Overall review comment:");
+		lines.push(reviewBody.trim());
+		lines.push("");
+	}
+
+	if (comments.length > 0) {
+		lines.push("Review comments:");
+		for (const comment of comments) {
+			const location = comment.path && comment.line !== undefined
+				? ` (${comment.path}:${comment.line})`
+				: "";
+			lines.push(`- @${comment.user}${location}: ${comment.body.trim()}`);
+		}
+		lines.push("");
+	}
+
+	lines.push("Address the review feedback by making the requested changes, running tests, and committing.");
+	lines.push("If the feedback is a question or non-actionable discussion, reply with an explanation and no code change.");
+
+	return lines.join("\n");
+}
+
 export function resolveConfiguredModel<TModel extends ModelReference>(
 	registry: ModelLookup<TModel>,
 	env: NodeJS.ProcessEnv = process.env,
@@ -167,10 +214,21 @@ export class PiAgentExecutor {
 		this.soulPath = options.soulPath;
 	}
 
-	async execute(state: SessionState, newComment?: string): Promise<ExecutionResult> {
+	async execute(
+		state: SessionState,
+		newComment?: string,
+		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
+	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
 
-		const prompt = newComment ? buildFeedbackPrompt(newComment) : buildIssuePrompt(state);
+		let prompt: string;
+		if (prReview) {
+			prompt = buildPRReviewPrompt(state, prReview.comments, prReview.reviewBody);
+		} else if (newComment) {
+			prompt = buildFeedbackPrompt(newComment);
+		} else {
+			prompt = buildIssuePrompt(state);
+		}
 		logger.logPrompt(prompt);
 
 		const piSessionManager = PiSessionManager.open(state.sessionPath, undefined, state.workspacePath);

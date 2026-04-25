@@ -3,7 +3,7 @@ import http from "node:http";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebhookServer, verifySignature } from "./server.js";
+import { createWebhookServer, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
 describe("verifySignature", () => {
@@ -14,6 +14,38 @@ describe("verifySignature", () => {
 
 		expect(verifySignature(secret, payload, signature)).toBe(true);
 		expect(verifySignature(secret, payload, "sha256=bad")).toBe(false);
+	});
+});
+
+describe("readBody", () => {
+	it("reads chunks from an async iterable request", async () => {
+		const request = {
+			async *[Symbol.asyncIterator]() {
+				yield Buffer.from('{"action":"opened"}');
+			},
+		} as http.IncomingMessage;
+		const body = await readBody(request);
+		expect(body.toString()).toBe('{"action":"opened"}');
+	});
+
+	it("handles string chunks", async () => {
+		const request = {
+			async *[Symbol.asyncIterator]() {
+				yield 'hello';
+			},
+		} as http.IncomingMessage;
+		const body = await readBody(request);
+		expect(body.toString()).toBe("hello");
+	});
+
+	it("rejects when the request stream throws", async () => {
+		const request = {
+			async *[Symbol.asyncIterator]() {
+				yield "chunk";
+				throw new Error("stream error");
+			},
+		} as http.IncomingMessage;
+		await expect(readBody(request)).rejects.toThrow("stream error");
 	});
 });
 
@@ -70,6 +102,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -165,6 +199,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: true,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -323,6 +359,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -393,6 +431,8 @@ describe("GitHubIssueHandlers", () => {
 			getSession: vi.fn(),
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
@@ -485,6 +525,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -604,6 +646,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -715,6 +759,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
@@ -795,6 +841,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
@@ -848,6 +896,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
@@ -991,7 +1041,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "tars",
 				title: expect.stringContaining("TARS self-report"),
-				labels: ["enhancement", "self-monitoring", "reliability"],
+				labels: ["tars-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -1030,7 +1080,7 @@ describe("GitHubIssueHandlers", () => {
 
 describe("createWebhookServer", () => {
 	it("returns 404 for non-POST or non-/webhook routes", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1045,7 +1095,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("returns 401 for invalid signature", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1064,7 +1114,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("calls handleIssueEvent for valid issues webhook", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1097,6 +1147,8 @@ describe("createWebhookServer", () => {
 				throw new Error("boom");
 			}),
 			handleCommentEvent: vi.fn(),
+			handlePullRequestReviewCommentEvent: vi.fn(),
+			handlePullRequestReviewEvent: vi.fn(),
 		};
 		const server = createWebhookServer("secret", handlers);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -1123,7 +1175,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("ignores unsupported events and returns 200", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn() };
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1146,6 +1198,122 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(200);
 		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
 		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
+		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
+		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 401 when signature header is missing", async () => {
+		const handlers = {
+			handleIssueEvent: vi.fn(),
+			handleCommentEvent: vi.fn(),
+			handlePullRequestReviewCommentEvent: vi.fn(),
+			handlePullRequestReviewEvent: vi.fn(),
+		};
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "opened" });
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-github-event": "issues",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(401);
+
+		server.close();
+	});
+
+	it("calls handlePullRequestReviewCommentEvent for valid PR review comment webhook", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "created", comment: {} });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "pull_request_review_comment",
+					"x-github-delivery": "456",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handlePullRequestReviewCommentEvent).toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("calls handlePullRequestReviewEvent for valid PR review webhook", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "submitted", review: {} });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "pull_request_review",
+					"x-github-delivery": "789",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handlePullRequestReviewEvent).toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("ignores event when x-github-event header is missing", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "opened" });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
+		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
+		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
+		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
 
 		server.close();
 	});
