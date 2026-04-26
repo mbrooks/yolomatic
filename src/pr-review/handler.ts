@@ -4,6 +4,7 @@ import type { PiAgentExecutor } from "../executor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
+import { generateCommitMessage } from "../workspace/manager.js";
 import { classifyComments } from "./classifier.js";
 
 export interface PRReviewComment {
@@ -268,7 +269,12 @@ export class PRReviewHandler {
 		await this.deps.sessionManager.incrementIterationCount(owner, repo, issueNumber);
 
 		if (result.status === "complete") {
-			await this.deps.workspaceManager.commitAndPush(owner, repo, issueNumber);
+			await this.deps.workspaceManager.commitAndPush(
+				owner,
+				repo,
+				issueNumber,
+				generateCommitMessage(state.labels, issueNumber, result.summary),
+			);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
 			await this.postPRComment(
 				owner,
