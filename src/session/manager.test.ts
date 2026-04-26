@@ -32,6 +32,28 @@ describe("SessionManager", () => {
 		expect(persisted.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
 	});
 
+	it("stores labels when provided", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const session = await manager.createSession(
+			"mbrooks",
+			"tars",
+			99,
+			"Title",
+			"Body",
+			"/tmp/ws",
+			["bug", "enhancement"],
+		);
+
+		expect(session.labels).toEqual(["bug", "enhancement"]);
+		const persisted = JSON.parse(
+			await readFile(path.join(sessionsDir, "github-mbrooks-tars", "issue-99.state.json"), "utf8"),
+		) as { labels?: string[] };
+		expect(persisted.labels).toEqual(["bug", "enhancement"]);
+	});
+
 	it("enforces 1:1 mapping by returning existing session on duplicate create", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);

@@ -18,6 +18,7 @@ export interface SessionState {
 	prUrl?: string;
 	prNumber?: number;
 	iterationCount?: number;
+	labels?: string[];
 }
 
 export class SessionStore {
