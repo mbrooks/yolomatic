@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceConfig } from "./config.js";
 import type { CommandRunner } from "./manager.js";
-import { WorkspaceManager } from "./manager.js";
+import { WorkspaceManager, generateCommitMessage } from "./manager.js";
 
 function createConfig(workspacesDir: string): WorkspaceConfig {
 	return {
@@ -183,6 +183,28 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("commits with a custom message when provided", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-commit-msg-"));
+		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.commitAndPush("mbrooks", "tars", 42, "feat: Add widget support");
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["commit", "-m", "feat: Add widget support"],
+			{ cwd: worktreePath },
+		);
+	});
+
 	it("removes worktree if it exists", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-remove-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
@@ -353,5 +375,61 @@ describe("WorkspaceManager", () => {
 		const hasChanges = await manager.hasChanges(root, true);
 		expect(hasChanges).toBe(false);
 		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
+	});
+});
+
+describe("generateCommitMessage", () => {
+	it("uses TARS: prefix when no labels match", () => {
+		const msg = generateCommitMessage(undefined, 42, "Add widget support");
+		expect(msg).toBe("TARS: Add widget support");
+	});
+
+	it("infers feat: from enhancement label", () => {
+		const msg = generateCommitMessage(["enhancement"], 42, "Add dark mode");
+		expect(msg).toBe("feat: Add dark mode");
+	});
+
+	it("infers fix: from bug label", () => {
+		const msg = generateCommitMessage(["bug"], 42, "Resolve race condition");
+		expect(msg).toBe("fix: Resolve race condition");
+	});
+
+	it("infers test: from test label", () => {
+		const msg = generateCommitMessage(["test"], 42, "Cover edge cases");
+		expect(msg).toBe("test: Cover edge cases");
+	});
+
+	it("falls back to generic message without summary", () => {
+		const msg = generateCommitMessage(["chore"], 7, undefined);
+		expect(msg).toBe("chore: Changes for issue #7");
+	});
+
+	it("truncates at word boundary to stay under 72 chars", () => {
+		const long = "This is an extraordinarily long summary that definitely exceeds the seventy-two character soft limit";
+		const msg = generateCommitMessage(["bug"], 99, long);
+		expect(msg.length).toBeLessThanOrEqual(72);
+		expect(msg.startsWith("fix: ")).toBe(true);
+	});
+
+	it("hard truncates at 80 chars when word boundary not found", () => {
+		const long = "A".repeat(100);
+		const msg = generateCommitMessage(undefined, 1, long);
+		expect(msg.length).toBeLessThanOrEqual(80);
+		expect(msg.startsWith("TARS: ")).toBe(true);
+	});
+
+	it("uses first line of multiline summary", () => {
+		const msg = generateCommitMessage(["docs"], 5, "Update README\n\nMore details here");
+		expect(msg).toBe("docs: Update README");
+	});
+
+	it("is case-insensitive for label matching", () => {
+		const msg = generateCommitMessage(["BUG", "Enhancement"], 3, "Something");
+		expect(msg).toBe("fix: Something");
+	});
+
+	it("prefers first matching prefix", () => {
+		const msg = generateCommitMessage(["bug", "enhancement"], 2, "Something");
+		expect(msg).toBe("fix: Something");
 	});
 });

@@ -166,7 +166,7 @@ export function buildPRReviewPrompt(state: SessionState, comments: PRReviewComme
 		lines.push("");
 	}
 
-	lines.push("Address the review feedback by making the requested changes, running tests, and committing.");
+	lines.push("Address the review feedback by making the requested changes, running tests, and summarizing changes.");
 	lines.push("If the feedback is a question or non-actionable discussion, reply with an explanation and no code change.");
 
 	return lines.join("\n");

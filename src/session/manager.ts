@@ -21,6 +21,7 @@ export class SessionManager {
 		title: string,
 		body: string,
 		workspacePath: string,
+		labels?: string[],
 	): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (existing) {
@@ -36,6 +37,7 @@ export class SessionManager {
 			status: "pending",
 			sessionPath: this.getSessionPath(owner, repo, issueNumber),
 			workspacePath,
+			labels,
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};

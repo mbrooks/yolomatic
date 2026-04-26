@@ -157,6 +157,7 @@ describe("GitHubIssueHandlers", () => {
 			"Test issue",
 			"Test body",
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+			["tars-working"],
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 	});
@@ -242,7 +243,7 @@ describe("GitHubIssueHandlers", () => {
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "TARS: Done.");
 
 		// Should add tars-pr-created on complete, not tars-complete
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
