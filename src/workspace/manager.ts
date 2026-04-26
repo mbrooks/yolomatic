@@ -5,6 +5,63 @@ import { promisify } from "node:util";
 
 import type { WorkspaceConfig } from "./config.js";
 
+const PREFIX_MAP: Record<string, string> = {
+	bug: "fix",
+	enhancement: "feat",
+	feature: "feat",
+	documentation: "docs",
+	docs: "docs",
+	test: "test",
+	testing: "test",
+	refactor: "refactor",
+	chore: "chore",
+	style: "style",
+	perf: "perf",
+	performance: "perf",
+	ci: "ci",
+	build: "build",
+};
+
+export function generateCommitMessage(
+	labels: string[] | undefined,
+	issueNumber: number,
+	summary?: string,
+): string {
+	const labelSet = new Set((labels ?? []).map((l) => l.toLowerCase()));
+	let prefix: string | undefined;
+	for (const [label, p] of Object.entries(PREFIX_MAP)) {
+		if (labelSet.has(label)) {
+			prefix = p;
+			break;
+		}
+	}
+
+	const prefixStr = prefix ? `${prefix}:` : "TARS:";
+	const prefixLen = prefixStr.length + 1; // +1 for space
+
+	const firstLine = (summary ?? "").trim().split(/\r?\n/)[0] ?? "";
+	let subject = firstLine || `Changes for issue #${issueNumber}`;
+
+	const softMax = 72;
+	const hardMax = 80;
+
+	if (prefixLen + subject.length > softMax) {
+		const targetLen = softMax - prefixLen;
+		let truncated = subject.slice(0, targetLen);
+		const lastSpace = truncated.lastIndexOf(" ");
+		if (lastSpace > targetLen * 0.5) {
+			truncated = truncated.slice(0, lastSpace);
+		}
+		subject = truncated.trimEnd();
+	}
+
+	if (prefixLen + subject.length > hardMax) {
+		subject = subject.slice(0, hardMax - prefixLen).trimEnd();
+	}
+
+	return `${prefixStr} ${subject}`;
+}
+
 const execFileAsync = promisify(execFile);
 
 export interface WorktreeInfo {
@@ -141,7 +198,7 @@ export class WorkspaceManager {
 		}
 	}
 
-	async commitAndPush(owner: string, repo: string, issueNumber: number): Promise<void> {
+	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<void> {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
 
@@ -150,7 +207,7 @@ export class WorkspaceManager {
 		if (await this.hasChanges(worktreePath, true)) {
 			await this.runCommand(
 				"git",
-				["commit", "-m", `TARS: Changes for issue #${issueNumber}`],
+				["commit", "-m", message ?? `TARS: Changes for issue #${issueNumber}`],
 				{ cwd: worktreePath },
 			);
 		}

@@ -6,6 +6,7 @@ import { PRReviewHandler } from "../pr-review/handler.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
+import { generateCommitMessage } from "../workspace/manager.js";
 
 interface IssueLabel {
 	name?: string;
@@ -184,6 +185,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			issue.title,
 			issue.body ?? "",
 			worktree.path,
+			issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
 		);
 
 		if (session.status !== "pending") {
@@ -286,6 +288,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				payload.issue.title ?? "",
 				payload.issue.body ?? "",
 				worktree.path,
+				payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
 			);
 		}
 
@@ -372,7 +375,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
 
 			// Push branch so code is actually delivered
-			await this.deps.workspaceManager.commitAndPush(owner, repo, issueNumber);
+			await this.deps.workspaceManager.commitAndPush(
+				owner,
+				repo,
+				issueNumber,
+				generateCommitMessage(state.labels, issueNumber, result.summary),
+			);
 
 			// Create PR via GitHub API
 			const prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
