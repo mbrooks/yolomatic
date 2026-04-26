@@ -10,41 +10,25 @@ cd "${REPO_ROOT}"
 
 echo "[$(date -Iseconds)] Checking ${REMOTE}/${BRANCH} for updates"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Working tree has local changes. Refusing to auto-update."
-  exit 1
-fi
+BEFORE_COMMIT="$(git rev-parse HEAD)"
 
 git fetch "${REMOTE}" "${BRANCH}"
 
-LOCAL_COMMIT="$(git rev-parse HEAD)"
-REMOTE_COMMIT="$(git rev-parse "${REMOTE}/${BRANCH}")"
+# Discard any local changes and reset to the target branch
+git checkout -f -B "${BRANCH}" "${REMOTE}/${BRANCH}"
 
-if [[ "${LOCAL_COMMIT}" == "${REMOTE_COMMIT}" ]]; then
+AFTER_COMMIT="$(git rev-parse HEAD)"
+
+if [[ "${BEFORE_COMMIT}" == "${AFTER_COMMIT}" ]]; then
   echo "No updates available."
   exit 0
 fi
 
-CURRENT_BRANCH="$(git branch --show-current)"
-if [[ "${CURRENT_BRANCH}" != "${BRANCH}" ]]; then
-  echo "Current branch is '${CURRENT_BRANCH}', expected '${BRANCH}'. Refusing to auto-update."
-  exit 1
-fi
+echo "Reset to ${REMOTE}/${BRANCH} (${AFTER_COMMIT}). Checking for dependency changes..."
 
-if ! git merge-base --is-ancestor "${LOCAL_COMMIT}" "${REMOTE_COMMIT}"; then
-  echo "Local branch has diverged from ${REMOTE}/${BRANCH}. Refusing to auto-update."
-  exit 1
-fi
-
-BEFORE_LOCKSUM="$(shasum package-lock.json 2>/dev/null | awk '{print $1}')"
-BEFORE_PKGSUM="$(shasum package.json 2>/dev/null | awk '{print $1}')"
-
-git pull --ff-only "${REMOTE}" "${BRANCH}"
-
-AFTER_LOCKSUM="$(shasum package-lock.json 2>/dev/null | awk '{print $1}')"
-AFTER_PKGSUM="$(shasum package.json 2>/dev/null | awk '{print $1}')"
-
-if [[ "${BEFORE_LOCKSUM}" != "${AFTER_LOCKSUM}" || "${BEFORE_PKGSUM}" != "${AFTER_PKGSUM}" ]]; then
+DEP_DIFF=0
+git diff --quiet "${BEFORE_COMMIT}" "${AFTER_COMMIT}" -- package-lock.json package.json || DEP_DIFF=$?
+if [[ "${DEP_DIFF}" -ne 0 ]]; then
   echo "Dependencies changed. Running npm install."
   npm install
 fi
