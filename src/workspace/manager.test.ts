@@ -404,23 +404,24 @@ describe("generateCommitMessage", () => {
 		expect(msg).toBe("chore: Changes for issue #7");
 	});
 
-	it("truncates at word boundary to stay under 72 chars", () => {
-		const long = "This is an extraordinarily long summary that definitely exceeds the seventy-two character soft limit";
+	it("truncates at word boundary to stay under 50 chars", () => {
+		const long =
+			"This is an extraordinarily long summary that definitely exceeds the fifty character soft limit";
 		const msg = generateCommitMessage(["bug"], 99, long);
-		expect(msg.length).toBeLessThanOrEqual(72);
+		expect(msg.length).toBeLessThanOrEqual(50);
 		expect(msg.startsWith("fix: ")).toBe(true);
 	});
 
-	it("hard truncates at 80 chars when word boundary not found", () => {
+	it("hard truncates at 72 chars when word boundary not found", () => {
 		const long = "A".repeat(100);
 		const msg = generateCommitMessage(undefined, 1, long);
-		expect(msg.length).toBeLessThanOrEqual(80);
+		expect(msg.length).toBeLessThanOrEqual(72);
 		expect(msg.startsWith("TARS: ")).toBe(true);
 	});
 
-	it("uses first line of multiline summary", () => {
+	it("uses first line as subject and rest as body", () => {
 		const msg = generateCommitMessage(["docs"], 5, "Update README\n\nMore details here");
-		expect(msg).toBe("docs: Update README");
+		expect(msg).toBe("docs: Update README\n\nMore details here");
 	});
 
 	it("is case-insensitive for label matching", () => {
@@ -431,5 +432,38 @@ describe("generateCommitMessage", () => {
 	it("prefers first matching prefix", () => {
 		const msg = generateCommitMessage(["bug", "enhancement"], 2, "Something");
 		expect(msg).toBe("fix: Something");
+	});
+
+	it("converts past tense to imperative mood", () => {
+		const msg = generateCommitMessage(["enhancement"], 1, "Implemented the silent flag");
+		expect(msg).toBe("feat: Implement the silent flag");
+	});
+
+	it("preserves case when converting to imperative", () => {
+		const msg = generateCommitMessage(["enhancement"], 1, "implemented the silent flag");
+		expect(msg).toBe("feat: implement the silent flag");
+	});
+
+	it("strips trailing period from subject", () => {
+		const msg = generateCommitMessage(["bug"], 1, "Fixed a bug.");
+		expect(msg).toBe("fix: Fix a bug");
+	});
+
+	it("wraps body at 72 characters", () => {
+		const body = Array.from({ length: 50 }, () => "word").join(" ");
+		const summary = `Subject\n\n${body}`;
+		const msg = generateCommitMessage(["feat"], 1, summary);
+		const lines = msg.split("\n");
+		for (const line of lines) {
+			expect(line.length).toBeLessThanOrEqual(72);
+		}
+	});
+
+	it("preserves list items when wrapping body", () => {
+		const summary =
+			"Subject\n\n- First item that is very long and should definitely be wrapped correctly because it exceeds seventy-two characters\n- Second item";
+		const msg = generateCommitMessage(["feat"], 1, summary);
+		expect(msg).toContain("- First item");
+		expect(msg).toContain("- Second item");
 	});
 });

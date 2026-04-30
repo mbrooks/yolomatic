@@ -155,7 +155,7 @@ describe("PRReviewHandler", () => {
 			comments: [{ body: "Please fix the typo on line 42", user: "user", path: "src/foo.ts", line: 42 }],
 			reviewBody: undefined,
 		});
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fixed the typo.");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fix the typo");
 		expect(sessionManager.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
