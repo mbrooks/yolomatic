@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed";
@@ -72,5 +72,32 @@ export class SessionStore {
 		} catch {
 			return false;
 		}
+	}
+
+	async getAll(): Promise<SessionState[]> {
+		const sessions: SessionState[] = [];
+		try {
+			const entries = await readdir(this.sessionsDir, { withFileTypes: true });
+			for (const entry of entries) {
+				if (!entry.isDirectory()) continue;
+				const repoDir = path.join(this.sessionsDir, entry.name);
+				const files = await readdir(repoDir);
+				for (const file of files) {
+					if (!file.endsWith(".state.json")) continue;
+					const filePath = path.join(repoDir, file);
+					try {
+						const raw = await readFile(filePath, "utf8");
+						const parsed = JSON.parse(raw) as SessionState;
+						sessions.push(parsed);
+					} catch (error) {
+						const message = error instanceof Error ? error.message : String(error);
+						process.stdout.write(`[session-store] warning: invalid state file ${filePath}: ${message}\n`);
+					}
+				}
+			}
+		} catch {
+			// sessions dir doesn't exist or isn't readable
+		}
+		return sessions;
 	}
 }

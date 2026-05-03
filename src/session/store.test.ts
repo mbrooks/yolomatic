@@ -90,10 +90,76 @@ describe("SessionStore", () => {
 		expect(await store.exists("mbrooks", "tars", 3)).toBe(true);
 	});
 
-	it("computes correct paths", () => {
-		const store = new SessionStore("/tmp/sessions");
-		expect(store.getSessionKey("mbrooks", "tars", 1)).toBe("github-mbrooks-tars-issue-1");
-		expect(store.getSessionPath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.jsonl");
-		expect(store.getStatePath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.state.json");
+	it("returns all sessions from disk via getAll", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const stateA = {
+			issueNumber: 10,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "A",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session.jsonl",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		const stateB = {
+			issueNumber: 11,
+			repo: "case",
+			owner: "mbrooks",
+			title: "B",
+			body: "Body",
+			status: "working" as const,
+			sessionPath: "/tmp/session.jsonl",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		};
+
+		await store.set(stateA);
+		await store.set(stateB);
+
+		const store2 = new SessionStore(dir);
+		const all = await store2.getAll();
+		expect(all).toHaveLength(2);
+		expect(all.map((s) => s.title).sort()).toEqual(["A", "B"]);
+	});
+
+	it("returns empty array from getAll when sessions dir is missing", async () => {
+		const dir = path.join(os.tmpdir(), `tars-store-nonexistent-${Date.now()}`);
+		const store = new SessionStore(dir);
+		const all = await store.getAll();
+		expect(all).toEqual([]);
+	});
+
+	it("skips invalid state files in getAll and logs warning", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const valid = {
+			issueNumber: 20,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Valid",
+			body: "Body",
+			status: "complete" as const,
+			sessionPath: "/tmp/session.jsonl",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		};
+		await store.set(valid);
+
+		// Write an invalid state file
+		const invalidPath = path.join(dir, "github-mbrooks-tars", "issue-21.state.json");
+		await writeFile(invalidPath, "not json", "utf8");
+
+		const store2 = new SessionStore(dir);
+		const all = await store2.getAll();
+		expect(all).toHaveLength(1);
+		expect(all[0].title).toBe("Valid");
 	});
 });

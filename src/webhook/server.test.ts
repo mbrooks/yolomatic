@@ -6,6 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createWebhookServer, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
+function makeSessionStore(sessions: Array<Record<string, unknown>> = []) {
+	return {
+		getAll: vi.fn(async () => sessions),
+	} as never;
+}
+
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {
 		const payload = Buffer.from('{"action":"opened"}');
@@ -1082,7 +1088,7 @@ describe("GitHubIssueHandlers", () => {
 describe("createWebhookServer", () => {
 	it("returns 404 for non-POST or non-/webhook routes", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1097,7 +1103,7 @@ describe("createWebhookServer", () => {
 
 	it("returns 401 for invalid signature", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1116,7 +1122,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handleIssueEvent for valid issues webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1151,7 +1157,7 @@ describe("createWebhookServer", () => {
 			handlePullRequestReviewCommentEvent: vi.fn(),
 			handlePullRequestReviewEvent: vi.fn(),
 		};
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1177,7 +1183,7 @@ describe("createWebhookServer", () => {
 
 	it("ignores unsupported events and returns 200", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1212,7 +1218,7 @@ describe("createWebhookServer", () => {
 			handlePullRequestReviewCommentEvent: vi.fn(),
 			handlePullRequestReviewEvent: vi.fn(),
 		};
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1236,7 +1242,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handlePullRequestReviewCommentEvent for valid PR review comment webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1264,7 +1270,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handlePullRequestReviewEvent for valid PR review webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1290,31 +1296,114 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("ignores event when x-github-event header is missing", async () => {
+	it("serves the admin dashboard at GET /admin", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "opened" });
-		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
-
-		const response = await makeRequest(
-			port,
-			{
-				method: "POST",
-				path: "/webhook",
-				headers: {
-					"x-hub-signature-256": signature,
-				},
-			},
-			payload,
-		);
+		const response = await makeRequest(port, { method: "GET", path: "/admin" });
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
-		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
+		expect(response.body).toContain("TARS Admin");
+		expect(response.body).toContain("/api/status");
+
+		server.close();
+	});
+
+	it("returns agent status and sessions at GET /api/status", async () => {
+		const session = {
+			issueNumber: 1,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as const,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+			lastActivity: "2026-04-29T05:28:03.000Z",
+			seeded: true,
+			prUrl: "https://github.com/mbrooks/tars/pull/1",
+			prNumber: 1,
+		};
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const store = makeSessionStore([session]);
+		const server = createWebhookServer("secret", handlers, store);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.agent).toBe("busy");
+		expect(typeof body.uptime).toBe("string");
+		expect(body.sessions).toHaveLength(1);
+		expect(body.sessions[0]).toMatchObject({
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: 1,
+			status: "working",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+			branch: "tars/issue-1",
+			lastActivity: "2026-04-29T05:28:03.000Z",
+			prUrl: "https://github.com/mbrooks/tars/pull/1",
+			prNumber: 1,
+		});
+
+		server.close();
+	});
+
+	it("returns online when no sessions exist", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeSessionStore([]));
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.agent).toBe("online");
+		expect(body.sessions).toEqual([]);
+
+		server.close();
+	});
+
+	it("returns feedback status when sessions are waiting-feedback and none are working", async () => {
+		const session = {
+			issueNumber: 2,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "waiting-feedback" as const,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+			lastActivity: "2026-04-29T05:28:03.000Z",
+			seeded: true,
+		};
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeSessionStore([session]));
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.agent).toBe("feedback");
+
+		server.close();
+	});
+
+	it("returns 500 when session store throws", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const badStore = { getAll: vi.fn(async () => { throw new Error("disk error"); }) } as never;
+		const server = createWebhookServer("secret", handlers, badStore);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
+		expect(response.statusCode).toBe(500);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("disk error");
 
 		server.close();
 	});

@@ -23,6 +23,7 @@ vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
 		get: vi.fn(),
 		set: vi.fn(),
+		getAll: vi.fn(),
 	})),
 }));
 
@@ -76,7 +77,7 @@ import { main } from "./index.js";
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object));
+		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object));
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 	});
