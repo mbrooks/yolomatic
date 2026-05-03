@@ -60,7 +60,7 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktree.path, "-b", "tars/issue-42", "origin/HEAD"],
+			["worktree", "add", worktree.path, "-b", "tars/issue-42", "origin/main"],
 			{ cwd: bareRepoPath },
 		);
 	});
@@ -103,7 +103,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/HEAD"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/main"],
 			{ cwd: bareRepoPath },
 		);
 
@@ -145,7 +145,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree.branch).toBe("tars/issue-42");
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["branch", "-f", "tars/issue-42", "origin/HEAD"],
+			["branch", "-f", "tars/issue-42", "origin/main"],
 			{ cwd: bareRepoPath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
@@ -326,12 +326,12 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["fetch", "origin"],
+			["fetch", "origin", "+master:master"],
 			{ cwd: bareRepoPath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/HEAD"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/master"],
 			{ cwd: bareRepoPath },
 		);
 	});
