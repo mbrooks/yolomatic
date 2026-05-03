@@ -16,6 +16,8 @@ vi.mock("./config.js", () => ({
 		soulPath: "/tmp/SOUL.md",
 		maxIterations: 3,
 		selfReportEnabled: true,
+		adminUsername: "admin",
+		adminPassword: "secret",
 	})),
 }));
 
@@ -76,7 +78,7 @@ import { main } from "./index.js";
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object));
+		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret");
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 	});

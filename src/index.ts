@@ -31,7 +31,7 @@ export async function main(): Promise<void> {
 		maxIterations: config.maxIterations,
 	});
 
-	const server = createWebhookServer(config.webhookSecret, handlers);
+	const server = createWebhookServer(config.webhookSecret, handlers, sessionStore, config.adminUsername, config.adminPassword);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
