@@ -12,6 +12,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/99", number: 99 } })),
+				list: vi.fn(async () => ({ data: [] as any[] })),
 				listReviewComments: vi.fn(async () => ({ data: [] })),
 			},
 		};
@@ -564,6 +565,68 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
 			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, labels: ["tars"] }),
+		);
+	});
+
+	it("reuses existing PR when createPR reports a pull request already exists", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		executor.execute.mockResolvedValue({
+			status: "complete" as never,
+			summary: "Fixed.",
+			rawResponse: "TARS_STATUS: complete\nFixed.",
+		});
+		const existingPrUrl = "https://github.com/mbrooks/tars/pull/42";
+		const existingPrNumber = 42;
+		octokit.pulls.create.mockRejectedValue(
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"A pull request already exists for mbrooks:tars/issue-6."}'),
+		);
+		octokit.pulls.list.mockResolvedValue({
+			data: [{ number: existingPrNumber, html_url: existingPrUrl }],
+		});
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(octokit.pulls.list).toHaveBeenCalledWith(
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", head: "mbrooks:tars/issue-56", base: "main", state: "open" }),
+		);
+		expect(sessionManager.associatePR).toHaveBeenCalledWith("mbrooks", "tars", 56, existingPrNumber, existingPrUrl);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "complete");
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-pr-created"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: expect.stringContaining(existingPrUrl) }),
 		);
 	});
 });

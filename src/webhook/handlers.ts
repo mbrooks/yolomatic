@@ -437,18 +437,37 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const base = this.deps.defaultBranch;
 		const head = `tars/issue-${issueNumber}`;
 
-		const pr = await this.octokit.pulls.create({
-			owner,
-			repo,
-			title: `TARS: ${title}`,
-			body: `Fixes #${issueNumber}\n\n${summary}`,
-			head,
-			base,
-		});
+		try {
+			const pr = await this.octokit.pulls.create({
+				owner,
+				repo,
+				title: `TARS: ${title}`,
+				body: `Fixes #${issueNumber}\n\n${summary}`,
+				head,
+				base,
+			});
 
-		await this.deps.sessionManager.associatePR(owner, repo, issueNumber, pr.data.number, pr.data.html_url);
+			await this.deps.sessionManager.associatePR(owner, repo, issueNumber, pr.data.number, pr.data.html_url);
 
-		return pr.data.html_url;
+			return pr.data.html_url;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (message.includes("A pull request already exists")) {
+				const existing = await this.octokit.pulls.list({
+					owner,
+					repo,
+					head: `${owner}:${head}`,
+					base,
+					state: "open",
+				});
+				if (existing.data.length > 0) {
+					const pr = existing.data[0];
+					await this.deps.sessionManager.associatePR(owner, repo, issueNumber, pr.number, pr.html_url);
+					return pr.html_url;
+				}
+			}
+			throw error;
+		}
 	}
 
 	private async addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
