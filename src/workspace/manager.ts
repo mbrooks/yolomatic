@@ -517,7 +517,7 @@ export class WorkspaceManager {
 	}
 
 	private getBaseRef(): string {
-		return "origin/HEAD";
+		return `origin/${this.config.defaultBranch}`;
 	}
 
 	private async ensureBaseBranch(bareRepoPath: string): Promise<void> {
@@ -586,7 +586,7 @@ export class WorkspaceManager {
 	}
 
 	private async updateDefaultBranch(bareRepoPath: string): Promise<void> {
-		await this.runCommand("git", ["fetch", "origin"], {
+		await this.runCommand("git", ["fetch", "origin", `+${this.config.defaultBranch}:${this.config.defaultBranch}`], {
 			cwd: bareRepoPath,
 		});
 	}
