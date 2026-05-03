@@ -484,6 +484,7 @@ export class WorkspaceManager {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
 
+		await this.ensureGitIdentity(worktreePath);
 		await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
 
 		if (await this.hasChanges(worktreePath, true)) {
@@ -494,11 +495,15 @@ export class WorkspaceManager {
 			);
 		}
 
-		try {
-			await this.runCommand("git", ["push", "origin", branchName], { cwd: worktreePath });
-		} catch {
-			// Push may fail for benign reasons (already up to date, etc.).
-		}
+		await this.runCommand("git", ["push", "origin", branchName], { cwd: worktreePath });
+	}
+
+	private async ensureGitIdentity(worktreePath: string): Promise<void> {
+		const name = "TARS";
+		const email = `${this.config.githubUsername}@users.noreply.github.com`;
+
+		await this.runCommand("git", ["config", "user.name", name], { cwd: worktreePath });
+		await this.runCommand("git", ["config", "user.email", email], { cwd: worktreePath });
 	}
 
 	private async ensureBareRepo(owner: string, repo: string): Promise<void> {
