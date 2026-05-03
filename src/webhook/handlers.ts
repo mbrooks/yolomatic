@@ -371,19 +371,25 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		if (result.status === "complete") {
+			let prUrl: string;
+			try {
+				// Push branch so code is actually delivered
+				await this.deps.workspaceManager.commitAndPush(
+					owner,
+					repo,
+					issueNumber,
+					generateCommitMessage(state.labels, issueNumber, result.summary),
+				);
+
+				// Create PR via GitHub API
+				prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
+			} catch (error) {
+				await this.handleDeliveryFailure(owner, repo, issueNumber, state, error);
+				return;
+			}
+
 			updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
-
-			// Push branch so code is actually delivered
-			await this.deps.workspaceManager.commitAndPush(
-				owner,
-				repo,
-				issueNumber,
-				generateCommitMessage(state.labels, issueNumber, result.summary),
-			);
-
-			// Create PR via GitHub API
-			const prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
 
 			await this.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
 			await this.postComment(
@@ -502,6 +508,63 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			repo,
 			issue_number: issueNumber,
 			body,
+		});
+	}
+
+	private async handleDeliveryFailure(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		state: SessionState,
+		error: unknown,
+	): Promise<void> {
+		const message = error instanceof Error ? error.message : String(error);
+
+		if (this.deps.selfReportEnabled) {
+			const issueUrl = await this.fileSelfReport(this.createDeliveryFatalError(state, message));
+			await this.postComment(
+				owner,
+				repo,
+				issueNumber,
+				`TARS could not deliver the completed work. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+			);
+			process.stdout.write(`[webhook] delivery failure self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
+		} else {
+			await this.postFailureComment(owner, repo, issueNumber, error, "Delivering completed work");
+		}
+
+		await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+		await this.safeRemoveLabel(owner, repo, issueNumber, "tars-pr-created");
+		await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+	}
+
+	private createDeliveryFatalError(state: SessionState, message: string): FatalSystemError {
+		return new FatalSystemError({
+			toolHistory: [
+				{
+					toolName: "workspace.commitAndPush/createPR",
+					args: undefined,
+					result: message,
+					isError: true,
+					timestamp: new Date().toISOString(),
+				},
+			],
+			fatalError: {
+				category: "git_worktree_failure",
+				message,
+				toolName: "workspace.commitAndPush/createPR",
+			},
+			systemEvidence: {
+				whoami: process.env.USER ?? process.env.LOGNAME ?? "unknown",
+				pwd: process.cwd(),
+				workspacePath: state.workspacePath,
+				lsWorkspace: "(not collected for delivery failure)",
+				gitStatus: "(not collected for delivery failure)",
+				gitBranch: `tars/issue-${state.issueNumber}`,
+				nodeVersion: process.version,
+				timestamp: new Date().toISOString(),
+			},
 		});
 	}
 
