@@ -1055,6 +1055,127 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
 	});
+
+	it("files a self-report when commit and push delivery fails", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/issues/1000" } })),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
+				issueNumber: 1,
+				repo: "teamhub-case",
+				owner: "mbrooks",
+				title,
+				body,
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-teamhub-case/issue-1.jsonl",
+				workspacePath,
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "teamhub-case",
+				owner: "mbrooks",
+				title: "T",
+				body: "B",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-teamhub-case/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+				issueNumber: 1,
+				repo: "teamhub-case",
+				owner: "mbrooks",
+				title: "T",
+				body: "B",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-teamhub-case/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "teamhub-case",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => {
+				throw new Error("Author identity unknown");
+			}),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "opened",
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Body",
+					assignees: [{ login: "tars-bot" }],
+				},
+				repository: { name: "teamhub-case", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			}),
+		).resolves.toBeUndefined();
+
+		expect(octokit.issues.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				owner: "mbrooks",
+				repo: "tars",
+				title: expect.stringContaining("TARS self-report"),
+				body: expect.stringContaining("Author identity unknown"),
+				labels: ["tars-self-report", "bug"],
+			}),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				owner: "mbrooks",
+				repo: "teamhub-case",
+				issue_number: 1,
+				body: expect.stringContaining("could not deliver"),
+			}),
+		);
+		expect(sessionManager.updateStatus).not.toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "complete");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "failed");
+		expect(octokit.pulls.create).not.toHaveBeenCalled();
+	});
 });
 
 
