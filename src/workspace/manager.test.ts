@@ -170,6 +170,12 @@ describe("WorkspaceManager", () => {
 
 		await manager.commitAndPush("mbrooks", "tars", 42);
 
+		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "TARS"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["config", "user.email", "mbrooks@users.noreply.github.com"],
+			{ cwd: worktreePath },
+		);
 		expect(runCommand).toHaveBeenCalledWith("git", ["add", "-A"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -181,6 +187,22 @@ describe("WorkspaceManager", () => {
 			["push", "origin", "tars/issue-42"],
 			{ cwd: worktreePath },
 		);
+	});
+
+	it("throws when push fails", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-push-fails-"));
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "push") {
+				throw new Error("fatal: Authentication failed");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.commitAndPush("mbrooks", "tars", 42)).rejects.toThrow("Authentication failed");
 	});
 
 	it("commits with a custom message when provided", async () => {
