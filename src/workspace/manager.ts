@@ -411,7 +411,6 @@ export class WorkspaceManager {
 
 		await mkdir(this.config.workspacesDir, { recursive: true });
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
-		await this.ensureBaseBranch(bareRepoPath);
 
 		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
 			return {
@@ -427,17 +426,18 @@ export class WorkspaceManager {
 
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 		await this.updateDefaultBranch(bareRepoPath);
+		const baseRef = await this.resolveBaseRef(bareRepoPath);
 
 		try {
 			if (existsBranch) {
-				await this.runCommand("git", ["branch", "-f", branchName, this.getBaseRef()], { cwd: bareRepoPath });
+				await this.runCommand("git", ["branch", "-f", branchName, baseRef], { cwd: bareRepoPath });
 				await this.runCommand("git", ["worktree", "add", "--force", worktreePath, branchName], {
 					cwd: bareRepoPath,
 				});
 			} else {
 				await this.runCommand(
 					"git",
-					["worktree", "add", worktreePath, "-b", branchName, this.getBaseRef()],
+					["worktree", "add", worktreePath, "-b", branchName, baseRef],
 					{
 						cwd: bareRepoPath,
 					},
@@ -516,16 +516,6 @@ export class WorkspaceManager {
 		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
 	}
 
-	private getBaseRef(): string {
-		return `origin/${this.config.defaultBranch}`;
-	}
-
-	private async ensureBaseBranch(bareRepoPath: string): Promise<void> {
-		await this.runCommand("git", ["rev-parse", "--verify", this.getBaseRef()], {
-			cwd: bareRepoPath,
-		});
-	}
-
 	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
 		try {
 			const { stdout } = await this.runCommand("git", ["worktree", "list", "--porcelain"], {
@@ -586,9 +576,64 @@ export class WorkspaceManager {
 	}
 
 	private async updateDefaultBranch(bareRepoPath: string): Promise<void> {
-		await this.runCommand("git", ["fetch", "origin", `+${this.config.defaultBranch}:${this.config.defaultBranch}`], {
+		await this.runCommand("git", ["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"], {
 			cwd: bareRepoPath,
 		});
+
+		try {
+			await this.runCommand("git", ["remote", "set-head", "origin", "-a"], { cwd: bareRepoPath });
+		} catch {
+			// Some repositories or older bare clones may not have enough remote
+			// metadata for origin/HEAD. resolveBaseRef() has fallbacks.
+		}
+	}
+
+	private async resolveBaseRef(bareRepoPath: string): Promise<string> {
+		const candidates = [
+			"origin/HEAD",
+			`origin/${this.config.defaultBranch}`,
+			`refs/remotes/origin/${this.config.defaultBranch}`,
+			this.config.defaultBranch,
+			`refs/heads/${this.config.defaultBranch}`,
+			"HEAD",
+		];
+
+		for (const candidate of candidates) {
+			if (await this.refExists(bareRepoPath, candidate)) {
+				return candidate;
+			}
+		}
+
+		try {
+			const { stdout } = await this.runCommand("git", ["branch", "-r", "--format=%(refname:short)"], {
+				cwd: bareRepoPath,
+			});
+			const remoteBranches = stdout
+				.split("\n")
+				.map((line) => line.trim())
+				.filter((line) => line !== "" && line !== "origin/HEAD");
+
+			if (remoteBranches.length === 1 && await this.refExists(bareRepoPath, remoteBranches[0])) {
+				return remoteBranches[0];
+			}
+		} catch {
+			// Fall through to diagnostic error below.
+		}
+
+		throw new Error(
+			`[workspace] ERROR: Cannot resolve base branch in ${bareRepoPath}\n\n` +
+				`Tried origin/HEAD, origin/${this.config.defaultBranch}, ${this.config.defaultBranch}, and HEAD.\n` +
+				`Check that the remote has at least one branch and that git fetch can read it.`,
+		);
+	}
+
+	private async refExists(bareRepoPath: string, ref: string): Promise<boolean> {
+		try {
+			await this.runCommand("git", ["rev-parse", "--verify", ref], { cwd: bareRepoPath });
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	private async pathExists(targetPath: string): Promise<boolean> {

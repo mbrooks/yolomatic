@@ -226,7 +226,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "mbrooks",
+			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: false,
@@ -236,7 +236,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should resume on tars-feedback-required
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "mbrooks" }] },
+			issue: { number: 42, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "tars-bot" }] },
 			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -265,7 +265,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should resume on tars-pr-created too
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "tars-bot" }] },
 			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -276,7 +276,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore non-TARS labels
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "mbrooks" }] },
+			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "tars-bot" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -287,7 +287,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore bot comments
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "mbrooks" }] },
+			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "tars-bot" }] },
 			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "tars-bot" },

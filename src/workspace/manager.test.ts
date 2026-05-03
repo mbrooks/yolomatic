@@ -60,7 +60,7 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktree.path, "-b", "tars/issue-42", "origin/main"],
+			["worktree", "add", worktree.path, "-b", "tars/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 	});
@@ -103,7 +103,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/main"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 
@@ -145,7 +145,7 @@ describe("WorkspaceManager", () => {
 		expect(worktree.branch).toBe("tars/issue-42");
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["branch", "-f", "tars/issue-42", "origin/main"],
+			["branch", "-f", "tars/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
@@ -326,12 +326,53 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["fetch", "origin", "+master:master"],
+			["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
 			{ cwd: bareRepoPath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/master"],
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "origin/HEAD"],
+			{ cwd: bareRepoPath },
+		);
+	});
+
+	it("falls back to bare HEAD when remote refs are unavailable", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-head-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				const ref = args[2];
+				if (ref === "HEAD") {
+					return { stdout: "abcd1234\n", stderr: "" };
+				}
+				const error = new Error(`fatal: Needed a single revision: ${ref}`) as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "branch" && args[1] === "-r") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", worktreePath, "-b", "tars/issue-42", "HEAD"],
 			{ cwd: bareRepoPath },
 		);
 	});

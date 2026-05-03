@@ -216,9 +216,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
-		if (payload.sender.login === this.deps.githubUsername) {
+		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(
-				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: event from ${this.deps.githubUsername}\n`,
+				`[webhook] issue_comment ignored for ${payload.repository.name}#${payload.issue.number}: comment from ${this.deps.githubUsername}\n`,
 			);
 			return;
 		}
