@@ -6,6 +6,27 @@ import { describe, expect, it, vi } from "vitest";
 import { createWebhookServer, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
+function makeRequest(
+	port: number,
+	options: http.RequestOptions,
+	body?: string,
+): Promise<{ statusCode: number; body: string }> {
+	return new Promise((resolve, reject) => {
+		const req = http.request({ hostname: "127.0.0.1", port, ...options }, (res) => {
+			let data = "";
+			res.on("data", (chunk) => {
+				data += chunk;
+			});
+			res.on("end", () => {
+				resolve({ statusCode: res.statusCode ?? 0, body: data });
+			});
+		});
+		req.on("error", reject);
+		if (body) req.write(body);
+		req.end();
+	});
+}
+
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {
 		const payload = Buffer.from('{"action":"opened"}');
@@ -31,7 +52,7 @@ describe("readBody", () => {
 	it("handles string chunks", async () => {
 		const request = {
 			async *[Symbol.asyncIterator]() {
-				yield 'hello';
+				yield "hello";
 			},
 		} as http.IncomingMessage;
 		const body = await readBody(request);
@@ -513,7 +534,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
 				owner: "mbrooks",
@@ -1057,32 +1078,22 @@ describe("GitHubIssueHandlers", () => {
 	});
 });
 
-
-	function makeRequest(
-		port: number,
-		options: http.RequestOptions,
-		body?: string,
-	): Promise<{ statusCode: number; body: string }> {
-		return new Promise((resolve, reject) => {
-			const req = http.request({ hostname: "127.0.0.1", port, ...options }, (res) => {
-				let data = "";
-				res.on("data", (chunk) => {
-					data += chunk;
-				});
-				res.on("end", () => {
-					resolve({ statusCode: res.statusCode ?? 0, body: data });
-				});
-			});
-			req.on("error", reject);
-			if (body) req.write(body);
-			req.end();
-		});
+describe("createWebhookServer", () => {
+	function makeMockSessionStore(): import("../session/store.js").SessionStore {
+		return {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
 	}
 
-describe("createWebhookServer", () => {
 	it("returns 404 for non-POST or non-/webhook routes", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1097,7 +1108,7 @@ describe("createWebhookServer", () => {
 
 	it("returns 401 for invalid signature", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1116,7 +1127,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handleIssueEvent for valid issues webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1151,7 +1162,7 @@ describe("createWebhookServer", () => {
 			handlePullRequestReviewCommentEvent: vi.fn(),
 			handlePullRequestReviewEvent: vi.fn(),
 		};
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1177,7 +1188,7 @@ describe("createWebhookServer", () => {
 
 	it("ignores unsupported events and returns 200", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1212,7 +1223,7 @@ describe("createWebhookServer", () => {
 			handlePullRequestReviewCommentEvent: vi.fn(),
 			handlePullRequestReviewEvent: vi.fn(),
 		};
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1236,7 +1247,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handlePullRequestReviewCommentEvent for valid PR review comment webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1264,7 +1275,7 @@ describe("createWebhookServer", () => {
 
 	it("calls handlePullRequestReviewEvent for valid PR review webhook", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1292,7 +1303,7 @@ describe("createWebhookServer", () => {
 
 	it("ignores event when x-github-event header is missing", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1315,6 +1326,156 @@ describe("createWebhookServer", () => {
 		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
 		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
 		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 404 for /admin when credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/admin" });
+		expect(response.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("returns 404 for /api/status when credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
+		expect(response.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("returns 401 for /admin without auth header when credentials are configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/admin" });
+		expect(response.statusCode).toBe(401);
+		expect(response.body).toBe("Unauthorized");
+
+		server.close();
+	});
+
+	it("returns 401 for /api/status with wrong credentials", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:wrong").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(401);
+		expect(response.body).toBe("Invalid credentials");
+
+		server.close();
+	});
+
+	it("returns HTML for /admin with valid credentials", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/admin",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toContain("TARS Admin");
+
+		server.close();
+	});
+
+	it("returns JSON for /api/status with valid credentials", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Test",
+					body: "Body",
+					status: "working" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.agent).toBe("busy");
+		expect(body.sessions).toHaveLength(1);
+		expect(body.sessions[0].branch).toBe("tars/issue-1");
+
+		server.close();
+	});
+
+	it("returns 500 for /api/status when getAll throws", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => {
+				throw new Error("disk error");
+			}),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(500);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("disk error");
 
 		server.close();
 	});

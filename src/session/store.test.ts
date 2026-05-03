@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -95,5 +95,60 @@ describe("SessionStore", () => {
 		expect(store.getSessionKey("mbrooks", "tars", 1)).toBe("github-mbrooks-tars-issue-1");
 		expect(store.getSessionPath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.jsonl");
 		expect(store.getStatePath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.state.json");
+	});
+
+	it("getAll returns all sessions from disk", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const state1 = {
+			issueNumber: 1,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "One",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session1.jsonl",
+			workspacePath: "/tmp/workspace1",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		const state2 = {
+			issueNumber: 2,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Two",
+			body: "Body",
+			status: "working" as const,
+			sessionPath: "/tmp/session2.jsonl",
+			workspacePath: "/tmp/workspace2",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		};
+
+		await store.set(state1);
+		await store.set(state2);
+
+		const all = await store.getAll();
+		expect(all.length).toBe(2);
+		expect(all.map((s) => s.issueNumber).sort()).toEqual([1, 2]);
+	});
+
+	it("getAll returns empty array when sessions dir is missing", async () => {
+		const dir = path.join(os.tmpdir(), "tars-store-missing-" + Date.now());
+		const store = new SessionStore(dir);
+		const all = await store.getAll();
+		expect(all).toEqual([]);
+	});
+
+	it("getAll skips invalid state files", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const repoDir = path.join(dir, "github-mbrooks-tars");
+		await mkdir(repoDir, { recursive: true });
+		await writeFile(path.join(repoDir, "issue-1.state.json"), "not json");
+
+		const store = new SessionStore(dir);
+		const all = await store.getAll();
+		expect(all).toEqual([]);
 	});
 });
