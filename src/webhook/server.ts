@@ -205,7 +205,7 @@ export function createWebhookServer(
 			`[webhook] ${new Date().toISOString()} ${request.method ?? "UNKNOWN"} ${request.url ?? ""}\n`,
 		);
 
-		if (request.method === "GET" && request.url === "/admin") {
+		if (request.method === "GET" && request.url === "/tarsadmin") {
 			if (!adminUsername || !adminPassword) {
 				sendText(response, 404, "Not found");
 				return;

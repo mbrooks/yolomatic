@@ -1330,13 +1330,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for /admin when credentials are not configured", async () => {
+	it("returns 404 for /tarsadmin when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/tarsadmin" });
 		expect(response.statusCode).toBe(404);
 
 		server.close();
@@ -1354,13 +1354,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 401 for /admin without auth header when credentials are configured", async () => {
+	it("returns 401 for /tarsadmin without auth header when credentials are configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/tarsadmin" });
 		expect(response.statusCode).toBe(401);
 		expect(response.body).toBe("Unauthorized");
 
@@ -1386,7 +1386,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns HTML for /admin with valid credentials", async () => {
+	it("returns HTML for /tarsadmin with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -1394,7 +1394,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/admin",
+			path: "/tarsadmin",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
