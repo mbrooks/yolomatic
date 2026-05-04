@@ -18,6 +18,8 @@ describe("getConfig", () => {
 		delete process.env.SOUL_PATH;
 		delete process.env.TARS_SELF_REPORT_ENABLED;
 		delete process.env.MAX_ITERATIONS;
+		delete process.env.ADMIN_USERNAME;
+		delete process.env.ADMIN_PASSWORD;
 	});
 
 	afterEach(() => {
@@ -38,6 +40,8 @@ describe("getConfig", () => {
 		expect(config.soulPath).toBeTruthy();
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.maxIterations).toBe(3);
+		expect(config.adminUsername).toBeUndefined();
+		expect(config.adminPassword).toBeUndefined();
 	});
 
 	it("reads environment variables", () => {
@@ -51,6 +55,8 @@ describe("getConfig", () => {
 		process.env.WORKSPACES_DIR = "/tmp/workspaces";
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
 		process.env.MAX_ITERATIONS = "5";
+		process.env.ADMIN_USERNAME = "admin";
+		process.env.ADMIN_PASSWORD = "secret";
 
 		const config = getConfig();
 		expect(config.port).toBe(8080);
@@ -64,6 +70,8 @@ describe("getConfig", () => {
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.maxIterations).toBe(5);
+		expect(config.adminUsername).toBe("admin");
+		expect(config.adminPassword).toBe("secret");
 	});
 
 	it("reads TARS_SELF_REPORT_ENABLED", () => {

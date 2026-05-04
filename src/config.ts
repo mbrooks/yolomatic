@@ -12,6 +12,8 @@ export interface AppConfig {
 	soulPath: string;
 	selfReportEnabled: boolean;
 	maxIterations: number;
+	adminUsername: string | undefined;
+	adminPassword: string | undefined;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -35,5 +37,7 @@ export function getConfig(): AppConfig {
 		soulPath: path.resolve(process.env.SOUL_PATH?.trim() || path.join(process.cwd(), "SOUL.md")),
 		selfReportEnabled: process.env.TARS_SELF_REPORT_ENABLED !== "false",
 		maxIterations: Number.parseInt(process.env.MAX_ITERATIONS ?? "3", 10),
+		adminUsername: process.env.ADMIN_USERNAME?.trim() || undefined,
+		adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
 	};
 }
