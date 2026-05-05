@@ -151,4 +151,32 @@ describe("SessionStore", () => {
 		const all = await store.getAll();
 		expect(all).toEqual([]);
 	});
+
+	it("getAll sorts sessions by createdAt descending, falling back to issueNumber descending", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const base = {
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session.jsonl",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const oldSession = { ...base, issueNumber: 1, createdAt: "2024-01-01T00:00:00.000Z" };
+		const newSession = { ...base, issueNumber: 2, createdAt: "2024-06-01T00:00:00.000Z" };
+		const noCreatedAt = { ...base, issueNumber: 3 };
+
+		await store.set(oldSession);
+		await store.set(newSession);
+		await store.set(noCreatedAt);
+
+		const all = await store.getAll();
+		expect(all.map((s) => s.issueNumber)).toEqual([2, 1, 3]);
+	});
 });

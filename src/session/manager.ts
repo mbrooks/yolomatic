@@ -40,6 +40,7 @@ export class SessionManager {
 			labels,
 			lastActivity: new Date().toISOString(),
 			seeded: false,
+			createdAt: new Date().toISOString(),
 		};
 
 		return this.store.set(state);

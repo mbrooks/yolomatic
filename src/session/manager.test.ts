@@ -32,6 +32,26 @@ describe("SessionManager", () => {
 		expect(persisted.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
 	});
 
+	it("sets createdAt on new sessions", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const before = Date.now();
+		const session = await manager.createSession("mbrooks", "tars", 1, "Title", "Body", "/tmp/ws");
+		const after = Date.now();
+
+		expect(session.createdAt).toBeDefined();
+		const createdAt = new Date(session.createdAt!).getTime();
+		expect(createdAt).toBeGreaterThanOrEqual(before);
+		expect(createdAt).toBeLessThanOrEqual(after);
+
+		const persisted = JSON.parse(
+			await readFile(path.join(sessionsDir, "github-mbrooks-tars", "issue-1.state.json"), "utf8"),
+		) as { createdAt?: string };
+		expect(persisted.createdAt).toBe(session.createdAt);
+	});
+
 	it("stores labels when provided", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);

@@ -19,6 +19,7 @@ export interface SessionState {
 	prNumber?: number;
 	iterationCount?: number;
 	labels?: string[];
+	createdAt?: string;
 }
 
 export class SessionStore {
@@ -98,6 +99,14 @@ export class SessionStore {
 		} catch {
 			// sessions dir doesn't exist or isn't readable
 		}
+		sessions.sort((a, b) => {
+			if (a.createdAt && b.createdAt) {
+				return b.createdAt.localeCompare(a.createdAt);
+			}
+			if (a.createdAt) return -1;
+			if (b.createdAt) return 1;
+			return b.issueNumber - a.issueNumber;
+		});
 		return sessions;
 	}
 }
