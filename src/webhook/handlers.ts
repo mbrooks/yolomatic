@@ -7,6 +7,7 @@ import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { generateCommitMessage } from "../workspace/manager.js";
+import type { TaskController } from "../task-controller.js";
 
 interface IssueLabel {
 	name?: string;
@@ -106,6 +107,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			selfReportEnabled: boolean;
 			maxIterations?: number;
 			octokit?: Octokit;
+			taskController?: TaskController;
+			adminGithubUsername?: string;
 		},
 	) {
 		this.octokit = deps.octokit ?? new Octokit({ auth: deps.githubToken });
@@ -117,6 +120,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubUsername: deps.githubUsername,
 			maxIterations: deps.maxIterations ?? 3,
 			octokit: this.octokit,
+			taskController: deps.taskController,
 		});
 	}
 
@@ -124,6 +128,10 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		if (issue.assignees && issue.assignees.some((a) => a.login === this.deps.githubUsername)) return true;
 		if (issue.assignee?.login === this.deps.githubUsername) return true;
 		return false;
+	}
+
+	private isAdmin(login: string): boolean {
+		return !!this.deps.adminGithubUsername && login === this.deps.adminGithubUsername;
 	}
 
 	async handleIssueEvent(rawPayload: unknown): Promise<void> {
@@ -231,6 +239,40 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
+		const owner = payload.repository.owner.login;
+		const repo = payload.repository.name;
+		const issueNumber = payload.issue.number;
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+
+		// Handle admin stop command
+		const isStopCommand = payload.comment.body.trim().toLowerCase() === "/tars stop";
+		if (isStopCommand) {
+			if (!this.isAdmin(payload.sender.login)) {
+				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
+				await this.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
+				return;
+			}
+
+			process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
+			const cancelledInFlight = this.deps.taskController?.cancel(inFlightKey) ?? false;
+			if (cancelledInFlight) {
+				await this.postComment(owner, repo, issueNumber, "Stopping TARS...");
+				return;
+			}
+
+			const session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+			if (session && session.status === "working") {
+				await this.deps.sessionManager.cancelSession(owner, repo, issueNumber);
+				await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+				await this.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
+				await this.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
+				process.stdout.write(`[webhook] stopped ${inFlightKey} (not in-flight)\n`);
+			} else {
+				await this.postComment(owner, repo, issueNumber, "TARS is not currently working on this issue.");
+			}
+			return;
+		}
+
 		const isAssigned = this.isAssignedToTars(payload.issue);
 		const isCreatedByTars = payload.issue.user?.login === this.deps.githubUsername;
 		const isMentioned =
@@ -251,10 +293,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			);
 			return;
 		}
-
-		const owner = payload.repository.owner.login;
-		const repo = payload.repository.name;
-		const issueNumber = payload.issue.number;
 
 		if (isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
@@ -314,10 +352,23 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		state = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const abortController = new AbortController();
+		this.deps.taskController?.register(inFlightKey, () => abortController.abort());
+
 		let result: ExecutionResult;
 		try {
-			result = await this.deps.executor.execute(state, comment);
+			result = await this.deps.executor.execute(state, comment, undefined, abortController.signal);
 		} catch (error) {
+			if (abortController.signal.aborted) {
+				process.stdout.write(`[webhook] execution aborted for ${inFlightKey}\n`);
+				await this.deps.sessionManager.cancelSession(owner, repo, issueNumber);
+				await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+				await this.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
+				await this.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
+				return;
+			}
+
 			if (error instanceof FatalSystemError && this.deps.selfReportEnabled) {
 				const issueUrl = await this.fileSelfReport(error);
 				await this.postComment(
@@ -339,6 +390,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
 			await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 			throw error;
+		} finally {
+			this.deps.taskController?.unregister(inFlightKey);
 		}
 		process.stdout.write(
 			`[webhook] execution result repo=${repo} issue=#${issueNumber} status=${result.status}\n`,
@@ -405,6 +458,26 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 					result.summary || "No summary provided.",
 					"",
 					"Ready for review.",
+				].join("\n"),
+			);
+			return;
+		}
+
+		if (result.status === "cancelled") {
+			updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "cancelled");
+			process.stdout.write(`[webhook] marked cancelled ${repo}#${issueNumber}\n`);
+			await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+			await this.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
+			await this.postComment(
+				owner,
+				repo,
+				issueNumber,
+				[
+					"Task cancelled by admin.",
+					"",
+					result.summary || "TARS has stopped working on this issue.",
+					"",
+					"TARS is idle and ready for the next task.",
 				].join("\n"),
 			);
 			return;

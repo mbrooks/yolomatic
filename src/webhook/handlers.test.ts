@@ -56,6 +56,18 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
+			cancelSession: vi.fn(async () => ({
+				issueNumber: 56,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "cancelled" as never,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
 			getSessionKey: vi.fn(),
 			getSessionPath: vi.fn(),
 			resumeSession: vi.fn(),
@@ -371,6 +383,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).toHaveBeenCalledWith(
 			expect.objectContaining({ issueNumber: 56 }),
 			"Please resume work",
+			undefined,
+			expect.any(AbortSignal),
 		);
 	});
 
@@ -627,6 +641,130 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining(existingPrUrl) }),
+		);
+	});
+
+	it("ignores /tars stop from non-admin", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			adminGithubUsername: "admin",
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "/tars stop", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Only admins can stop TARS." }),
+		);
+	});
+
+	it("cancels in-flight execution on /tars stop from admin", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const taskController = {
+			cancel: vi.fn(() => true),
+			isActive: vi.fn(() => true),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			adminGithubUsername: "admin",
+			taskController: taskController as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "/tars stop", user: { login: "admin" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Stopping TARS..." }),
+		);
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("marks session cancelled on /tars stop when not in-flight", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const taskController = {
+			cancel: vi.fn(() => false),
+			isActive: vi.fn(() => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		};
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			adminGithubUsername: "admin",
+			taskController: taskController as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "/tars stop", user: { login: "admin" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(sessionManager.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
+		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, name: "tars-working" }),
+		);
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-cancelled"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Task cancelled by admin. TARS is idle." }),
 		);
 	});
 });
