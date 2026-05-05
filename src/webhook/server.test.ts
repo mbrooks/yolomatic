@@ -137,7 +137,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 99,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -235,7 +235,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 42,
 			})),
-			commitAndPush: vi.fn(async () => undefined),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -331,6 +331,98 @@ describe("GitHubIssueHandlers", () => {
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 	});
 
+	it("marks issue complete without PR when there are no changes to deliver", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 42,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 42,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				branch: "tars/issue-42",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+			})),
+			commitAndPush: vi.fn(async () => false),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Proceed", user: { login: "mbrooks" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "TARS: Done");
+		expect(octokit.pulls.create).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 42, "complete");
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.stringContaining("No code changes were necessary."),
+			}),
+		);
+		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-pr-created"] }),
+		);
+	});
+
 	it("ignores duplicate issue events targeting the same issue", async () => {
 		const octokit = {
 			issues: {
@@ -395,7 +487,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -461,7 +553,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -561,7 +653,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
-			commitAndPush: vi.fn(async () => undefined),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -682,7 +774,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 7,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -795,7 +887,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {
@@ -871,7 +963,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = { execute: vi.fn() };
@@ -926,7 +1018,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = { execute: vi.fn() };
@@ -1008,7 +1100,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 

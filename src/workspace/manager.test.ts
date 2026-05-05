@@ -168,7 +168,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.commitAndPush("mbrooks", "tars", 42);
+		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "TARS"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
@@ -189,7 +189,7 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
-	it("throws when there are no changes and no commits ahead of base", async () => {
+	it("returns false when there are no changes and no commits ahead of base", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-changes-no-commits-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
@@ -202,9 +202,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.commitAndPush("mbrooks", "tars", 42)).rejects.toThrow(
-			"No changes to commit on tars/issue-42",
-		);
+		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(false);
 	});
 
 	it("pushes when there are no new changes but commits already exist on branch", async () => {
@@ -221,7 +219,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.commitAndPush("mbrooks", "tars", 42);
+		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -261,7 +259,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.commitAndPush("mbrooks", "tars", 42, "feat: Add widget support");
+		expect(await manager.commitAndPush("mbrooks", "tars", 42, "feat: Add widget support")).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
