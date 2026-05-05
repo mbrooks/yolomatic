@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { access, mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -150,5 +150,40 @@ describe("SessionStore", () => {
 		const store = new SessionStore(dir);
 		const all = await store.getAll();
 		expect(all).toEqual([]);
+	});
+
+	it("deletes session state and log files", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const state = {
+			issueNumber: 7,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Delete me",
+			body: "Body",
+			status: "complete" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 7),
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		await store.set(state);
+		await writeFile(state.sessionPath, "log line\n");
+		expect(await store.exists("mbrooks", "tars", 7)).toBe(true);
+
+		await store.delete("mbrooks", "tars", 7);
+
+		expect(await store.exists("mbrooks", "tars", 7)).toBe(false);
+		expect(await store.get("mbrooks", "tars", 7)).toBeNull();
+		await expect(access(store.getStatePath("mbrooks", "tars", 7))).rejects.toThrow();
+		await expect(access(store.getSessionPath("mbrooks", "tars", 7))).rejects.toThrow();
+	});
+
+	it("delete is idempotent for missing sessions", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+		await expect(store.delete("mbrooks", "tars", 999)).resolves.toBeUndefined();
 	});
 });

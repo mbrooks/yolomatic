@@ -33,6 +33,12 @@ header {
 	margin-bottom: 1rem;
 }
 
+.header-actions {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+}
+
 h1 {
 	font-size: 1.25rem;
 }
@@ -161,6 +167,28 @@ tr:hover td {
 .stop-btn:disabled {
 	opacity: 0.6;
 	cursor: not-allowed;
+}
+
+.delete-btn {
+	background: var(--red);
+	border: none;
+	border-radius: 4px;
+	color: #fff;
+	cursor: pointer;
+	font-size: 0.75rem;
+	font-weight: 600;
+	padding: 0.25rem 0.5rem;
+}
+
+.delete-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.delete-btn.bulk {
+	background: var(--surface);
+	border: 1px solid var(--red);
+	color: var(--red);
 }
 
 .stop-result {
