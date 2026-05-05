@@ -124,4 +124,17 @@ export class SessionManager {
 			lastActivity: new Date().toISOString(),
 		});
 	}
+
+	async cancelSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			status: "cancelled",
+			lastActivity: new Date().toISOString(),
+		});
+	}
 }

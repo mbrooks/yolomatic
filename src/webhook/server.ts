@@ -7,6 +7,7 @@ import { extname, join, relative, resolve } from "node:path";
 
 import type { WebhookHandlers } from "./handlers.js";
 import type { SessionState, SessionStore } from "../session/store.js";
+import type { TaskController } from "../task-controller.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
@@ -226,6 +227,7 @@ export function createWebhookServer(
 	sessionStore: SessionStore,
 	adminUsername?: string,
 	adminPassword?: string,
+	taskController?: TaskController,
 	options: WebhookServerOptions = {},
 ) {
 	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
@@ -277,6 +279,72 @@ export function createWebhookServer(
 				process.stdout.write(`[webhook] status error: ${message}\n`);
 				sendJson(response, 500, { error: message });
 			}
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname.startsWith("/api/sessions/")) {
+			if (!adminUsername || !adminPassword) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+
+			const cancelMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/cancel$/u.exec(requestUrl.pathname);
+			if (cancelMatch) {
+				const [, owner, repo, issueNumberStr] = cancelMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					const key = `${owner}/${repo}#${issueNumber}`;
+					const wasActive = taskController?.isActive(key) ?? false;
+					const cancelled = taskController?.cancel(key) ?? false;
+
+					if (cancelled) {
+						sendJson(response, 200, {
+							owner,
+							repo,
+							issueNumber,
+							cancelled: true,
+							wasActive,
+							message: "Cancellation signal sent. TARS will stop after completing the current step.",
+						});
+					} else {
+						if (session.status === "working") {
+							session.status = "cancelled";
+							session.lastActivity = new Date().toISOString();
+							await sessionStore.set(session);
+						}
+						sendJson(response, 200, {
+							owner,
+							repo,
+							issueNumber,
+							cancelled: false,
+							wasActive,
+							status: session.status,
+							message: session.status === "cancelled" ? "Session marked as cancelled." : "TARS was not active on this session.",
+						});
+					}
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] cancel error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			sendJson(response, 404, { error: "Not found" });
 			return;
 		}
 

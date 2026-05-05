@@ -6,6 +6,7 @@ import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { generateCommitMessage } from "../workspace/manager.js";
 import { classifyComments } from "./classifier.js";
+import type { TaskController } from "../task-controller.js";
 
 export interface PRReviewComment {
 	id: number;
@@ -61,6 +62,7 @@ export interface PRReviewHandlerDeps {
 	githubUsername: string;
 	maxIterations: number;
 	octokit?: Octokit;
+	taskController?: TaskController;
 }
 
 export class PRReviewHandler {
@@ -248,6 +250,10 @@ export class PRReviewHandler {
 			`Picked up review feedback. Iteration ${ (state.iterationCount ?? 0) + 1 }/${ this.deps.maxIterations }.`,
 		);
 
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const abortController = new AbortController();
+		this.deps.taskController?.register(inFlightKey, () => abortController.abort());
+
 		let result: import("../executor/index.js").ExecutionResult;
 		try {
 			result = await this.deps.executor.execute(state, undefined, {
@@ -258,15 +264,40 @@ export class PRReviewHandler {
 					line: c.line ?? undefined,
 				})),
 				reviewBody,
-			});
+			}, abortController.signal);
 		} catch (error) {
+			if (abortController.signal.aborted) {
+				process.stdout.write(`[webhook] PR review execution aborted for ${inFlightKey}\n`);
+				await this.deps.sessionManager.cancelSession(owner, repo, issueNumber);
+				await this.postPRComment(owner, repo, prNumber, "Task cancelled by admin. TARS is idle.");
+				return;
+			}
 			const message = error instanceof Error ? error.message : String(error);
 			await this.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${ message }`);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
+		} finally {
+			this.deps.taskController?.unregister(inFlightKey);
 		}
 
 		await this.deps.sessionManager.incrementIterationCount(owner, repo, issueNumber);
+
+		if (result.status === "cancelled") {
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "cancelled");
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"Task cancelled by admin.",
+					"",
+					result.summary || "TARS has stopped working on this review.",
+					"",
+					"TARS is idle and ready for the next task.",
+				].join("\n"),
+			);
+			return;
+		}
 
 		if (result.status === "complete") {
 			await this.deps.workspaceManager.commitAndPush(

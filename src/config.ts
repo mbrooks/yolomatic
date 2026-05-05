@@ -14,6 +14,7 @@ export interface AppConfig {
 	maxIterations: number;
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
+	adminGithubUsername: string | undefined;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -39,5 +40,6 @@ export function getConfig(): AppConfig {
 		maxIterations: Number.parseInt(process.env.MAX_ITERATIONS ?? "3", 10),
 		adminUsername: process.env.ADMIN_USERNAME?.trim() || undefined,
 		adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
+		adminGithubUsername: process.env.ADMIN_GITHUB_USERNAME?.trim() || process.env.ADMIN_USERNAME?.trim() || undefined,
 	};
 }

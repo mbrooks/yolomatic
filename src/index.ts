@@ -4,6 +4,7 @@ import { getConfig } from "./config.js";
 import { PiAgentExecutor } from "./executor/index.js";
 import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
+import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { createWebhookServer } from "./webhook/server.js";
 import { WorkspaceManager } from "./workspace/manager.js";
@@ -19,6 +20,7 @@ export async function main(): Promise<void> {
 		defaultBranch: config.defaultBranch,
 	});
 	const executor = new PiAgentExecutor({ soulPath: config.soulPath });
+	const taskController = new TaskController();
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,
@@ -29,9 +31,18 @@ export async function main(): Promise<void> {
 		defaultBranch: config.defaultBranch,
 		selfReportEnabled: config.selfReportEnabled,
 		maxIterations: config.maxIterations,
+		taskController,
+		adminGithubUsername: config.adminGithubUsername,
 	});
 
-	const server = createWebhookServer(config.webhookSecret, handlers, sessionStore, config.adminUsername, config.adminPassword);
+	const server = createWebhookServer(
+		config.webhookSecret,
+		handlers,
+		sessionStore,
+		config.adminUsername,
+		config.adminPassword,
+		taskController,
+	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
