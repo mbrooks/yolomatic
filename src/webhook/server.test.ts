@@ -1,5 +1,8 @@
 import { createHmac } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,7 +13,7 @@ function makeRequest(
 	port: number,
 	options: http.RequestOptions,
 	body?: string,
-): Promise<{ statusCode: number; body: string }> {
+): Promise<{ statusCode: number; body: string; headers: http.IncomingHttpHeaders }> {
 	return new Promise((resolve, reject) => {
 		const req = http.request({ hostname: "127.0.0.1", port, ...options }, (res) => {
 			let data = "";
@@ -18,7 +21,7 @@ function makeRequest(
 				data += chunk;
 			});
 			res.on("end", () => {
-				resolve({ statusCode: res.statusCode ?? 0, body: data });
+				resolve({ statusCode: res.statusCode ?? 0, body: data, headers: res.headers });
 			});
 		});
 		req.on("error", reject);
@@ -1509,21 +1512,77 @@ describe("createWebhookServer", () => {
 
 	it("returns HTML for /tarsadmin with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		await writeFile(
+			join(adminAssetsDir, "index.html"),
+			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div><script type="module" src="/tarsadmin/assets/main.js"></script></body></html>',
+		);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, {
-			method: "GET",
-			path: "/tarsadmin",
-			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
-			},
-		});
-		expect(response.statusCode).toBe(200);
-		expect(response.body).toContain("TARS Admin");
+		try {
+			const response = await makeRequest(port, {
+				method: "GET",
+				path: "/tarsadmin",
+				headers: {
+					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				},
+			});
+			expect(response.statusCode).toBe(200);
+			expect(response.headers["content-type"]).toContain("text/html");
+			expect(response.body).toContain("TARS Admin");
+			expect(response.body).toContain('id="root"');
+			expect(response.body).toContain("/tarsadmin/assets/main.js");
+		} finally {
+			server.close();
+			await rm(adminAssetsDir, { force: true, recursive: true });
+		}
+	});
 
-		server.close();
+	it("serves /tarsadmin bundled assets with valid credentials", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		await mkdir(join(adminAssetsDir, "assets"));
+		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", { adminAssetsDir });
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const response = await makeRequest(port, {
+				method: "GET",
+				path: "/tarsadmin/assets/main.js",
+				headers: {
+					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				},
+			});
+			expect(response.statusCode).toBe(200);
+			expect(response.headers["content-type"]).toContain("text/javascript");
+			expect(response.body).toBe("console.log('admin');");
+		} finally {
+			server.close();
+			await rm(adminAssetsDir, { force: true, recursive: true });
+		}
+	});
+
+	it("requires auth for /tarsadmin bundled assets", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		await mkdir(join(adminAssetsDir, "assets"));
+		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", { adminAssetsDir });
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const response = await makeRequest(port, { method: "GET", path: "/tarsadmin/assets/main.js" });
+			expect(response.statusCode).toBe(401);
+			expect(response.body).toBe("Unauthorized");
+		} finally {
+			server.close();
+			await rm(adminAssetsDir, { force: true, recursive: true });
+		}
 	});
 
 	it("returns JSON for /api/status with valid credentials", async () => {
