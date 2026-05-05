@@ -137,6 +137,37 @@ tr:hover td {
 	color: var(--red);
 }
 
+.status-badge.cancelled {
+	color: var(--red);
+}
+
+.stop-cell {
+	align-items: center;
+	display: flex;
+	gap: 0.5rem;
+}
+
+.stop-btn {
+	background: var(--red);
+	border: none;
+	border-radius: 4px;
+	color: #fff;
+	cursor: pointer;
+	font-size: 0.75rem;
+	font-weight: 600;
+	padding: 0.25rem 0.5rem;
+}
+
+.stop-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.stop-result {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
 a {
 	color: var(--blue);
 	text-decoration: none;

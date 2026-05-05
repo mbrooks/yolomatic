@@ -229,4 +229,24 @@ describe("SessionManager", () => {
 			"No session for mbrooks/tars#999",
 		);
 	});
+
+	it("cancels an existing session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 12, "Title", "Body", "/tmp/ws");
+		const updated = await manager.cancelSession("mbrooks", "tars", 12);
+		expect(updated.status).toBe("cancelled");
+	});
+
+	it("throws when cancelling a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.cancelSession("mbrooks", "tars", 999)).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
 });

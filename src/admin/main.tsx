@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
 
 type AgentStatus = "online" | "busy" | "feedback" | "offline";
-type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed";
+type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
 
 type Session = {
 	owner: string;
@@ -87,6 +87,41 @@ function StatusBadge({ status }: { status: AgentStatus }): React.ReactElement {
 	return <span className={`badge ${status}`}>{labelAgentStatus(status)}</span>;
 }
 
+function StopButton({ owner, repo, issueNumber }: { owner: string; repo: string; issueNumber: number }): React.ReactElement {
+	const [stopping, setStopping] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleStop = useCallback(async () => {
+		if (!window.confirm(`Stop TARS on ${owner}/${repo}#${issueNumber}?`)) return;
+		setStopping(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/cancel`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Stopped.");
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setStopping(false);
+		}
+	}, [owner, repo, issueNumber]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="stop-btn" onClick={handleStop} disabled={stopping}>
+				{stopping ? "Stopping…" : "Stop"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
 function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
@@ -102,6 +137,7 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 					<th>Workspace</th>
 					<th>Last Activity</th>
 					<th>PR</th>
+					<th>Actions</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -127,6 +163,17 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 								<a href={session.prUrl} target="_blank" rel="noreferrer">
 									#{session.prNumber}
 								</a>
+							) : (
+								"-"
+							)}
+						</td>
+						<td>
+							{session.status === "working" ? (
+								<StopButton
+									owner={session.owner}
+									repo={session.repo}
+									issueNumber={session.issueNumber}
+								/>
 							) : (
 								"-"
 							)}

@@ -471,4 +471,76 @@ describe("PiAgentExecutor", () => {
 		expect(abort).toHaveBeenCalled();
 		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
+
+	it("returns cancelled when abort signal is already aborted", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 4,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const controller = new AbortController();
+		controller.abort();
+		const result = await executor.execute(state, undefined, undefined, controller.signal);
+		expect(result.status).toBe("cancelled");
+		expect(result.summary).toBe("Task cancelled before execution started.");
+	});
+
+	it("returns cancelled when abort signal fires during execution", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		const abort = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(async () => {
+				controller.abort();
+				throw new Error("abort error");
+			}),
+			abort,
+			messages: [],
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 5,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const controller = new AbortController();
+		const result = await executor.execute(state, undefined, undefined, controller.signal);
+		expect(result.status).toBe("cancelled");
+		expect(result.summary).toBe("Task cancelled by admin.");
+		expect(abort).toHaveBeenCalled();
+	});
 });
