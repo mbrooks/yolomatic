@@ -1517,7 +1517,7 @@ describe("createWebhookServer", () => {
 			join(adminAssetsDir, "index.html"),
 			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div><script type="module" src="/tarsadmin/assets/main.js"></script></body></html>',
 		);
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1545,7 +1545,7 @@ describe("createWebhookServer", () => {
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1571,7 +1571,7 @@ describe("createWebhookServer", () => {
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -1801,6 +1801,220 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
+	it("deletes a terminal session via POST /api/sessions/:owner/:repo/:issueNumber/delete", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 3,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "complete" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+			delete: vi.fn(async () => undefined),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const workspaceManager = {
+			removeWorktree: vi.fn(async () => undefined),
+		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined, workspaceManager);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/3/delete",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.deleted).toBe(true);
+		expect(body.message).toBe("Session and workspace deleted.");
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 3);
+		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "tars", 3);
+
+		server.close();
+	});
+
+	it("returns 400 when deleting a non-terminal session", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 4,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-4.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-4",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+			delete: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/4/delete",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(400);
+		const body = JSON.parse(response.body);
+		expect(body.error).toContain("Cannot delete session in 'working' status");
+		expect(mockStore.delete).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 404 for delete when session does not exist", async () => {
+		const mockStore = {
+			get: vi.fn(async () => null),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+			delete: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/999/delete",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(404);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
+	it("bulk deletes terminal sessions via POST /api/sessions/delete-completed", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "One",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+				{
+					issueNumber: 2,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Two",
+					body: "Body",
+					status: "working" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+				{
+					issueNumber: 3,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Three",
+					body: "Body",
+					status: "cancelled" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+			delete: vi.fn(async () => undefined),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const workspaceManager = {
+			removeWorktree: vi.fn(async () => undefined),
+		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined, workspaceManager);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/delete-completed",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.deleted).toBe(2);
+		expect(body.failed).toBe(0);
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 3);
+		expect(workspaceManager.removeWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 2);
+
+		server.close();
+	});
+
+	it("returns 404 for delete when admin credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/1/delete",
+		});
+		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});

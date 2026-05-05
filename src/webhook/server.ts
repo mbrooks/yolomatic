@@ -6,8 +6,9 @@ import { createServer } from "node:http";
 import { extname, join, relative, resolve } from "node:path";
 
 import type { WebhookHandlers } from "./handlers.js";
-import type { SessionState, SessionStore } from "../session/store.js";
+import { isTerminalStatus, type SessionState, type SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
+import type { WorkspaceManager } from "../workspace/manager.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
@@ -228,6 +229,7 @@ export function createWebhookServer(
 	adminUsername?: string,
 	adminPassword?: string,
 	taskController?: TaskController,
+	workspaceManager?: WorkspaceManager,
 	options: WebhookServerOptions = {},
 ) {
 	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
@@ -344,6 +346,93 @@ export function createWebhookServer(
 				return;
 			}
 
+			const deleteMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/delete$/u.exec(requestUrl.pathname);
+			if (deleteMatch) {
+				const [, owner, repo, issueNumberStr] = deleteMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (!isTerminalStatus(session.status)) {
+						sendJson(response, 400, {
+							error: `Cannot delete session in '${session.status}' status. Only terminal sessions (complete, failed, cancelled) can be deleted.`,
+						});
+						return;
+					}
+
+					if (workspaceManager) {
+						await workspaceManager.removeWorktree(owner, repo, issueNumber);
+					}
+					await sessionStore.delete(owner, repo, issueNumber);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						deleted: true,
+						message: "Session and workspace deleted.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] delete error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const bulkDeleteMatch = requestUrl.pathname === "/api/sessions/delete-completed";
+			if (bulkDeleteMatch) {
+				try {
+					const sessions = await sessionStore.getAll();
+					const terminalSessions = sessions.filter((s) => isTerminalStatus(s.status));
+					const results: Array<{ owner: string; repo: string; issueNumber: number; deleted: boolean; error?: string }> = [];
+
+					for (const session of terminalSessions) {
+						try {
+							if (workspaceManager) {
+								await workspaceManager.removeWorktree(session.owner, session.repo, session.issueNumber);
+							}
+							await sessionStore.delete(session.owner, session.repo, session.issueNumber);
+							results.push({
+								owner: session.owner,
+								repo: session.repo,
+								issueNumber: session.issueNumber,
+								deleted: true,
+							});
+						} catch (err) {
+							const message = err instanceof Error ? err.message : String(err);
+							results.push({
+								owner: session.owner,
+								repo: session.repo,
+								issueNumber: session.issueNumber,
+								deleted: false,
+								error: message,
+							});
+						}
+					}
+
+					sendJson(response, 200, {
+						deleted: results.filter((r) => r.deleted).length,
+						failed: results.filter((r) => !r.deleted).length,
+						sessions: results,
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] bulk delete error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
 			sendJson(response, 404, { error: "Not found" });
 			return;
 		}
@@ -393,4 +482,33 @@ export function createWebhookServer(
 		process.stdout.write("[webhook] handled successfully\n");
 		sendText(response, 200, "OK");
 	});
+}
+
+export async function cleanupOldSessions(
+	sessionStore: SessionStore,
+	workspaceManager: WorkspaceManager | undefined,
+	retentionDays: number,
+): Promise<{ deleted: number; failed: number }> {
+	const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+	const sessions = await sessionStore.getAll();
+	const stale = sessions.filter((s) => isTerminalStatus(s.status) && new Date(s.lastActivity).getTime() < cutoff);
+	let deleted = 0;
+	let failed = 0;
+	for (const session of stale) {
+		try {
+			if (workspaceManager) {
+				await workspaceManager.removeWorktree(session.owner, session.repo, session.issueNumber);
+			}
+			await sessionStore.delete(session.owner, session.repo, session.issueNumber);
+			deleted++;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[cleanup] failed to delete ${session.owner}/${session.repo}#${session.issueNumber}: ${message}\n`);
+			failed++;
+		}
+	}
+	if (deleted > 0 || failed > 0) {
+		process.stdout.write(`[cleanup] ${deleted} deleted, ${failed} failed out of ${stale.length} stale sessions\n`);
+	}
+	return { deleted, failed };
 }
