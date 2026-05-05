@@ -1721,6 +1721,134 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
+	it("sorts sessions by createdAt descending in /api/status", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "First",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: "2026-01-01T00:00:00.000Z",
+					createdAt: "2026-01-01T00:00:00.000Z",
+					seeded: false,
+				},
+				{
+					issueNumber: 2,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Second",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					lastActivity: "2026-01-02T00:00:00.000Z",
+					createdAt: "2026-01-03T00:00:00.000Z",
+					seeded: false,
+				},
+				{
+					issueNumber: 3,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Third",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+					lastActivity: "2026-01-03T00:00:00.000Z",
+					createdAt: "2026-01-02T00:00:00.000Z",
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.sessions).toHaveLength(3);
+		expect(body.sessions[0].issueNumber).toBe(2); // newest createdAt first
+		expect(body.sessions[1].issueNumber).toBe(3);
+		expect(body.sessions[2].issueNumber).toBe(1);
+
+		server.close();
+	});
+
+	it("falls back to lastActivity when createdAt is missing", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Old",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: "2026-01-01T00:00:00.000Z",
+					seeded: false,
+				},
+				{
+					issueNumber: 2,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "New",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					lastActivity: "2026-01-03T00:00:00.000Z",
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.sessions).toHaveLength(2);
+		expect(body.sessions[0].issueNumber).toBe(2); // newer lastActivity first
+		expect(body.sessions[1].issueNumber).toBe(1);
+
+		server.close();
+	});
+
 	it("returns 500 for /api/status when getAll throws", async () => {
 		const mockStore = {
 			get: vi.fn(),

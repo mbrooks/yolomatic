@@ -39,6 +39,7 @@ export class SessionManager {
 			workspacePath,
 			labels,
 			lastActivity: new Date().toISOString(),
+			createdAt: new Date().toISOString(),
 			seeded: false,
 		};
 
