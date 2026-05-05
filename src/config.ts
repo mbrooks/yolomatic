@@ -15,6 +15,7 @@ export interface AppConfig {
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
 	adminGithubUsername: string | undefined;
+	cleanupRetentionDays: number | undefined;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -41,5 +42,11 @@ export function getConfig(): AppConfig {
 		adminUsername: process.env.ADMIN_USERNAME?.trim() || undefined,
 		adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
 		adminGithubUsername: process.env.ADMIN_GITHUB_USERNAME?.trim() || process.env.ADMIN_USERNAME?.trim() || undefined,
+		cleanupRetentionDays: (() => {
+			const raw = process.env.CLEANUP_RETENTION_DAYS?.trim();
+			if (!raw) return undefined;
+			const parsed = Number.parseInt(raw, 10);
+			return Number.isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+		})(),
 	};
 }
