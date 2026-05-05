@@ -51,7 +51,7 @@ describe("PRReviewHandler", () => {
 				repo: "tars",
 				issueNumber: 56,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -161,6 +161,40 @@ describe("PRReviewHandler", () => {
 			expect.objectContaining({
 				issue_number: 99,
 				body: expect.stringContaining("iteration complete"),
+			}),
+		);
+	});
+
+	it("posts no-changes message when commitAndPush returns false", async () => {
+		const { handler, sessionManager, workspaceManager, octokit } = createHandler();
+		workspaceManager.commitAndPush.mockResolvedValue(false);
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete",
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
+		});
+
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
+		});
+
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("No changes were needed."),
 			}),
 		);
 	});
