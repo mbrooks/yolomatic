@@ -6,6 +6,12 @@ import "./styles.css";
 type AgentStatus = "online" | "busy" | "feedback" | "offline";
 type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
 
+const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
+
+function isTerminalStatus(status: SessionStatus): boolean {
+	return TERMINAL_STATUSES.includes(status);
+}
+
 type Session = {
 	owner: string;
 	repo: string;
@@ -122,6 +128,78 @@ function StopButton({ owner, repo, issueNumber }: { owner: string; repo: string;
 	);
 }
 
+function DeleteButton({ owner, repo, issueNumber, onDeleted }: { owner: string; repo: string; issueNumber: number; onDeleted?: () => void }): React.ReactElement {
+	const [deleting, setDeleting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleDelete = useCallback(async () => {
+		if (!window.confirm(`Delete session and workspace for ${owner}/${repo}#${issueNumber}? This cannot be undone.`)) return;
+		setDeleting(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/delete`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Deleted.");
+				onDeleted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setDeleting(false);
+		}
+	}, [owner, repo, issueNumber, onDeleted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="delete-btn" onClick={handleDelete} disabled={deleting}>
+				{deleting ? "Deleting…" : "Delete"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
+	const [deleting, setDeleting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleDelete = useCallback(async () => {
+		if (!window.confirm(`Delete all ${count} terminal sessions and their workspaces? This cannot be undone.`)) return;
+		setDeleting(true);
+		setResult(null);
+		try {
+			const response = await fetch("/api/sessions/delete-completed", {
+				method: "POST",
+			});
+			const data = (await response.json()) as { deleted?: number; error?: string };
+			if (response.ok) {
+				setResult(`${data.deleted ?? 0} deleted.`);
+				onDeleted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setDeleting(false);
+		}
+	}, [count, onDeleted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="delete-btn bulk" onClick={handleDelete} disabled={deleting}>
+				{deleting ? "Deleting…" : `Delete all completed (${count})`}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
 function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
@@ -174,6 +252,12 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 									repo={session.repo}
 									issueNumber={session.issueNumber}
 								/>
+							) : isTerminalStatus(session.status) ? (
+								<DeleteButton
+									owner={session.owner}
+									repo={session.repo}
+									issueNumber={session.issueNumber}
+								/>
 							) : (
 								"-"
 							)}
@@ -186,9 +270,11 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 }
 
 function App(): React.ReactElement {
+	const [tick, setTick] = useState(0);
 	const state = useStatus();
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
+	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
 	const lastUpdated = useMemo(() => {
 		if (state.status === "loading") return "Loading...";
 		if (state.status === "error") return `Error: ${state.error}`;
@@ -199,7 +285,12 @@ function App(): React.ReactElement {
 		<>
 			<header>
 				<h1>TARS Admin</h1>
-				<StatusBadge status={agentStatus} />
+				<div className="header-actions">
+					<StatusBadge status={agentStatus} />
+					{terminalCount > 0 && (
+						<BulkDeleteButton count={terminalCount} onDeleted={() => setTick((t) => t + 1)} />
+					)}
+				</div>
 			</header>
 			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} />}
 			<div className="last-updated">{lastUpdated}</div>

@@ -1,7 +1,13 @@
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
+
+export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
+
+export function isTerminalStatus(status: SessionStatus): boolean {
+	return TERMINAL_STATUSES.includes(status);
+}
 
 export interface SessionState {
 	issueNumber: number;
@@ -71,6 +77,23 @@ export class SessionStore {
 			return true;
 		} catch {
 			return false;
+		}
+	}
+
+	async delete(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const key = this.getSessionKey(owner, repo, issueNumber);
+		this.sessions.delete(key);
+		const statePath = this.getStatePath(owner, repo, issueNumber);
+		const sessionPath = this.getSessionPath(owner, repo, issueNumber);
+		try {
+			await rm(statePath, { force: true });
+		} catch {
+			// ignore
+		}
+		try {
+			await rm(sessionPath, { force: true });
+		} catch {
+			// ignore
 		}
 	}
 

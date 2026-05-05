@@ -6,7 +6,7 @@ import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
 import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
-import { createWebhookServer } from "./webhook/server.js";
+import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 
 export async function main(): Promise<void> {
@@ -42,10 +42,20 @@ export async function main(): Promise<void> {
 		config.adminUsername,
 		config.adminPassword,
 		taskController,
+		workspaceManager,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
+
+	if (config.cleanupRetentionDays) {
+		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);
+		await cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays);
+		const cleanupIntervalMs = 24 * 60 * 60 * 1000;
+		setInterval(() => {
+			void cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays!);
+		}, cleanupIntervalMs);
+	}
 }
 
 /* c8 ignore start */
