@@ -189,11 +189,54 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("throws when there are no changes and no commits ahead of base", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-changes-no-commits-"));
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-list" && args[1] === "--count") {
+				return { stdout: "0\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.commitAndPush("mbrooks", "tars", 42)).rejects.toThrow(
+			"No changes to commit on tars/issue-42",
+		);
+	});
+
+	it("pushes when there are no new changes but commits already exist on branch", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-existing-commits-"));
+		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-list" && args[1] === "--count") {
+				return { stdout: "3\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.commitAndPush("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["push", "origin", "tars/issue-42"],
+			{ cwd: worktreePath },
+		);
+	});
+
 	it("throws when push fails", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-push-fails-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
-				return { stdout: "", stderr: "" };
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
 			}
 			if (args[0] === "push") {
 				throw new Error("fatal: Authentication failed");
