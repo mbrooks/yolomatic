@@ -45,7 +45,7 @@ vi.mock("./session/manager.js", () => ({
 vi.mock("./workspace/manager.js", () => ({
 	WorkspaceManager: vi.fn(() => ({
 		createOrGetWorktree: vi.fn(),
-		commitAndPush: vi.fn(),
+		commitAndPush: vi.fn(async () => true),
 		removeWorktree: vi.fn(),
 	})),
 }));
