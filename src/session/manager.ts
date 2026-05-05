@@ -85,6 +85,63 @@ export class SessionManager {
 		});
 	}
 
+	async markStale(owner: string, repo: string, issueNumber: number, reason: string): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			staleDetectedAt: new Date().toISOString(),
+			staleReason: reason,
+		});
+	}
+
+	async markFailed(owner: string, repo: string, issueNumber: number, reason?: string): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			status: "failed",
+			lastActivity: new Date().toISOString(),
+			staleDetectedAt: new Date().toISOString(),
+			staleReason: reason ?? existing.staleReason,
+			summary: reason && !existing.summary ? reason : existing.summary,
+		});
+	}
+
+	async markComplete(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			status: "complete",
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async archiveSession(owner: string, repo: string, issueNumber: number, archiveDir: string): Promise<void> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		const archived: SessionState = {
+			...existing,
+			archivedAt: new Date().toISOString(),
+		};
+
+		await this.store.set(archived);
+		await this.store.archive(archived, archiveDir);
+	}
+
 	async markSeeded(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {

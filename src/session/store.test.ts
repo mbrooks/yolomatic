@@ -95,17 +95,19 @@ describe("SessionStore", () => {
 		expect(store.getSessionKey("mbrooks", "tars", 1)).toBe("github-mbrooks-tars-issue-1");
 		expect(store.getSessionPath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.jsonl");
 		expect(store.getStatePath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.state.json");
+		expect(store.getArchivePath("/tmp/archive", "mbrooks", "tars", 1)).toBe("/tmp/archive/github-mbrooks-tars/issue-1.state.json");
+		expect(store.getSessionArchivePath("/tmp/archive", "mbrooks", "tars", 1)).toBe("/tmp/archive/github-mbrooks-tars/issue-1.jsonl");
 	});
 
-	it("getAll returns all sessions from disk", async () => {
+	it("getAll skips archived sessions", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
 		const store = new SessionStore(dir);
 
-		const state1 = {
+		const activeState = {
 			issueNumber: 1,
 			repo: "tars",
 			owner: "mbrooks",
-			title: "One",
+			title: "Active",
 			body: "Body",
 			status: "pending" as const,
 			sessionPath: "/tmp/session1.jsonl",
@@ -113,25 +115,60 @@ describe("SessionStore", () => {
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};
-		const state2 = {
+		const archivedState = {
 			issueNumber: 2,
 			repo: "tars",
 			owner: "mbrooks",
-			title: "Two",
+			title: "Archived",
 			body: "Body",
-			status: "working" as const,
+			status: "complete" as const,
 			sessionPath: "/tmp/session2.jsonl",
 			workspacePath: "/tmp/workspace2",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
+			archivedAt: new Date().toISOString(),
 		};
 
-		await store.set(state1);
-		await store.set(state2);
+		await store.set(activeState);
+		await store.set(archivedState);
 
 		const all = await store.getAll();
-		expect(all.length).toBe(2);
-		expect(all.map((s) => s.issueNumber).sort()).toEqual([1, 2]);
+		expect(all.length).toBe(1);
+		expect(all[0]?.issueNumber).toBe(1);
+	});
+
+	it("archives session files and removes from cache", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const archiveDir = await mkdtemp(path.join(os.tmpdir(), "tars-archive-"));
+		const store = new SessionStore(dir);
+
+		const state = {
+			issueNumber: 3,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "To Archive",
+			body: "Body",
+			status: "working" as const,
+			sessionPath: "/tmp/session3.jsonl",
+			workspacePath: "/tmp/workspace3",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		await store.set(state);
+
+		const archivedState = { ...state, archivedAt: new Date().toISOString() };
+
+		await store.archive(archivedState, archiveDir);
+
+		expect(await store.exists("mbrooks", "tars", 3)).toBe(false);
+		expect(await store.get("mbrooks", "tars", 3)).toBeNull();
+
+		const archiveStatePath = store.getArchivePath(archiveDir, "mbrooks", "tars", 3);
+		const archiveSessionPath = store.getSessionArchivePath(archiveDir, "mbrooks", "tars", 3);
+		const { access } = await import("node:fs/promises");
+		await expect(access(archiveStatePath)).resolves.toBeUndefined();
+		await expect(access(archiveSessionPath)).rejects.toThrow();
 	});
 
 	it("getAll returns empty array when sessions dir is missing", async () => {

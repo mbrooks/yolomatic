@@ -5,6 +5,7 @@ export interface AppConfig {
 	autoStart: boolean;
 	webhookSecret: string;
 	sessionsDir: string;
+	archiveDir: string;
 	defaultBranch: string;
 	githubToken: string;
 	githubUsername: string;
@@ -14,6 +15,7 @@ export interface AppConfig {
 	maxIterations: number;
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
+	staleThresholdMs: number;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -25,11 +27,13 @@ function requireEnv(name: keyof NodeJS.ProcessEnv): string {
 }
 
 export function getConfig(): AppConfig {
+	const sessionsDir = path.resolve(process.env.SESSIONS_DIR?.trim() || path.join(process.cwd(), "sessions"));
 	return {
 		port: Number.parseInt(process.env.PORT ?? "3000", 10),
 		autoStart: process.env.AUTO_START === "true",
 		webhookSecret: requireEnv("WEBHOOK_SECRET"),
-		sessionsDir: path.resolve(process.env.SESSIONS_DIR?.trim() || path.join(process.cwd(), "sessions")),
+		sessionsDir,
+		archiveDir: path.resolve(process.env.ARCHIVE_DIR?.trim() || path.join(sessionsDir, "archive")),
 		defaultBranch: process.env.DEFAULT_BRANCH?.trim() || "main",
 		githubToken: requireEnv("GITHUB_TOKEN"),
 		githubUsername: requireEnv("GITHUB_USERNAME"),
@@ -39,5 +43,6 @@ export function getConfig(): AppConfig {
 		maxIterations: Number.parseInt(process.env.MAX_ITERATIONS ?? "3", 10),
 		adminUsername: process.env.ADMIN_USERNAME?.trim() || undefined,
 		adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
+		staleThresholdMs: Number.parseInt(process.env.STALE_THRESHOLD_MS ?? "14400000", 10),
 	};
 }

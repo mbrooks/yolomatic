@@ -6,11 +6,24 @@ import { createServer } from "node:http";
 import { extname, join, relative, resolve } from "node:path";
 
 import type { WebhookHandlers } from "./handlers.js";
+import type { SessionManager } from "../session/manager.js";
 import type { SessionState, SessionStore } from "../session/store.js";
+import type { WorkspaceManager } from "../workspace/manager.js";
+import type { StaleSessionDetector, StaleSessionInfo } from "../session/stale-detector.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
 };
+
+export interface WebhookServerDeps {
+	secret: string;
+	handlers: WebhookHandlers;
+	sessionStore: SessionStore;
+	sessionManager?: SessionManager;
+	workspaceManager?: WorkspaceManager;
+	staleDetector?: StaleSessionDetector;
+	archiveDir?: string;
+}
 
 export async function readBody(request: IncomingMessage): Promise<Buffer> {
 	const chunks: Buffer[] = [];
@@ -105,21 +118,36 @@ function computeAgentStatus(sessions: SessionState[]): "online" | "busy" | "feed
 	return "online";
 }
 
-function buildStatusResponse(sessions: SessionState[]) {
+function buildStatusResponse(sessions: SessionState[], staleInfoMap: Map<string, StaleSessionInfo>) {
 	return {
 		agent: computeAgentStatus(sessions),
 		uptime: formatUptime(process.uptime()),
-		sessions: sessions.map((s) => ({
-			owner: s.owner,
-			repo: s.repo,
-			issueNumber: s.issueNumber,
-			status: s.status,
-			workspacePath: s.workspacePath,
-			branch: `tars/issue-${s.issueNumber}`,
-			lastActivity: s.lastActivity,
-			prUrl: s.prUrl ?? null,
-			prNumber: s.prNumber ?? null,
-		})),
+		sessions: sessions.map((s) => {
+			const stale = staleInfoMap.get(`${s.owner}/${s.repo}#${s.issueNumber}`);
+			return {
+				owner: s.owner,
+				repo: s.repo,
+				issueNumber: s.issueNumber,
+				status: s.status,
+				workspacePath: s.workspacePath,
+				branch: `tars/issue-${s.issueNumber}`,
+				lastActivity: s.lastActivity,
+				prUrl: s.prUrl ?? null,
+				prNumber: s.prNumber ?? null,
+				staleDetectedAt: s.staleDetectedAt ?? null,
+				staleReason: s.staleReason ?? null,
+				stale: stale
+					? {
+							isStale: stale.isStale,
+							ageMinutes: Math.floor(stale.ageMs / 60000),
+							classification: stale.classification,
+							worktreeDirty: stale.worktreeDirty,
+							issueState: stale.issueState ?? null,
+							prState: stale.prState ?? null,
+					  }
+					: null,
+			};
+		}),
 	};
 }
 
@@ -221,9 +249,7 @@ function checkBasicAuth(
 }
 
 export function createWebhookServer(
-	secret: string,
-	handlers: WebhookHandlers,
-	sessionStore: SessionStore,
+	{ secret, handlers, sessionStore, sessionManager, workspaceManager, staleDetector, archiveDir }: WebhookServerDeps,
 	adminUsername?: string,
 	adminPassword?: string,
 	options: WebhookServerOptions = {},
@@ -271,10 +297,120 @@ export function createWebhookServer(
 			}
 			try {
 				const sessions = await sessionStore.getAll();
-				sendJson(response, 200, buildStatusResponse(sessions));
+				const staleInfoMap = new Map<string, import("../session/stale-detector.js").StaleSessionInfo>();
+				if (staleDetector) {
+					const staleInfos = await staleDetector.detectStaleSessions();
+					for (const info of staleInfos) {
+						staleInfoMap.set(
+							`${info.session.owner}/${info.session.repo}#${info.session.issueNumber}`,
+							info,
+						);
+					}
+				}
+				sendJson(response, 200, buildStatusResponse(sessions, staleInfoMap));
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				process.stdout.write(`[webhook] status error: ${message}\n`);
+				sendJson(response, 500, { error: message });
+			}
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname === "/api/sessions/archive") {
+			if (!adminUsername || !adminPassword || !sessionManager || !archiveDir) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as { owner?: string; repo?: string; issueNumber?: number };
+			if (!body.owner || !body.repo || !body.issueNumber) {
+				sendJson(response, 400, { error: "Missing owner, repo, or issueNumber" });
+				return;
+			}
+			try {
+				await sessionManager.archiveSession(body.owner, body.repo, body.issueNumber, archiveDir);
+				sendJson(response, 200, { ok: true });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 500, { error: message });
+			}
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname === "/api/sessions/mark-failed") {
+			if (!adminUsername || !adminPassword || !sessionManager) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as { owner?: string; repo?: string; issueNumber?: number; reason?: string };
+			if (!body.owner || !body.repo || !body.issueNumber) {
+				sendJson(response, 400, { error: "Missing owner, repo, or issueNumber" });
+				return;
+			}
+			try {
+				await sessionManager.markFailed(body.owner, body.repo, body.issueNumber, body.reason || "stale_session_cleanup");
+				sendJson(response, 200, { ok: true });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 500, { error: message });
+			}
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname === "/api/sessions/mark-complete") {
+			if (!adminUsername || !adminPassword || !sessionManager) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as { owner?: string; repo?: string; issueNumber?: number };
+			if (!body.owner || !body.repo || !body.issueNumber) {
+				sendJson(response, 400, { error: "Missing owner, repo, or issueNumber" });
+				return;
+			}
+			try {
+				await sessionManager.markComplete(body.owner, body.repo, body.issueNumber);
+				sendJson(response, 200, { ok: true });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 500, { error: message });
+			}
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname === "/api/sessions/prune-worktree") {
+			if (!adminUsername || !adminPassword || !workspaceManager) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as { owner?: string; repo?: string; issueNumber?: number; confirmDirty?: boolean };
+			if (!body.owner || !body.repo || !body.issueNumber) {
+				sendJson(response, 400, { error: "Missing owner, repo, or issueNumber" });
+				return;
+			}
+			try {
+				const dirty = await workspaceManager.hasChanges(
+					workspaceManager["getWorktreePath"](body.owner, body.repo, body.issueNumber),
+					false,
+				);
+				if (dirty && !body.confirmDirty) {
+					sendJson(response, 409, { error: "Worktree is dirty. Pass confirmDirty=true to force." });
+					return;
+				}
+				await workspaceManager.removeWorktree(body.owner, body.repo, body.issueNumber);
+				sendJson(response, 200, { ok: true });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
 				sendJson(response, 500, { error: message });
 			}
 			return;

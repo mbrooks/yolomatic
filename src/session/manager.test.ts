@@ -220,12 +220,89 @@ describe("SessionManager", () => {
 		expect(second.iterationCount).toBe(2);
 	});
 
-	it("throws when incrementing iteration count for a non-existent session", async () => {
+	it("marks a session as stale", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.incrementIterationCount("mbrooks", "tars", 999)).rejects.toThrow(
+		await manager.createSession("mbrooks", "tars", 20, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markStale("mbrooks", "tars", 20, "interrupted_or_abandoned");
+		expect(updated.staleDetectedAt).toBeTruthy();
+		expect(updated.staleReason).toBe("interrupted_or_abandoned");
+		expect(updated.status).toBe("pending");
+	});
+
+	it("throws when marking a non-existent session as stale", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.markStale("mbrooks", "tars", 999, "reason")).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("marks a session as failed with reason", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 21, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markFailed("mbrooks", "tars", 21, "stale_session_cleanup");
+		expect(updated.status).toBe("failed");
+		expect(updated.staleDetectedAt).toBeTruthy();
+		expect(updated.staleReason).toBe("stale_session_cleanup");
+	});
+
+	it("throws when marking a non-existent session as failed", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.markFailed("mbrooks", "tars", 999)).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("marks a session as complete", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 22, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markComplete("mbrooks", "tars", 22);
+		expect(updated.status).toBe("complete");
+	});
+
+	it("throws when marking a non-existent session as complete", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.markComplete("mbrooks", "tars", 999)).rejects.toThrow(
+			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("archives a session to archive dir", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const archiveDir = await mkdtemp(path.join(os.tmpdir(), "tars-archive-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 23, "Title", "Body", "/tmp/ws");
+		await manager.archiveSession("mbrooks", "tars", 23, archiveDir);
+
+		expect(await manager.getSession("mbrooks", "tars", 23)).toBeNull();
+	});
+
+	it("throws when archiving a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const archiveDir = await mkdtemp(path.join(os.tmpdir(), "tars-archive-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.archiveSession("mbrooks", "tars", 999, archiveDir)).rejects.toThrow(
 			"No session for mbrooks/tars#999",
 		);
 	});

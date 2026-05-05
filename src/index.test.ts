@@ -9,6 +9,7 @@ vi.mock("./config.js", () => ({
 		autoStart: true,
 		webhookSecret: "secret",
 		sessionsDir: "/tmp/sessions",
+		archiveDir: "/tmp/sessions/archive",
 		defaultBranch: "main",
 		githubToken: "token",
 		githubUsername: "tars-bot",
@@ -18,6 +19,7 @@ vi.mock("./config.js", () => ({
 		selfReportEnabled: true,
 		adminUsername: "admin",
 		adminPassword: "secret",
+		staleThresholdMs: 14400000,
 	})),
 }));
 
@@ -25,6 +27,7 @@ vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
 		get: vi.fn(),
 		set: vi.fn(),
+		getAll: vi.fn(async () => []),
 	})),
 }));
 
@@ -60,6 +63,7 @@ vi.mock("./webhook/handlers.js", () => ({
 		handleCommentEvent: vi.fn(),
 		handlePullRequestReviewCommentEvent: vi.fn(),
 		handlePullRequestReviewEvent: vi.fn(),
+		isInFlight: vi.fn(() => false),
 	})),
 }));
 
@@ -78,7 +82,19 @@ import { main } from "./index.js";
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret");
+		expect(createWebhookServer).toHaveBeenCalledWith(
+			expect.objectContaining({
+				secret: "secret",
+				handlers: expect.any(Object),
+				sessionStore: expect.any(Object),
+				sessionManager: expect.any(Object),
+				workspaceManager: expect.any(Object),
+				staleDetector: expect.any(Object),
+				archiveDir: "/tmp/sessions/archive",
+			}),
+			"admin",
+			"secret",
+		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 	});
