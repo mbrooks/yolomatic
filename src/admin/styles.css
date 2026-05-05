@@ -1,0 +1,173 @@
+:root {
+	--bg: #0d1117;
+	--surface: #161b22;
+	--border: #30363d;
+	--text: #c9d1d9;
+	--muted: #8b949e;
+	--green: #3fb950;
+	--yellow: #d29922;
+	--red: #f85149;
+	--blue: #58a6ff;
+}
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background: var(--bg);
+	color: var(--text);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+	padding: 1rem;
+}
+
+header {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	justify-content: space-between;
+	margin-bottom: 1rem;
+}
+
+h1 {
+	font-size: 1.25rem;
+}
+
+.badge {
+	align-items: center;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	display: inline-flex;
+	font-size: 0.75rem;
+	font-weight: 600;
+	gap: 0.4rem;
+	letter-spacing: 0.04em;
+	padding: 0.25rem 0.6rem;
+	text-transform: uppercase;
+}
+
+.badge.online {
+	color: var(--green);
+}
+
+.badge.busy {
+	animation: pulse 2s infinite;
+	color: var(--yellow);
+}
+
+.badge.feedback {
+	color: var(--blue);
+}
+
+.badge.offline {
+	color: var(--red);
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
+
+table {
+	border-collapse: collapse;
+	font-size: 0.875rem;
+	margin-top: 1rem;
+	width: 100%;
+}
+
+th,
+td {
+	border-bottom: 1px solid var(--border);
+	padding: 0.6rem 0.5rem;
+	text-align: left;
+	white-space: nowrap;
+}
+
+th {
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+td {
+	color: var(--text);
+}
+
+tr:hover td {
+	background: var(--surface);
+}
+
+.status-badge {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.75rem;
+	padding: 0.15rem 0.4rem;
+}
+
+.status-badge.pending {
+	color: var(--muted);
+}
+
+.status-badge.working {
+	color: var(--yellow);
+}
+
+.status-badge.waiting-feedback {
+	color: var(--blue);
+}
+
+.status-badge.complete {
+	color: var(--green);
+}
+
+.status-badge.failed {
+	color: var(--red);
+}
+
+a {
+	color: var(--blue);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+.empty {
+	color: var(--muted);
+	padding: 2rem 0;
+	text-align: center;
+}
+
+.last-updated {
+	color: var(--muted);
+	font-size: 0.75rem;
+	margin-top: 0.5rem;
+}
+
+@media (max-width: 600px) {
+	th,
+	td {
+		white-space: normal;
+	}
+
+	td:nth-child(3),
+	td:nth-child(4),
+	th:nth-child(3),
+	th:nth-child(4) {
+		display: none;
+	}
+}

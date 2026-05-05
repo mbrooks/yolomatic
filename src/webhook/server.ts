@@ -1,9 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
+import { extname, join, relative, resolve } from "node:path";
 
 import type { WebhookHandlers } from "./handlers.js";
 import type { SessionState, SessionStore } from "../session/store.js";
+
+type WebhookServerOptions = {
+	adminAssetsDir?: string;
+};
 
 export async function readBody(request: IncomingMessage): Promise<Buffer> {
 	const chunks: Buffer[] = [];
@@ -47,6 +54,36 @@ function sendHtml(response: ServerResponse, statusCode: number, body: string): v
 	response.end(body);
 }
 
+function sendStream(response: ServerResponse, statusCode: number, contentType: string, path: string): void {
+	response.statusCode = statusCode;
+	response.setHeader("content-type", contentType);
+	createReadStream(path)
+		.on("error", (error) => {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[webhook] admin asset error: ${message}\n`);
+			if (!response.headersSent) {
+				sendText(response, 500, "Unable to read admin asset");
+			} else {
+				response.destroy();
+			}
+		})
+		.pipe(response);
+}
+
+function contentTypeFor(path: string): string {
+	const extension = extname(path);
+	if (extension === ".css") return "text/css; charset=utf-8";
+	if (extension === ".html") return "text/html; charset=utf-8";
+	if (extension === ".js" || extension === ".mjs") return "text/javascript; charset=utf-8";
+	if (extension === ".json") return "application/json; charset=utf-8";
+	if (extension === ".map") return "application/json; charset=utf-8";
+	if (extension === ".svg") return "image/svg+xml";
+	if (extension === ".png") return "image/png";
+	if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+	if (extension === ".ico") return "image/x-icon";
+	return "application/octet-stream";
+}
+
 function formatUptime(seconds: number): string {
 	const d = Math.floor(seconds / 86400);
 	const h = Math.floor((seconds % 86400) / 3600);
@@ -86,65 +123,55 @@ function buildStatusResponse(sessions: SessionState[]) {
 	};
 }
 
-function adminHtml(): string {
-	return `<!DOCTYPE html>
+function fallbackAdminHtml(): string {
+	return `<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TARS Admin</title>
-<style>
-:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--green:#3fb950;--yellow:#d29922;--red:#f85149;--blue:#58a6ff;}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.5;padding:1rem}
-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
-h1{font-size:1.25rem}
-.badge{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:var(--surface);border:1px solid var(--border)}
-.badge.online{color:var(--green)}
-.badge.busy{color:var(--yellow);animation:pulse 2s infinite}
-.badge.feedback{color:var(--blue)}
-.badge.offline{color:var(--red)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
-table{width:100%;border-collapse:collapse;font-size:.875rem;margin-top:1rem}
-th,td{padding:.6rem .5rem;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
-th{color:var(--muted);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
-td{color:var(--text)}
-tr:hover td{background:var(--surface)}
-.status-badge{font-size:.75rem;padding:.15rem .4rem;border-radius:4px;background:var(--surface);border:1px solid var(--border)}
-.status-badge.pending{color:var(--muted)}
-.status-badge.working{color:var(--yellow)}
-.status-badge.waiting-feedback{color:var(--blue)}
-.status-badge.complete{color:var(--green)}
-.status-badge.failed{color:var(--red)}
-a{color:var(--blue);text-decoration:none}
-a:hover{text-decoration:underline}
-.empty{color:var(--muted);padding:2rem 0;text-align:center}
-.last-updated{color:var(--muted);font-size:.75rem;margin-top:.5rem}
-@media(max-width:600px){th,td{white-space:normal}td:nth-child(3),td:nth-child(4),th:nth-child(3),th:nth-child(4){display:none}}
-</style>
-</head>
-<body>
-<header>
-<h1>TARS Admin</h1>
-<span id="agent-badge" class="badge offline">Offline</span>
-</header>
-<div id="session-list"></div>
-<div class="last-updated" id="last-updated">Loading…</div>
-<script>
-const $=id=>document.getElementById(id);
-const fmtRelative=(iso)=>{const s=(Date.now()-new Date(iso).getTime())/1e3|0;if(s<60)return s+'s ago';const m=s/60|0;if(m<60)return m+'m ago';const h=m/60|0;if(h<24)return h+'h ago';return(h/24|0)+'d ago'};
-const badgeClass={online:'online',busy:'busy',feedback:'feedback',offline:'offline'};
-const sessionClass={pending:'pending',working:'working','waiting-feedback':'waiting-feedback',complete:'complete',failed:'failed'};
-async function load(){try{const res=await fetch('/api/status');if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();$('agent-badge').className='badge '+(badgeClass[data.agent]||'offline');$('agent-badge').textContent=data.agent==='online'?'Online':data.agent==='busy'?'Busy':data.agent==='feedback'?'Feedback':'Offline';const list=$('session-list');if(!data.sessions.length){list.innerHTML='<div class="empty">No active sessions</div>';}else{const cols=['Repo','Issue','Status','Workspace','Last Activity','PR'];const rows=data.sessions.map(s=>{
-const repoLink=s.owner+'/'+s.repo;
-const issueLink='<a href="https://github.com/'+s.owner+'/'+s.repo+'/issues/'+s.issueNumber+'" target="_blank">#'+s.issueNumber+'</a>';
-const prLink=s.prUrl?'<a href="'+s.prUrl+'" target="_blank">#'+s.prNumber+'</a>':'—';
-return '<tr><td>'+repoLink+'</td><td>'+issueLink+'</td><td><span class="status-badge '+sessionClass[s.status]+'">'+s.status+'</span></td><td>'+s.workspacePath+'</td><td>'+fmtRelative(s.lastActivity)+'</td><td>'+prLink+'</td></tr>';}).join('');list.innerHTML='<table><thead><tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table>';}const now=new Date();$('last-updated').textContent='Last updated: '+now.toLocaleTimeString();}catch(e){$('agent-badge').className='badge offline';$('agent-badge').textContent='Offline';$('session-list').innerHTML='<div class="empty">Unable to reach API</div>';$('last-updated').textContent='Error: '+e.message;}}
-load();
-setInterval(load,5000);
-</script>
-</body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>TARS Admin</title>
+	</head>
+	<body>
+		<div id="root">TARS Admin assets have not been built.</div>
+	</body>
 </html>`;
+}
+
+async function adminHtml(adminAssetsDir: string): Promise<string> {
+	try {
+		return await readFile(join(adminAssetsDir, "index.html"), "utf8");
+	} catch {
+		return fallbackAdminHtml();
+	}
+}
+
+async function serveAdminAsset(response: ServerResponse, adminAssetsDir: string, assetPath: string): Promise<void> {
+	let decodedPath: string;
+	try {
+		decodedPath = decodeURIComponent(assetPath);
+	} catch {
+		sendText(response, 400, "Invalid asset path");
+		return;
+	}
+	const resolvedPath = resolve(adminAssetsDir, decodedPath);
+	const relativePath = relative(adminAssetsDir, resolvedPath);
+	if (relativePath.startsWith("..") || relativePath === "" || relativePath.startsWith("/")) {
+		sendText(response, 404, "Not found");
+		return;
+	}
+
+	try {
+		const assetStat = await stat(resolvedPath);
+		if (!assetStat.isFile()) {
+			sendText(response, 404, "Not found");
+			return;
+		}
+	} catch {
+		sendText(response, 404, "Not found");
+		return;
+	}
+
+	sendStream(response, 200, contentTypeFor(resolvedPath), resolvedPath);
 }
 
 function checkBasicAuth(
@@ -199,13 +226,18 @@ export function createWebhookServer(
 	sessionStore: SessionStore,
 	adminUsername?: string,
 	adminPassword?: string,
+	options: WebhookServerOptions = {},
 ) {
+	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
+
 	return createServer(async (request, response) => {
 		process.stdout.write(
 			`[webhook] ${new Date().toISOString()} ${request.method ?? "UNKNOWN"} ${request.url ?? ""}\n`,
 		);
 
-		if (request.method === "GET" && request.url === "/tarsadmin") {
+		const requestUrl = new URL(request.url ?? "/", "http://localhost");
+
+		if (request.method === "GET" && (requestUrl.pathname === "/tarsadmin" || requestUrl.pathname === "/tarsadmin/")) {
 			if (!adminUsername || !adminPassword) {
 				sendText(response, 404, "Not found");
 				return;
@@ -213,11 +245,23 @@ export function createWebhookServer(
 			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
 				return;
 			}
-			sendHtml(response, 200, adminHtml());
+			sendHtml(response, 200, await adminHtml(adminAssetsDir));
 			return;
 		}
 
-		if (request.method === "GET" && request.url === "/api/status") {
+		if (request.method === "GET" && requestUrl.pathname.startsWith("/tarsadmin/")) {
+			if (!adminUsername || !adminPassword) {
+				sendText(response, 404, "Not found");
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			await serveAdminAsset(response, adminAssetsDir, requestUrl.pathname.slice("/tarsadmin/".length));
+			return;
+		}
+
+		if (request.method === "GET" && requestUrl.pathname === "/api/status") {
 			if (!adminUsername || !adminPassword) {
 				sendJson(response, 404, { error: "Not found" });
 				return;
