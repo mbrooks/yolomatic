@@ -300,26 +300,42 @@ export class PRReviewHandler {
 		}
 
 		if (result.status === "complete") {
-			await this.deps.workspaceManager.commitAndPush(
+			const pushed = await this.deps.workspaceManager.commitAndPush(
 				owner,
 				repo,
 				issueNumber,
 				generateCommitMessage(state.labels, issueNumber, result.summary),
 			);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
-			await this.postPRComment(
-				owner,
-				repo,
-				prNumber,
-				[
-					"**TARS iteration complete.**",
-					"",
-					"Changes pushed to the PR branch.",
-					"",
-					"Summary:",
-					result.summary || "No summary provided.",
-				].join("\n"),
-			);
+			if (pushed) {
+				await this.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"Changes pushed to the PR branch.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			} else {
+				await this.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"No changes were needed.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			}
 		} else if (result.status === "waiting-feedback") {
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "waiting-feedback");
 			await this.postPRComment(

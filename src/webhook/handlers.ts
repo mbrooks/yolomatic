@@ -424,18 +424,20 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		if (result.status === "complete") {
-			let prUrl: string;
+			let prUrl: string | undefined;
 			try {
 				// Push branch so code is actually delivered
-				await this.deps.workspaceManager.commitAndPush(
+				const pushed = await this.deps.workspaceManager.commitAndPush(
 					owner,
 					repo,
 					issueNumber,
 					generateCommitMessage(state.labels, issueNumber, result.summary),
 				);
 
-				// Create PR via GitHub API
-				prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
+				if (pushed) {
+					// Create PR via GitHub API
+					prUrl = await this.createPR(owner, repo, issueNumber, state.title, result.summary);
+				}
 			} catch (error) {
 				await this.handleDeliveryFailure(owner, repo, issueNumber, state, error);
 				return;
@@ -444,22 +446,38 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			updatedState = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
 			process.stdout.write(`[webhook] marked complete ${repo}#${issueNumber}\n`);
 
-			await this.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
-			await this.postComment(
-				owner,
-				repo,
-				issueNumber,
-				[
-					"**TARS Complete**",
-					"",
-					`PR created: ${prUrl}`,
-					"",
-					"Summary:",
-					result.summary || "No summary provided.",
-					"",
-					"Ready for review.",
-				].join("\n"),
-			);
+			if (prUrl) {
+				await this.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
+				await this.postComment(
+					owner,
+					repo,
+					issueNumber,
+					[
+						"**TARS Complete**",
+						"",
+						`PR created: ${prUrl}`,
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+						"",
+						"Ready for review.",
+					].join("\n"),
+				);
+			} else {
+				await this.postComment(
+					owner,
+					repo,
+					issueNumber,
+					[
+						"**TARS Complete**",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+						"",
+						"No code changes were necessary.",
+					].join("\n"),
+				);
+			}
 			return;
 		}
 

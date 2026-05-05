@@ -82,7 +82,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				repo: "tars",
 				issueNumber: 56,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 		};
 		const executor = {

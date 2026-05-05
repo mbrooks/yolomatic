@@ -480,7 +480,7 @@ export class WorkspaceManager {
 		}
 	}
 
-	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<void> {
+	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
 
@@ -500,12 +500,11 @@ export class WorkspaceManager {
 		// base branch, there's nothing to deliver. Pushing would create an empty branch
 		// that causes GitHub to reject PR creation with "No commits between ...".
 		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath))) {
-			throw new Error(
-				`No changes to commit on ${branchName}. The workspace has no modifications and the branch has no commits ahead of ${this.config.defaultBranch}.`,
-			);
+			return false;
 		}
 
 		await this.runCommand("git", ["push", "origin", branchName], { cwd: worktreePath });
+		return true;
 	}
 
 	private async branchHasCommitsAhead(worktreePath: string): Promise<boolean> {
