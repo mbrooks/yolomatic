@@ -114,6 +114,11 @@ export class SessionManager {
 		});
 	}
 
+	async findSessionByPR(owner: string, repo: string, prNumber: number): Promise<SessionState | null> {
+		const sessions = await this.store.getAll();
+		return sessions.find((s) => s.owner === owner && s.repo === repo && s.prNumber === prNumber) ?? null;
+	}
+
 	async incrementIterationCount(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {

@@ -208,6 +208,19 @@ describe("SessionManager", () => {
 		);
 	});
 
+	it("finds a session by associated PR number", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
+		await manager.associatePR("mbrooks", "tars", 10, 99, "https://github.com/mbrooks/tars/pull/99");
+
+		const found = await manager.findSessionByPR("mbrooks", "tars", 99);
+		expect(found?.issueNumber).toBe(10);
+		await expect(manager.findSessionByPR("mbrooks", "tars", 100)).resolves.toBeNull();
+	});
+
 	it("increments iteration count on an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);
