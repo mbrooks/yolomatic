@@ -26,6 +26,8 @@ export interface SessionState {
 	prNumber?: number;
 	iterationCount?: number;
 	labels?: string[];
+	restartCount?: number;
+	restartedFrom?: SessionStatus;
 }
 
 export class SessionStore {
