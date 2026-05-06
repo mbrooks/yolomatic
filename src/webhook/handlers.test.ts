@@ -11,6 +11,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
+				get: vi.fn(async () => ({
+					data: {
+						head: { ref: "tars/issue-56" },
+						state: "open",
+						merged: false,
+					},
+				})),
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/99", number: 99 } })),
 				list: vi.fn(async () => ({ data: [] as any[] })),
 				listReviewComments: vi.fn(async () => ({ data: [] })),
@@ -386,6 +393,46 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			undefined,
 			expect.any(AbortSignal),
 		);
+	});
+
+	it("routes PR timeline comments through the PR head branch session", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: {
+				number: 99,
+				labels: [],
+				assignees: [],
+				user: { login: "tars-bot" },
+				pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" },
+			},
+			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(octokit.pulls.get).toHaveBeenCalledWith({
+			owner: "mbrooks",
+			repo: "tars",
+			pull_number: 99,
+		});
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
+		expect(workspaceManager.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "tars", 56);
+		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
 
 	it("ignores unassigned issue comments without a TARS mention", async () => {
