@@ -44,6 +44,9 @@ interface CommentPayload {
 		number: number;
 		title?: string;
 		body?: string | null;
+		pull_request?: {
+			url: string;
+		};
 		labels?: IssueLabel[];
 		assignee?: {
 			login: string;
@@ -56,6 +59,7 @@ interface CommentPayload {
 		};
 	};
 	comment: {
+		id?: number;
 		body: string;
 		user: {
 			login: string;
@@ -273,6 +277,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
+		if (payload.issue.pull_request) {
+			await this.handlePullRequestTimelineComment(payload);
+			return;
+		}
+
 		const isAssigned = this.isAssignedToTars(payload.issue);
 		const isCreatedByTars = payload.issue.user?.login === this.deps.githubUsername;
 		const isMentioned =
@@ -337,6 +346,37 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		await this.addLabels(owner, repo, issueNumber, ["tars-working"]);
 		await this.postComment(owner, repo, issueNumber, "Feedback received. Resuming work.");
 		await this.runExecution(owner, repo, issueNumber, payload.comment.body);
+	}
+
+	private async handlePullRequestTimelineComment(payload: CommentPayload): Promise<void> {
+		const owner = payload.repository.owner.login;
+		const repo = payload.repository.name;
+		const prNumber = payload.issue.number;
+
+		const { data: pullRequest } = await this.octokit.pulls.get({
+			owner,
+			repo,
+			pull_number: prNumber,
+		});
+
+		await this.prReviewHandler.handlePullRequestReviewCommentEvent({
+			action: payload.action,
+			pull_request: {
+				number: prNumber,
+				head: {
+					ref: pullRequest.head.ref,
+				},
+				state: pullRequest.state,
+				merged: pullRequest.merged ?? false,
+			},
+			repository: payload.repository,
+			sender: payload.sender,
+			comment: {
+				id: payload.comment.id ?? 0,
+				body: payload.comment.body,
+				user: payload.comment.user,
+			},
+		});
 	}
 
 	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string): Promise<void> {
