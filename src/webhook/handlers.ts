@@ -8,6 +8,10 @@ import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { generateCommitMessage } from "../workspace/manager.js";
 import type { TaskController } from "../task-controller.js";
+import {
+	extractIssueNumberFromBranch,
+	validatePRSessionMapping,
+} from "../pr-review/session-invariant.js";
 
 interface IssueLabel {
 	name?: string;
@@ -245,6 +249,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
+
+		if (payload.issue.pull_request) {
+			await this.handlePullRequestTimelineComment(payload);
+			return;
+		}
+
 		const issueNumber = payload.issue.number;
 		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
 
@@ -274,11 +284,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			} else {
 				await this.postComment(owner, repo, issueNumber, "TARS is not currently working on this issue.");
 			}
-			return;
-		}
-
-		if (payload.issue.pull_request) {
-			await this.handlePullRequestTimelineComment(payload);
 			return;
 		}
 
@@ -359,6 +364,27 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			pull_number: prNumber,
 		});
 
+		const issueNumber = extractIssueNumberFromBranch(pullRequest.head.ref);
+		if (!issueNumber) {
+			await this.postComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS stopped.**",
+					"",
+					`PR #${prNumber} head branch \`${pullRequest.head.ref}\` is not a TARS issue branch.`,
+				].join("\n"),
+			);
+			return;
+		}
+
+		const isStopCommand = payload.comment.body.trim().toLowerCase() === "/tars stop";
+		if (isStopCommand) {
+			await this.handleStopCommand(owner, repo, issueNumber, prNumber, payload.sender.login);
+			return;
+		}
+
 		await this.prReviewHandler.handlePullRequestReviewCommentEvent({
 			action: payload.action,
 			pull_request: {
@@ -379,6 +405,39 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		});
 	}
 
+	private async handleStopCommand(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		commentTargetNumber: number,
+		senderLogin: string,
+	): Promise<void> {
+		if (!this.isAdmin(senderLogin)) {
+			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${commentTargetNumber}: /tars stop from non-admin\n`);
+			await this.postComment(owner, repo, commentTargetNumber, "Only admins can stop TARS.");
+			return;
+		}
+
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${commentTargetNumber} mapped to ${inFlightKey} from admin\n`);
+		const cancelledInFlight = this.deps.taskController?.cancel(inFlightKey) ?? false;
+		if (cancelledInFlight) {
+			await this.postComment(owner, repo, commentTargetNumber, "Stopping TARS...");
+			return;
+		}
+
+		const session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (session && session.status === "working") {
+			await this.deps.sessionManager.cancelSession(owner, repo, issueNumber);
+			await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+			await this.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
+			await this.postComment(owner, repo, commentTargetNumber, "Task cancelled by admin. TARS is idle.");
+			process.stdout.write(`[webhook] stopped ${inFlightKey} (not in-flight)\n`);
+		} else {
+			await this.postComment(owner, repo, commentTargetNumber, "TARS is not currently working on this issue.");
+		}
+	}
+
 	private async runExecution(owner: string, repo: string, issueNumber: number, comment?: string): Promise<void> {
 		await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
 
@@ -389,6 +448,29 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		process.stdout.write(
 			`[webhook] execute repo=${owner}/${repo} issue=#${issueNumber} session=${state.sessionPath}\n`,
 		);
+
+		const preflightError = await this.validateSessionBeforeExecution(state);
+		if (preflightError) {
+			process.stdout.write(`[webhook] execution blocked for ${owner}/${repo}#${issueNumber}: ${preflightError}\n`);
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed", {
+				summary: preflightError,
+			});
+			await this.safeRemoveLabel(owner, repo, issueNumber, "tars-working");
+			await this.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+			await this.postComment(
+				owner,
+				repo,
+				issueNumber,
+				[
+					"**TARS stopped before execution.**",
+					"",
+					preflightError,
+					"",
+					"This protects the task from being handled by the wrong issue worktree.",
+				].join("\n"),
+			);
+			return;
+		}
 
 		state = await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "working");
 
@@ -556,6 +638,27 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		);
 
 		void updatedState;
+	}
+
+	private async validateSessionBeforeExecution(state: SessionState): Promise<string | null> {
+		if (!state.workspacePath.endsWith(`issue-${state.issueNumber}`)) {
+			return [
+				`Session ${state.owner}/${state.repo}#${state.issueNumber} points to unexpected workspace '${state.workspacePath}'.`,
+				`Expected a path ending in 'issue-${state.issueNumber}'.`,
+			].join(" ");
+		}
+
+		if (state.prNumber === undefined) {
+			return null;
+		}
+
+		const { data: pullRequest } = await this.octokit.pulls.get({
+			owner: state.owner,
+			repo: state.repo,
+			pull_number: state.prNumber,
+		});
+
+		return validatePRSessionMapping(state, state.prNumber, pullRequest.head.ref);
 	}
 
 	private async createPR(
