@@ -13,7 +13,7 @@ import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
-	status: "working" | "waiting-feedback" | "complete";
+	status: "working" | "waiting-feedback" | "complete" | "cancelled";
 	summary: string;
 	rawResponse: string;
 }
@@ -216,6 +216,7 @@ export class PiAgentExecutor {
 		state: SessionState,
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
+		abortSignal?: AbortSignal,
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
 
@@ -264,6 +265,14 @@ export class PiAgentExecutor {
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 
+		if (abortSignal?.aborted) {
+			return {
+				status: "cancelled",
+				summary: "Task cancelled before execution started.",
+				rawResponse: "",
+			};
+		}
+
 		const unsubscribe = session.subscribe((event) => {
 			if (event.type === "message_update") {
 				if (event.assistantMessageEvent.type === "thinking_end") {
@@ -295,15 +304,28 @@ export class PiAgentExecutor {
 			}
 		});
 
+		const onAbort = () => {
+			void session.abort();
+		};
+		abortSignal?.addEventListener("abort", onAbort);
+
 		try {
 			await session.prompt(prompt);
 		} catch (error) {
 			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
+			if (abortSignal?.aborted) {
+				return {
+					status: "cancelled",
+					summary: "Task cancelled by admin.",
+					rawResponse: "",
+				};
+			}
 			if (selfMonitor.hasFatalError()) {
 				throw await selfMonitor.createFatalSystemError();
 			}
 			throw error;
 		} finally {
+			abortSignal?.removeEventListener("abort", onAbort);
 			unsubscribe();
 		}
 

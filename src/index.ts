@@ -5,8 +5,9 @@ import { PiAgentExecutor } from "./executor/index.js";
 import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
+import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
-import { createWebhookServer } from "./webhook/server.js";
+import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 
 export async function main(): Promise<void> {
@@ -20,6 +21,7 @@ export async function main(): Promise<void> {
 		defaultBranch: config.defaultBranch,
 	});
 	const executor = new PiAgentExecutor({ soulPath: config.soulPath });
+	const taskController = new TaskController();
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,
@@ -30,6 +32,8 @@ export async function main(): Promise<void> {
 		defaultBranch: config.defaultBranch,
 		selfReportEnabled: config.selfReportEnabled,
 		maxIterations: config.maxIterations,
+		taskController,
+		adminGithubUsername: config.adminGithubUsername,
 	});
 
 	const staleDetector = new StaleSessionDetector(
@@ -41,19 +45,16 @@ export async function main(): Promise<void> {
 	);
 
 	const server = createWebhookServer(
-		{
-			secret: config.webhookSecret,
-			handlers,
-			sessionStore,
-			sessionManager,
-			workspaceManager,
-			staleDetector,
-			archiveDir: config.archiveDir,
-		},
+		config.webhookSecret,
+		handlers,
+		sessionStore,
 		config.adminUsername,
 		config.adminPassword,
+		taskController,
+		workspaceManager,
+		staleDetector,
+		config.archiveDir,
 	);
-
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
@@ -78,6 +79,15 @@ export async function main(): Promise<void> {
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		process.stdout.write(`[startup] stale detection error: ${message}\n`);
+	}
+
+	if (config.cleanupRetentionDays) {
+		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);
+		await cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays);
+		const cleanupIntervalMs = 24 * 60 * 60 * 1000;
+		setInterval(() => {
+			void cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays!);
+		}, cleanupIntervalMs);
 	}
 }
 

@@ -6,6 +6,11 @@ import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { generateCommitMessage } from "../workspace/manager.js";
 import { classifyComments } from "./classifier.js";
+import type { TaskController } from "../task-controller.js";
+import {
+	extractIssueNumberFromBranch,
+	validatePRSessionMapping,
+} from "./session-invariant.js";
 
 export interface PRReviewComment {
 	id: number;
@@ -61,6 +66,7 @@ export interface PRReviewHandlerDeps {
 	githubUsername: string;
 	maxIterations: number;
 	octokit?: Octokit;
+	taskController?: TaskController;
 }
 
 export class PRReviewHandler {
@@ -72,8 +78,7 @@ export class PRReviewHandler {
 	}
 
 	private extractIssueNumber(branch: string): number | null {
-		const match = /^tars\/issue-(\d+)$/u.exec(branch);
-		return match ? Number.parseInt(match[1], 10) : null;
+		return extractIssueNumberFromBranch(branch);
 	}
 
 	async handlePullRequestReviewCommentEvent(rawPayload: unknown): Promise<void> {
@@ -126,11 +131,47 @@ export class PRReviewHandler {
 		const session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
 		if (!session) {
 			process.stdout.write(`[webhook] ${ eventType } ignored: no session for ${ inFlightKey }\n`);
+			const sessionForPR = await this.deps.sessionManager.findSessionByPR(owner, repo, prNumber);
+			const canonicalNote = sessionForPR
+				? ` Stored PR mapping points to ${owner}/${repo}#${sessionForPR.issueNumber}; refusing to guess.`
+				: "";
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS stopped.**",
+					"",
+					`PR #${prNumber} maps to branch \`${branch}\`, but no session exists for ${owner}/${repo}#${issueNumber}.`,
+					`TARS will not create a new session from a PR comment because that can target the wrong branch.${canonicalNote}`,
+				].join("\n"),
+			);
+			return;
+		}
+
+		const mappingError = validatePRSessionMapping(session, prNumber, branch);
+		if (mappingError) {
+			process.stdout.write(`[webhook] ${ eventType } ignored: ${mappingError}\n`);
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed", {
+				summary: mappingError,
+			});
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS stopped before execution.**",
+					"",
+					mappingError,
+					"",
+					"This protects the PR from being handled by the wrong issue worktree.",
+				].join("\n"),
+			);
 			return;
 		}
 
 		// Sync PR association if not already tracked
-		if (!session.prNumber) {
+		if (!session.prNumber || !session.prUrl) {
 			const prUrl = `https://github.com/${ owner }/${ repo }/pull/${ prNumber }`;
 			await this.deps.sessionManager.associatePR(owner, repo, issueNumber, prNumber, prUrl);
 		}
@@ -248,6 +289,10 @@ export class PRReviewHandler {
 			`Picked up review feedback. Iteration ${ (state.iterationCount ?? 0) + 1 }/${ this.deps.maxIterations }.`,
 		);
 
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const abortController = new AbortController();
+		this.deps.taskController?.register(inFlightKey, () => abortController.abort());
+
 		let result: import("../executor/index.js").ExecutionResult;
 		try {
 			result = await this.deps.executor.execute(state, undefined, {
@@ -258,37 +303,78 @@ export class PRReviewHandler {
 					line: c.line ?? undefined,
 				})),
 				reviewBody,
-			});
+			}, abortController.signal);
 		} catch (error) {
+			if (abortController.signal.aborted) {
+				process.stdout.write(`[webhook] PR review execution aborted for ${inFlightKey}\n`);
+				await this.deps.sessionManager.cancelSession(owner, repo, issueNumber);
+				await this.postPRComment(owner, repo, prNumber, "Task cancelled by admin. TARS is idle.");
+				return;
+			}
 			const message = error instanceof Error ? error.message : String(error);
 			await this.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${ message }`);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
+		} finally {
+			this.deps.taskController?.unregister(inFlightKey);
 		}
 
 		await this.deps.sessionManager.incrementIterationCount(owner, repo, issueNumber);
 
+		if (result.status === "cancelled") {
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "cancelled");
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"Task cancelled by admin.",
+					"",
+					result.summary || "TARS has stopped working on this review.",
+					"",
+					"TARS is idle and ready for the next task.",
+				].join("\n"),
+			);
+			return;
+		}
+
 		if (result.status === "complete") {
-			await this.deps.workspaceManager.commitAndPush(
+			const pushed = await this.deps.workspaceManager.commitAndPush(
 				owner,
 				repo,
 				issueNumber,
 				generateCommitMessage(state.labels, issueNumber, result.summary),
 			);
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "complete");
-			await this.postPRComment(
-				owner,
-				repo,
-				prNumber,
-				[
-					"**TARS iteration complete.**",
-					"",
-					"Changes pushed to the PR branch.",
-					"",
-					"Summary:",
-					result.summary || "No summary provided.",
-				].join("\n"),
-			);
+			if (pushed) {
+				await this.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"Changes pushed to the PR branch.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			} else {
+				await this.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"No changes were needed.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			}
 		} else if (result.status === "waiting-feedback") {
 			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "waiting-feedback");
 			await this.postPRComment(

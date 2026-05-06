@@ -1,10 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
 
 type AgentStatus = "online" | "busy" | "feedback" | "offline";
-type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed";
+type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
+
+const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
+
+function isTerminalStatus(status: SessionStatus): boolean {
+	return TERMINAL_STATUSES.includes(status);
+}
+
 type StaleClassification =
 	| "stale-complete-candidate"
 	| "stale-abandoned-candidate"
@@ -34,6 +41,11 @@ type Session = {
 	staleDetectedAt: string | null;
 	staleReason: string | null;
 	stale: StaleInfo | null;
+	risk: {
+		suspectedMisroute: boolean;
+		reasons: string[];
+		referencedIssueNumber: number | null;
+	};
 };
 
 type StatusResponse = {
@@ -68,13 +80,6 @@ function formatDuration(minutes: number): string {
 	return `${d}d`;
 }
 
-function labelAgentStatus(status: AgentStatus): string {
-	if (status === "online") return "Online";
-	if (status === "busy") return "Busy";
-	if (status === "feedback") return "Feedback";
-	return "Offline";
-}
-
 function classificationLabel(c: StaleClassification): string {
 	if (c === "stale-complete-candidate") return "complete candidate";
 	if (c === "stale-abandoned-candidate") return "abandoned";
@@ -83,7 +88,14 @@ function classificationLabel(c: StaleClassification): string {
 	return c;
 }
 
-function useStatus(): LoadState {
+function labelAgentStatus(status: AgentStatus): string {
+	if (status === "online") return "Online";
+	if (status === "busy") return "Busy";
+	if (status === "feedback") return "Feedback";
+	return "Offline";
+}
+
+function useStatus(refreshToken = 0): LoadState {
 	const [state, setState] = useState<LoadState>(initialState);
 
 	useEffect(() => {
@@ -113,7 +125,7 @@ function useStatus(): LoadState {
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, []);
+	}, [refreshToken]);
 
 	return state;
 }
@@ -122,91 +134,169 @@ function StatusBadge({ status }: { status: AgentStatus }): React.ReactElement {
 	return <span className={`badge ${status}`}>{labelAgentStatus(status)}</span>;
 }
 
-function AdminActions({ session }: { session: Session }): React.ReactElement {
-	const [busy, setBusy] = useState<false | string>(false);
+function StopButton({ owner, repo, issueNumber }: { owner: string; repo: string; issueNumber: number }): React.ReactElement {
+	const [stopping, setStopping] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleStop = useCallback(async () => {
+		if (!window.confirm(`Stop TARS on ${owner}/${repo}#${issueNumber}?`)) return;
+		setStopping(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/cancel`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Stopped.");
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setStopping(false);
+		}
+	}, [owner, repo, issueNumber]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="stop-btn" onClick={handleStop} disabled={stopping}>
+				{stopping ? "Stopping…" : "Stop"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function DeleteButton({ owner, repo, issueNumber, onDeleted }: { owner: string; repo: string; issueNumber: number; onDeleted?: () => void }): React.ReactElement {
+	const [deleting, setDeleting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleDelete = useCallback(async () => {
+		if (!window.confirm(`Delete session and workspace for ${owner}/${repo}#${issueNumber}? This cannot be undone.`)) return;
+		setDeleting(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/delete`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Deleted.");
+				onDeleted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setDeleting(false);
+		}
+	}, [owner, repo, issueNumber, onDeleted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="delete-btn" onClick={handleDelete} disabled={deleting}>
+				{deleting ? "Deleting…" : "Delete"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function MarkFailedButton({ owner, repo, issueNumber, onMarked }: { owner: string; repo: string; issueNumber: number; onMarked?: () => void }): React.ReactElement {
+	const [marking, setMarking] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleMarkFailed = useCallback(async () => {
+		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} failed?`)) return;
+		setMarking(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-failed`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Marked failed.");
+				onMarked?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setMarking(false);
+		}
+	}, [owner, repo, issueNumber, onMarked]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="warn-btn" onClick={handleMarkFailed} disabled={marking}>
+				{marking ? "Marking…" : "Mark failed"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function StaleAdminActions({ session, onMutate }: { session: Session; onMutate?: () => void }): React.ReactElement {
+	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	async function postAction(path: string, body: object) {
-		setBusy(path);
+	async function postAction(path: string) {
+		setBusy(true);
 		setError(null);
 		try {
-			const res = await fetch(path, {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify(body),
-			});
+			const res = await fetch(path, { method: "POST" });
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 				throw new Error(data.error ?? `HTTP ${res.status}`);
 			}
-			window.location.reload();
+			onMutate?.();
 		} catch (err) {
-			setBusy(false);
 			setError(err instanceof Error ? err.message : String(err));
+		} finally {
+			setBusy(false);
 		}
 	}
 
-	const key = `${session.owner}/${session.repo}#${session.issueNumber}`;
-
 	return (
-		<div className="actions">
+		<div className="stale-actions">
 			<button
 				className="btn"
-				disabled={!!busy}
-				onClick={() =>
-					postAction("/api/sessions/archive", {
-						owner: session.owner,
-						repo: session.repo,
-						issueNumber: session.issueNumber,
-					})
-				}
+				disabled={busy}
+				onClick={() => postAction(`/api/sessions/${encodeURIComponent(session.owner)}/${encodeURIComponent(session.repo)}/${session.issueNumber}/archive`)}
 				title="Archive session"
 			>
 				🗃️ Archive
 			</button>
 			<button
 				className="btn btn-danger"
-				disabled={!!busy}
-				onClick={() =>
-					postAction("/api/sessions/mark-failed", {
-						owner: session.owner,
-						repo: session.repo,
-						issueNumber: session.issueNumber,
-						reason: "stale_session_cleanup",
-					})
-				}
+				disabled={busy}
+				onClick={() => postAction(`/api/sessions/${encodeURIComponent(session.owner)}/${encodeURIComponent(session.repo)}/${session.issueNumber}/mark-failed`)}
 				title="Mark failed"
 			>
 				❌ Mark failed
 			</button>
 			<button
 				className="btn btn-success"
-				disabled={!!busy}
-				onClick={() =>
-					postAction("/api/sessions/mark-complete", {
-						owner: session.owner,
-						repo: session.repo,
-						issueNumber: session.issueNumber,
-					})
-				}
+				disabled={busy}
+				onClick={() => postAction(`/api/sessions/${encodeURIComponent(session.owner)}/${encodeURIComponent(session.repo)}/${session.issueNumber}/mark-complete`)}
 				title="Mark complete"
 			>
 				✅ Mark complete
-	</button>
+			</button>
 			<button
 				className="btn btn-warning"
-				disabled={!!busy}
+				disabled={busy}
 				onClick={() => {
 					const confirmDirty =
 						session.stale?.worktreeDirty &&
 						!window.confirm("Worktree is dirty. Confirm prune?");
 					if (confirmDirty) return;
-					postAction("/api/sessions/prune-worktree", {
-						owner: session.owner,
-						repo: session.repo,
-						issueNumber: session.issueNumber,
-						confirmDirty: !!session.stale?.worktreeDirty,
-					});
+					postAction(`/api/sessions/${encodeURIComponent(session.owner)}/${encodeURIComponent(session.repo)}/${session.issueNumber}/prune-worktree`);
 				}}
 				title="Prune worktree"
 			>
@@ -218,13 +308,105 @@ function AdminActions({ session }: { session: Session }): React.ReactElement {
 	);
 }
 
-function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement {
+function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
+	const [deleting, setDeleting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleDelete = useCallback(async () => {
+		if (!window.confirm(`Delete all ${count} terminal sessions and their workspaces? This cannot be undone.`)) return;
+		setDeleting(true);
+		setResult(null);
+		try {
+			const response = await fetch("/api/sessions/delete-completed", {
+				method: "POST",
+			});
+			const data = (await response.json()) as { deleted?: number; error?: string };
+			if (response.ok) {
+				setResult(`${data.deleted ?? 0} deleted.`);
+				onDeleted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setDeleting(false);
+		}
+	}, [count, onDeleted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="delete-btn bulk" onClick={handleDelete} disabled={deleting}>
+				{deleting ? "Deleting…" : `Delete all completed (${count})`}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function SessionRisk({ session }: { session: Session }): React.ReactElement {
+	if (!session.risk.suspectedMisroute) {
+		return <span className="risk-ok">OK</span>;
+	}
+
+	return (
+		<div className="risk-warning">
+			<strong>Check mapping</strong>
+			{session.risk.referencedIssueNumber && (
+				<span> references #{session.risk.referencedIssueNumber}</span>
+			)}
+			<ul>
+				{session.risk.reasons.map((reason) => (
+					<li key={reason}>{reason}</li>
+				))}
+			</ul>
+		</div>
+	);
+}
+
+function RestartButton({ owner, repo, issueNumber, onRestarted }: { owner: string; repo: string; issueNumber: number; onRestarted?: () => void }): React.ReactElement {
+	const [restarting, setRestarting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleRestart = useCallback(async () => {
+		if (!window.confirm(`This will reset the workspace and re-queue the session for ${owner}/${repo}#${issueNumber}. Proceed?`)) return;
+		setRestarting(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/restart`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Restarted.");
+				onRestarted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setRestarting(false);
+		}
+	}, [owner, repo, issueNumber, onRestarted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="restart-btn" onClick={handleRestart} disabled={restarting}>
+				{restarting ? "Restarting…" : "Restart"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function SessionTable({ sessions, onMutate }: { sessions: Session[]; onMutate?: () => void }): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
 	}
 
-	const active = sessions.filter((s) => !s.stale?.isStale);
 	const stale = sessions.filter((s) => s.stale?.isStale);
+	const active = sessions.filter((s) => !s.stale?.isStale);
 
 	return (
 		<>
@@ -281,7 +463,7 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 											<span className="meta-badge">pr:{session.stale.prState}</span>
 										)}
 									</td>
-									<td><AdminActions session={session} /></td>
+									<td><StaleAdminActions session={session} onMutate={onMutate} /></td>
 								</tr>
 							))}
 						</tbody>
@@ -300,6 +482,8 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 								<th>Workspace</th>
 								<th>Last Activity</th>
 								<th>PR</th>
+								<th>Risk</th>
+								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -324,7 +508,50 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 										{session.prUrl && session.prNumber ? (
 											<a href={session.prUrl} target="_blank" rel="noreferrer">
 												#{session.prNumber}
-	</a>
+											</a>
+										) : (
+											"-"
+										)}
+									</td>
+									<td>
+										<SessionRisk session={session} />
+									</td>
+									<td>
+										{session.status === "working" ? (
+											<StopButton
+												owner={session.owner}
+												repo={session.repo}
+												issueNumber={session.issueNumber}
+											/>
+										) : session.risk.suspectedMisroute && session.status !== "failed" ? (
+											<MarkFailedButton
+												owner={session.owner}
+												repo={session.repo}
+												issueNumber={session.issueNumber}
+												onMarked={onMutate}
+											/>
+										) : (session.status === "failed" || session.status === "cancelled") && !session.risk.suspectedMisroute ? (
+											<div className="action-cell">
+												<RestartButton
+													owner={session.owner}
+													repo={session.repo}
+													issueNumber={session.issueNumber}
+													onRestarted={onMutate}
+												/>
+												<DeleteButton
+													owner={session.owner}
+													repo={session.repo}
+													issueNumber={session.issueNumber}
+													onDeleted={onMutate}
+												/>
+											</div>
+										) : isTerminalStatus(session.status) ? (
+											<DeleteButton
+												owner={session.owner}
+												repo={session.repo}
+												issueNumber={session.issueNumber}
+												onDeleted={onMutate}
+											/>
 										) : (
 											"-"
 										)}
@@ -340,9 +567,11 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 }
 
 function App(): React.ReactElement {
-	const state = useStatus();
+	const [tick, setTick] = useState(0);
+	const state = useStatus(tick);
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
+	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
 	const lastUpdated = useMemo(() => {
 		if (state.status === "loading") return "Loading...";
 		if (state.status === "error") return `Error: ${state.error}`;
@@ -353,9 +582,14 @@ function App(): React.ReactElement {
 		<>
 			<header>
 				<h1>TARS Admin</h1>
-				<StatusBadge status={agentStatus} />
+				<div className="header-actions">
+					<StatusBadge status={agentStatus} />
+					{terminalCount > 0 && (
+						<BulkDeleteButton count={terminalCount} onDeleted={() => setTick((t) => t + 1)} />
+					)}
+				</div>
 			</header>
-			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} />}
+			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />}
 			<div className="last-updated">{lastUpdated}</div>
 		</>
 	);

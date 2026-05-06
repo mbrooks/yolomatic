@@ -15,7 +15,9 @@ export interface AppConfig {
 	maxIterations: number;
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
+	adminGithubUsername: string | undefined;
 	staleThresholdMs: number;
+	cleanupRetentionDays: number | undefined;
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -43,6 +45,13 @@ export function getConfig(): AppConfig {
 		maxIterations: Number.parseInt(process.env.MAX_ITERATIONS ?? "3", 10),
 		adminUsername: process.env.ADMIN_USERNAME?.trim() || undefined,
 		adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
+		adminGithubUsername: process.env.ADMIN_GITHUB_USERNAME?.trim() || process.env.ADMIN_USERNAME?.trim() || undefined,
 		staleThresholdMs: Number.parseInt(process.env.STALE_THRESHOLD_MS ?? "14400000", 10),
+		cleanupRetentionDays: (() => {
+			const raw = process.env.CLEANUP_RETENTION_DAYS?.trim();
+			if (!raw) return undefined;
+			const parsed = Number.parseInt(raw, 10);
+			return Number.isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+		})(),
 	};
 }

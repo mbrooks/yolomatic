@@ -480,14 +480,15 @@ export class WorkspaceManager {
 		}
 	}
 
-	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<void> {
+	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
 
 		await this.ensureGitIdentity(worktreePath);
 		await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
 
-		if (await this.hasChanges(worktreePath, true)) {
+		const hasStagedChanges = await this.hasChanges(worktreePath, true);
+		if (hasStagedChanges) {
 			await this.runCommand(
 				"git",
 				["commit", "-m", message ?? `TARS: Changes for issue #${issueNumber}`],
@@ -495,7 +496,28 @@ export class WorkspaceManager {
 			);
 		}
 
+		// If there are no staged changes and the branch has no commits ahead of the
+		// base branch, there's nothing to deliver. Pushing would create an empty branch
+		// that causes GitHub to reject PR creation with "No commits between ...".
+		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath))) {
+			return false;
+		}
+
 		await this.runCommand("git", ["push", "origin", branchName], { cwd: worktreePath });
+		return true;
+	}
+
+	private async branchHasCommitsAhead(worktreePath: string): Promise<boolean> {
+		try {
+			const { stdout } = await this.runCommand(
+				"git",
+				["rev-list", "--count", `origin/${this.config.defaultBranch}..HEAD`],
+				{ cwd: worktreePath },
+			);
+			return parseInt(stdout.trim(), 10) > 0;
+		} catch {
+			return false;
+		}
 	}
 
 	private async ensureGitIdentity(worktreePath: string): Promise<void> {

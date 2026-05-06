@@ -19,7 +19,9 @@ vi.mock("./config.js", () => ({
 		selfReportEnabled: true,
 		adminUsername: "admin",
 		adminPassword: "secret",
+		adminGithubUsername: "admin",
 		staleThresholdMs: 14400000,
+		cleanupRetentionDays: undefined,
 	})),
 }));
 
@@ -27,7 +29,6 @@ vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
 		get: vi.fn(),
 		set: vi.fn(),
-		getAll: vi.fn(async () => []),
 	})),
 }));
 
@@ -46,7 +47,7 @@ vi.mock("./session/manager.js", () => ({
 vi.mock("./workspace/manager.js", () => ({
 	WorkspaceManager: vi.fn(() => ({
 		createOrGetWorktree: vi.fn(),
-		commitAndPush: vi.fn(),
+		commitAndPush: vi.fn(async () => true),
 		removeWorktree: vi.fn(),
 	})),
 }));
@@ -83,17 +84,15 @@ describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
 		expect(createWebhookServer).toHaveBeenCalledWith(
-			expect.objectContaining({
-				secret: "secret",
-				handlers: expect.any(Object),
-				sessionStore: expect.any(Object),
-				sessionManager: expect.any(Object),
-				workspaceManager: expect.any(Object),
-				staleDetector: expect.any(Object),
-				archiveDir: "/tmp/sessions/archive",
-			}),
+			"secret",
+			expect.any(Object),
+			expect.any(Object),
 			"admin",
 			"secret",
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+			"/tmp/sessions/archive",
 		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));

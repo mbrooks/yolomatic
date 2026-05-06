@@ -14,6 +14,7 @@ describe("PRReviewHandler", () => {
 		};
 		const sessionManager = {
 			getSession: vi.fn(),
+			findSessionByPR: vi.fn(async () => null),
 			associatePR: vi.fn(),
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 56,
@@ -51,7 +52,7 @@ describe("PRReviewHandler", () => {
 				repo: "tars",
 				issueNumber: 56,
 			})),
-			commitAndPush: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -111,7 +112,7 @@ describe("PRReviewHandler", () => {
 	});
 
 	it("ignores when no session exists for the mapped issue", async () => {
-		const { handler, sessionManager, executor } = createHandler();
+		const { handler, sessionManager, executor, octokit } = createHandler();
 		sessionManager.getSession.mockResolvedValue(null);
 		await handler.handlePullRequestReviewCommentEvent({
 			action: "created",
@@ -121,6 +122,56 @@ describe("PRReviewHandler", () => {
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 		expect(executor.execute).not.toHaveBeenCalled();
+		expect(sessionManager.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("will not create a new session from a PR comment"),
+			}),
+		);
+	});
+
+	it("stops when stored PR mapping points at a different PR", async () => {
+		const { handler, sessionManager, executor, octokit } = createHandler();
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete",
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 100,
+			prUrl: "https://github.com/mbrooks/tars/pull/100",
+		});
+
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			56,
+			"failed",
+			expect.objectContaining({
+				summary: expect.stringContaining("already associated with PR #100"),
+			}),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("stopped before execution"),
+			}),
+		);
 	});
 
 	it("processes actionable review comments and pushes changes", async () => {
@@ -161,6 +212,40 @@ describe("PRReviewHandler", () => {
 			expect.objectContaining({
 				issue_number: 99,
 				body: expect.stringContaining("iteration complete"),
+			}),
+		);
+	});
+
+	it("posts no-changes message when commitAndPush returns false", async () => {
+		const { handler, sessionManager, workspaceManager, octokit } = createHandler();
+		workspaceManager.commitAndPush.mockResolvedValue(false);
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete",
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
+		});
+
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
+		});
+
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("No changes were needed."),
 			}),
 		);
 	});

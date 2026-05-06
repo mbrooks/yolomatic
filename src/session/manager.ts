@@ -1,4 +1,5 @@
 import type { SessionStore, SessionState, SessionStatus } from "./store.js";
+import { isTerminalStatus } from "./store.js";
 
 export class SessionManager {
 	public constructor(
@@ -39,6 +40,7 @@ export class SessionManager {
 			workspacePath,
 			labels,
 			lastActivity: new Date().toISOString(),
+			createdAt: new Date().toISOString(),
 			seeded: false,
 		};
 
@@ -81,6 +83,51 @@ export class SessionManager {
 			...existing,
 			...updates,
 			status,
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async markSeeded(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			seeded: true,
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async associatePR(owner: string, repo: string, issueNumber: number, prNumber: number, prUrl: string): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			prNumber,
+			prUrl,
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async findSessionByPR(owner: string, repo: string, prNumber: number): Promise<SessionState | null> {
+		const sessions = await this.store.getAll();
+		return sessions.find((s) => s.owner === owner && s.repo === repo && s.prNumber === prNumber) ?? null;
+	}
+
+	async incrementIterationCount(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		return this.store.set({
+			...existing,
+			iterationCount: (existing.iterationCount ?? 0) + 1,
 			lastActivity: new Date().toISOString(),
 		});
 	}
@@ -142,7 +189,7 @@ export class SessionManager {
 		await this.store.archive(archived, archiveDir);
 	}
 
-	async markSeeded(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+	async cancelSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
@@ -150,34 +197,37 @@ export class SessionManager {
 
 		return this.store.set({
 			...existing,
-			seeded: true,
+			status: "cancelled",
 			lastActivity: new Date().toISOString(),
 		});
 	}
 
-	async associatePR(owner: string, repo: string, issueNumber: number, prNumber: number, prUrl: string): Promise<SessionState> {
+	async restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
 
-		return this.store.set({
-			...existing,
-			prNumber,
-			prUrl,
-			lastActivity: new Date().toISOString(),
-		});
-	}
+		if (existing.status === "complete") {
+			throw new Error(`Cannot restart a completed session.`);
+		}
 
-	async incrementIterationCount(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
-		if (!existing) {
-			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		if (!isTerminalStatus(existing.status)) {
+			throw new Error(
+				`Cannot restart session in '${existing.status}' status. Only failed or cancelled sessions can be restarted.`,
+			);
 		}
 
 		return this.store.set({
 			...existing,
-			iterationCount: (existing.iterationCount ?? 0) + 1,
+			status: "pending",
+			summary: undefined,
+			prUrl: undefined,
+			prNumber: undefined,
+			seeded: false,
+			iterationCount: undefined,
+			restartCount: (existing.restartCount ?? 0) + 1,
+			restartedFrom: existing.status,
 			lastActivity: new Date().toISOString(),
 		});
 	}
