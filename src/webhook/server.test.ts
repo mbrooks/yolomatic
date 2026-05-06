@@ -1717,6 +1717,56 @@ describe("createWebhookServer", () => {
 		expect(body.agent).toBe("busy");
 		expect(body.sessions).toHaveLength(1);
 		expect(body.sessions[0].branch).toBe("tars/issue-1");
+		expect(body.sessions[0].risk).toEqual({
+			suspectedMisroute: false,
+			reasons: [],
+			referencedIssueNumber: null,
+		});
+
+		server.close();
+	});
+
+	it("flags PR-shaped sessions in /api/status", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 89,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "TARS: Add stale session detection",
+					body: "Fixes #86\n\nSummary",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-89",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.sessions[0].risk.suspectedMisroute).toBe(true);
+		expect(body.sessions[0].risk.referencedIssueNumber).toBe(86);
+		expect(body.sessions[0].risk.reasons).toContain("Session body references issue #86.");
+		expect(body.sessions[0].risk.reasons).toContain("Session title looks like a generated PR title.");
 
 		server.close();
 	});
@@ -2021,6 +2071,54 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
+	it("marks a session failed via POST /api/sessions/:owner/:repo/:issueNumber/mark-failed", async () => {
+		const session = {
+			issueNumber: 89,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "TARS: Add stale session detection",
+			body: "Fixes #86\n\nSummary",
+			status: "complete" as const,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-89",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		const mockStore = {
+			get: vi.fn(async () => session),
+			set: vi.fn(async (state: import("../session/store.js").SessionState) => state),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn() };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/89/mark-failed",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.status).toBe("failed");
+		expect(mockStore.set).toHaveBeenCalledWith(
+			expect.objectContaining({
+				status: "failed",
+				summary: "Marked failed by admin cleanup.",
+			}),
+		);
 
 		server.close();
 	});

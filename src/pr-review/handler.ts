@@ -7,6 +7,10 @@ import type { WorkspaceManager } from "../workspace/manager.js";
 import { generateCommitMessage } from "../workspace/manager.js";
 import { classifyComments } from "./classifier.js";
 import type { TaskController } from "../task-controller.js";
+import {
+	extractIssueNumberFromBranch,
+	validatePRSessionMapping,
+} from "./session-invariant.js";
 
 export interface PRReviewComment {
 	id: number;
@@ -74,8 +78,7 @@ export class PRReviewHandler {
 	}
 
 	private extractIssueNumber(branch: string): number | null {
-		const match = /^tars\/issue-(\d+)$/u.exec(branch);
-		return match ? Number.parseInt(match[1], 10) : null;
+		return extractIssueNumberFromBranch(branch);
 	}
 
 	async handlePullRequestReviewCommentEvent(rawPayload: unknown): Promise<void> {
@@ -128,11 +131,47 @@ export class PRReviewHandler {
 		const session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
 		if (!session) {
 			process.stdout.write(`[webhook] ${ eventType } ignored: no session for ${ inFlightKey }\n`);
+			const sessionForPR = await this.deps.sessionManager.findSessionByPR(owner, repo, prNumber);
+			const canonicalNote = sessionForPR
+				? ` Stored PR mapping points to ${owner}/${repo}#${sessionForPR.issueNumber}; refusing to guess.`
+				: "";
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS stopped.**",
+					"",
+					`PR #${prNumber} maps to branch \`${branch}\`, but no session exists for ${owner}/${repo}#${issueNumber}.`,
+					`TARS will not create a new session from a PR comment because that can target the wrong branch.${canonicalNote}`,
+				].join("\n"),
+			);
+			return;
+		}
+
+		const mappingError = validatePRSessionMapping(session, prNumber, branch);
+		if (mappingError) {
+			process.stdout.write(`[webhook] ${ eventType } ignored: ${mappingError}\n`);
+			await this.deps.sessionManager.updateStatus(owner, repo, issueNumber, "failed", {
+				summary: mappingError,
+			});
+			await this.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS stopped before execution.**",
+					"",
+					mappingError,
+					"",
+					"This protects the PR from being handled by the wrong issue worktree.",
+				].join("\n"),
+			);
 			return;
 		}
 
 		// Sync PR association if not already tracked
-		if (!session.prNumber) {
+		if (!session.prNumber || !session.prUrl) {
 			const prUrl = `https://github.com/${ owner }/${ repo }/pull/${ prNumber }`;
 			await this.deps.sessionManager.associatePR(owner, repo, issueNumber, prNumber, prUrl);
 		}
