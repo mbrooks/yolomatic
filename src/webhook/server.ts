@@ -108,10 +108,15 @@ function computeAgentStatus(sessions: SessionState[]): "online" | "busy" | "feed
 }
 
 function buildStatusResponse(sessions: SessionState[]) {
+	const sorted = [...sessions].sort((a, b) => {
+		const aTime = a.createdAt ?? a.lastActivity;
+		const bTime = b.createdAt ?? b.lastActivity;
+		return new Date(bTime).getTime() - new Date(aTime).getTime();
+	});
 	return {
-		agent: computeAgentStatus(sessions),
+		agent: computeAgentStatus(sorted),
 		uptime: formatUptime(process.uptime()),
-		sessions: sessions.map((s) => ({
+		sessions: sorted.map((s) => ({
 			owner: s.owner,
 			repo: s.repo,
 			issueNumber: s.issueNumber,
