@@ -1,4 +1,5 @@
 import type { SessionStore, SessionState, SessionStatus } from "./store.js";
+import { isTerminalStatus } from "./store.js";
 
 export class SessionManager {
 	public constructor(
@@ -140,6 +141,36 @@ export class SessionManager {
 		return this.store.set({
 			...existing,
 			status: "cancelled",
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		if (existing.status === "complete") {
+			throw new Error(`Cannot restart a completed session.`);
+		}
+
+		if (!isTerminalStatus(existing.status)) {
+			throw new Error(
+				`Cannot restart session in '${existing.status}' status. Only failed or cancelled sessions can be restarted.`,
+			);
+		}
+
+		return this.store.set({
+			...existing,
+			status: "pending",
+			summary: undefined,
+			prUrl: undefined,
+			prNumber: undefined,
+			seeded: false,
+			iterationCount: undefined,
+			restartCount: (existing.restartCount ?? 0) + 1,
+			restartedFrom: existing.status,
 			lastActivity: new Date().toISOString(),
 		});
 	}
