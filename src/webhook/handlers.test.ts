@@ -62,6 +62,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			})),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
+			findSessionByPR: vi.fn(async () => null),
 			incrementIterationCount: vi.fn(),
 			cancelSession: vi.fn(async () => ({
 				issueNumber: 56,
@@ -433,6 +434,110 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(workspaceManager.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 99);
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
+	});
+
+	it("does not create a fallback session from PR timeline comments", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue(null as never);
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: {
+				number: 99,
+				labels: [],
+				assignees: [],
+				user: { login: "tars-bot" },
+				pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" },
+			},
+			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
+		expect(sessionManager.createSession).not.toHaveBeenCalled();
+		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("will not create a new session from a PR comment"),
+			}),
+		);
+	});
+
+	it("blocks issue execution when stored PR head maps to a different issue branch", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		octokit.pulls.get.mockResolvedValue({
+			data: {
+				head: { ref: "tars/issue-57" },
+				state: "open",
+				merged: false,
+			},
+		});
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "pending" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
+		} as never);
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Continue", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			56,
+			"failed",
+			expect.objectContaining({
+				summary: expect.stringContaining("maps to 'tars/issue-57'"),
+			}),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 56,
+				body: expect.stringContaining("stopped before execution"),
+			}),
+		);
 	});
 
 	it("ignores unassigned issue comments without a TARS mention", async () => {

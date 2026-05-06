@@ -22,6 +22,11 @@ type Session = {
 	lastActivity: string;
 	prUrl: string | null;
 	prNumber: number | null;
+	risk: {
+		suspectedMisroute: boolean;
+		reasons: string[];
+		referencedIssueNumber: number | null;
+	};
 };
 
 type StatusResponse = {
@@ -54,7 +59,7 @@ function labelAgentStatus(status: AgentStatus): string {
 	return "Offline";
 }
 
-function useStatus(): LoadState {
+function useStatus(refreshToken = 0): LoadState {
 	const [state, setState] = useState<LoadState>(initialState);
 
 	useEffect(() => {
@@ -84,7 +89,7 @@ function useStatus(): LoadState {
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, []);
+	}, [refreshToken]);
 
 	return state;
 }
@@ -164,6 +169,42 @@ function DeleteButton({ owner, repo, issueNumber, onDeleted }: { owner: string; 
 	);
 }
 
+function MarkFailedButton({ owner, repo, issueNumber, onMarked }: { owner: string; repo: string; issueNumber: number; onMarked?: () => void }): React.ReactElement {
+	const [marking, setMarking] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleMarkFailed = useCallback(async () => {
+		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} failed?`)) return;
+		setMarking(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-failed`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Marked failed.");
+				onMarked?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setMarking(false);
+		}
+	}, [owner, repo, issueNumber, onMarked]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="warn-btn" onClick={handleMarkFailed} disabled={marking}>
+				{marking ? "Marking…" : "Mark failed"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
 function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
 	const [deleting, setDeleting] = useState(false);
 	const [result, setResult] = useState<string | null>(null);
@@ -200,7 +241,27 @@ function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () 
 	);
 }
 
-function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement {
+function SessionRisk({ session }: { session: Session }): React.ReactElement {
+	if (!session.risk.suspectedMisroute) {
+		return <span className="risk-ok">OK</span>;
+	}
+
+	return (
+		<div className="risk-warning">
+			<strong>Check mapping</strong>
+			{session.risk.referencedIssueNumber && (
+				<span> references #{session.risk.referencedIssueNumber}</span>
+			)}
+			<ul>
+				{session.risk.reasons.map((reason) => (
+					<li key={reason}>{reason}</li>
+				))}
+			</ul>
+		</div>
+	);
+}
+
+function SessionTable({ sessions, onChanged }: { sessions: Session[]; onChanged?: () => void }): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
 	}
@@ -215,6 +276,7 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 					<th>Workspace</th>
 					<th>Last Activity</th>
 					<th>PR</th>
+					<th>Risk</th>
 					<th>Actions</th>
 				</tr>
 			</thead>
@@ -246,17 +308,28 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 							)}
 						</td>
 						<td>
+							<SessionRisk session={session} />
+						</td>
+						<td>
 							{session.status === "working" ? (
 								<StopButton
 									owner={session.owner}
 									repo={session.repo}
 									issueNumber={session.issueNumber}
 								/>
+							) : session.risk.suspectedMisroute ? (
+								<MarkFailedButton
+									owner={session.owner}
+									repo={session.repo}
+									issueNumber={session.issueNumber}
+									onMarked={onChanged}
+								/>
 							) : isTerminalStatus(session.status) ? (
 								<DeleteButton
 									owner={session.owner}
 									repo={session.repo}
 									issueNumber={session.issueNumber}
+									onDeleted={onChanged}
 								/>
 							) : (
 								"-"
@@ -271,7 +344,7 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 
 function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
-	const state = useStatus();
+	const state = useStatus(tick);
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
 	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
@@ -292,7 +365,7 @@ function App(): React.ReactElement {
 					)}
 				</div>
 			</header>
-			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} />}
+			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} onChanged={() => setTick((t) => t + 1)} />}
 			<div className="last-updated">{lastUpdated}</div>
 		</>
 	);

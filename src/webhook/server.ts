@@ -107,6 +107,36 @@ function computeAgentStatus(sessions: SessionState[]): "online" | "busy" | "feed
 	return "online";
 }
 
+function detectSessionRisk(session: SessionState): {
+	suspectedMisroute: boolean;
+	reasons: string[];
+	referencedIssueNumber: number | null;
+} {
+	const reasons: string[] = [];
+	let referencedIssueNumber: number | null = null;
+	const fixesMatch = /^Fixes #(\d+)/u.exec(session.body.trim());
+	if (fixesMatch) {
+		referencedIssueNumber = Number.parseInt(fixesMatch[1], 10);
+		if (referencedIssueNumber !== session.issueNumber) {
+			reasons.push(`Session body references issue #${referencedIssueNumber}.`);
+		}
+	}
+
+	if (session.title.trim().startsWith("TARS:")) {
+		reasons.push("Session title looks like a generated PR title.");
+	}
+
+	if (!session.workspacePath.endsWith(`issue-${session.issueNumber}`)) {
+		reasons.push(`Workspace path does not end with issue-${session.issueNumber}.`);
+	}
+
+	return {
+		suspectedMisroute: reasons.length > 0,
+		reasons,
+		referencedIssueNumber,
+	};
+}
+
 function buildStatusResponse(sessions: SessionState[]) {
 	const sorted = [...sessions].sort((a, b) => {
 		const aTime = a.createdAt ?? a.lastActivity;
@@ -126,6 +156,7 @@ function buildStatusResponse(sessions: SessionState[]) {
 			lastActivity: s.lastActivity,
 			prUrl: s.prUrl ?? null,
 			prNumber: s.prNumber ?? null,
+			risk: detectSessionRisk(s),
 		})),
 	};
 }
@@ -389,6 +420,42 @@ export function createWebhookServer(
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					process.stdout.write(`[webhook] delete error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const markFailedMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/mark-failed$/u.exec(requestUrl.pathname);
+			if (markFailedMatch) {
+				const [, owner, repo, issueNumberStr] = markFailedMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					session.status = "failed";
+					session.summary = "Marked failed by admin cleanup.";
+					session.lastActivity = new Date().toISOString();
+					await sessionStore.set(session);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						status: session.status,
+						message: "Session marked as failed.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] mark failed error: ${message}\n`);
 					sendJson(response, 500, { error: message });
 				}
 				return;
