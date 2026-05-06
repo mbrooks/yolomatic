@@ -200,7 +200,43 @@ function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () 
 	);
 }
 
-function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement {
+function RestartButton({ owner, repo, issueNumber, onRestarted }: { owner: string; repo: string; issueNumber: number; onRestarted?: () => void }): React.ReactElement {
+	const [restarting, setRestarting] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleRestart = useCallback(async () => {
+		if (!window.confirm(`This will reset the workspace and re-queue the session for ${owner}/${repo}#${issueNumber}. Proceed?`)) return;
+		setRestarting(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/restart`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Restarted.");
+				onRestarted?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setRestarting(false);
+		}
+	}, [owner, repo, issueNumber, onRestarted]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="restart-btn" onClick={handleRestart} disabled={restarting}>
+				{restarting ? "Restarting…" : "Restart"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function SessionTable({ sessions, onMutate }: { sessions: Session[]; onMutate?: () => void }): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
 	}
@@ -252,11 +288,27 @@ function SessionTable({ sessions }: { sessions: Session[] }): React.ReactElement
 									repo={session.repo}
 									issueNumber={session.issueNumber}
 								/>
+							) : session.status === "failed" || session.status === "cancelled" ? (
+								<div className="action-cell">
+									<RestartButton
+										owner={session.owner}
+										repo={session.repo}
+										issueNumber={session.issueNumber}
+										onRestarted={onMutate}
+									/>
+									<DeleteButton
+										owner={session.owner}
+										repo={session.repo}
+										issueNumber={session.issueNumber}
+										onDeleted={onMutate}
+									/>
+								</div>
 							) : isTerminalStatus(session.status) ? (
 								<DeleteButton
 									owner={session.owner}
 									repo={session.repo}
 									issueNumber={session.issueNumber}
+									onDeleted={onMutate}
 								/>
 							) : (
 								"-"
@@ -292,7 +344,7 @@ function App(): React.ReactElement {
 					)}
 				</div>
 			</header>
-			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} />}
+			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />}
 			<div className="last-updated">{lastUpdated}</div>
 		</>
 	);

@@ -351,6 +351,68 @@ export function createWebhookServer(
 				return;
 			}
 
+			const restartMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/restart$/u.exec(requestUrl.pathname);
+			if (restartMatch) {
+				const [, owner, repo, issueNumberStr] = restartMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (session.status === "complete") {
+						sendJson(response, 400, {
+							error: `Cannot restart a completed session.`,
+						});
+						return;
+					}
+
+					if (!isTerminalStatus(session.status)) {
+						sendJson(response, 400, {
+							error: `Cannot restart session in '${session.status}' status. Only failed or cancelled sessions can be restarted.`,
+						});
+						return;
+					}
+
+					if (workspaceManager) {
+						await workspaceManager.removeWorktree(owner, repo, issueNumber);
+					}
+
+					const originalStatus = session.status;
+					session.status = "pending";
+					session.summary = undefined;
+					session.prUrl = undefined;
+					session.prNumber = undefined;
+					session.seeded = false;
+					session.iterationCount = undefined;
+					session.restartCount = (session.restartCount ?? 0) + 1;
+					session.restartedFrom = originalStatus;
+					session.lastActivity = new Date().toISOString();
+					await sessionStore.set(session);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						restarted: true,
+						status: "pending",
+						message: "Session restarted. Workspace reset to fresh state. TARS will re-process on the next triggering event.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] restart error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
 			const deleteMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/delete$/u.exec(requestUrl.pathname);
 			if (deleteMatch) {
 				const [, owner, repo, issueNumberStr] = deleteMatch;
