@@ -19,6 +19,7 @@ export interface SessionState {
 	sessionPath: string;
 	workspacePath: string;
 	lastActivity: string;
+	createdAt?: string;
 	seeded: boolean;
 	summary?: string;
 	prUrl?: string;
