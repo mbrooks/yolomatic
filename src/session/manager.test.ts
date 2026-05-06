@@ -253,13 +253,94 @@ describe("SessionManager", () => {
 		expect(updated.status).toBe("cancelled");
 	});
 
-	it("throws when cancelling a non-existent session", async () => {
+	it("restarts a failed session, resetting state and tracking audit", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.cancelSession("mbrooks", "tars", 999)).rejects.toThrow(
+		const created = await manager.createSession("mbrooks", "tars", 13, "Title", "Body", "/tmp/ws", ["bug"]);
+		await manager.updateStatus("mbrooks", "tars", 13, "failed", {
+			summary: "Boom",
+			prNumber: 7,
+			prUrl: "https://github.com/mbrooks/tars/pull/7",
+			seeded: true,
+			iterationCount: 2,
+		});
+
+		const restarted = await manager.restartSession("mbrooks", "tars", 13);
+		expect(restarted.status).toBe("pending");
+		expect(restarted.summary).toBeUndefined();
+		expect(restarted.prNumber).toBeUndefined();
+		expect(restarted.prUrl).toBeUndefined();
+		expect(restarted.seeded).toBe(false);
+		expect(restarted.iterationCount).toBeUndefined();
+		expect(restarted.restartCount).toBe(1);
+		expect(restarted.restartedFrom).toBe("failed");
+		expect(restarted.title).toBe("Title");
+		expect(restarted.body).toBe("Body");
+		expect(restarted.labels).toEqual(["bug"]);
+	});
+
+	it("restarts a cancelled session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 14, "Title", "Body", "/tmp/ws");
+		await manager.cancelSession("mbrooks", "tars", 14);
+		const restarted = await manager.restartSession("mbrooks", "tars", 14);
+		expect(restarted.status).toBe("pending");
+		expect(restarted.restartedFrom).toBe("cancelled");
+		expect(restarted.restartCount).toBe(1);
+	});
+
+	it("increments restart count on multiple restarts", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 15, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 15, "failed");
+		const first = await manager.restartSession("mbrooks", "tars", 15);
+		expect(first.restartCount).toBe(1);
+
+		await manager.updateStatus("mbrooks", "tars", 15, "failed");
+		const second = await manager.restartSession("mbrooks", "tars", 15);
+		expect(second.restartCount).toBe(2);
+		expect(second.restartedFrom).toBe("failed");
+	});
+
+	it("throws when restarting a non-existent session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.restartSession("mbrooks", "tars", 999)).rejects.toThrow(
 			"No session for mbrooks/tars#999",
+		);
+	});
+
+	it("throws when restarting a completed session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 16, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 16, "complete");
+		await expect(manager.restartSession("mbrooks", "tars", 16)).rejects.toThrow(
+			"Cannot restart a completed session.",
+		);
+	});
+
+	it("throws when restarting a working session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 17, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 17, "working");
+		await expect(manager.restartSession("mbrooks", "tars", 17)).rejects.toThrow(
+			"Cannot restart session in 'working' status. Only failed or cancelled sessions can be restarted.",
 		);
 	});
 });
