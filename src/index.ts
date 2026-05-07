@@ -18,6 +18,8 @@ export async function main(): Promise<void> {
 		githubUsername: config.githubUsername,
 		githubToken: config.githubToken,
 		defaultBranch: config.defaultBranch,
+		maxWorktrees: config.maxWorktrees,
+		evictionStrategy: config.evictionStrategy,
 	});
 	const executor = new PiAgentExecutor({ soulPath: config.soulPath });
 	const taskController = new TaskController();
