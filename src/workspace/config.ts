@@ -5,6 +5,8 @@ export interface WorkspaceConfig {
 	githubUsername: string;
 	githubToken: string;
 	defaultBranch: string;
+	maxWorktrees?: number;
+	evictionStrategy?: "fifo" | "lru";
 }
 
 const DEFAULT_BRANCH = "main";
@@ -24,5 +26,7 @@ export function getWorkspaceConfig(): WorkspaceConfig {
 		githubUsername: requireEnv("GITHUB_USERNAME"),
 		githubToken: requireEnv("GITHUB_TOKEN"),
 		defaultBranch: process.env.DEFAULT_BRANCH?.trim() || DEFAULT_BRANCH,
+		maxWorktrees: Math.max(1, Number.parseInt(process.env.MAX_WORKTREES ?? "10", 10)),
+		evictionStrategy: process.env.WORKTREE_EVICTION_STRATEGY?.trim().toLowerCase() === "fifo" ? "fifo" : "lru",
 	};
 }

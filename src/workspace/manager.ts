@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -413,6 +413,7 @@ export class WorkspaceManager {
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
 
 		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
+			await this.touchWorktree(worktreePath);
 			return {
 				owner: normalizedOwner,
 				repo: normalizedRepo,
@@ -423,6 +424,7 @@ export class WorkspaceManager {
 		}
 
 		await this.pruneWorktrees(bareRepoPath);
+		await this.enforceWorktreeLimit(bareRepoPath, normalizedOwner, normalizedRepo);
 
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 		await this.updateDefaultBranch(bareRepoPath);
@@ -669,6 +671,112 @@ export class WorkspaceManager {
 			return true;
 		} catch {
 			return false;
+		}
+	}
+
+	private async touchWorktree(worktreePath: string): Promise<void> {
+		try {
+			const now = new Date();
+			await utimes(worktreePath, now, now);
+		} catch {
+			// ignore
+		}
+	}
+
+	private async enforceWorktreeLimit(bareRepoPath: string, owner: string, repo: string): Promise<void> {
+		const maxWorktrees = this.config.maxWorktrees ?? 10;
+		const allWorktrees = await this.getWorktreeList(bareRepoPath);
+		const worktreeCount = allWorktrees.filter((w) => w.path !== bareRepoPath).length;
+		if (worktreeCount < maxWorktrees) {
+			return;
+		}
+
+		const sorted = await this.sortWorktreesForEviction(allWorktrees, bareRepoPath);
+		const victim = sorted[0];
+		if (!victim) {
+			return;
+		}
+
+		const victimInfo = allWorktrees.find((w) => w.path === victim.path);
+		await this.safeEvictWorktree(victim.path, victimInfo?.branch, bareRepoPath, owner, repo);
+	}
+
+	private async sortWorktreesForEviction(
+		candidates: Array<{ path: string; branch?: string }>,
+		bareRepoPath: string,
+	): Promise<Array<{ path: string; branch?: string }>> {
+		const filtered = candidates.filter((w) => w.path !== bareRepoPath);
+		const withTimestamps = await Promise.all(
+			filtered.map(async (w) => {
+				try {
+					const stats = await stat(w.path);
+					return {
+						path: w.path,
+						branch: w.branch,
+						birthtimeMs: stats.birthtimeMs || stats.ctimeMs,
+						mtimeMs: stats.mtimeMs,
+					};
+				} catch {
+					return {
+						path: w.path,
+						branch: w.branch,
+						birthtimeMs: Number.POSITIVE_INFINITY,
+						mtimeMs: Number.POSITIVE_INFINITY,
+					};
+				}
+			}),
+		);
+
+		const strategy = this.config.evictionStrategy ?? "lru";
+		if (strategy === "fifo") {
+			return withTimestamps.sort((a, b) => a.birthtimeMs - b.birthtimeMs);
+		}
+		return withTimestamps.sort((a, b) => a.mtimeMs - b.mtimeMs);
+	}
+
+	private async safeEvictWorktree(
+		worktreePath: string,
+		branch: string | undefined,
+		bareRepoPath: string,
+		owner: string,
+		repo: string,
+	): Promise<void> {
+		const hasUncommitted = await this.hasAnyChanges(worktreePath);
+		if (hasUncommitted) {
+			await this.ensureGitIdentity(worktreePath);
+			const stashMessage = `TARS auto-stash before eviction of ${path.basename(worktreePath)}`;
+			await this.runCommand("git", ["stash", "push", "-m", stashMessage, "-u"], {
+				cwd: worktreePath,
+			});
+		}
+
+		try {
+			await this.runCommand("git", ["worktree", "remove", worktreePath], {
+				cwd: bareRepoPath,
+			});
+		} catch {
+			await this.runCommand("git", ["worktree", "remove", "--force", worktreePath], {
+				cwd: bareRepoPath,
+			});
+		}
+
+		const strategy = this.config.evictionStrategy ?? "lru";
+		const maxWorktrees = this.config.maxWorktrees ?? 10;
+		process.stdout.write(
+			`[workspace] Evicted worktree ${worktreePath}${branch ? ` (${branch})` : ""} for ${owner}/${repo}. ` +
+				`Strategy: ${strategy}, limit: ${maxWorktrees}. ` +
+				`Uncommitted changes: ${hasUncommitted ? "stashed" : "none"}\n`,
+		);
+	}
+
+	private async hasAnyChanges(workspacePath: string): Promise<boolean> {
+		try {
+			const { stdout } = await this.runCommand("git", ["status", "--porcelain"], {
+				cwd: workspacePath,
+			});
+			return stdout.trim().length > 0;
+		} catch {
+			return true;
 		}
 	}
 }
