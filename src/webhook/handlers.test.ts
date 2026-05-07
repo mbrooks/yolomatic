@@ -796,6 +796,59 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 	});
 
+	it("treats 'No commits between' as no changes needed", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		executor.execute.mockResolvedValue({
+			status: "complete" as never,
+			summary: "Fixed.",
+			rawResponse: "TARS_STATUS: complete\nFixed.",
+		});
+		octokit.pulls.create.mockRejectedValue(
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and tars/issue-56."}'),
+		);
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "complete");
+		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-pr-created"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: expect.stringContaining("No code changes were necessary.") }),
+		);
+	});
+
 	it("ignores /tars stop from non-admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
