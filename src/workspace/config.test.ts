@@ -11,6 +11,8 @@ describe("getWorkspaceConfig", () => {
 		delete process.env.GITHUB_TOKEN;
 		delete process.env.DEFAULT_BRANCH;
 		delete process.env.WORKSPACES_DIR;
+		delete process.env.MAX_WORKTREES;
+		delete process.env.WORKTREE_EVICTION_STRATEGY;
 	});
 
 	afterEach(() => {
@@ -23,6 +25,8 @@ describe("getWorkspaceConfig", () => {
 		const config = getWorkspaceConfig();
 		expect(config.defaultBranch).toBe("main");
 		expect(config.workspacesDir).toBeTruthy();
+		expect(config.maxWorktrees).toBe(10);
+		expect(config.evictionStrategy).toBe("lru");
 	});
 
 	it("reads environment variables", () => {
@@ -30,9 +34,21 @@ describe("getWorkspaceConfig", () => {
 		process.env.GITHUB_TOKEN = "token";
 		process.env.DEFAULT_BRANCH = "develop";
 		process.env.WORKSPACES_DIR = "/tmp/workspaces";
+		process.env.MAX_WORKTREES = "5";
+		process.env.WORKTREE_EVICTION_STRATEGY = "fifo";
 		const config = getWorkspaceConfig();
 		expect(config.defaultBranch).toBe("develop");
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
+		expect(config.maxWorktrees).toBe(5);
+		expect(config.evictionStrategy).toBe("fifo");
+	});
+
+	it("floors maxWorktrees to 1", () => {
+		process.env.GITHUB_USERNAME = "user";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.MAX_WORKTREES = "0";
+		const config = getWorkspaceConfig();
+		expect(config.maxWorktrees).toBe(1);
 	});
 
 	it("throws when GITHUB_USERNAME is missing", () => {

@@ -16,6 +16,8 @@ export interface AppConfig {
 	adminPassword: string | undefined;
 	adminGithubUsername: string | undefined;
 	cleanupRetentionDays: number | undefined;
+	maxWorktrees: number;
+	evictionStrategy: "fifo" | "lru";
 }
 
 function requireEnv(name: keyof NodeJS.ProcessEnv): string {
@@ -48,5 +50,7 @@ export function getConfig(): AppConfig {
 			const parsed = Number.parseInt(raw, 10);
 			return Number.isNaN(parsed) || parsed <= 0 ? undefined : parsed;
 		})(),
+		maxWorktrees: Math.max(1, Number.parseInt(process.env.MAX_WORKTREES ?? "10", 10)),
+		evictionStrategy: process.env.WORKTREE_EVICTION_STRATEGY?.trim().toLowerCase() === "fifo" ? "fifo" : "lru",
 	};
 }
