@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, mkdir, utimes, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -479,6 +479,345 @@ describe("WorkspaceManager", () => {
 		const hasChanges = await manager.hasChanges(root, true);
 		expect(hasChanges).toBe(false);
 		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
+	});
+
+	it("evicts oldest worktree when limit is reached with FIFO", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-fifo-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+		await mkdir(worktree2, { recursive: true });
+
+		const now = Date.now();
+		await utimes(worktree1, new Date(now - 2000), new Date(now - 2000));
+		await utimes(worktree2, new Date(now - 1000), new Date(now - 1000));
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: [
+						`worktree ${worktree1}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-1",
+						"",
+						`worktree ${worktree2}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-2",
+						"",
+					].join("\n"),
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 2, evictionStrategy: "fifo" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(1);
+		expect(removeCalls[0][1]).toContain(worktree1);
+		expect(removeCalls[0][1]).not.toContain(worktree2);
+	});
+
+	it("evicts least recently used worktree with LRU", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-lru-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+		await mkdir(worktree2, { recursive: true });
+
+		const now = Date.now();
+		await utimes(worktree1, new Date(now - 2000), new Date(now - 2000));
+		await utimes(worktree2, new Date(now - 1000), new Date(now - 1000));
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: [
+						`worktree ${worktree1}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-1",
+						"",
+						`worktree ${worktree2}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-2",
+						"",
+					].join("\n"),
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 2, evictionStrategy: "lru" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(1);
+		expect(removeCalls[0][1]).toContain(worktree1);
+		expect(removeCalls[0][1]).not.toContain(worktree2);
+	});
+
+	it("updates mtime of existing worktree when returned to track LRU", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-lru-touch-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+
+		const beforeStat = await stat(worktree1);
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/tars/issue-1\n`,
+					stderr: "",
+				};
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 2, evictionStrategy: "lru" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 1);
+
+		const afterStat = await stat(worktree1);
+		expect(afterStat.mtimeMs).toBeGreaterThanOrEqual(beforeStat.mtimeMs);
+	});
+
+	it("stashes uncommitted changes before evicting a worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-stash-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+		await mkdir(worktree2, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: [
+						`worktree ${worktree1}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-1",
+						"",
+						`worktree ${worktree2}`,
+						"HEAD abcd1234",
+						"branch refs/heads/tars/issue-2",
+						"",
+					].join("\n"),
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "status" && args[1] === "--porcelain") {
+				return { stdout: "M file.txt\n", stderr: "" };
+			}
+			if (args[0] === "stash" && args[1] === "push") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "config") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 2, evictionStrategy: "fifo" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+
+		const stashCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "stash" && args[1] === "push",
+		);
+		expect(stashCalls).toHaveLength(1);
+		expect(stashCalls[0][1]).toContain("-u");
+		expect(stashCalls[0][1]).toContain("TARS auto-stash before eviction of issue-1");
+	});
+
+	it("logs eviction to stdout", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-log-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/tars/issue-1\n`,
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 1, evictionStrategy: "fifo" },
+			runCommand,
+		);
+
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+
+		expect(writeSpy).toHaveBeenCalledWith(
+			expect.stringContaining("[workspace] Evicted worktree"),
+		);
+		expect(writeSpy).toHaveBeenCalledWith(
+			expect.stringContaining("mbrooks/tars"),
+		);
+
+		writeSpy.mockRestore();
+	});
+
+	it("does not evict when under the worktree limit", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-evict-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
+
+		await mkdir(bareRepoPath, { recursive: true });
+		await mkdir(worktree1, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
+				return {
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/tars/issue-1\n`,
+					stderr: "",
+				};
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), maxWorktrees: 3, evictionStrategy: "fifo" },
+			runCommand,
+		);
+
+		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(0);
 	});
 });
 
