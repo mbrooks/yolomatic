@@ -667,7 +667,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		issueNumber: number,
 		title: string,
 		summary: string,
-	): Promise<string> {
+	): Promise<string | undefined> {
 		const base = this.deps.defaultBranch;
 		const head = `tars/issue-${issueNumber}`;
 
@@ -699,6 +699,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 					await this.deps.sessionManager.associatePR(owner, repo, issueNumber, pr.number, pr.html_url);
 					return pr.html_url;
 				}
+			}
+			if (message.includes("No commits between")) {
+				// GitHub rejects PR creation when the branch has no unique commits
+				// compared to the base. Treat this as "no changes needed".
+				return undefined;
 			}
 			throw error;
 		}
