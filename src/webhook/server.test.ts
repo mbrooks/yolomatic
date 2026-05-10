@@ -1932,6 +1932,103 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
+	it("returns repo summaries in /api/status", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "One",
+					body: "Body",
+					status: "working" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+				{
+					issueNumber: 2,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Two",
+					body: "Body",
+					status: "complete" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+				{
+					issueNumber: 3,
+					repo: "case",
+					owner: "mbrooks",
+					title: "Three",
+					body: "Body",
+					status: "pending" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-case/issue-3.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-case/.worktrees/issue-3",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.repos).toHaveLength(2);
+		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1 });
+		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1 });
+
+		server.close();
+	});
+
+	it("returns empty repos array when no sessions exist", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.repos).toEqual([]);
+
+		server.close();
+	});
+
 	it("returns 404 for /api/sessions cancel when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());

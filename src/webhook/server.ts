@@ -138,6 +138,29 @@ function detectSessionRisk(session: SessionState): {
 	};
 }
 
+function buildRepoSummaries(sessions: SessionState[]): Array<{ owner: string; repo: string; sessionCount: number; activeCount: number }> {
+	const map = new Map<string, { owner: string; repo: string; sessionCount: number; activeCount: number }>();
+	for (const s of sessions) {
+		const key = `${s.owner}/${s.repo}`;
+		const existing = map.get(key);
+		if (existing) {
+			existing.sessionCount++;
+			if (!isTerminalStatus(s.status)) existing.activeCount++;
+		} else {
+			map.set(key, {
+				owner: s.owner,
+				repo: s.repo,
+				sessionCount: 1,
+				activeCount: isTerminalStatus(s.status) ? 0 : 1,
+			});
+		}
+	}
+	return Array.from(map.values()).sort((a, b) => {
+		if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+		return a.repo.localeCompare(b.repo);
+	});
+}
+
 function buildStatusResponse(sessions: SessionState[], staleInfoMap?: Map<string, StaleSessionInfo>) {
 	const sorted = [...sessions].sort((a, b) => {
 		const aTime = a.createdAt ?? a.lastActivity;
@@ -147,6 +170,7 @@ function buildStatusResponse(sessions: SessionState[], staleInfoMap?: Map<string
 	return {
 		agent: computeAgentStatus(sorted),
 		uptime: formatUptime(process.uptime()),
+		repos: buildRepoSummaries(sorted),
 		sessions: sorted.map((s) => {
 			const stale = staleInfoMap?.get(`${s.owner}/${s.repo}#${s.issueNumber}`);
 			return {
