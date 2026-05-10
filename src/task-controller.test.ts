@@ -44,4 +44,39 @@ describe("TaskController", () => {
 		expect(log).toEqual(["a"]);
 		expect(controller.isActive("b")).toBe(true);
 	});
+
+	it("steers an active task", async () => {
+		const controller = new TaskController();
+		let steered = false;
+		controller.register("key1", () => {}, async () => {
+			steered = true;
+		});
+
+		const result = await controller.steer("key1", "hello");
+		expect(result).toBe(true);
+		expect(steered).toBe(true);
+	});
+
+	it("returns false when steering a non-existent key", async () => {
+		const controller = new TaskController();
+		const result = await controller.steer("missing", "hello");
+		expect(result).toBe(false);
+	});
+
+	it("returns false when steering a task without a steer callback", async () => {
+		const controller = new TaskController();
+		controller.register("key1", () => {});
+		const result = await controller.steer("key1", "hello");
+		expect(result).toBe(false);
+	});
+
+	it("returns false when steer callback throws", async () => {
+		const controller = new TaskController();
+		controller.register("key1", () => {}, async () => {
+			throw new Error("steer failed");
+		});
+
+		const result = await controller.steer("key1", "hello");
+		expect(result).toBe(false);
+	});
 });
