@@ -1,4 +1,5 @@
 import {
+	AgentSession,
 	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
@@ -217,6 +218,7 @@ export class PiAgentExecutor {
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: AgentSession) => void,
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
 
@@ -262,6 +264,7 @@ export class PiAgentExecutor {
 			modelRegistry,
 			model: configuredModel,
 		});
+		onSessionCreated?.(session);
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 
