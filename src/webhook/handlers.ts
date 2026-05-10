@@ -96,6 +96,7 @@ export interface WebhookHandlers {
 	handleCommentEvent(payload: unknown): Promise<void>;
 	handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
 	handlePullRequestReviewEvent(payload: unknown): Promise<void>;
+	isInFlight(owner: string, repo: string, issueNumber: number): boolean;
 }
 
 export class GitHubIssueHandlers implements WebhookHandlers {
@@ -848,5 +849,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 	async handlePullRequestReviewEvent(payload: unknown): Promise<void> {
 		return this.prReviewHandler.handlePullRequestReviewEvent(payload);
+	}
+
+	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
+		return this.inFlight.has(`${owner}/${repo}#${issueNumber}`);
 	}
 }
