@@ -426,4 +426,28 @@ describe("PRReviewHandler", () => {
 			}),
 		);
 	});
+
+	it("ignores deleted review comment events", async () => {
+		const { handler, sessionManager } = createHandler();
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "deleted",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+	});
+
+	it("ignores edited review comment events", async () => {
+		const { handler, sessionManager } = createHandler();
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "edited",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+	});
 });

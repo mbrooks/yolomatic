@@ -83,6 +83,10 @@ export class PRReviewHandler {
 
 	async handlePullRequestReviewCommentEvent(rawPayload: unknown): Promise<void> {
 		const payload = rawPayload as PullRequestPayload;
+		if (payload.action !== "created") {
+			process.stdout.write(`[webhook] pull_request_review_comment action ignored: ${payload.action}\n`);
+			return;
+		}
 		await this.processPREvent(payload, "pull_request_review_comment");
 	}
 
