@@ -4,7 +4,7 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 
 ## Features
 
-- Receives `issues` and `issue_comment` GitHub webhooks in real time
+- Receives `issues`, `issue_comment`, `pull_request_review_comment`, and `pull_request_review` GitHub webhooks in real time
 - Maintains one persistent pi session per issue at `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`
 - Keeps repository work isolated under `WORKSPACES_DIR/{owner}-{repo}`
 - Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-pr-created`, `tars-complete`
@@ -160,7 +160,8 @@ For production deployments, wire `scripts/update-tars-if-needed.sh` into cron to
 2. If `AUTO_START=true`, TARS labels the issue `tars-working`, comments, and executes in the repo workspace.
 3. If the agent responds with `TARS_STATUS: waiting-feedback`, TARS switches the issue to `tars-feedback-required`.
 4. When `issue_comment.created` arrives on any TARS-labeled issue, TARS resumes the same session (ignores bot comments).
-5. If the agent responds with `TARS_STATUS: complete`, TARS commits changes, pushes the branch, adds `tars-pr-created`, and posts a completion summary.
+5. When `pull_request_review_comment.created` or `pull_request_review.submitted` arrives on a TARS PR, TARS iterates on the code and pushes updates to the PR branch.
+6. If the agent responds with `TARS_STATUS: complete`, TARS commits changes, pushes the branch, adds `tars-pr-created`, and posts a completion summary.
 
 ## Notes
 
