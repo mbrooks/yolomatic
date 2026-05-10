@@ -486,6 +486,8 @@ function SessionActions({
 	const canCancel = status === "working" || status === "pending" || status === "waiting-feedback";
 	const canRestart = status === "failed" || status === "cancelled";
 	const canDelete = isTerminalStatus(status);
+	const canMarkFailed = status !== "failed";
+	const canMarkComplete = status !== "complete";
 
 	return (
 		<div className="detail-actions">
@@ -493,8 +495,8 @@ function SessionActions({
 			{canCancel && <StopButton {...common} onStopped={onMutate} />}
 			{canRestart && <RestartButton {...common} onRestarted={onMutate} />}
 			{canDelete && <DeleteButton {...common} onDeleted={onMutate} />}
-			<MarkFailedButton {...common} onMarked={onMutate} />
-			<MarkCompleteButton {...common} onMarked={onMutate} />
+			{canMarkFailed && <MarkFailedButton {...common} onMarked={onMutate} />}
+			{canMarkComplete && <MarkCompleteButton {...common} onMarked={onMutate} />}
 			<ArchiveButton {...common} onArchived={onMutate} />
 			<PruneWorktreeButton {...common} onPruned={onMutate} />
 		</div>
