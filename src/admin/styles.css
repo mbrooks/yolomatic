@@ -400,6 +400,35 @@ h1 {
 	margin-left: 1rem;
 }
 
+.list-body::-webkit-scrollbar,
+.detail-pane::-webkit-scrollbar {
+	width: 10px;
+}
+
+.list-body::-webkit-scrollbar-track,
+.detail-pane::-webkit-scrollbar-track {
+	background: var(--surface);
+	border-radius: 6px;
+}
+
+.list-body::-webkit-scrollbar-thumb,
+.detail-pane::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 6px;
+	border: 2px solid var(--surface);
+}
+
+.list-body::-webkit-scrollbar-thumb:hover,
+.detail-pane::-webkit-scrollbar-thumb:hover {
+	background: var(--muted);
+}
+
+.list-body,
+.detail-pane {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border) var(--surface);
+}
+
 a {
 	color: var(--blue);
 	text-decoration: none;
