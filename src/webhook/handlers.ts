@@ -1,3 +1,4 @@
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { Octokit } from "@octokit/rest";
 
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
@@ -30,6 +31,9 @@ interface IssuePayload {
 		assignees?: {
 			login: string;
 		}[];
+		user?: {
+			login: string;
+		};
 	};
 	repository: {
 		name: string;
@@ -39,6 +43,10 @@ interface IssuePayload {
 	};
 	sender: {
 		login: string;
+	};
+	changes?: {
+		body?: { from: string };
+		title?: { from: string };
 	};
 }
 
@@ -181,6 +189,34 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				await this.safeRemoveLabel(owner, repo, issue.number, "tars-complete");
 				await this.postComment(owner, repo, issue.number, "TARS unassigned. Pausing work.");
 			}
+			return;
+		} else if (payload.action === "edited") {
+			const hasTarsLabel = hasAnyLabel(issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(issue.labels, "tars");
+			if (!this.isAssignedToTars(issue) && !hasTarsLabel && issue.user?.login !== this.deps.githubUsername) {
+				process.stdout.write(`[webhook] issues.edited ignored: not a TARS issue\n`);
+				return;
+			}
+			const inFlightKey = `${owner}/${repo}#${issue.number}`;
+			const state = await this.deps.sessionManager.getSession(owner, repo, issue.number);
+			if (!state) {
+				process.stdout.write(`[webhook] issues.edited ignored: no session for ${inFlightKey}\n`);
+				return;
+			}
+			if (this.deps.taskController?.isActive(inFlightKey)) {
+				const steered = await this.deps.taskController?.steer(inFlightKey, issue.body ?? "");
+				if (steered) {
+					process.stdout.write(`[webhook] steered description update on active execution ${inFlightKey}\n`);
+					await this.postComment(owner, repo, issue.number, "Issue description updated. Steering to TARS.");
+				} else {
+					await this.postComment(owner, repo, issue.number, "Issue description updated but could not be steered.");
+				}
+				return;
+			}
+			await this.deps.sessionManager.updateStatus(owner, repo, issue.number, state.status, {
+				body: issue.body ?? "",
+				title: issue.title,
+			});
+			process.stdout.write(`[webhook] updated session body/title for ${inFlightKey}\n`);
 			return;
 		} else {
 			process.stdout.write(`[webhook] issues action ignored: ${payload.action}\n`);
@@ -326,6 +362,19 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 				labels: ["tars"],
 			});
 			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
+		}
+
+		// If TARS is actively executing, steer the comment instead of starting a new run
+		if (this.deps.taskController?.isActive(inFlightKey)) {
+			const steered = await this.deps.taskController?.steer(inFlightKey, payload.comment.body);
+			if (steered) {
+				process.stdout.write(`[webhook] steered comment on active execution ${inFlightKey}\n`);
+				await this.postComment(owner, repo, issueNumber, "Steering comment received.");
+				return;
+			}
+			process.stdout.write(`[webhook] could not steer comment for ${inFlightKey}\n`);
+			await this.postComment(owner, repo, issueNumber, "TARS is busy. Comment could not be steered.");
+			return;
 		}
 
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
@@ -477,11 +526,35 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
 		const abortController = new AbortController();
-		this.deps.taskController?.register(inFlightKey, () => abortController.abort());
+
+		let resolveSession: ((session: AgentSession) => void) | undefined;
+		const sessionPromise = new Promise<AgentSession>((resolve) => {
+			resolveSession = resolve;
+		});
+
+		this.deps.taskController?.register(
+			inFlightKey,
+			() => abortController.abort(),
+			async (msg) => {
+				const session = await Promise.race([
+					sessionPromise,
+					new Promise<never>((_, reject) => setTimeout(() => reject(new Error("steer timeout")), 5000)),
+				]);
+				await session.steer(msg);
+			},
+		);
 
 		let result: ExecutionResult;
 		try {
-			result = await this.deps.executor.execute(state, comment, undefined, abortController.signal);
+			result = await this.deps.executor.execute(
+				state,
+				comment,
+				undefined,
+				abortController.signal,
+				(session) => {
+					resolveSession?.(session);
+				},
+			);
 		} catch (error) {
 			if (abortController.signal.aborted) {
 				process.stdout.write(`[webhook] execution aborted for ${inFlightKey}\n`);
