@@ -12,6 +12,15 @@ function isTerminalStatus(status: SessionStatus): boolean {
 	return TERMINAL_STATUSES.includes(status);
 }
 
+type StaleInfo = {
+	isStale: boolean;
+	ageMinutes: number;
+	classification: string;
+	worktreeDirty: boolean | null;
+	issueState: string | null;
+	prState: string | null;
+};
+
 type Session = {
 	owner: string;
 	repo: string;
@@ -27,6 +36,9 @@ type Session = {
 		reasons: string[];
 		referencedIssueNumber: number | null;
 	};
+	staleDetectedAt: string | null;
+	staleReason: string | null;
+	stale: StaleInfo | null;
 };
 
 type StatusResponse = {
@@ -205,6 +217,116 @@ function MarkFailedButton({ owner, repo, issueNumber, onMarked }: { owner: strin
 	);
 }
 
+function ArchiveButton({ owner, repo, issueNumber, onArchived }: { owner: string; repo: string; issueNumber: number; onArchived?: () => void }): React.ReactElement {
+	const [archiving, setArchiving] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleArchive = useCallback(async () => {
+		if (!window.confirm(`Archive ${owner}/${repo}#${issueNumber}? Session files will be moved to archive directory.`)) return;
+		setArchiving(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/archive`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Archived.");
+				onArchived?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setArchiving(false);
+		}
+	}, [owner, repo, issueNumber, onArchived]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="archive-btn" onClick={handleArchive} disabled={archiving}>
+				{archiving ? "Archiving…" : "Archive"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function MarkCompleteButton({ owner, repo, issueNumber, onMarked }: { owner: string; repo: string; issueNumber: number; onMarked?: () => void }): React.ReactElement {
+	const [marking, setMarking] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handleMarkComplete = useCallback(async () => {
+		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} complete?`)) return;
+		setMarking(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-complete`, {
+				method: "POST",
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Marked complete.");
+				onMarked?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setMarking(false);
+		}
+	}, [owner, repo, issueNumber, onMarked]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="complete-btn" onClick={handleMarkComplete} disabled={marking}>
+				{marking ? "Marking…" : "Mark complete"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
+function PruneWorktreeButton({ owner, repo, issueNumber, onPruned }: { owner: string; repo: string; issueNumber: number; onPruned?: () => void }): React.ReactElement {
+	const [pruning, setPruning] = useState(false);
+	const [result, setResult] = useState<string | null>(null);
+
+	const handlePrune = useCallback(async () => {
+		if (!window.confirm(`Prune worktree for ${owner}/${repo}#${issueNumber}?`)) return;
+		setPruning(true);
+		setResult(null);
+		try {
+			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/prune-worktree`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ confirmDirty: true }),
+			});
+			const data = (await response.json()) as { message?: string; error?: string };
+			if (response.ok) {
+				setResult(data.message ?? "Pruned.");
+				onPruned?.();
+			} else {
+				setResult(`Error: ${data.error ?? response.statusText}`);
+			}
+		} catch (error) {
+			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			setPruning(false);
+		}
+	}, [owner, repo, issueNumber, onPruned]);
+
+	return (
+		<div className="stop-cell">
+			<button type="button" className="prune-btn" onClick={handlePrune} disabled={pruning}>
+				{pruning ? "Pruning…" : "Prune"}
+			</button>
+			{result && <span className="stop-result">{result}</span>}
+		</div>
+	);
+}
+
 function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
 	const [deleting, setDeleting] = useState(false);
 	const [result, setResult] = useState<string | null>(null);
@@ -294,6 +416,58 @@ function RestartButton({ owner, repo, issueNumber, onRestarted }: { owner: strin
 			</button>
 			{result && <span className="stop-result">{result}</span>}
 		</div>
+	);
+}
+
+function StaleSessionTable({ sessions, onMutate }: { sessions: Session[]; onMutate?: () => void }): React.ReactElement | null {
+	const stale = sessions.filter((s) => s.stale?.isStale);
+	if (stale.length === 0) return null;
+
+	return (
+		<>
+			<h2 style={{ marginTop: "1.5rem", fontSize: "1rem" }}>Stale Sessions ({stale.length})</h2>
+			<table className="stale-table">
+				<thead>
+					<tr>
+						<th>Repo</th>
+						<th>Issue</th>
+						<th>Status</th>
+						<th>Age</th>
+						<th>Classification</th>
+						<th>Worktree</th>
+						<th>Issue State</th>
+						<th>PR State</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					{stale.map((session) => (
+						<tr key={`stale-${session.owner}/${session.repo}#${session.issueNumber}`}>
+							<td>{session.owner}/{session.repo}</td>
+							<td>
+								<a href={`https://github.com/${session.owner}/${session.repo}/issues/${session.issueNumber}`} target="_blank" rel="noreferrer">
+									#{session.issueNumber}
+								</a>
+							</td>
+							<td><span className={`status-badge ${session.status}`}>{session.status}</span></td>
+							<td>{session.stale ? `${session.stale.ageMinutes}m` : "-"}</td>
+							<td><span className="stale-classification">{session.stale?.classification ?? "-"}</span></td>
+							<td>{session.stale?.worktreeDirty === true ? "dirty" : session.stale?.worktreeDirty === false ? "clean" : "?"}</td>
+							<td>{session.stale?.issueState ?? "-"}</td>
+							<td>{session.stale?.prState ?? "-"}</td>
+							<td>
+								<div className="action-cell">
+									<ArchiveButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onArchived={onMutate} />
+									<MarkFailedButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onMarked={onMutate} />
+									<MarkCompleteButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onMarked={onMutate} />
+									<PruneWorktreeButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onPruned={onMutate} />
+								</div>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</>
 	);
 }
 
@@ -416,7 +590,12 @@ function App(): React.ReactElement {
 					)}
 				</div>
 			</header>
-			{state.status === "error" ? <div className="empty">Unable to reach API</div> : <SessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />}
+			{state.status === "error" ? <div className="empty">Unable to reach API</div> : (
+				<>
+					<StaleSessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />
+					<SessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />
+				</>
+			)}
 			<div className="last-updated">{lastUpdated}</div>
 		</>
 	);

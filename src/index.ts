@@ -4,6 +4,7 @@ import { getConfig } from "./config.js";
 import { PiAgentExecutor } from "./executor/index.js";
 import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
+import { StaleSessionDetector } from "./session/stale-detector.js";
 import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
@@ -37,6 +38,14 @@ export async function main(): Promise<void> {
 		adminGithubUsername: config.adminGithubUsername,
 	});
 
+	const staleDetector = new StaleSessionDetector(
+		sessionStore,
+		workspaceManager,
+		config.githubToken,
+		(owner, repo, issueNumber) => handlers.isInFlight(owner, repo, issueNumber),
+		config.staleThresholdMs,
+	);
+
 	const server = createWebhookServer(
 		config.webhookSecret,
 		handlers,
@@ -45,10 +54,34 @@ export async function main(): Promise<void> {
 		config.adminPassword,
 		taskController,
 		workspaceManager,
+		staleDetector,
+		config.archiveDir,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
+
+	// Startup stale detection: conservatively mark very old working sessions
+	try {
+		const staleInfos = await staleDetector.detectStaleSessions();
+		const veryOldThreshold = config.staleThresholdMs * 2;
+		for (const info of staleInfos) {
+			if (info.isStale && info.ageMs > veryOldThreshold && !info.session.staleDetectedAt) {
+				process.stdout.write(
+					`[startup] Marking stale session ${info.session.owner}/${info.session.repo}#${info.session.issueNumber} as interrupted_or_abandoned\n`,
+				);
+				await sessionManager.markFailed(
+					info.session.owner,
+					info.session.repo,
+					info.session.issueNumber,
+					"interrupted_or_abandoned",
+				);
+			}
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stdout.write(`[startup] stale detection error: ${message}\n`);
+	}
 
 	if (config.cleanupRetentionDays) {
 		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);

@@ -8,6 +8,7 @@ import { extname, join, relative, resolve } from "node:path";
 import type { WebhookHandlers } from "./handlers.js";
 import { isTerminalStatus, type SessionState, type SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
+import type { StaleSessionDetector, StaleSessionInfo } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 
 type WebhookServerOptions = {
@@ -137,7 +138,7 @@ function detectSessionRisk(session: SessionState): {
 	};
 }
 
-function buildStatusResponse(sessions: SessionState[]) {
+function buildStatusResponse(sessions: SessionState[], staleInfoMap?: Map<string, StaleSessionInfo>) {
 	const sorted = [...sessions].sort((a, b) => {
 		const aTime = a.createdAt ?? a.lastActivity;
 		const bTime = b.createdAt ?? b.lastActivity;
@@ -146,18 +147,33 @@ function buildStatusResponse(sessions: SessionState[]) {
 	return {
 		agent: computeAgentStatus(sorted),
 		uptime: formatUptime(process.uptime()),
-		sessions: sorted.map((s) => ({
-			owner: s.owner,
-			repo: s.repo,
-			issueNumber: s.issueNumber,
-			status: s.status,
-			workspacePath: s.workspacePath,
-			branch: `tars/issue-${s.issueNumber}`,
-			lastActivity: s.lastActivity,
-			prUrl: s.prUrl ?? null,
-			prNumber: s.prNumber ?? null,
-			risk: detectSessionRisk(s),
-		})),
+		sessions: sorted.map((s) => {
+			const stale = staleInfoMap?.get(`${s.owner}/${s.repo}#${s.issueNumber}`);
+			return {
+				owner: s.owner,
+				repo: s.repo,
+				issueNumber: s.issueNumber,
+				status: s.status,
+				workspacePath: s.workspacePath,
+				branch: `tars/issue-${s.issueNumber}`,
+				lastActivity: s.lastActivity,
+				prUrl: s.prUrl ?? null,
+				prNumber: s.prNumber ?? null,
+				risk: detectSessionRisk(s),
+				staleDetectedAt: s.staleDetectedAt ?? null,
+				staleReason: s.staleReason ?? null,
+				stale: stale
+					? {
+							isStale: stale.isStale,
+							ageMinutes: Math.floor(stale.ageMs / 60000),
+							classification: stale.classification,
+							worktreeDirty: stale.worktreeDirty,
+							issueState: stale.issueState ?? null,
+							prState: stale.prState ?? null,
+					  }
+					: null,
+			};
+		}),
 	};
 }
 
@@ -266,6 +282,8 @@ export function createWebhookServer(
 	adminPassword?: string,
 	taskController?: TaskController,
 	workspaceManager?: WorkspaceManager,
+	staleDetector?: StaleSessionDetector,
+	archiveDir?: string,
 	options: WebhookServerOptions = {},
 ) {
 	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
@@ -311,7 +329,17 @@ export function createWebhookServer(
 			}
 			try {
 				const sessions = await sessionStore.getAll();
-				sendJson(response, 200, buildStatusResponse(sessions));
+				const staleInfoMap = new Map<string, StaleSessionInfo>();
+				if (staleDetector) {
+					const staleInfos = await staleDetector.detectStaleSessions();
+					for (const info of staleInfos) {
+						staleInfoMap.set(
+							`${info.session.owner}/${info.session.repo}#${info.session.issueNumber}`,
+							info,
+						);
+					}
+				}
+				sendJson(response, 200, buildStatusResponse(sessions, staleInfoMap));
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				process.stdout.write(`[webhook] status error: ${message}\n`);
@@ -562,6 +590,121 @@ export function createWebhookServer(
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					process.stdout.write(`[webhook] bulk delete error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const archiveMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/archive$/u.exec(requestUrl.pathname);
+			if (archiveMatch) {
+				const [, owner, repo, issueNumberStr] = archiveMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (!archiveDir) {
+						sendJson(response, 500, { error: "Archive directory not configured" });
+						return;
+					}
+
+					session.archivedAt = new Date().toISOString();
+					await sessionStore.set(session);
+					await sessionStore.archive(session, archiveDir);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						archived: true,
+						message: "Session archived.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] archive error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const markCompleteMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/mark-complete$/u.exec(requestUrl.pathname);
+			if (markCompleteMatch) {
+				const [, owner, repo, issueNumberStr] = markCompleteMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					session.status = "complete";
+					session.lastActivity = new Date().toISOString();
+					await sessionStore.set(session);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						status: session.status,
+						message: "Session marked as complete.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] mark-complete error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const pruneWorktreeMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/prune-worktree$/u.exec(requestUrl.pathname);
+			if (pruneWorktreeMatch) {
+				const [, owner, repo, issueNumberStr] = pruneWorktreeMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					if (!workspaceManager) {
+						sendJson(response, 500, { error: "Workspace manager not configured" });
+						return;
+					}
+
+					const requestBody = JSON.parse((await readBody(request)).toString("utf8")) as { confirmDirty?: boolean };
+					const worktreePath = workspaceManager["getWorktreePath"](owner, repo, issueNumber);
+					const dirty = await workspaceManager.hasChanges(worktreePath, false);
+					if (dirty && !requestBody.confirmDirty) {
+						sendJson(response, 409, { error: "Worktree is dirty. Pass confirmDirty=true to force." });
+						return;
+					}
+
+					await workspaceManager.removeWorktree(owner, repo, issueNumber);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						pruned: true,
+						message: "Worktree pruned.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] prune-worktree error: ${message}\n`);
 					sendJson(response, 500, { error: message });
 				}
 				return;
