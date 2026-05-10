@@ -110,256 +110,348 @@ function StatusBadge({ status }: { status: AgentStatus }): React.ReactElement {
 	return <span className={`badge ${status}`}>{labelAgentStatus(status)}</span>;
 }
 
-function StopButton({ owner, repo, issueNumber }: { owner: string; repo: string; issueNumber: number }): React.ReactElement {
-	const [stopping, setStopping] = useState(false);
+function useAction<Args extends unknown[]>(
+	handler: (...args: Args) => Promise<{ ok: boolean; message: string }>,
+): {
+	loading: boolean;
+	result: string | null;
+	execute: (...args: Args) => void;
+} {
+	const [loading, setLoading] = useState(false);
 	const [result, setResult] = useState<string | null>(null);
 
-	const handleStop = useCallback(async () => {
-		if (!window.confirm(`Stop TARS on ${owner}/${repo}#${issueNumber}?`)) return;
-		setStopping(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/cancel`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Stopped.");
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
+	const execute = useCallback(
+		async (...args: Args) => {
+			setLoading(true);
+			setResult(null);
+			try {
+				const res = await handler(...args);
+				setResult(res.ok ? res.message : `Error: ${res.message}`);
+			} catch (error) {
+				setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+			} finally {
+				setLoading(false);
 			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setStopping(false);
-		}
-	}, [owner, repo, issueNumber]);
+		},
+		[handler],
+	);
 
+	return { loading, result, execute };
+}
+
+function ActionButton({
+	label,
+	loadingLabel,
+	variant,
+	onClick,
+	disabled,
+	result,
+}: {
+	label: string;
+	loadingLabel: string;
+	variant: string;
+	onClick: () => void;
+	disabled: boolean;
+	result: string | null;
+}): React.ReactElement {
 	return (
-		<div className="stop-cell">
-			<button type="button" className="stop-btn" onClick={handleStop} disabled={stopping}>
-				{stopping ? "Stopping…" : "Stop"}
+		<div className="action-row">
+			<button type="button" className={`action-btn ${variant}`} onClick={onClick} disabled={disabled}>
+				{disabled ? loadingLabel : label}
 			</button>
-			{result && <span className="stop-result">{result}</span>}
+			{result && <span className="action-result">{result}</span>}
 		</div>
 	);
 }
 
-function DeleteButton({ owner, repo, issueNumber, onDeleted }: { owner: string; repo: string; issueNumber: number; onDeleted?: () => void }): React.ReactElement {
-	const [deleting, setDeleting] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
-
-	const handleDelete = useCallback(async () => {
-		if (!window.confirm(`Delete session and workspace for ${owner}/${repo}#${issueNumber}? This cannot be undone.`)) return;
-		setDeleting(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/delete`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Deleted.");
-				onDeleted?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setDeleting(false);
+function StopButton({
+	owner,
+	repo,
+	issueNumber,
+	onStopped,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onStopped?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Stop TARS on ${owner}/${repo}#${issueNumber}?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/cancel`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onStopped?.();
+			return { ok: true, message: data.message ?? "Stopped." };
 		}
-	}, [owner, repo, issueNumber, onDeleted]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="delete-btn" onClick={handleDelete} disabled={deleting}>
-				{deleting ? "Deleting…" : "Delete"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label="Stop"
+			loadingLabel="Stopping…"
+			variant="stop"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
-function MarkFailedButton({ owner, repo, issueNumber, onMarked }: { owner: string; repo: string; issueNumber: number; onMarked?: () => void }): React.ReactElement {
-	const [marking, setMarking] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
-
-	const handleMarkFailed = useCallback(async () => {
-		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} failed?`)) return;
-		setMarking(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-failed`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Marked failed.");
-				onMarked?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setMarking(false);
+function DeleteButton({
+	owner,
+	repo,
+	issueNumber,
+	onDeleted,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onDeleted?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Delete session and workspace for ${owner}/${repo}#${issueNumber}? This cannot be undone.`))
+			return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/delete`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onDeleted?.();
+			return { ok: true, message: data.message ?? "Deleted." };
 		}
-	}, [owner, repo, issueNumber, onMarked]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="warn-btn" onClick={handleMarkFailed} disabled={marking}>
-				{marking ? "Marking…" : "Mark failed"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label="Delete"
+			loadingLabel="Deleting…"
+			variant="delete"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
-function ArchiveButton({ owner, repo, issueNumber, onArchived }: { owner: string; repo: string; issueNumber: number; onArchived?: () => void }): React.ReactElement {
-	const [archiving, setArchiving] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
-
-	const handleArchive = useCallback(async () => {
-		if (!window.confirm(`Archive ${owner}/${repo}#${issueNumber}? Session files will be moved to archive directory.`)) return;
-		setArchiving(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/archive`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Archived.");
-				onArchived?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setArchiving(false);
+function MarkFailedButton({
+	owner,
+	repo,
+	issueNumber,
+	onMarked,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onMarked?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} failed?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-failed`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onMarked?.();
+			return { ok: true, message: data.message ?? "Marked failed." };
 		}
-	}, [owner, repo, issueNumber, onArchived]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="archive-btn" onClick={handleArchive} disabled={archiving}>
-				{archiving ? "Archiving…" : "Archive"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label="Mark failed"
+			loadingLabel="Marking…"
+			variant="warn"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
-function MarkCompleteButton({ owner, repo, issueNumber, onMarked }: { owner: string; repo: string; issueNumber: number; onMarked?: () => void }): React.ReactElement {
-	const [marking, setMarking] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
-
-	const handleMarkComplete = useCallback(async () => {
-		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} complete?`)) return;
-		setMarking(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-complete`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Marked complete.");
-				onMarked?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setMarking(false);
+function MarkCompleteButton({
+	owner,
+	repo,
+	issueNumber,
+	onMarked,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onMarked?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Mark ${owner}/${repo}#${issueNumber} complete?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/mark-complete`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onMarked?.();
+			return { ok: true, message: data.message ?? "Marked complete." };
 		}
-	}, [owner, repo, issueNumber, onMarked]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="complete-btn" onClick={handleMarkComplete} disabled={marking}>
-				{marking ? "Marking…" : "Mark complete"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label="Mark complete"
+			loadingLabel="Marking…"
+			variant="complete"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
-function PruneWorktreeButton({ owner, repo, issueNumber, onPruned }: { owner: string; repo: string; issueNumber: number; onPruned?: () => void }): React.ReactElement {
-	const [pruning, setPruning] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
+function RestartButton({
+	owner,
+	repo,
+	issueNumber,
+	onRestarted,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onRestarted?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`This will reset the workspace and re-queue the session for ${owner}/${repo}#${issueNumber}. Proceed?`))
+			return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/restart`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onRestarted?.();
+			return { ok: true, message: data.message ?? "Restarted." };
+		}
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
-	const handlePrune = useCallback(async () => {
-		if (!window.confirm(`Prune worktree for ${owner}/${repo}#${issueNumber}?`)) return;
-		setPruning(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/prune-worktree`, {
+	return (
+		<ActionButton
+			label="Restart"
+			loadingLabel="Restarting…"
+			variant="restart"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
+	);
+}
+
+function ArchiveButton({
+	owner,
+	repo,
+	issueNumber,
+	onArchived,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onArchived?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Archive ${owner}/${repo}#${issueNumber}? Session files will be moved to archive directory.`))
+			return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/archive`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onArchived?.();
+			return { ok: true, message: data.message ?? "Archived." };
+		}
+		return { ok: false, message: data.error ?? response.statusText };
+	});
+
+	return (
+		<ActionButton
+			label="Archive"
+			loadingLabel="Archiving…"
+			variant="archive"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
+	);
+}
+
+function PruneWorktreeButton({
+	owner,
+	repo,
+	issueNumber,
+	onPruned,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onPruned?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Prune worktree for ${owner}/${repo}#${issueNumber}?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/prune-worktree`,
+			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ confirmDirty: true }),
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Pruned.");
-				onPruned?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setPruning(false);
+			},
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onPruned?.();
+			return { ok: true, message: data.message ?? "Pruned." };
 		}
-	}, [owner, repo, issueNumber, onPruned]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="prune-btn" onClick={handlePrune} disabled={pruning}>
-				{pruning ? "Pruning…" : "Prune"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label="Prune worktree"
+			loadingLabel="Pruning…"
+			variant="prune"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
 function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
-	const [deleting, setDeleting] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
-
-	const handleDelete = useCallback(async () => {
-		if (!window.confirm(`Delete all ${count} terminal sessions and their workspaces? This cannot be undone.`)) return;
-		setDeleting(true);
-		setResult(null);
-		try {
-			const response = await fetch("/api/sessions/delete-completed", {
-				method: "POST",
-			});
-			const data = (await response.json()) as { deleted?: number; error?: string };
-			if (response.ok) {
-				setResult(`${data.deleted ?? 0} deleted.`);
-				onDeleted?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setDeleting(false);
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Delete all ${count} terminal sessions and their workspaces? This cannot be undone.`))
+			return { ok: false, message: "Cancelled" };
+		const response = await fetch("/api/sessions/delete-completed", { method: "POST" });
+		const data = (await response.json()) as { deleted?: number; error?: string };
+		if (response.ok) {
+			onDeleted?.();
+			return { ok: true, message: `${data.deleted ?? 0} deleted.` };
 		}
-	}, [count, onDeleted]);
+		return { ok: false, message: data.error ?? response.statusText };
+	});
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="delete-btn bulk" onClick={handleDelete} disabled={deleting}>
-				{deleting ? "Deleting…" : `Delete all completed (${count})`}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
-		</div>
+		<ActionButton
+			label={`Delete all completed (${count})`}
+			loadingLabel="Deleting…"
+			variant="delete bulk"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
 	);
 }
 
@@ -371,9 +463,7 @@ function SessionRisk({ session }: { session: Session }): React.ReactElement {
 	return (
 		<div className="risk-warning">
 			<strong>Check mapping</strong>
-			{session.risk.referencedIssueNumber && (
-				<span> references #{session.risk.referencedIssueNumber}</span>
-			)}
+			{session.risk.referencedIssueNumber && <span> references #{session.risk.referencedIssueNumber}</span>}
 			<ul>
 				{session.risk.reasons.map((reason) => (
 					<li key={reason}>{reason}</li>
@@ -383,221 +473,236 @@ function SessionRisk({ session }: { session: Session }): React.ReactElement {
 	);
 }
 
-function RestartButton({ owner, repo, issueNumber, onRestarted }: { owner: string; repo: string; issueNumber: number; onRestarted?: () => void }): React.ReactElement {
-	const [restarting, setRestarting] = useState(false);
-	const [result, setResult] = useState<string | null>(null);
+function SessionActions({
+	session,
+	onMutate,
+}: {
+	session: Session;
+	onMutate?: () => void;
+}): React.ReactElement {
+	const { owner, repo, issueNumber, status } = session;
+	const common = { owner, repo, issueNumber };
 
-	const handleRestart = useCallback(async () => {
-		if (!window.confirm(`This will reset the workspace and re-queue the session for ${owner}/${repo}#${issueNumber}. Proceed?`)) return;
-		setRestarting(true);
-		setResult(null);
-		try {
-			const response = await fetch(`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/restart`, {
-				method: "POST",
-			});
-			const data = (await response.json()) as { message?: string; error?: string };
-			if (response.ok) {
-				setResult(data.message ?? "Restarted.");
-				onRestarted?.();
-			} else {
-				setResult(`Error: ${data.error ?? response.statusText}`);
-			}
-		} catch (error) {
-			setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
-		} finally {
-			setRestarting(false);
-		}
-	}, [owner, repo, issueNumber, onRestarted]);
+	const canCancel = status === "working" || status === "pending" || status === "waiting-feedback";
+	const canRestart = status === "failed" || status === "cancelled";
+	const canDelete = isTerminalStatus(status);
+	const canMarkFailed = status !== "failed";
+	const canMarkComplete = status !== "complete";
 
 	return (
-		<div className="stop-cell">
-			<button type="button" className="restart-btn" onClick={handleRestart} disabled={restarting}>
-				{restarting ? "Restarting…" : "Restart"}
-			</button>
-			{result && <span className="stop-result">{result}</span>}
+		<div className="detail-actions">
+			<h3>Actions</h3>
+			{canCancel && <StopButton {...common} onStopped={onMutate} />}
+			{canRestart && <RestartButton {...common} onRestarted={onMutate} />}
+			{canDelete && <DeleteButton {...common} onDeleted={onMutate} />}
+			{canMarkFailed && <MarkFailedButton {...common} onMarked={onMutate} />}
+			{canMarkComplete && <MarkCompleteButton {...common} onMarked={onMutate} />}
+			<ArchiveButton {...common} onArchived={onMutate} />
+			<PruneWorktreeButton {...common} onPruned={onMutate} />
 		</div>
 	);
 }
 
-function StaleSessionTable({ sessions, onMutate }: { sessions: Session[]; onMutate?: () => void }): React.ReactElement | null {
-	const stale = sessions.filter((s) => s.stale?.isStale);
-	if (stale.length === 0) return null;
-
+function SessionDetail({
+	session,
+	onMutate,
+}: {
+	session: Session;
+	onMutate?: () => void;
+}): React.ReactElement {
 	return (
-		<>
-			<h2 style={{ marginTop: "1.5rem", fontSize: "1rem" }}>Stale Sessions ({stale.length})</h2>
-			<table className="stale-table">
-				<thead>
-					<tr>
-						<th>Repo</th>
-						<th>Issue</th>
-						<th>Status</th>
-						<th>Age</th>
-						<th>Classification</th>
-						<th>Worktree</th>
-						<th>Issue State</th>
-						<th>PR State</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{stale.map((session) => (
-						<tr key={`stale-${session.owner}/${session.repo}#${session.issueNumber}`}>
-							<td>{session.owner}/{session.repo}</td>
-							<td>
-								<a href={`https://github.com/${session.owner}/${session.repo}/issues/${session.issueNumber}`} target="_blank" rel="noreferrer">
-									#{session.issueNumber}
-								</a>
-							</td>
-							<td><span className={`status-badge ${session.status}`}>{session.status}</span></td>
-							<td>{session.stale ? `${session.stale.ageMinutes}m` : "-"}</td>
-							<td><span className="stale-classification">{session.stale?.classification ?? "-"}</span></td>
-							<td>{session.stale?.worktreeDirty === true ? "dirty" : session.stale?.worktreeDirty === false ? "clean" : "?"}</td>
-							<td>{session.stale?.issueState ?? "-"}</td>
-							<td>{session.stale?.prState ?? "-"}</td>
-							<td>
-								<div className="action-cell">
-									<ArchiveButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onArchived={onMutate} />
-									<MarkFailedButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onMarked={onMutate} />
-									<MarkCompleteButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onMarked={onMutate} />
-									<PruneWorktreeButton owner={session.owner} repo={session.repo} issueNumber={session.issueNumber} onPruned={onMutate} />
-								</div>
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		</>
+		<div className="detail-pane">
+			<h2 className="detail-title">
+				<a href={`https://github.com/${session.owner}/${session.repo}/issues/${session.issueNumber}`} target="_blank" rel="noreferrer">
+					{session.owner}/{session.repo}#{session.issueNumber}
+				</a>
+			</h2>
+
+			<div className="detail-section">
+				<h3>Status</h3>
+				<div className="detail-row">
+					<span className={`status-badge ${session.status}`}>{session.status}</span>
+					{session.stale?.isStale && (
+						<span className="stale-badge">Stale — {session.stale.classification}</span>
+					)}
+				</div>
+			</div>
+
+			<div className="detail-section">
+				<h3>Details</h3>
+				<dl className="detail-grid">
+					<dt>Workspace</dt>
+					<dd>{session.workspacePath}</dd>
+
+					<dt>Branch</dt>
+					<dd>{session.branch}</dd>
+
+					<dt>Last Activity</dt>
+					<dd>{formatRelative(session.lastActivity)}</dd>
+
+					<dt>PR</dt>
+					<dd>
+						{session.prUrl && session.prNumber ? (
+							<a href={session.prUrl} target="_blank" rel="noreferrer">
+								#{session.prNumber}
+							</a>
+						) : (
+							"-"
+						)}
+					</dd>
+
+					<dt>Risk</dt>
+					<dd>
+						<SessionRisk session={session} />
+					</dd>
+				</dl>
+			</div>
+
+			{session.stale && (
+				<div className="detail-section">
+					<h3>Stale Info</h3>
+					<dl className="detail-grid">
+						<dt>Age</dt>
+						<dd>{session.stale.ageMinutes}m</dd>
+						<dt>Classification</dt>
+						<dd>{session.stale.classification}</dd>
+						<dt>Worktree</dt>
+						<dd>
+							{session.stale.worktreeDirty === true ? "dirty" : session.stale.worktreeDirty === false ? "clean" : "?"}
+						</dd>
+						<dt>Issue State</dt>
+						<dd>{session.stale.issueState ?? "-"}</dd>
+						<dt>PR State</dt>
+						<dd>{session.stale.prState ?? "-"}</dd>
+					</dl>
+				</div>
+			)}
+
+			<SessionActions session={session} onMutate={onMutate} />
+		</div>
 	);
 }
 
-function SessionTable({ sessions, onMutate }: { sessions: Session[]; onMutate?: () => void }): React.ReactElement {
+function EmptyDetail(): React.ReactElement {
+	return (
+		<div className="detail-pane empty">
+			<p>Select a session from the list to view details and actions.</p>
+		</div>
+	);
+}
+
+function SessionList({
+	sessions,
+	selected,
+	onSelect,
+}: {
+	sessions: Session[];
+	selected: Session | null;
+	onSelect: (session: Session) => void;
+}): React.ReactElement {
 	if (sessions.length === 0) {
 		return <div className="empty">No active sessions</div>;
 	}
 
 	return (
-		<table>
-			<thead>
-				<tr>
-					<th>Repo</th>
-					<th>Issue</th>
-					<th>Status</th>
-					<th>Workspace</th>
-					<th>Last Activity</th>
-					<th>PR</th>
-					<th>Risk</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{sessions.map((session) => (
-					<tr key={`${session.owner}/${session.repo}#${session.issueNumber}`}>
-						<td>{session.owner}/{session.repo}</td>
-						<td>
-							<a
-								href={`https://github.com/${session.owner}/${session.repo}/issues/${session.issueNumber}`}
-								target="_blank"
-								rel="noreferrer"
-							>
-								#{session.issueNumber}
-							</a>
-						</td>
-						<td>
-							<span className={`status-badge ${session.status}`}>{session.status}</span>
-						</td>
-						<td>{session.workspacePath}</td>
-						<td>{formatRelative(session.lastActivity)}</td>
-						<td>
-							{session.prUrl && session.prNumber ? (
-								<a href={session.prUrl} target="_blank" rel="noreferrer">
-									#{session.prNumber}
-								</a>
-							) : (
-								"-"
-							)}
-						</td>
-						<td>
-							<SessionRisk session={session} />
-						</td>
-						<td>
-							{session.status === "working" ? (
-								<StopButton
-									owner={session.owner}
-									repo={session.repo}
-									issueNumber={session.issueNumber}
-								/>
-							) : session.risk.suspectedMisroute && session.status !== "failed" ? (
-								<MarkFailedButton
-									owner={session.owner}
-									repo={session.repo}
-									issueNumber={session.issueNumber}
-									onMarked={onMutate}
-								/>
-							) : (session.status === "failed" || session.status === "cancelled") && !session.risk.suspectedMisroute ? (
-								<div className="action-cell">
-									<RestartButton
-										owner={session.owner}
-										repo={session.repo}
-										issueNumber={session.issueNumber}
-										onRestarted={onMutate}
-									/>
-									<DeleteButton
-										owner={session.owner}
-										repo={session.repo}
-										issueNumber={session.issueNumber}
-										onDeleted={onMutate}
-									/>
-								</div>
-							) : isTerminalStatus(session.status) ? (
-								<DeleteButton
-									owner={session.owner}
-									repo={session.repo}
-									issueNumber={session.issueNumber}
-									onDeleted={onMutate}
-								/>
-							) : (
-								"-"
-							)}
-						</td>
-					</tr>
-				))}
-			</tbody>
-		</table>
+		<div className="list-pane">
+			<div className="list-header">
+				<div className="list-col repo">Repo</div>
+				<div className="list-col issue">Issue</div>
+				<div className="list-col status">Status</div>
+				<div className="list-col activity">Last Activity</div>
+			</div>
+			<div className="list-body">
+				{sessions.map((session) => {
+					const key = `${session.owner}/${session.repo}#${session.issueNumber}`;
+					const isSelected =
+						selected !== null &&
+						selected.owner === session.owner &&
+						selected.repo === session.repo &&
+						selected.issueNumber === session.issueNumber;
+					return (
+						<div
+							key={key}
+							className={`list-row ${isSelected ? "selected" : ""}`}
+							onClick={() => onSelect(session)}
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onSelect(session);
+								}
+							}}
+							role="button"
+						>
+							<div className="list-col repo">
+								{session.owner}/{session.repo}
+							</div>
+							<div className="list-col issue">#{session.issueNumber}</div>
+							<div className="list-col status">
+								<span className={`status-badge ${session.status}`}>{session.status}</span>
+							</div>
+							<div className="list-col activity">{formatRelative(session.lastActivity)}</div>
+							{session.stale?.isStale && <span className="stale-dot" title={`Stale — ${session.stale.classification}`} />}
+						</div>
+					);
+				})}
+			</div>
+		</div>
 	);
 }
 
 function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
 	const state = useStatus(tick);
+	const [selected, setSelected] = useState<Session | null>(null);
+
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
 	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
+
 	const lastUpdated = useMemo(() => {
 		if (state.status === "loading") return "Loading...";
 		if (state.status === "error") return `Error: ${state.error}`;
 		return `Last updated: ${state.updatedAt.toLocaleTimeString()}`;
 	}, [state]);
 
+	const handleMutate = useCallback(() => {
+		setTick((t) => t + 1);
+	}, []);
+
+	const selectedSession = useMemo(() => {
+		if (!selected) return null;
+		return (
+			sessions.find(
+				(s) =>
+					s.owner === selected.owner && s.repo === selected.repo && s.issueNumber === selected.issueNumber,
+			) ?? null
+		);
+	}, [sessions, selected]);
+
 	return (
-		<>
+		<div className="app">
 			<header>
 				<h1>TARS Admin</h1>
 				<div className="header-actions">
 					<StatusBadge status={agentStatus} />
-					{terminalCount > 0 && (
-						<BulkDeleteButton count={terminalCount} onDeleted={() => setTick((t) => t + 1)} />
-					)}
+					{terminalCount > 0 && <BulkDeleteButton count={terminalCount} onDeleted={handleMutate} />}
 				</div>
 			</header>
-			{state.status === "error" ? <div className="empty">Unable to reach API</div> : (
-				<>
-					<StaleSessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />
-					<SessionTable sessions={sessions} onMutate={() => setTick((t) => t + 1)} />
-				</>
+			{state.status === "error" ? (
+				<div className="empty">Unable to reach API</div>
+			) : (
+				<div className="workspace">
+					<SessionList sessions={sessions} selected={selectedSession} onSelect={setSelected} />
+					{selectedSession ? (
+						<SessionDetail session={selectedSession} onMutate={handleMutate} />
+					) : (
+						<EmptyDetail />
+					)}
+				</div>
 			)}
 			<div className="last-updated">{lastUpdated}</div>
-		</>
+		</div>
 	);
 }
 
