@@ -508,6 +508,19 @@ a:hover {
 	border-color: var(--blue);
 }
 
+.repo-card.working-card {
+	border-color: var(--yellow);
+}
+
+.repo-card.working-card:hover {
+	background: rgba(210, 153, 34, 0.15);
+	border-color: var(--yellow);
+}
+
+.repo-card.working-card .repo-card-name {
+	color: var(--yellow);
+}
+
 .repo-card:focus {
 	outline: none;
 	border-color: var(--blue);
