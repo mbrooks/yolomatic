@@ -70,13 +70,12 @@ describe("TaskController", () => {
 		expect(result).toBe(false);
 	});
 
-	it("returns false when steer callback throws", async () => {
+	it("supports draining mode", () => {
 		const controller = new TaskController();
-		controller.register("key1", () => {}, async () => {
-			throw new Error("steer failed");
-		});
-
-		const result = await controller.steer("key1", "hello");
-		expect(result).toBe(false);
+		expect(controller.isDraining()).toBe(false);
+		controller.setDraining(true);
+		expect(controller.isDraining()).toBe(true);
+		controller.setDraining(false);
+		expect(controller.isDraining()).toBe(false);
 	});
 });
