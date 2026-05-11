@@ -1,0 +1,101 @@
+import type { Clock } from "../../ports/clock.js";
+import type { SessionRepository } from "../../ports/session-repository.js";
+import type { StaleSessionService } from "../../ports/stale-session-service.js";
+import {
+	buildRepoSummaries,
+	computeAgentStatus,
+	detectSessionRisk,
+	sessionKey,
+	sortSessionsByRecency,
+} from "../../domain/session/model.js";
+import { formatUptime } from "../../domain/workflow/policy.js";
+import type { StaleSessionInfo } from "../../session/stale-detector.js";
+import { ok, type AppResult } from "../result.js";
+
+export interface AdminStatusSessionView {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	status: string;
+	workspacePath: string;
+	branch: string;
+	lastActivity: string;
+	prUrl: string | null;
+	prNumber: number | null;
+	risk: ReturnType<typeof detectSessionRisk>;
+	staleDetectedAt: string | null;
+	staleReason: string | null;
+	stale: {
+		isStale: boolean;
+		ageMinutes: number;
+		classification: string;
+		worktreeDirty: boolean | null;
+		issueState: string | null;
+		prState: string | null;
+	} | null;
+}
+
+export interface AdminStatusView {
+	agent: "online" | "busy" | "feedback";
+	uptime: string;
+	repos: ReturnType<typeof buildRepoSummaries>;
+	sessions: AdminStatusSessionView[];
+}
+
+export class GetAdminStatus {
+	constructor(
+		private readonly sessions: SessionRepository,
+		private readonly stale: StaleSessionService,
+		private readonly clock: Clock,
+	) {}
+
+	async execute(): Promise<AppResult<AdminStatusView>> {
+		const all = await this.sessions.getAll();
+		const sorted = sortSessionsByRecency(all);
+		const staleMap = new Map<string, StaleSessionInfo>();
+
+		try {
+			const staleInfos = await this.stale.detectStaleSessions();
+			for (const info of staleInfos) {
+				staleMap.set(sessionKey(info.session.owner, info.session.repo, info.session.issueNumber), info);
+			}
+		} catch {
+			// ignore stale detection errors
+		}
+
+		const view: AdminStatusView = {
+			agent: computeAgentStatus(sorted),
+			uptime: formatUptime(this.clock.uptime()),
+			repos: buildRepoSummaries(sorted),
+			sessions: sorted.map((s) => {
+				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
+				return {
+					owner: s.owner,
+					repo: s.repo,
+					issueNumber: s.issueNumber,
+					status: s.status,
+					workspacePath: s.workspacePath,
+					branch: `tars/issue-${s.issueNumber}`,
+					lastActivity: s.lastActivity,
+					prUrl: s.prUrl ?? null,
+					prNumber: s.prNumber ?? null,
+					risk: detectSessionRisk(s),
+					staleDetectedAt: s.staleDetectedAt ?? null,
+					staleReason: s.staleReason ?? null,
+					stale: stale
+						? {
+								isStale: stale.isStale,
+								ageMinutes: Math.floor(stale.ageMs / 60000),
+								classification: stale.classification,
+								worktreeDirty: stale.worktreeDirty,
+								issueState: stale.issueState ?? null,
+								prState: stale.prState ?? null,
+							}
+						: null,
+				};
+			}),
+		};
+
+		return ok(view);
+	}
+}
