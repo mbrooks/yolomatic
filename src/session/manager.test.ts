@@ -343,4 +343,71 @@ describe("SessionManager", () => {
 			"Cannot restart session in 'working' status. Only failed or cancelled sessions can be restarted.",
 		);
 	});
+
+	it("pauses a working session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 18, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 18, "working");
+		const paused = await manager.pauseSession("mbrooks", "tars", 18);
+		expect(paused.status).toBe("paused");
+	});
+
+	it("pauses a pending session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 19, "Title", "Body", "/tmp/ws");
+		const paused = await manager.pauseSession("mbrooks", "tars", 19);
+		expect(paused.status).toBe("paused");
+	});
+
+	it("throws when pausing an already paused session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 20, "Title", "Body", "/tmp/ws");
+		await manager.pauseSession("mbrooks", "tars", 20);
+		await expect(manager.pauseSession("mbrooks", "tars", 20)).rejects.toThrow(
+			"Session is already paused.",
+		);
+	});
+
+	it("throws when pausing a terminal session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 21, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 21, "complete");
+		await expect(manager.pauseSession("mbrooks", "tars", 21)).rejects.toThrow(
+			"Cannot pause a session in 'complete' status.",
+		);
+	});
+
+	it("unpauses a paused session and restores to pending", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 22, "Title", "Body", "/tmp/ws");
+		await manager.pauseSession("mbrooks", "tars", 22);
+		const resumed = await manager.unpauseSession("mbrooks", "tars", 22);
+		expect(resumed.status).toBe("pending");
+	});
+
+	it("throws when unpausing a non-paused session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 23, "Title", "Body", "/tmp/ws");
+		await expect(manager.unpauseSession("mbrooks", "tars", 23)).rejects.toThrow(
+			"Cannot resume a session in 'pending' status. Only paused sessions can be resumed.",
+		);
+	});
 });
