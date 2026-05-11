@@ -442,31 +442,6 @@ function PruneWorktreeButton({
 	);
 }
 
-function BulkDeleteButton({ count, onDeleted }: { count: number; onDeleted?: () => void }): React.ReactElement {
-	const { loading, result, execute } = useAction(async () => {
-		if (!window.confirm(`Delete all ${count} terminal sessions and their workspaces? This cannot be undone.`))
-			return { ok: false, message: "Cancelled" };
-		const response = await fetch("/api/sessions/delete-completed", { method: "POST" });
-		const data = (await response.json()) as { deleted?: number; error?: string };
-		if (response.ok) {
-			onDeleted?.();
-			return { ok: true, message: `${data.deleted ?? 0} deleted.` };
-		}
-		return { ok: false, message: data.error ?? response.statusText };
-	});
-
-	return (
-		<ActionButton
-			label={`Delete all completed (${count})`}
-			loadingLabel="Deleting…"
-			variant="delete bulk"
-			onClick={execute}
-			disabled={loading}
-			result={result}
-		/>
-	);
-}
-
 function SessionRisk({ session }: { session: Session }): React.ReactElement {
 	if (!session.risk.suspectedMisroute) {
 		return <span className="risk-ok">OK</span>;
@@ -734,7 +709,6 @@ function App(): React.ReactElement {
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
 	const repos = state.status === "ready" ? state.data.repos : [];
-	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
 
 	const repoSessions = useMemo(() => {
 		if (view.type !== "repo") return [];
@@ -773,13 +747,10 @@ function App(): React.ReactElement {
 
 	return (
 		<div className="app">
-			<header>
+				<header>
 				<h1>TARS Admin</h1>
 				<div className="header-actions">
 					<StatusBadge status={agentStatus} />
-					{terminalCount > 0 && (
-						<BulkDeleteButton count={terminalCount} onDeleted={handleMutate} />
-					)}
 				</div>
 			</header>
 			{view.type === "repo" && (
