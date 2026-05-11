@@ -676,7 +676,8 @@ export class WorkspaceManager {
 
 	private async touchWorktree(worktreePath: string): Promise<void> {
 		try {
-			const now = new Date();
+			// Bias forward slightly so coarse filesystem timestamp resolution still records access.
+			const now = new Date(Date.now() + 1000);
 			await utimes(worktreePath, now, now);
 		} catch {
 			// ignore
