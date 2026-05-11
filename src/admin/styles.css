@@ -525,6 +525,67 @@ a:hover {
 	font-size: 0.875rem;
 }
 
+.log-container {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	max-height: 24rem;
+	overflow: auto;
+}
+
+.log-status {
+	color: var(--muted);
+	font-size: 0.875rem;
+	padding: 0.5rem 0;
+}
+
+.log-error {
+	color: var(--red);
+}
+
+.log-truncation-notice {
+	background: rgba(210, 153, 34, 0.15);
+	border-bottom: 1px solid var(--border);
+	color: var(--yellow);
+	font-size: 0.75rem;
+	padding: 0.4rem 0.6rem;
+}
+
+.log-content {
+	color: var(--text);
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	margin: 0;
+	padding: 0.6rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.log-container::-webkit-scrollbar {
+	width: 10px;
+}
+
+.log-container::-webkit-scrollbar-track {
+	background: var(--bg);
+	border-radius: 6px;
+}
+
+.log-container::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 6px;
+	border: 2px solid var(--bg);
+}
+
+.log-container::-webkit-scrollbar-thumb:hover {
+	background: var(--muted);
+}
+
+.log-container {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border) var(--bg);
+}
+
 @media (max-width: 768px) {
 	.workspace {
 		flex-direction: column;
