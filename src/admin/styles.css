@@ -551,6 +551,14 @@ a:hover {
 	padding: 0.4rem 0.6rem;
 }
 
+.log-refresh-notice {
+	background: rgba(88, 166, 255, 0.12);
+	border-bottom: 1px solid var(--border);
+	color: var(--blue);
+	font-size: 0.75rem;
+	padding: 0.4rem 0.6rem;
+}
+
 .log-content {
 	color: var(--text);
 	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;

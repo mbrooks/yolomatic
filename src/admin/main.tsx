@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
@@ -126,18 +126,25 @@ function useStatus(refreshToken = 0): LoadState {
 	return state;
 }
 
-type LogLoadState =
-	| { status: "idle"; data: null; error: null }
-	| { status: "loading"; data: null; error: null }
-	| { status: "ready"; data: SessionLogResponse; error: null }
-	| { status: "error"; data: null; error: string };
+type LogLoadState = {
+	status: "idle" | "loading" | "ready" | "error";
+	data: SessionLogResponse | null;
+	error: string | null;
+	refreshing: boolean;
+};
 
 function useSessionLog(session: Session | null): LogLoadState {
-	const [state, setState] = useState<LogLoadState>({ status: "idle", data: null, error: null });
+	const [state, setState] = useState<LogLoadState>({
+		status: "idle",
+		data: null,
+		error: null,
+		refreshing: false,
+	});
+	const sessionKey = session ? `${session.owner}/${session.repo}#${session.issueNumber}` : null;
 
 	useEffect(() => {
 		if (!session) {
-			setState({ status: "idle", data: null, error: null });
+			setState({ status: "idle", data: null, error: null, refreshing: false });
 			return;
 		}
 
@@ -145,7 +152,22 @@ function useSessionLog(session: Session | null): LogLoadState {
 		let cancelled = false;
 
 		async function load(): Promise<void> {
-			setState({ status: "loading", data: null, error: null });
+			setState((current) => {
+				if (current.data) {
+					return {
+						...current,
+						error: null,
+						refreshing: true,
+					};
+				}
+
+				return {
+					status: "loading",
+					data: null,
+					error: null,
+					refreshing: false,
+				};
+			});
 			try {
 				const response = await fetch(
 					`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log`,
@@ -155,21 +177,38 @@ function useSessionLog(session: Session | null): LogLoadState {
 				}
 				const data = (await response.json()) as SessionLogResponse;
 				if (!cancelled) {
-					setState({ status: "ready", data, error: null });
+					setState({ status: "ready", data, error: null, refreshing: false });
 				}
 			} catch (error) {
 				if (!cancelled) {
 					const message = error instanceof Error ? error.message : String(error);
-					setState({ status: "error", data: null, error: message });
+					setState((current) => {
+						if (current.data) {
+							return {
+								...current,
+								error: message,
+								refreshing: false,
+							};
+						}
+
+						return {
+							status: "error",
+							data: null,
+							error: message,
+							refreshing: false,
+						};
+					});
 				}
 			}
 		}
 
 		void load();
+		const interval = window.setInterval(() => void load(), 5000);
 		return () => {
 			cancelled = true;
+			window.clearInterval(interval);
 		};
-	}, [session]);
+	}, [sessionKey]);
 
 	return state;
 }
@@ -550,24 +589,67 @@ function SessionActions({
 
 function SessionLog({ session }: { session: Session }): React.ReactElement {
 	const logState = useSessionLog(session);
+	const containerRef = useRef<HTMLDivElement | null>(null);
+	const scrollSnapshotRef = useRef({ stickToBottom: true, offsetFromBottom: 0 });
+	const logText = logState.data?.lines?.join("\n") ?? "";
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const captureScroll = (): void => {
+			const offsetFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+			scrollSnapshotRef.current = {
+				stickToBottom: offsetFromBottom <= 24,
+				offsetFromBottom,
+			};
+		};
+
+		captureScroll();
+		container.addEventListener("scroll", captureScroll);
+		return () => {
+			container.removeEventListener("scroll", captureScroll);
+		};
+	}, [session.owner, session.repo, session.issueNumber]);
+
+	useLayoutEffect(() => {
+		const container = containerRef.current;
+		if (!container || !logState.data?.available) return;
+
+		if (scrollSnapshotRef.current.stickToBottom) {
+			container.scrollTop = container.scrollHeight;
+			return;
+		}
+
+		container.scrollTop = Math.max(
+			0,
+			container.scrollHeight - container.clientHeight - scrollSnapshotRef.current.offsetFromBottom,
+		);
+	}, [logText, logState.data?.available]);
 
 	return (
 		<div className="detail-section">
 			<h3>LLM Session Log</h3>
-			{logState.status === "loading" && (
+			{logState.status === "loading" && !logState.data && (
 				<div className="log-status">Loading log…</div>
 			)}
-			{logState.status === "error" && (
+			{logState.status === "error" && !logState.data && (
 				<div className="log-status log-error">Error loading log: {logState.error}</div>
 			)}
-			{logState.status === "ready" && (
-				<div className="log-container">
+			{logState.data && (
+				<div className="log-container" ref={containerRef}>
 					{!logState.data.available ? (
 						<div className="log-status">
 							{logState.data.error ?? "Log unavailable"}
 						</div>
 					) : (
 						<>
+							{logState.refreshing && (
+								<div className="log-refresh-notice">Refreshing…</div>
+							)}
+							{logState.error && (
+								<div className="log-status log-error">Error loading log: {logState.error}</div>
+							)}
 							{logState.data.truncated && (
 								<div className="log-truncation-notice">
 									Log truncated ({logState.data.totalLines ?? 0} total lines; showing last {logState.data.lines?.length ?? 0})
