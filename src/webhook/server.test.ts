@@ -2615,6 +2615,308 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
+	it("returns 404 for pause when admin credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/1/pause",
+		});
+		expect(response.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("pauses a session via POST /api/sessions/:owner/:repo/:issueNumber/pause", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(async (state: import("../session/store.js").SessionState) => state),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/1/pause",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.paused).toBe(true);
+		expect(body.status).toBe("paused");
+		expect(mockStore.set).toHaveBeenCalledWith(expect.objectContaining({ status: "paused" }));
+
+		server.close();
+	});
+
+	it("returns 400 when pausing an already paused session", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 2,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "paused" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/2/pause",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(400);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Session is already paused.");
+		expect(mockStore.set).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 400 when pausing a terminal session", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 3,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "complete" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/3/pause",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(400);
+		const body = JSON.parse(response.body);
+		expect(body.error).toContain("Cannot pause a session in 'complete' status");
+		expect(mockStore.set).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 404 for pause when session does not exist", async () => {
+		const mockStore = {
+			get: vi.fn(async () => null),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/999/pause",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(404);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
+	it("returns 404 for resume when admin credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/1/resume",
+		});
+		expect(response.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("resumes a paused session via POST /api/sessions/:owner/:repo/:issueNumber/resume", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "paused" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(async (state: import("../session/store.js").SessionState) => state),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/1/resume",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.resumed).toBe(true);
+		expect(body.status).toBe("pending");
+		expect(mockStore.set).toHaveBeenCalledWith(expect.objectContaining({ status: "pending" }));
+
+		server.close();
+	});
+
+	it("returns 400 when resuming a non-paused session", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 2,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/2/resume",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(400);
+		const body = JSON.parse(response.body);
+		expect(body.error).toContain("Cannot resume a session in 'working' status");
+		expect(mockStore.set).not.toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("returns 404 for resume when session does not exist", async () => {
+		const mockStore = {
+			get: vi.fn(async () => null),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/sessions/mbrooks/tars/999/resume",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(404);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
 	it("returns 404 for restart when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());

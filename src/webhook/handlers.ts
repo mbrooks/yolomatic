@@ -393,6 +393,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 		// Fallback: auto-create session if it doesn't exist (e.g., assignment event was missed)
 		let session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (session && session.status === "paused") {
+			process.stdout.write(`[webhook] comment ignored: ${inFlightKey} is paused\n`);
+			await this.postComment(owner, repo, issueNumber, "TARS is paused on this issue. It will resume when unpaused.");
+			return;
+		}
+
 		if (!session) {
 			const worktree = await this.deps.workspaceManager.createOrGetWorktree(owner, repo, issueNumber);
 			session = await this.deps.sessionManager.createSession(
@@ -601,6 +607,14 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		} finally {
 			this.deps.taskController?.unregister(inFlightKey);
 		}
+
+		// If session was paused during execution, skip all further status updates
+		const postExecState = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (postExecState?.status === "paused") {
+			process.stdout.write(`[webhook] ${inFlightKey} paused during execution; suppressing result transitions\n`);
+			return;
+		}
+
 		process.stdout.write(
 			`[webhook] execution result repo=${repo} issue=#${issueNumber} status=${result.status}\n`,
 		);

@@ -4,10 +4,11 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 type AgentStatus = "online" | "busy" | "feedback" | "offline";
-type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
+type SessionStatus = "pending" | "working" | "waiting-feedback" | "paused" | "complete" | "failed" | "cancelled";
 
 export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
-export const IN_PROGRESS_STATUSES: readonly SessionStatus[] = ["working", "pending", "waiting-feedback"];
+export const IN_PROGRESS_STATUSES: readonly SessionStatus[] = ["working", "pending", "waiting-feedback", "paused"];
+export const PAUSABLE_STATUSES: readonly SessionStatus[] = ["working", "pending", "waiting-feedback"];
 
 export function isTerminalStatus(status: SessionStatus): boolean {
 	return TERMINAL_STATUSES.includes(status);
@@ -15,6 +16,10 @@ export function isTerminalStatus(status: SessionStatus): boolean {
 
 export function isInProgressStatus(status: SessionStatus): boolean {
 	return IN_PROGRESS_STATUSES.includes(status);
+}
+
+export function isPausableStatus(status: SessionStatus): boolean {
+	return PAUSABLE_STATUSES.includes(status);
 }
 
 type StaleInfo = {
@@ -321,6 +326,80 @@ function StopButton({
 	);
 }
 
+function PauseButton({
+	owner,
+	repo,
+	issueNumber,
+	onPaused,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onPaused?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Pause TARS on ${owner}/${repo}#${issueNumber}?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/pause`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onPaused?.();
+			return { ok: true, message: data.message ?? "Paused." };
+		}
+		return { ok: false, message: data.error ?? response.statusText };
+	});
+
+	return (
+		<ActionButton
+			label="Pause"
+			loadingLabel="Pausing…"
+			variant="pause"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
+	);
+}
+
+function ResumeButton({
+	owner,
+	repo,
+	issueNumber,
+	onResumed,
+}: {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	onResumed?: () => void;
+}): React.ReactElement {
+	const { loading, result, execute } = useAction(async () => {
+		if (!window.confirm(`Resume TARS on ${owner}/${repo}#${issueNumber}?`)) return { ok: false, message: "Cancelled" };
+		const response = await fetch(
+			`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/resume`,
+			{ method: "POST" },
+		);
+		const data = (await response.json()) as { message?: string; error?: string };
+		if (response.ok) {
+			onResumed?.();
+			return { ok: true, message: data.message ?? "Resumed." };
+		}
+		return { ok: false, message: data.error ?? response.statusText };
+	});
+
+	return (
+		<ActionButton
+			label="Resume"
+			loadingLabel="Resuming…"
+			variant="resume"
+			onClick={execute}
+			disabled={loading}
+			result={result}
+		/>
+	);
+}
+
 function DeleteButton({
 	owner,
 	repo,
@@ -579,6 +658,8 @@ function SessionActions({
 	const common = { owner, repo, issueNumber };
 
 	const canCancel = status === "working" || status === "pending" || status === "waiting-feedback";
+	const canPause = isPausableStatus(status);
+	const canResume = status === "paused";
 	const canRestart = status === "failed" || status === "cancelled";
 	const canDelete = isTerminalStatus(status);
 	const canMarkFailed = status !== "failed";
@@ -589,6 +670,8 @@ function SessionActions({
 			<h3>Actions</h3>
 			<div className="detail-actions">
 				{canCancel && <StopButton {...common} onStopped={onMutate} />}
+				{canPause && <PauseButton {...common} onPaused={onMutate} />}
+				{canResume && <ResumeButton {...common} onResumed={onMutate} />}
 				{canRestart && <RestartButton {...common} onRestarted={onMutate} />}
 				{canDelete && <DeleteButton {...common} onDeleted={onMutate} />}
 				{canMarkFailed && <MarkFailedButton {...common} onMarked={onMutate} />}
