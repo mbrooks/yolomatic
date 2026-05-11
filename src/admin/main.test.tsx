@@ -3,7 +3,15 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, renderHook, act } from "@testing-library/react";
 import React from "react";
 
-import { App, isInProgressStatus, isTerminalStatus, IN_PROGRESS_STATUSES, isPausableStatus, PAUSABLE_STATUSES, useSessionLog } from "./main.js";
+import { App } from "./app/App.js";
+import {
+	isInProgressStatus,
+	isTerminalStatus,
+	IN_PROGRESS_STATUSES,
+	isPausableStatus,
+	PAUSABLE_STATUSES,
+} from "./lib/status-helpers.js";
+import { useSessionLog } from "./hooks/useSessionLog.js";
 
 describe("isInProgressStatus", () => {
 	it("returns true for working, pending, waiting-feedback, and paused", () => {
@@ -73,6 +81,7 @@ describe("App", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
+		window.location.hash = "#/repos";
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockStatusResponse({
 				agent: "online",
@@ -149,6 +158,7 @@ describe("App", () => {
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
+		window.location.hash = "#/repos";
 	});
 
 	it("renders landing page with repo cards and active tasks card", async () => {
@@ -185,11 +195,8 @@ describe("App", () => {
 		fireEvent.click(screen.getByText("Active Tasks"));
 
 		await waitFor(() => {
-			expect(screen.queryByText("Repos")).not.toBeNull();
+			expect(screen.queryByRole("button", { name: "Repos" })).not.toBeNull();
 		});
-
-		// Breadcrumb should show "Repos → Active Tasks"
-		expect(screen.queryByRole("button", { name: "Repos" })).not.toBeNull();
 
 		// Working view should show session list with in-progress sessions
 		expect(screen.queryByText("#1")).not.toBeNull();
@@ -442,9 +449,7 @@ describe("useSessionLog", () => {
 
 	it("keeps log content visible after polling stops", async () => {
 		vi.useFakeTimers();
-		fetchSpy.mockImplementation(async () =>
-			mockLogResponse({ lines: ["old content"] }),
-		);
+		fetchSpy.mockImplementation(async () => mockLogResponse({ lines: ["old content"] }));
 
 		const { rerender, result } = renderHook(
 			({ session }) => useSessionLog(session),
