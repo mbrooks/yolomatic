@@ -621,6 +621,93 @@ export function createWebhookServer(
 				return;
 			}
 
+			const pauseMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/pause$/u.exec(requestUrl.pathname);
+			if (pauseMatch) {
+				const [, owner, repo, issueNumberStr] = pauseMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (session.status === "paused") {
+						sendJson(response, 400, { error: "Session is already paused." });
+						return;
+					}
+
+					if (isTerminalStatus(session.status)) {
+						sendJson(response, 400, { error: `Cannot pause a session in '${session.status}' status.` });
+						return;
+					}
+
+					session.status = "paused";
+					session.lastActivity = new Date().toISOString();
+					await sessionStore.set(session);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						paused: true,
+						status: session.status,
+						message: "Session paused. It will not be picked up for execution until resumed.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] pause error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			const resumeMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/resume$/u.exec(requestUrl.pathname);
+			if (resumeMatch) {
+				const [, owner, repo, issueNumberStr] = resumeMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (session.status !== "paused") {
+						sendJson(response, 400, { error: `Cannot resume a session in '${session.status}' status. Only paused sessions can be resumed.` });
+						return;
+					}
+
+					session.status = "pending";
+					session.lastActivity = new Date().toISOString();
+					await sessionStore.set(session);
+
+					sendJson(response, 200, {
+						owner,
+						repo,
+						issueNumber,
+						resumed: true,
+						status: session.status,
+						message: "Session resumed. It will be picked up for execution on the next triggering event.",
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] resume error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
 			const deleteMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/delete$/u.exec(requestUrl.pathname);
 			if (deleteMatch) {
 				const [, owner, repo, issueNumberStr] = deleteMatch;

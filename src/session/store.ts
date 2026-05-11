@@ -1,7 +1,7 @@
 import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
+export type SessionStatus = "pending" | "working" | "waiting-feedback" | "paused" | "complete" | "failed" | "cancelled";
 
 export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
 
