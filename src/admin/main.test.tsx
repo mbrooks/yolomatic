@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, renderHook, act } from "@testing-library/react";
 import React from "react";
 
-import { App, isInProgressStatus, isTerminalStatus, IN_PROGRESS_STATUSES } from "./main.js";
+import { App, isInProgressStatus, isTerminalStatus, IN_PROGRESS_STATUSES, useSessionLog } from "./main.js";
 
 describe("isInProgressStatus", () => {
 	it("returns true for working, pending, and waiting-feedback", () => {
@@ -253,5 +253,199 @@ describe("App", () => {
 		await waitFor(() => {
 			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();
 		});
+	});
+});
+
+function mockLogResponse(overrides: Record<string, unknown> = {}): Response {
+	return new Response(
+		JSON.stringify({
+			available: true,
+			lines: ["line 1", "line 2"],
+			...overrides,
+		}),
+		{
+			status: 200,
+			headers: { "content-type": "application/json" },
+		},
+	);
+}
+
+function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
+	return {
+		owner: "mbrooks",
+		repo: "tars",
+		issueNumber: 1,
+		status,
+		workspacePath: "/ws/1",
+		branch: "tars/issue-1",
+		lastActivity: new Date().toISOString(),
+		prUrl: null,
+		prNumber: null,
+		risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
+		staleDetectedAt: null,
+		staleReason: null,
+		stale: null,
+	};
+}
+
+describe("useSessionLog", () => {
+	let fetchSpy: any;
+
+	beforeEach(() => {
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => mockLogResponse());
+	});
+
+	afterEach(() => {
+		fetchSpy.mockRestore();
+		vi.useRealTimers();
+	});
+
+	it("loads log immediately when a session is selected", async () => {
+		const { result } = renderHook(() => useSessionLog(makeSession("working")));
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(result.current.status).toBe("ready");
+		expect(result.current.data?.lines).toEqual(["line 1", "line 2"]);
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("polls log endpoint for working sessions", async () => {
+		vi.useFakeTimers();
+
+		renderHook(() => useSessionLog(makeSession("working")));
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+		await act(async () => {
+			vi.advanceTimersByTime(5000);
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not poll for complete sessions", async () => {
+		vi.useFakeTimers();
+
+		renderHook(() => useSessionLog(makeSession("complete")));
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+		await act(async () => {
+			vi.advanceTimersByTime(5000);
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("stops polling when session changes from working to complete", async () => {
+		vi.useFakeTimers();
+
+		const { rerender } = renderHook(
+			({ session }) => useSessionLog(session),
+			{ initialProps: { session: makeSession("working") } },
+		);
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+		await act(async () => {
+			vi.advanceTimersByTime(5000);
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+		// Transition to complete
+		rerender({ session: makeSession("complete") });
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		// The effect runs once more on status change, triggering one extra load
+		expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+		await act(async () => {
+			vi.advanceTimersByTime(5000);
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		// No more fetches after stopping polling
+		expect(fetchSpy).toHaveBeenCalledTimes(3);
+	});
+
+	it("keeps log content visible after polling stops", async () => {
+		vi.useFakeTimers();
+		fetchSpy.mockImplementation(async () =>
+			mockLogResponse({ lines: ["old content"] }),
+		);
+
+		const { rerender, result } = renderHook(
+			({ session }) => useSessionLog(session),
+			{ initialProps: { session: makeSession("working") } },
+		);
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(result.current.data?.lines).toEqual(["old content"]);
+
+		rerender({ session: makeSession("complete") });
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(result.current.data?.lines).toEqual(["old content"]);
 	});
 });

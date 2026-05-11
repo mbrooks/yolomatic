@@ -139,7 +139,7 @@ type LogLoadState = {
 	refreshing: boolean;
 };
 
-function useSessionLog(session: Session | null): LogLoadState {
+export function useSessionLog(session: Session | null): LogLoadState {
 	const [state, setState] = useState<LogLoadState>({
 		status: "idle",
 		data: null,
@@ -209,12 +209,19 @@ function useSessionLog(session: Session | null): LogLoadState {
 		}
 
 		void load();
+
+		if (session.status === "complete") {
+			return () => {
+				cancelled = true;
+			};
+		}
+
 		const interval = window.setInterval(() => void load(), 5000);
 		return () => {
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, [sessionKey]);
+	}, [sessionKey, session?.status]);
 
 	return state;
 }
