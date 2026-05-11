@@ -6,10 +6,15 @@ import "./styles.css";
 type AgentStatus = "online" | "busy" | "feedback" | "offline";
 type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
 
-const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
+export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
+export const IN_PROGRESS_STATUSES: readonly SessionStatus[] = ["working", "pending", "waiting-feedback"];
 
-function isTerminalStatus(status: SessionStatus): boolean {
+export function isTerminalStatus(status: SessionStatus): boolean {
 	return TERMINAL_STATUSES.includes(status);
+}
+
+export function isInProgressStatus(status: SessionStatus): boolean {
+	return IN_PROGRESS_STATUSES.includes(status);
 }
 
 type StaleInfo = {
@@ -65,7 +70,8 @@ type StatusResponse = {
 
 type ViewState =
 	| { type: "repos" }
-	| { type: "repo"; owner: string; repo: string };
+	| { type: "repo"; owner: string; repo: string }
+	| { type: "working" };
 
 type LoadState =
 	| { status: "loading"; data: null; error: null; updatedAt: null }
@@ -763,11 +769,13 @@ function EmptyDetail(): React.ReactElement {
 function RepoList({
 	repos,
 	onSelect,
+	children,
 }: {
 	repos: RepoSummary[];
 	onSelect: (owner: string, repo: string) => void;
+	children?: React.ReactNode;
 }): React.ReactElement {
-	if (repos.length === 0) {
+	if (repos.length === 0 && !children) {
 		return (
 			<div className="empty-state">
 				<p>No repositories have been used yet.</p>
@@ -777,6 +785,7 @@ function RepoList({
 
 	return (
 		<div className="repo-list">
+			{children}
 			{repos.map((repo) => (
 				<div
 					key={`${repo.owner}/${repo.repo}`}
@@ -803,19 +812,17 @@ function RepoList({
 }
 
 function Breadcrumb({
-	owner,
-	repo,
+	label,
 	onBack,
 }: {
-	owner: string;
-	repo: string;
+	label: string;
 	onBack: () => void;
 }): React.ReactElement {
 	return (
 		<nav className="breadcrumb">
 			<button type="button" className="breadcrumb-link" onClick={onBack}>Repos</button>
 			<span className="breadcrumb-separator">→</span>
-			<span className="breadcrumb-current">{owner}/{repo}</span>
+			<span className="breadcrumb-current">{label}</span>
 		</nav>
 	);
 }
@@ -882,7 +889,7 @@ function SessionList({
 	);
 }
 
-function App(): React.ReactElement {
+export function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
 	const state = useStatus(tick);
 	const [selected, setSelected] = useState<Session | null>(null);
@@ -922,10 +929,21 @@ function App(): React.ReactElement {
 		setSelected(null);
 	}, []);
 
+	const handleSelectWorking = useCallback(() => {
+		setView({ type: "working" });
+		setSelected(null);
+	}, []);
+
 	const handleBackToRepos = useCallback(() => {
 		setView({ type: "repos" });
 		setSelected(null);
 	}, []);
+
+	const workingSessions = useMemo(() => {
+		return sessions.filter((s) => isInProgressStatus(s.status));
+	}, [sessions]);
+
+	const inProgressCount = workingSessions.length;
 
 	return (
 		<div className="app">
@@ -936,14 +954,49 @@ function App(): React.ReactElement {
 				</div>
 			</header>
 			{view.type === "repo" && (
-				<Breadcrumb owner={view.owner} repo={view.repo} onBack={handleBackToRepos} />
+				<Breadcrumb label={`${view.owner}/${view.repo}`} onBack={handleBackToRepos} />
+			)}
+			{view.type === "working" && (
+				<Breadcrumb label="Active Tasks" onBack={handleBackToRepos} />
 			)}
 			{state.status === "error" ? (
 				<div className="empty">Unable to reach API</div>
 			) : (
 				<div className="workspace">
 					{view.type === "repos" ? (
-						<RepoList repos={repos} onSelect={handleSelectRepo} />
+						<RepoList repos={repos} onSelect={handleSelectRepo}>
+							<div
+								className="repo-card working-card"
+								onClick={handleSelectWorking}
+								tabIndex={0}
+								role="button"
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										handleSelectWorking();
+									}
+								}}
+							>
+								<div className="repo-card-name">Active Tasks</div>
+								<div className="repo-card-meta">
+									{inProgressCount} active task{inProgressCount !== 1 ? "s" : ""}
+								</div>
+							</div>
+						</RepoList>
+					) : view.type === "working" ? (
+						<>
+							<SessionList
+								sessions={workingSessions}
+								selected={selectedSession}
+								onSelect={setSelected}
+								emptyMessage="No active tasks."
+							/>
+							{selectedSession ? (
+								<SessionDetail session={selectedSession} onMutate={handleMutate} />
+							) : (
+								<EmptyDetail />
+							)}
+						</>
 					) : (
 						<>
 							<SessionList
@@ -966,13 +1019,11 @@ function App(): React.ReactElement {
 	);
 }
 
-const root = document.getElementById("root");
-if (!root) {
-	throw new Error("Missing root element");
+const rootEl = typeof document !== "undefined" ? document.getElementById("root") : null;
+if (rootEl) {
+	createRoot(rootEl).render(
+		<React.StrictMode>
+			<App />
+		</React.StrictMode>,
+	);
 }
-
-createRoot(root).render(
-	<React.StrictMode>
-		<App />
-	</React.StrictMode>,
-);
