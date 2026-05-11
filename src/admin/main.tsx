@@ -21,6 +21,14 @@ type StaleInfo = {
 	prState: string | null;
 };
 
+type SessionLogResponse = {
+	available: boolean;
+	truncated?: boolean;
+	totalLines?: number;
+	lines?: string[];
+	error?: string;
+};
+
 type Session = {
 	owner: string;
 	repo: string;
@@ -114,6 +122,54 @@ function useStatus(refreshToken = 0): LoadState {
 			window.clearInterval(interval);
 		};
 	}, [refreshToken]);
+
+	return state;
+}
+
+type LogLoadState =
+	| { status: "idle"; data: null; error: null }
+	| { status: "loading"; data: null; error: null }
+	| { status: "ready"; data: SessionLogResponse; error: null }
+	| { status: "error"; data: null; error: string };
+
+function useSessionLog(session: Session | null): LogLoadState {
+	const [state, setState] = useState<LogLoadState>({ status: "idle", data: null, error: null });
+
+	useEffect(() => {
+		if (!session) {
+			setState({ status: "idle", data: null, error: null });
+			return;
+		}
+
+		const { owner, repo, issueNumber } = session;
+		let cancelled = false;
+
+		async function load(): Promise<void> {
+			setState({ status: "loading", data: null, error: null });
+			try {
+				const response = await fetch(
+					`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log`,
+				);
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}`);
+				}
+				const data = (await response.json()) as SessionLogResponse;
+				if (!cancelled) {
+					setState({ status: "ready", data, error: null });
+				}
+			} catch (error) {
+				if (!cancelled) {
+					const message = error instanceof Error ? error.message : String(error);
+					setState({ status: "error", data: null, error: message });
+				}
+			}
+		}
+
+		void load();
+		return () => {
+			cancelled = true;
+		};
+	}, [session]);
 
 	return state;
 }
@@ -492,6 +548,45 @@ function SessionActions({
 	);
 }
 
+function SessionLog({ session }: { session: Session }): React.ReactElement {
+	const logState = useSessionLog(session);
+
+	return (
+		<div className="detail-section">
+			<h3>LLM Session Log</h3>
+			{logState.status === "loading" && (
+				<div className="log-status">Loading log…</div>
+			)}
+			{logState.status === "error" && (
+				<div className="log-status log-error">Error loading log: {logState.error}</div>
+			)}
+			{logState.status === "ready" && (
+				<div className="log-container">
+					{!logState.data.available ? (
+						<div className="log-status">
+							{logState.data.error ?? "Log unavailable"}
+						</div>
+					) : (
+						<>
+							{logState.data.truncated && (
+								<div className="log-truncation-notice">
+									Log truncated ({logState.data.totalLines ?? 0} total lines; showing last {logState.data.lines?.length ?? 0})
+								</div>
+							)}
+							<pre className="log-content">
+								{logState.data.lines?.join("\n") ?? ""}
+							</pre>
+						</>
+					)}
+				</div>
+			)}
+			{logState.status === "idle" && (
+				<div className="log-status">Select a session to view the log.</div>
+			)}
+		</div>
+	);
+}
+
 function SessionDetail({
 	session,
 	onMutate,
@@ -566,6 +661,8 @@ function SessionDetail({
 					</dl>
 				</div>
 			)}
+
+			<SessionLog session={session} />
 
 			<SessionActions session={session} onMutate={onMutate} />
 		</div>
