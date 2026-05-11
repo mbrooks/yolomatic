@@ -3,16 +3,30 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Source .env so ADMIN_USERNAME, ADMIN_PASSWORD, PORT, etc. are available
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+	# shellcheck source=/dev/null
+	. "${REPO_ROOT}/.env"
+fi
 BRANCH="main"
 REMOTE="origin"
+
+cd "${REPO_ROOT}"
+
+# Load environment variables from .env if present
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  . ".env"
+  set +a
+fi
 
 API_BASE="http://localhost:${PORT:-3000}"
 ADMIN_USER="${ADMIN_USERNAME:-}"
 ADMIN_PASS="${ADMIN_PASSWORD:-}"
 SLEEP_DURATION="${SLEEP_DURATION:-30}"
 MAX_TRIES="${MAX_TRIES:-120}"
-
-cd "${REPO_ROOT}"
 
 if [[ -z "${SKIP_GIT:-}" ]]; then
 	echo "[$(date -Iseconds)] Checking ${REMOTE}/${BRANCH} for updates"
