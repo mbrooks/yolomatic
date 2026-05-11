@@ -1,5 +1,6 @@
 export class TaskController {
 	private readonly active = new Map<string, { abort: () => void; steer?: (msg: string) => Promise<void> }>();
+	private draining = false;
 
 	register(key: string, abort: () => void, steer?: (msg: string) => Promise<void>): void {
 		this.active.set(key, { abort, steer });
@@ -34,5 +35,13 @@ export class TaskController {
 			}
 		}
 		return false;
+	}
+
+	setDraining(value: boolean): void {
+		this.draining = value;
+	}
+
+	isDraining(): boolean {
+		return this.draining;
 	}
 }

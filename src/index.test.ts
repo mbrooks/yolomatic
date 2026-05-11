@@ -31,6 +31,7 @@ vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
 		get: vi.fn(),
 		set: vi.fn(),
+		getAll: vi.fn(async () => []),
 	})),
 }));
 
@@ -67,6 +68,7 @@ vi.mock("./webhook/handlers.js", () => ({
 		handlePullRequestReviewCommentEvent: vi.fn(),
 		handlePullRequestReviewEvent: vi.fn(),
 		isInFlight: vi.fn(() => false),
+		resumeInterruptedSession: vi.fn(),
 	})),
 }));
 
@@ -81,6 +83,8 @@ vi.mock("./webhook/server.js", () => ({
 
 import { createWebhookServer } from "./webhook/server.js";
 import { main } from "./index.js";
+import { GitHubIssueHandlers } from "./webhook/handlers.js";
+import { SessionStore } from "./session/store.js";
 
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
@@ -88,5 +92,30 @@ describe("main", () => {
 		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret", expect.any(Object), expect.any(Object), expect.any(Object), expect.any(String));
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
+	});
+
+	it("resumes interrupted working sessions on startup", async () => {
+		const mockGetAll = vi.fn(async () => [
+			{
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+				status: "working",
+				workspacePath: "/tmp/ws",
+				title: "Title",
+				body: "Body",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			},
+		]);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+			getAll: mockGetAll,
+		}));
+		await main();
+		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
+		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "tars", 42);
 	});
 });

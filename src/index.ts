@@ -83,6 +83,26 @@ export async function main(): Promise<void> {
 		process.stdout.write(`[startup] stale detection error: ${message}\n`);
 	}
 
+	// Resume any sessions that were interrupted by a restart
+	try {
+		const sessions = await sessionStore.getAll();
+		const workingSessions = sessions.filter((s) => s.status === "working");
+		if (workingSessions.length > 0) {
+			process.stdout.write(`[startup] Found ${workingSessions.length} working session(s) to resume after restart\n`);
+			for (const session of workingSessions) {
+				try {
+					await handlers.resumeInterruptedSession(session.owner, session.repo, session.issueNumber);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[startup] failed to resume ${session.owner}/${session.repo}#${session.issueNumber}: ${message}\n`);
+				}
+			}
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stdout.write(`[startup] resume error: ${message}\n`);
+	}
+
 	if (config.cleanupRetentionDays) {
 		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);
 		await cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays);

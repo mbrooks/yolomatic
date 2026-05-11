@@ -199,6 +199,12 @@ export class PRReviewHandler {
 			return;
 		}
 
+		if (this.deps.taskController?.isDraining()) {
+			process.stdout.write(`[webhook] ${eventType} ignored: draining mode for ${inFlightKey}\n`);
+			await this.postPRComment(owner, repo, prNumber, "Deploy in progress. Review feedback will be processed after restart.");
+			return;
+		}
+
 		// Check iteration limit
 		const iterationCount = session.iterationCount ?? 0;
 		if (iterationCount >= this.deps.maxIterations) {
