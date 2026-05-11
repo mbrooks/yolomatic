@@ -305,17 +305,10 @@ h1 {
 
 .detail-actions {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
 	gap: 0.5rem;
-	margin-top: 1rem;
-}
-
-.detail-actions h3 {
-	color: var(--muted);
-	font-size: 0.8rem;
-	font-weight: 500;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
 }
 
 .action-row {
