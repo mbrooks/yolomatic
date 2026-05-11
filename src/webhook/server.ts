@@ -372,6 +372,67 @@ export function createWebhookServer(
 			return;
 		}
 
+		if (request.method === "GET" && requestUrl.pathname.startsWith("/api/sessions/")) {
+			if (!adminUsername || !adminPassword) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+
+			const logMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/log$/u.exec(requestUrl.pathname);
+			if (logMatch) {
+				const [, owner, repo, issueNumberStr] = logMatch;
+				const issueNumber = Number.parseInt(issueNumberStr, 10);
+				if (Number.isNaN(issueNumber)) {
+					sendJson(response, 400, { error: "Invalid issue number" });
+					return;
+				}
+
+				try {
+					const session = await sessionStore.get(owner, repo, issueNumber);
+					if (!session) {
+						sendJson(response, 404, { error: "Session not found" });
+						return;
+					}
+
+					if (!session.sessionPath) {
+						sendJson(response, 200, { available: false, error: "No session log path configured" });
+						return;
+					}
+
+					let raw: string;
+					try {
+						raw = await readFile(session.sessionPath, "utf8");
+					} catch {
+						sendJson(response, 200, { available: false, error: "Log file not found" });
+						return;
+					}
+
+					const allLines = raw.split("\n").map((line) => line.trimEnd()).filter((line) => line.length > 0);
+					const MAX_LINES = 10_000;
+					const truncated = allLines.length > MAX_LINES;
+					const lines = truncated ? allLines.slice(allLines.length - MAX_LINES) : allLines;
+
+					sendJson(response, 200, {
+						available: true,
+						truncated,
+						totalLines: allLines.length,
+						lines,
+					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[webhook] log error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+				return;
+			}
+
+			sendJson(response, 404, { error: "Not found" });
+			return;
+		}
+
 		if (request.method === "POST" && requestUrl.pathname.startsWith("/api/sessions/")) {
 			if (!adminUsername || !adminPassword) {
 				sendJson(response, 404, { error: "Not found" });
