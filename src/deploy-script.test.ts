@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
@@ -6,6 +6,9 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
+const BASH =
+	process.env.BASH_PATH ??
+	execFileSync("/bin/sh", ["-lc", "command -v bash"], { encoding: "utf8" }).trim();
 
 async function withMockCurl(
 	responses: string[],
@@ -46,7 +49,7 @@ describe("update-tars-if-needed.sh", () => {
 		await withMockCurl(
 			['{"working":true,"count":1}', '{"working":false,"count":0}'],
 			async (extraEnv) => {
-				const { stdout } = await execFileAsync("/usr/bin/bash", ["scripts/update-tars-if-needed.sh"], {
+				const { stdout } = await execFileAsync(BASH, ["scripts/update-tars-if-needed.sh"], {
 					cwd: process.cwd(),
 					env: {
 						...process.env,
@@ -71,7 +74,7 @@ describe("update-tars-if-needed.sh", () => {
 		await withMockCurl(
 			['{"working":true,"count":1}', '{"working":true,"count":1}'],
 			async (extraEnv) => {
-				const { stdout } = await execFileAsync("/usr/bin/bash", ["scripts/update-tars-if-needed.sh"], {
+				const { stdout } = await execFileAsync(BASH, ["scripts/update-tars-if-needed.sh"], {
 					cwd: process.cwd(),
 					env: {
 						...process.env,
@@ -91,7 +94,7 @@ describe("update-tars-if-needed.sh", () => {
 	});
 
 	it("skips drain check when admin credentials are missing", async () => {
-		const { stdout } = await execFileAsync("/usr/bin/bash", ["scripts/update-tars-if-needed.sh"], {
+		const { stdout } = await execFileAsync(BASH, ["scripts/update-tars-if-needed.sh"], {
 			cwd: process.cwd(),
 			env: {
 				...process.env,
@@ -110,7 +113,7 @@ describe("update-tars-if-needed.sh", () => {
 	it("proceeds when curl is not available", async () => {
 		const dir = await mkdtemp(join(tmpdir(), "tars-no-curl-"));
 		try {
-			const { stdout } = await execFileAsync("/usr/bin/bash", ["scripts/update-tars-if-needed.sh"], {
+			const { stdout } = await execFileAsync(BASH, ["scripts/update-tars-if-needed.sh"], {
 				cwd: process.cwd(),
 				env: {
 					...process.env,
