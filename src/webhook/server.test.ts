@@ -2672,4 +2672,229 @@ describe("createWebhookServer", () => {
 
 		server.close();
 	});
+
+	it("returns 404 for log when admin credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/sessions/mbrooks/tars/1/log",
+		});
+		expect(response.statusCode).toBe(404);
+
+		server.close();
+	});
+
+	it("returns 401 for log without auth header when credentials are configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/tars/1/log" });
+		expect(response.statusCode).toBe(401);
+		expect(response.body).toBe("Unauthorized");
+
+		server.close();
+	});
+
+	it("returns 404 for log when session does not exist", async () => {
+		const mockStore = {
+			get: vi.fn(async () => null),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/sessions/mbrooks/tars/999/log",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(404);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Session not found");
+
+		server.close();
+	});
+
+	it("returns log lines when log file exists", async () => {
+		const sessionsDir = await mkdtemp(join(tmpdir(), "tars-sessions-"));
+		const sessionPath = join(sessionsDir, "github-mbrooks-tars", "issue-1.jsonl");
+		await mkdir(join(sessionsDir, "github-mbrooks-tars"), { recursive: true });
+		await writeFile(sessionPath, '{"type":"prompt"}\n{"type":"response"}\n');
+
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath,
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const response = await makeRequest(port, {
+				method: "GET",
+				path: "/api/sessions/mbrooks/tars/1/log",
+				headers: {
+					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				},
+			});
+			expect(response.statusCode).toBe(200);
+			const body = JSON.parse(response.body);
+			expect(body.available).toBe(true);
+			expect(body.truncated).toBe(false);
+			expect(body.lines).toEqual(['{"type":"prompt"}', '{"type":"response"}']);
+		} finally {
+			server.close();
+			await rm(sessionsDir, { force: true, recursive: true });
+		}
+	});
+
+	it("returns unavailable log when log file is missing", async () => {
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/nonexistent/path/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/sessions/mbrooks/tars/1/log",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.available).toBe(false);
+		expect(body.error).toBe("Log file not found");
+
+		server.close();
+	});
+
+	it("truncates log when it exceeds 10,000 lines", async () => {
+		const sessionsDir = await mkdtemp(join(tmpdir(), "tars-sessions-"));
+		const sessionPath = join(sessionsDir, "github-mbrooks-tars", "issue-1.jsonl");
+		await mkdir(join(sessionsDir, "github-mbrooks-tars"), { recursive: true });
+		const lines = Array.from({ length: 10_005 }, (_, i) => `{"line":${i}}`);
+		await writeFile(sessionPath, lines.join("\n") + "\n");
+
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Test",
+				body: "Body",
+				status: "working" as const,
+				sessionPath,
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const response = await makeRequest(port, {
+				method: "GET",
+				path: "/api/sessions/mbrooks/tars/1/log",
+				headers: {
+					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				},
+			});
+			expect(response.statusCode).toBe(200);
+			const body = JSON.parse(response.body);
+			expect(body.available).toBe(true);
+			expect(body.truncated).toBe(true);
+			expect(body.totalLines).toBe(10_005);
+			expect(body.lines).toHaveLength(10_000);
+			expect(body.lines![0]).toBe('{"line":5}');
+		} finally {
+			server.close();
+			await rm(sessionsDir, { force: true, recursive: true });
+		}
+	});
+
+	it("returns 404 for log with invalid issue number", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/sessions/mbrooks/tars/abc/log",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(404);
+		const body = JSON.parse(response.body);
+		expect(body.error).toBe("Not found");
+
+		server.close();
+	});
 });
