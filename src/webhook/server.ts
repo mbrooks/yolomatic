@@ -575,50 +575,6 @@ export function createWebhookServer(
 				return;
 			}
 
-			const bulkDeleteMatch = requestUrl.pathname === "/api/sessions/delete-completed";
-			if (bulkDeleteMatch) {
-				try {
-					const sessions = await sessionStore.getAll();
-					const terminalSessions = sessions.filter((s) => isTerminalStatus(s.status));
-					const results: Array<{ owner: string; repo: string; issueNumber: number; deleted: boolean; error?: string }> = [];
-
-					for (const session of terminalSessions) {
-						try {
-							if (workspaceManager) {
-								await workspaceManager.removeWorktree(session.owner, session.repo, session.issueNumber);
-							}
-							await sessionStore.delete(session.owner, session.repo, session.issueNumber);
-							results.push({
-								owner: session.owner,
-								repo: session.repo,
-								issueNumber: session.issueNumber,
-								deleted: true,
-							});
-						} catch (err) {
-							const message = err instanceof Error ? err.message : String(err);
-							results.push({
-								owner: session.owner,
-								repo: session.repo,
-								issueNumber: session.issueNumber,
-								deleted: false,
-								error: message,
-							});
-						}
-					}
-
-					sendJson(response, 200, {
-						deleted: results.filter((r) => r.deleted).length,
-						failed: results.filter((r) => !r.deleted).length,
-						sessions: results,
-					});
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					process.stdout.write(`[webhook] bulk delete error: ${message}\n`);
-					sendJson(response, 500, { error: message });
-				}
-				return;
-			}
-
 			const archiveMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/archive$/u.exec(requestUrl.pathname);
 			if (archiveMatch) {
 				const [, owner, repo, issueNumberStr] = archiveMatch;
