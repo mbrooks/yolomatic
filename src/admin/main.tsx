@@ -662,9 +662,10 @@ function SessionDetail({
 				</div>
 			)}
 
+			<SessionActions session={session} onMutate={onMutate} />
+
 			<SessionLog session={session} />
 
-			<SessionActions session={session} onMutate={onMutate} />
 		</div>
 	);
 }
