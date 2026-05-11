@@ -246,6 +246,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			return;
 		}
 
+		if (this.deps.taskController?.isDraining()) {
+			process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${inFlightKey}\n`);
+			await this.postComment(owner, repo, issue.number, "Deploy in progress. Task will resume after restart.");
+			return;
+		}
+
 		if (!this.deps.autoStart) {
 			process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
 			return;
@@ -378,6 +384,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		}
 
 		process.stdout.write(`[webhook] resuming ${owner}/${repo}#${issueNumber} from comment\n`);
+
+		if (this.deps.taskController?.isDraining()) {
+			process.stdout.write(`[webhook] comment ignored: draining mode for ${inFlightKey}\n`);
+			await this.postComment(owner, repo, issueNumber, "Deploy in progress. Feedback will be processed after restart.");
+			return;
+		}
 
 		// Fallback: auto-create session if it doesn't exist (e.g., assignment event was missed)
 		let session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
@@ -922,6 +934,32 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 	async handlePullRequestReviewEvent(payload: unknown): Promise<void> {
 		return this.prReviewHandler.handlePullRequestReviewEvent(payload);
+	}
+
+	async resumeInterruptedSession(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const session = await this.deps.sessionManager.getSession(owner, repo, issueNumber);
+		if (!session) {
+			process.stdout.write(`[resume] no session for ${inFlightKey}\n`);
+			return;
+		}
+		if (session.status !== "working") {
+			process.stdout.write(`[resume] session ${inFlightKey} is not in working status (${session.status})\n`);
+			return;
+		}
+		process.stdout.write(`[resume] restarting interrupted session ${inFlightKey}\n`);
+		await this.postComment(
+			owner,
+			repo,
+			issueNumber,
+			"TARS was restarted while working on this issue. Resuming work...",
+		);
+		this.inFlight.add(inFlightKey);
+		try {
+			await this.runExecution(owner, repo, issueNumber);
+		} finally {
+			this.inFlight.delete(inFlightKey);
+		}
 	}
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {

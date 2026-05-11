@@ -1292,6 +1292,261 @@ describe("GitHubIssueHandlers", () => {
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "failed");
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
+
+	it("queues new issue events when draining mode is active", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			getSession: vi.fn(async () => null),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(),
+		};
+		const taskController = {
+			isDraining: vi.fn(() => true),
+			setDraining: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(() => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Deploy in progress. Task will resume after restart." }),
+		);
+	});
+
+	it("resumes an interrupted working session", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+		});
+
+		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: "TARS was restarted while working on this issue. Resuming work...",
+			}),
+		);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+	});
+
+	it("skips resume when session is not in working status", async () => {
+		const sessionManager = {
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				status: "pending" as const,
+				lastActivity: new Date().toISOString(),
+			})),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(),
+		};
+		const executor = { execute: vi.fn() };
+		const octokit = { issues: { createComment: vi.fn() } };
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+		});
+
+		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).not.toHaveBeenCalled();
+	});
+
+	it("queues comment events when draining mode is active", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "waiting-feedback" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = { execute: vi.fn() };
+		const taskController = {
+			isDraining: vi.fn(() => true),
+			setDraining: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(() => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 1, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Proceed", user: { login: "mbrooks" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Deploy in progress. Feedback will be processed after restart." }),
+		);
+	});
 });
 
 describe("createWebhookServer", () => {
@@ -2818,6 +3073,164 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Not found");
+
+		server.close();
+	});
+
+	it("returns working status via GET /api/status/working", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => [
+				{
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Test",
+					body: "Body",
+					status: "working" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+				{
+					issueNumber: 2,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Test",
+					body: "Body",
+					status: "pending" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				},
+			]),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status/working",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.working).toBe(true);
+		expect(body.count).toBe(1);
+		expect(body.sessions).toHaveLength(1);
+		expect(body.sessions[0].issueNumber).toBe(1);
+
+		server.close();
+	});
+
+	it("returns working:false when no sessions are working", async () => {
+		const mockStore = {
+			get: vi.fn(),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/status/working",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.working).toBe(false);
+		expect(body.count).toBe(0);
+
+		server.close();
+	});
+
+	it("returns maintenance status via GET /api/maintenance", async () => {
+		const taskController = {
+			isDraining: vi.fn(() => true),
+			setDraining: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		} as unknown as import("../task-controller.js").TaskController;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", taskController);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/api/maintenance",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.draining).toBe(true);
+
+		server.close();
+	});
+
+	it("sets draining mode via POST /api/maintenance", async () => {
+		const taskController = {
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		} as unknown as import("../task-controller.js").TaskController;
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", taskController);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "POST",
+			path: "/api/maintenance",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
+			},
+		},
+		JSON.stringify({ enabled: true }));
+		expect(response.statusCode).toBe(200);
+		const body = JSON.parse(response.body);
+		expect(body.draining).toBe(true);
+		expect(taskController.setDraining).toHaveBeenCalledWith(true);
+
+		server.close();
+	});
+
+	it("returns 404 for /api/status/working when credentials are not configured", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, { method: "GET", path: "/api/status/working" });
+		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});

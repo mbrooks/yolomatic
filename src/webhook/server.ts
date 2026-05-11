@@ -343,6 +343,70 @@ export function createWebhookServer(
 			return;
 		}
 
+		if (request.method === "GET" && requestUrl.pathname === "/api/status/working") {
+			if (!adminUsername || !adminPassword) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			try {
+				const sessions = await sessionStore.getAll();
+				const workingSessions = sessions.filter((s) => s.status === "working");
+				sendJson(response, 200, {
+					working: workingSessions.length > 0,
+					count: workingSessions.length,
+					sessions: workingSessions.map((s) => ({
+						owner: s.owner,
+						repo: s.repo,
+						issueNumber: s.issueNumber,
+						status: s.status,
+						lastActivity: s.lastActivity,
+					})),
+				});
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				process.stdout.write(`[webhook] status/working error: ${message}\n`);
+				sendJson(response, 500, { error: message });
+			}
+			return;
+		}
+
+		if (request.method === "GET" && requestUrl.pathname === "/api/maintenance") {
+			if (!adminUsername || !adminPassword) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			sendJson(response, 200, { draining: taskController?.isDraining() ?? false });
+			return;
+		}
+
+		if (request.method === "POST" && requestUrl.pathname === "/api/maintenance") {
+			if (!adminUsername || !adminPassword) {
+				sendJson(response, 404, { error: "Not found" });
+				return;
+			}
+			if (!checkBasicAuth(request, response, adminUsername, adminPassword)) {
+				return;
+			}
+			try {
+				const body = JSON.parse((await readBody(request)).toString("utf8")) as { enabled?: boolean };
+				const enabled = body.enabled === true;
+				taskController?.setDraining(enabled);
+				process.stdout.write(`[webhook] maintenance mode ${enabled ? "enabled" : "disabled"}\n`);
+				sendJson(response, 200, { draining: enabled });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				process.stdout.write(`[webhook] maintenance error: ${message}\n`);
+				sendJson(response, 400, { error: message });
+			}
+			return;
+		}
+
 		if (request.method === "GET" && requestUrl.pathname === "/api/status") {
 			if (!adminUsername || !adminPassword) {
 				sendJson(response, 404, { error: "Not found" });
