@@ -41,11 +41,23 @@ type Session = {
 	stale: StaleInfo | null;
 };
 
+type RepoSummary = {
+	owner: string;
+	repo: string;
+	sessionCount: number;
+	activeCount: number;
+};
+
 type StatusResponse = {
 	agent: Exclude<AgentStatus, "offline">;
 	uptime: string;
+	repos: RepoSummary[];
 	sessions: Session[];
 };
+
+type ViewState =
+	| { type: "repos" }
+	| { type: "repo"; owner: string; repo: string };
 
 type LoadState =
 	| { status: "loading"; data: null; error: null; updatedAt: null }
@@ -591,17 +603,79 @@ function EmptyDetail(): React.ReactElement {
 	);
 }
 
+function RepoList({
+	repos,
+	onSelect,
+}: {
+	repos: RepoSummary[];
+	onSelect: (owner: string, repo: string) => void;
+}): React.ReactElement {
+	if (repos.length === 0) {
+		return (
+			<div className="empty-state">
+				<p>No repositories have been used yet.</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="repo-list">
+			{repos.map((repo) => (
+				<div
+					key={`${repo.owner}/${repo.repo}`}
+					className="repo-card"
+					onClick={() => onSelect(repo.owner, repo.repo)}
+					tabIndex={0}
+					role="button"
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault();
+							onSelect(repo.owner, repo.repo);
+						}
+					}}
+				>
+					<div className="repo-card-name">{repo.owner}/{repo.repo}</div>
+					<div className="repo-card-meta">
+						{repo.sessionCount} session{repo.sessionCount !== 1 ? "s" : ""}
+						{repo.activeCount > 0 ? ` · ${repo.activeCount} active` : ""}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function Breadcrumb({
+	owner,
+	repo,
+	onBack,
+}: {
+	owner: string;
+	repo: string;
+	onBack: () => void;
+}): React.ReactElement {
+	return (
+		<nav className="breadcrumb">
+			<button type="button" className="breadcrumb-link" onClick={onBack}>Repos</button>
+			<span className="breadcrumb-separator">→</span>
+			<span className="breadcrumb-current">{owner}/{repo}</span>
+		</nav>
+	);
+}
+
 function SessionList({
 	sessions,
 	selected,
 	onSelect,
+	emptyMessage = "No active sessions",
 }: {
 	sessions: Session[];
 	selected: Session | null;
 	onSelect: (session: Session) => void;
+	emptyMessage?: string;
 }): React.ReactElement {
 	if (sessions.length === 0) {
-		return <div className="empty">No active sessions</div>;
+		return <div className="empty">{emptyMessage}</div>;
 	}
 
 	return (
@@ -655,10 +729,17 @@ function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
 	const state = useStatus(tick);
 	const [selected, setSelected] = useState<Session | null>(null);
+	const [view, setView] = useState<ViewState>({ type: "repos" });
 
 	const agentStatus: AgentStatus = state.status === "ready" ? state.data.agent : "offline";
 	const sessions = state.status === "ready" ? state.data.sessions : [];
+	const repos = state.status === "ready" ? state.data.repos : [];
 	const terminalCount = sessions.filter((s) => isTerminalStatus(s.status)).length;
+
+	const repoSessions = useMemo(() => {
+		if (view.type !== "repo") return [];
+		return sessions.filter((s) => s.owner === view.owner && s.repo === view.repo);
+	}, [sessions, view]);
 
 	const lastUpdated = useMemo(() => {
 		if (state.status === "loading") return "Loading...";
@@ -680,24 +761,50 @@ function App(): React.ReactElement {
 		);
 	}, [sessions, selected]);
 
+	const handleSelectRepo = useCallback((owner: string, repo: string) => {
+		setView({ type: "repo", owner, repo });
+		setSelected(null);
+	}, []);
+
+	const handleBackToRepos = useCallback(() => {
+		setView({ type: "repos" });
+		setSelected(null);
+	}, []);
+
 	return (
 		<div className="app">
 			<header>
 				<h1>TARS Admin</h1>
 				<div className="header-actions">
 					<StatusBadge status={agentStatus} />
-					{terminalCount > 0 && <BulkDeleteButton count={terminalCount} onDeleted={handleMutate} />}
+					{terminalCount > 0 && (
+						<BulkDeleteButton count={terminalCount} onDeleted={handleMutate} />
+					)}
 				</div>
 			</header>
+			{view.type === "repo" && (
+				<Breadcrumb owner={view.owner} repo={view.repo} onBack={handleBackToRepos} />
+			)}
 			{state.status === "error" ? (
 				<div className="empty">Unable to reach API</div>
 			) : (
 				<div className="workspace">
-					<SessionList sessions={sessions} selected={selectedSession} onSelect={setSelected} />
-					{selectedSession ? (
-						<SessionDetail session={selectedSession} onMutate={handleMutate} />
+					{view.type === "repos" ? (
+						<RepoList repos={repos} onSelect={handleSelectRepo} />
 					) : (
-						<EmptyDetail />
+						<>
+							<SessionList
+								sessions={repoSessions}
+								selected={selectedSession}
+								onSelect={setSelected}
+								emptyMessage="No sessions for this repository."
+							/>
+							{selectedSession ? (
+								<SessionDetail session={selectedSession} onMutate={handleMutate} />
+							) : (
+								<EmptyDetail />
+							)}
+						</>
 					)}
 				</div>
 			)}
