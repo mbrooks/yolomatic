@@ -502,15 +502,17 @@ function SessionActions({
 	const canMarkComplete = status !== "complete";
 
 	return (
-		<div className="detail-actions">
+		<div className="detail-section">
 			<h3>Actions</h3>
-			{canCancel && <StopButton {...common} onStopped={onMutate} />}
-			{canRestart && <RestartButton {...common} onRestarted={onMutate} />}
-			{canDelete && <DeleteButton {...common} onDeleted={onMutate} />}
-			{canMarkFailed && <MarkFailedButton {...common} onMarked={onMutate} />}
-			{canMarkComplete && <MarkCompleteButton {...common} onMarked={onMutate} />}
-			<ArchiveButton {...common} onArchived={onMutate} />
-			<PruneWorktreeButton {...common} onPruned={onMutate} />
+			<div className="detail-actions">
+				{canCancel && <StopButton {...common} onStopped={onMutate} />}
+				{canRestart && <RestartButton {...common} onRestarted={onMutate} />}
+				{canDelete && <DeleteButton {...common} onDeleted={onMutate} />}
+				{canMarkFailed && <MarkFailedButton {...common} onMarked={onMutate} />}
+				{canMarkComplete && <MarkCompleteButton {...common} onMarked={onMutate} />}
+				<ArchiveButton {...common} onArchived={onMutate} />
+				<PruneWorktreeButton {...common} onPruned={onMutate} />
+			</div>
 		</div>
 	);
 }
