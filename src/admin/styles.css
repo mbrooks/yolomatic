@@ -202,6 +202,10 @@ h1 {
 	color: var(--blue);
 }
 
+.status-badge.paused {
+	color: var(--red);
+}
+
 .status-badge.complete {
 	color: var(--green);
 }
@@ -369,6 +373,16 @@ h1 {
 
 .action-btn.prune {
 	background: var(--blue);
+	color: #000;
+}
+
+.action-btn.pause {
+	background: var(--yellow);
+	color: #1f1300;
+}
+
+.action-btn.resume {
+	background: var(--green);
 	color: #000;
 }
 

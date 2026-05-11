@@ -202,6 +202,45 @@ export class SessionManager {
 		});
 	}
 
+	async pauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		if (existing.status === "paused") {
+			throw new Error(`Session is already paused.`);
+		}
+
+		if (isTerminalStatus(existing.status)) {
+			throw new Error(`Cannot pause a session in '${existing.status}' status.`);
+		}
+
+		return this.store.set({
+			...existing,
+			status: "paused",
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
+	async unpauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber);
+		if (!existing) {
+			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
+		}
+
+		if (existing.status !== "paused") {
+			throw new Error(`Cannot resume a session in '${existing.status}' status. Only paused sessions can be resumed.`);
+		}
+
+		return this.store.set({
+			...existing,
+			// Restore to pending so it can be picked up again; do not resume working automatically
+			status: "pending",
+			lastActivity: new Date().toISOString(),
+		});
+	}
+
 	async restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
 		const existing = await this.store.get(owner, repo, issueNumber);
 		if (!existing) {

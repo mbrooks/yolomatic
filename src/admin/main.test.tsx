@@ -3,13 +3,14 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, renderHook, act } from "@testing-library/react";
 import React from "react";
 
-import { App, isInProgressStatus, isTerminalStatus, IN_PROGRESS_STATUSES, useSessionLog } from "./main.js";
+import { App, isInProgressStatus, isTerminalStatus, IN_PROGRESS_STATUSES, isPausableStatus, PAUSABLE_STATUSES, useSessionLog } from "./main.js";
 
 describe("isInProgressStatus", () => {
-	it("returns true for working, pending, and waiting-feedback", () => {
+	it("returns true for working, pending, waiting-feedback, and paused", () => {
 		expect(isInProgressStatus("working")).toBe(true);
 		expect(isInProgressStatus("pending")).toBe(true);
 		expect(isInProgressStatus("waiting-feedback")).toBe(true);
+		expect(isInProgressStatus("paused")).toBe(true);
 	});
 
 	it("returns false for terminal statuses", () => {
@@ -30,12 +31,34 @@ describe("isTerminalStatus", () => {
 		expect(isTerminalStatus("working")).toBe(false);
 		expect(isTerminalStatus("pending")).toBe(false);
 		expect(isTerminalStatus("waiting-feedback")).toBe(false);
+		expect(isTerminalStatus("paused")).toBe(false);
 	});
 });
 
 describe("IN_PROGRESS_STATUSES", () => {
+	it("explicitly defines working, pending, waiting-feedback, and paused", () => {
+		expect(IN_PROGRESS_STATUSES).toEqual(["working", "pending", "waiting-feedback", "paused"]);
+	});
+});
+
+describe("isPausableStatus", () => {
+	it("returns true for working, pending, and waiting-feedback", () => {
+		expect(isPausableStatus("working")).toBe(true);
+		expect(isPausableStatus("pending")).toBe(true);
+		expect(isPausableStatus("waiting-feedback")).toBe(true);
+	});
+
+	it("returns false for paused and terminal statuses", () => {
+		expect(isPausableStatus("paused")).toBe(false);
+		expect(isPausableStatus("complete")).toBe(false);
+		expect(isPausableStatus("failed")).toBe(false);
+		expect(isPausableStatus("cancelled")).toBe(false);
+	});
+});
+
+describe("PAUSABLE_STATUSES", () => {
 	it("explicitly defines working, pending, and waiting-feedback", () => {
-		expect(IN_PROGRESS_STATUSES).toEqual(["working", "pending", "waiting-feedback"]);
+		expect(PAUSABLE_STATUSES).toEqual(["working", "pending", "waiting-feedback"]);
 	});
 });
 
