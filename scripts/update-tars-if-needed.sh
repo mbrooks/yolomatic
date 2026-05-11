@@ -4,23 +4,43 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+env_port_is_set="${PORT+x}"
+env_port_value="${PORT-}"
+env_admin_user_is_set="${ADMIN_USERNAME+x}"
+env_admin_user_value="${ADMIN_USERNAME-}"
+env_admin_pass_is_set="${ADMIN_PASSWORD+x}"
+env_admin_pass_value="${ADMIN_PASSWORD-}"
+env_sleep_is_set="${SLEEP_DURATION+x}"
+env_sleep_value="${SLEEP_DURATION-}"
+env_max_tries_is_set="${MAX_TRIES+x}"
+env_max_tries_value="${MAX_TRIES-}"
+
 # Source .env so ADMIN_USERNAME, ADMIN_PASSWORD, PORT, etc. are available
 if [[ -f "${REPO_ROOT}/.env" ]]; then
 	# shellcheck source=/dev/null
 	. "${REPO_ROOT}/.env"
 fi
+
+if [[ -n "${env_port_is_set}" ]]; then
+	PORT="${env_port_value}"
+fi
+if [[ -n "${env_admin_user_is_set}" ]]; then
+	ADMIN_USERNAME="${env_admin_user_value}"
+fi
+if [[ -n "${env_admin_pass_is_set}" ]]; then
+	ADMIN_PASSWORD="${env_admin_pass_value}"
+fi
+if [[ -n "${env_sleep_is_set}" ]]; then
+	SLEEP_DURATION="${env_sleep_value}"
+fi
+if [[ -n "${env_max_tries_is_set}" ]]; then
+	MAX_TRIES="${env_max_tries_value}"
+fi
+
 BRANCH="main"
 REMOTE="origin"
 
 cd "${REPO_ROOT}"
-
-# Load environment variables from .env if present
-if [[ -f ".env" ]]; then
-  set -a
-  # shellcheck source=/dev/null
-  . ".env"
-  set +a
-fi
 
 API_BASE="http://localhost:${PORT:-3000}"
 ADMIN_USER="${ADMIN_USERNAME:-}"
