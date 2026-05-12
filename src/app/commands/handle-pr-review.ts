@@ -137,6 +137,14 @@ export class HandlePRReview {
 
 		if (this.deps.tasks.isDraining()) {
 			process.stdout.write(`[webhook] ${eventType} ignored: draining mode for ${inFlightKey}\n`);
+			const commentBodies = [...(reviewBody ? [reviewBody] : []), ...comments.map((c) => c.body)];
+			if (commentBodies.length > 0) {
+				const queued = [...(session.queuedComments ?? []), ...commentBodies];
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, session.status, {
+					resumeOnBoot: true,
+					queuedComments: queued,
+				});
+			}
 			await this.deps.github.postPRComment(owner, repo, prNumber, "Deploy in progress. Review feedback will be processed after restart.");
 			return;
 		}

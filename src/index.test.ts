@@ -118,4 +118,30 @@ describe("main", () => {
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
 		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "tars", 42);
 	});
+
+	it("resumes checkpointed sessions with resumeOnBoot on startup", async () => {
+		const mockGetAll = vi.fn(async () => [
+			{
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 43,
+				status: "pending",
+				workspacePath: "/tmp/ws",
+				title: "Title",
+				body: "Body",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+				resumeOnBoot: true,
+			},
+		]);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+			getAll: mockGetAll,
+		}));
+		await main();
+		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
+		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "tars", 43);
+	});
 });

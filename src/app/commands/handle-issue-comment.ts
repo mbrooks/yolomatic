@@ -197,6 +197,14 @@ export class HandleIssueComment {
 
 		if (this.deps.tasks.isDraining()) {
 			process.stdout.write(`[webhook] comment ignored: draining mode for ${key}\n`);
+			const session = await this.deps.sessions.get(owner, repo, issueNumber);
+			if (session) {
+				const queued = [...(session.queuedComments ?? []), payload.comment.body];
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, session.status, {
+					resumeOnBoot: true,
+					queuedComments: queued,
+				});
+			}
 			await this.deps.github.postComment(owner, repo, issueNumber, "Deploy in progress. Feedback will be processed after restart.");
 			return;
 		}
