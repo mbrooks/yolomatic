@@ -270,4 +270,20 @@ export class SessionManager {
 			lastActivity: new Date().toISOString(),
 		});
 	}
+
+	async getAll(): Promise<SessionState[]> {
+		return this.store.getAll();
+	}
+
+	async save(state: SessionState): Promise<SessionState> {
+		return this.store.set(state);
+	}
+
+	async delete(owner: string, repo: string, issueNumber: number): Promise<void> {
+		return this.store.delete(owner, repo, issueNumber);
+	}
+
+	async archive(state: SessionState, archiveDir: string): Promise<void> {
+		return this.store.archive(state, archiveDir);
+	}
 }
