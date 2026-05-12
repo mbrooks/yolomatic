@@ -1366,6 +1366,13 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Deploy in progress. Task will resume after restart." }),
 		);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"pending",
+			expect.objectContaining({ resumeOnBoot: true }),
+		);
 	});
 
 	it("resumes an interrupted working session", async () => {
@@ -1449,13 +1456,189 @@ describe("GitHubIssueHandlers", () => {
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 	});
 
-	it("skips resume when session is not in working status", async () => {
+	it("resumes a pending session that was checkpointed during draining", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+				resumeOnBoot: true,
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			})),
+			save: vi.fn(async (s) => s),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+		});
+
+		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-working"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: "TARS was restarted while queued. Picking up work...",
+			}),
+		);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+		expect(sessionManager.save).toHaveBeenCalledWith(
+			expect.objectContaining({ resumeOnBoot: undefined, queuedComments: undefined }),
+		);
+	});
+
+	it("resumes a waiting-feedback session with queued comments", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+		};
+		const sessionManager = {
+			createSession: vi.fn(),
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "waiting-feedback" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				resumeOnBoot: true,
+				queuedComments: ["Please also add tests."],
+			})),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			})),
+			save: vi.fn(async (s) => s),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				branch: "tars/issue-1",
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+			})),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = {
+			execute: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Done.",
+				rawResponse: "TARS_STATUS: complete\nDone.",
+			})),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+		});
+
+		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+
+		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
+			expect.objectContaining({ name: "tars-feedback-required" }),
+		);
+		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-working"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: "TARS was restarted with queued feedback. Resuming work...",
+			}),
+		);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+		expect(sessionManager.save).toHaveBeenCalledWith(
+			expect.objectContaining({ resumeOnBoot: undefined, queuedComments: undefined }),
+		);
+	});
+
+	it("skips resume when session is in terminal status", async () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
 				repo: "tars",
 				owner: "mbrooks",
-				status: "pending" as const,
+				status: "complete" as const,
 				lastActivity: new Date().toISOString(),
 			})),
 		};
@@ -1545,6 +1728,105 @@ describe("GitHubIssueHandlers", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Deploy in progress. Feedback will be processed after restart." }),
+		);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"waiting-feedback",
+			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["Proceed"] }),
+		);
+	});
+
+	it("queues PR review events when draining mode is active", async () => {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({})),
+			},
+			pulls: {
+				get: vi.fn(async () => ({
+					data: {
+						head: { ref: "tars/issue-1" },
+						state: "open",
+						merged: false,
+					},
+				})),
+				listReviewComments: vi.fn(async () => ({ data: [] })),
+			},
+		};
+		const sessionManager = {
+			getSession: vi.fn(async () => ({
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
+				status: "complete" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				prNumber: 99,
+				prUrl: "https://github.com/mbrooks/tars/pull/99",
+			})),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+			findSessionByPR: vi.fn(),
+		};
+		const workspaceManager = {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+		const executor = { execute: vi.fn() };
+		const taskController = {
+			isDraining: vi.fn(() => true),
+			setDraining: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(() => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			selfReportEnabled: false,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handlePullRequestReviewEvent({
+			action: "submitted",
+			pull_request: {
+				number: 99,
+				head: { ref: "tars/issue-1" },
+				state: "open",
+				merged: false,
+			},
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			review: { id: 101, body: "LGTM but needs tests", state: "CHANGES_REQUESTED", user: { login: "user" } },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Deploy in progress. Review feedback will be processed after restart." }),
+		);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"complete",
+			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["LGTM but needs tests"] }),
 		);
 	});
 });

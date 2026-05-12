@@ -86,10 +86,10 @@ export async function main(): Promise<void> {
 	// Resume any sessions that were interrupted by a restart
 	try {
 		const sessions = await sessionStore.getAll();
-		const workingSessions = sessions.filter((s) => s.status === "working");
-		if (workingSessions.length > 0) {
-			process.stdout.write(`[startup] Found ${workingSessions.length} working session(s) to resume after restart\n`);
-			for (const session of workingSessions) {
+		const sessionsToResume = sessions.filter((s) => s.resumeOnBoot || s.status === "working");
+		if (sessionsToResume.length > 0) {
+			process.stdout.write(`[startup] Found ${sessionsToResume.length} session(s) to resume after restart\n`);
+			for (const session of sessionsToResume) {
 				try {
 					await handlers.resumeInterruptedSession(session.owner, session.repo, session.issueNumber);
 				} catch (error) {
