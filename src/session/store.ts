@@ -31,6 +31,8 @@ export interface SessionState {
 	staleDetectedAt?: string;
 	staleReason?: string;
 	archivedAt?: string;
+	resumeOnBoot?: boolean;
+	queuedComments?: string[];
 }
 
 export class SessionStore {

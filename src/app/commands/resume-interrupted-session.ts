@@ -1,3 +1,4 @@
+import { isTerminalStatus } from "../../session/store.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
@@ -22,17 +23,61 @@ export class ResumeInterruptedSession {
 			process.stdout.write(`[resume] no session for ${key}\n`);
 			return;
 		}
-		if (session.status !== "working") {
-			process.stdout.write(`[resume] session ${key} is not in working status (${session.status})\n`);
+
+		if (isTerminalStatus(session.status)) {
+			process.stdout.write(`[resume] session ${key} is in terminal status (${session.status}), skipping\n`);
 			return;
 		}
-		process.stdout.write(`[resume] restarting interrupted session ${key}\n`);
-		await this.deps.github.postComment(
-			owner,
-			repo,
-			issueNumber,
-			"TARS was restarted while working on this issue. Resuming work...",
-		);
-		await this.executor.run(session);
+
+		process.stdout.write(`[resume] restarting interrupted session ${key} from ${session.status}\n`);
+
+		const queuedComment = session.queuedComments?.join("\n\n");
+
+		try {
+			if (session.status === "working") {
+				await this.deps.github.postComment(
+					owner,
+					repo,
+					issueNumber,
+					"TARS was restarted while working on this issue. Resuming work...",
+				);
+				await this.executor.run(session, queuedComment);
+			} else if (session.status === "pending") {
+				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
+				await this.deps.github.postComment(
+					owner,
+					repo,
+					issueNumber,
+					"TARS was restarted while queued. Picking up work...",
+				);
+				await this.executor.run(session, queuedComment);
+			} else if (session.status === "waiting-feedback") {
+				await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
+				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
+				await this.deps.github.postComment(
+					owner,
+					repo,
+					issueNumber,
+					"TARS was restarted with queued feedback. Resuming work...",
+				);
+				await this.executor.run(session, queuedComment);
+			} else {
+				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
+				await this.deps.github.postComment(
+					owner,
+					repo,
+					issueNumber,
+					"TARS was restarted. Resuming work...",
+				);
+				await this.executor.run(session, queuedComment);
+			}
+		} finally {
+			const latest = await this.deps.sessions.get(owner, repo, issueNumber);
+			if (latest && (latest.resumeOnBoot || latest.queuedComments)) {
+				latest.resumeOnBoot = undefined;
+				latest.queuedComments = undefined;
+				await this.deps.sessions.save(latest);
+			}
+		}
 	}
 }
