@@ -145,6 +145,9 @@ export class HandleIssueEvent {
 
 		if (this.deps.tasks.isDraining()) {
 			process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
+			await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending", {
+				resumeOnBoot: true,
+			});
 			await this.deps.github.postComment(owner, repo, issue.number, "Deploy in progress. Task will resume after restart.");
 			return;
 		}
