@@ -36,7 +36,7 @@ TARS can be deployed with Docker Compose, including an Ollama sidecar.
 
 2. Build and run:
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
 
 3. View logs (console only):
