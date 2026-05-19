@@ -9,6 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createWebhookServer, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
+import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
+
 function makeRequest(
 	port: number,
 	options: http.RequestOptions,
@@ -3495,10 +3497,9 @@ describe("createWebhookServer", () => {
 	});
 
 	it("returns log lines when log file exists", async () => {
-		const sessionsDir = await mkdtemp(join(tmpdir(), "tars-sessions-"));
-		const sessionPath = join(sessionsDir, "github-mbrooks-tars", "issue-1.jsonl");
-		await mkdir(join(sessionsDir, "github-mbrooks-tars"), { recursive: true });
-		await writeFile(sessionPath, '{"type":"prompt"}\n{"type":"response"}\n');
+		_resetSessionLogs();
+		recordSessionLog("mbrooks/tars#1", { level: "info", message: "prompt" });
+		recordSessionLog("mbrooks/tars#1", { level: "info", message: "response" });
 
 		const mockStore = {
 			get: vi.fn(async () => ({
@@ -3508,7 +3509,7 @@ describe("createWebhookServer", () => {
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath,
+				sessionPath: "/tmp/session.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -3537,11 +3538,11 @@ describe("createWebhookServer", () => {
 			expect(response.statusCode).toBe(200);
 			const body = JSON.parse(response.body);
 			expect(body.available).toBe(true);
-			expect(body.truncated).toBe(false);
-			expect(body.lines).toEqual(['{"type":"prompt"}', '{"type":"response"}']);
+			expect(body.logs).toHaveLength(2);
+			expect(body.logs[0].message).toBe("prompt");
+			expect(body.logs[1].message).toBe("response");
 		} finally {
 			server.close();
-			await rm(sessionsDir, { force: true, recursive: true });
 		}
 	});
 
@@ -3581,18 +3582,17 @@ describe("createWebhookServer", () => {
 		});
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
-		expect(body.available).toBe(false);
-		expect(body.error).toBe("Log file not found");
+		expect(body.available).toBe(true);
+		expect(body.logs).toEqual([]);
 
 		server.close();
 	});
 
 	it("truncates log when it exceeds 10,000 lines", async () => {
-		const sessionsDir = await mkdtemp(join(tmpdir(), "tars-sessions-"));
-		const sessionPath = join(sessionsDir, "github-mbrooks-tars", "issue-1.jsonl");
-		await mkdir(join(sessionsDir, "github-mbrooks-tars"), { recursive: true });
-		const lines = Array.from({ length: 10_005 }, (_, i) => `{"line":${i}}`);
-		await writeFile(sessionPath, lines.join("\n") + "\n");
+		_resetSessionLogs();
+		for (let i = 0; i < 5_001; i++) {
+			recordSessionLog("mbrooks/tars#1", { level: "info", message: "line " + i });
+		}
 
 		const mockStore = {
 			get: vi.fn(async () => ({
@@ -3602,7 +3602,7 @@ describe("createWebhookServer", () => {
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath,
+				sessionPath: "/tmp/session.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -3631,13 +3631,10 @@ describe("createWebhookServer", () => {
 			expect(response.statusCode).toBe(200);
 			const body = JSON.parse(response.body);
 			expect(body.available).toBe(true);
-			expect(body.truncated).toBe(true);
-			expect(body.totalLines).toBe(10_005);
-			expect(body.lines).toHaveLength(10_000);
-			expect(body.lines![0]).toBe('{"line":5}');
+			expect(body.logs).toHaveLength(5_000);
+			expect(body.logs[0].message).toBe("line 1");
 		} finally {
 			server.close();
-			await rm(sessionsDir, { force: true, recursive: true });
 		}
 	});
 

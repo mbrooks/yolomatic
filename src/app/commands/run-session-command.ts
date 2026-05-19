@@ -4,6 +4,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import { isTerminalStatus } from "../../domain/session/model.js";
 import { canDelete, canPause, canRestart, canResume } from "../../domain/workflow/policy.js";
+import { clearSessionLogs } from "../../logging/session-log-store.js";
 import { fail, ok, type AppResult } from "../result.js";
 
 export type SessionCommand =
@@ -126,6 +127,7 @@ export class RunSessionCommand {
 					return fail("invalid_state", check.reason);
 				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
+				clearSessionLogs(key);
 				const originalStatus = session.status;
 				session.status = "pending";
 				session.summary = undefined;
@@ -180,6 +182,7 @@ export class RunSessionCommand {
 					return fail("invalid_state", deleteCheck.reason);
 				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
+				clearSessionLogs(key);
 				await this.sessions.delete(owner, repo, issueNumber);
 				return ok<DeleteResult>({
 					deleted: true,
