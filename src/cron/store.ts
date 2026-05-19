@@ -2,6 +2,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { runMigrations } from "./migrations.js";
 
 export type CronScheduleType = "daily" | "weekly" | "interval" | "custom";
 
@@ -186,7 +187,7 @@ export class CronStore {
 		mkdirSync(path.dirname(dbPath), { recursive: true });
 		this.db = new DatabaseSync(dbPath);
 		this.db.exec("PRAGMA journal_mode = WAL;");
-		this._initTables();
+		runMigrations(this.db);
 
 		this.insertJobStmt = this.db.prepare(
 			`INSERT INTO cron_jobs (id, owner, repo, name, description, prompt, scheduleType, scheduleValue, branch, notificationChannel, enabled, nextRunAt, lastRunAt, lastRunStatus, lastError, createdAt)
@@ -209,47 +210,6 @@ export class CronStore {
 			`INSERT INTO cron_runs (id, cronId, owner, repo, startedAt, finishedAt, status, output, error)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		);
-	}
-
-	private _initTables(): void {
-		this.db.exec(`
-			CREATE TABLE IF NOT EXISTS cron_jobs (
-				id TEXT PRIMARY KEY,
-				owner TEXT NOT NULL,
-				repo TEXT NOT NULL,
-				name TEXT NOT NULL,
-				description TEXT NOT NULL,
-				prompt TEXT NOT NULL,
-				scheduleType TEXT NOT NULL,
-				scheduleValue TEXT NOT NULL,
-				branch TEXT NOT NULL,
-				notificationChannel TEXT,
-				enabled INTEGER NOT NULL DEFAULT 1,
-				nextRunAt TEXT NOT NULL,
-				lastRunAt TEXT,
-				lastRunStatus TEXT,
-				lastError TEXT,
-				createdAt TEXT NOT NULL
-			)
-		`);
-
-		this.db.exec(`
-			CREATE TABLE IF NOT EXISTS cron_runs (
-				id TEXT PRIMARY KEY,
-				cronId TEXT NOT NULL,
-				owner TEXT NOT NULL,
-				repo TEXT NOT NULL,
-				startedAt TEXT NOT NULL,
-				finishedAt TEXT NOT NULL,
-				status TEXT NOT NULL,
-				output TEXT NOT NULL,
-				error TEXT
-			)
-		`);
-
-		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_owner_repo ON cron_jobs(owner, repo)`);
-		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_next_run ON cron_jobs(nextRunAt)`);
-		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_runs_cronId ON cron_runs(cronId)`);
 	}
 
 	async get(owner: string, repo: string, id: string): Promise<CronJob | null> {
