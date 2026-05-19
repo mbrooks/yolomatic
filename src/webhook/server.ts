@@ -69,7 +69,15 @@ export function createWebhookServer(
 	const taskService = taskController ? new TaskControlServiceAdapter(taskController) : undefined;
 	const staleService = staleDetector ? new StaleSessionServiceAdapter(staleDetector) : undefined;
 
-	const getAdminStatus = new GetAdminStatus(sessionRepo, staleService ?? { detectStaleSessions: async () => [] }, systemClock);
+	const getAdminStatus = new GetAdminStatus(sessionRepo, staleService ?? { detectStaleSessions: async () => [] }, systemClock, taskService ?? {
+		cancel: () => false,
+		isActive: () => false,
+		steer: async () => false,
+		register: () => undefined,
+		unregister: () => undefined,
+		isDraining: () => false,
+		setDraining: () => undefined,
+	});
 	const getSession = new GetSession(sessionRepo);
 	const getSessionLog = new GetSessionLog(sessionRepo);
 	const runSessionCommand = new RunSessionCommand(

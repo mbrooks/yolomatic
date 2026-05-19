@@ -56,6 +56,7 @@ export type RepoSummary = {
 export type StatusResponse = {
 	agent: Exclude<AgentStatus, "offline">;
 	uptime: string;
+	draining: boolean;
 	repos: RepoSummary[];
 	sessions: Session[];
 };

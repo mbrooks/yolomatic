@@ -3,6 +3,7 @@ import { GetAdminStatus } from "./get-admin-status.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
 import type { Clock } from "../../ports/clock.js";
+import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { SessionState } from "../../session/store.js";
 
 function makeState(partial: Partial<SessionState> & { owner: string; repo: string; issueNumber: number }): SessionState {
@@ -30,13 +31,23 @@ describe("GetAdminStatus", () => {
 			detectStaleSessions: vi.fn(async () => []),
 		};
 		const clock: Clock = { now: () => new Date(), uptime: () => 3600 };
-		const query = new GetAdminStatus(repo, stale, clock);
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.agent).toBe("online");
 			expect(result.data.sessions).toHaveLength(2);
 			expect(result.data.uptime).toBe("1h");
+			expect(result.data.draining).toBe(false);
 		}
 	});
 
@@ -50,7 +61,16 @@ describe("GetAdminStatus", () => {
 			detectStaleSessions: vi.fn(async () => []),
 		};
 		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
-		const query = new GetAdminStatus(repo, stale, clock);
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -70,7 +90,16 @@ describe("GetAdminStatus", () => {
 			detectStaleSessions: vi.fn(async () => []),
 		};
 		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
-		const query = new GetAdminStatus(repo, stale, clock);
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -90,11 +119,45 @@ describe("GetAdminStatus", () => {
 			}),
 		};
 		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
-		const query = new GetAdminStatus(repo, stale, clock);
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.sessions).toEqual([]);
+		}
+	});
+
+	it("returns draining flag from task controller", async () => {
+		const repo: SessionRepository = {
+			getAll: vi.fn(async () => []),
+		} as unknown as SessionRepository;
+		const stale: StaleSessionService = {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => true),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
+		const result = await query.execute();
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.draining).toBe(true);
 		}
 	});
 });
