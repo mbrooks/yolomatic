@@ -139,6 +139,16 @@ function SessionDetail({
 					<dd>{selected.workspacePath}</dd>
 					<dt>Last activity</dt>
 					<dd>{formatRelative(selected.lastActivity)}</dd>
+					<dt>Issue</dt>
+					<dd>
+						<a
+							href={`https://github.com/${selected.owner}/${selected.repo}/issues/${selected.issueNumber}`}
+							target="_blank"
+							rel="noreferrer"
+						>
+							#{selected.issueNumber}
+						</a>
+					</dd>
 					<dt>Pull request</dt>
 					<dd>
 						{selected.prUrl ? (
