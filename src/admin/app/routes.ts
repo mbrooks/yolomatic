@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 export type Route =
 	| { screen: "repos" }
-	| { screen: "repo"; owner: string; repo: string; issueNumber?: number }
+	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number };
 
 export function parseHash(hash: string): Route {
@@ -12,7 +12,8 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			const issueNumber = path[3] ? Number.parseInt(path[3], 10) : undefined;
-			return { screen: "repo", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber };
+			const tab = path[4] === "crons" ? "crons" : "sessions";
+			return { screen: "repo", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber, tab };
 		}
 		return { screen: "repos" };
 	}
@@ -29,7 +30,11 @@ export function buildHash(route: Route): string {
 	if (route.screen === "repos") return "#/repos";
 	if (route.screen === "repo") {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
-		return route.issueNumber !== undefined ? `${base}/${route.issueNumber}` : base;
+		if (route.issueNumber !== undefined) {
+			return `${base}/${route.issueNumber}`;
+		}
+		const tab = route.tab === "crons" ? "/crons" : "";
+		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {
 		const base = "#/working";

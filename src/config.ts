@@ -16,6 +16,7 @@ export interface AppConfig {
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
 	adminGithubUsername: string | undefined;
+	memoryDir: string;
 	cleanupRetentionDays: number | undefined;
 	staleThresholdMs: number;
 	maxWorktrees: number;
@@ -38,6 +39,7 @@ export function getConfig(): AppConfig {
 		webhookSecret: requireEnv("WEBHOOK_SECRET"),
 		sessionsDir,
 		archiveDir: path.resolve(process.env.ARCHIVE_DIR?.trim() || path.join(sessionsDir, "archive")),
+		memoryDir: path.resolve(process.env.MEMORY_DIR?.trim() || path.join(process.cwd(), "memory")),
 		defaultBranch: process.env.DEFAULT_BRANCH?.trim() || "main",
 		githubToken: requireEnv("GITHUB_TOKEN"),
 		githubUsername: requireEnv("GITHUB_USERNAME"),
