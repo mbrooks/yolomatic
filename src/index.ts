@@ -50,14 +50,14 @@ export async function main(): Promise<void> {
 		config.staleThresholdMs,
 	);
 
-	const cronStore = new CronStore(config.cronsDir, path.join(config.cronsDir, "runs"));
+	const cronStore = new CronStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
 	const cronDeps = {
 		cronStore,
 		workspaceManager,
 		executor,
 		github,
-		cronsDir: config.cronsDir,
+		memoryDir: config.memoryDir,
 		githubToken: config.githubToken,
 		githubUsername: config.githubUsername,
 	};

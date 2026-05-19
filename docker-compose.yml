@@ -15,6 +15,7 @@ services:
       - tars_sessions:/app/sessions
       - tars_workspaces:/app/workspaces
       - tars_pi:/home/tars/.pi/agent
+      - tars_memory:/app/memory
 
   ollama:
     image: alpine/ollama:0.20.5
@@ -28,3 +29,4 @@ volumes:
   tars_workspaces:
   tars_pi:
   tars_ollama:
+  tars_memory:

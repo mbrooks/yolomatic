@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CronJob, CronRun } from "./store.js";
@@ -19,7 +19,7 @@ export interface CronSchedulerDeps {
 	workspaceManager: WorkspaceManager;
 	executor: PiAgentExecutor;
 	github: GitHubService;
-	cronsDir: string;
+	memoryDir: string;
 	githubToken: string;
 	githubUsername: string;
 }
@@ -79,7 +79,7 @@ export function createSessionStateForCron(
 async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date): Promise<void> {
 	const worktreePath = deps.workspaceManager.getWorktreePath(job.owner, job.repo, 0);
 	const cronWorktreePath = path.join(path.dirname(worktreePath), `cron-${job.id}`);
-	const sessionPath = path.join(deps.cronsDir, "sessions", `${job.owner}-${job.repo}-${job.id}.jsonl`);
+	const sessionPath = path.join(deps.memoryDir, "sessions", `${job.owner}-${job.repo}-${job.id}.jsonl`);
 	const branchName = `tars/cron-${job.id}`;
 
 	let output = "";

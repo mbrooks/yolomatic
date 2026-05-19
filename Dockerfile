@@ -21,6 +21,7 @@ ENV HOME=/home/tars
 ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
 ENV SESSIONS_DIR=/app/sessions
 ENV WORKSPACES_DIR=/app/workspaces
+ENV MEMORY_DIR=/app/memory
 
 # Install git (required for worktrees)
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
@@ -32,7 +33,7 @@ RUN npm ci --omit=dev
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
-  && mkdir -p /app/sessions /app/workspaces \
+  && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
 
 # Copy build artifacts
