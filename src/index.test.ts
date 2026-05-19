@@ -10,7 +10,7 @@ vi.mock("./config.js", () => ({
 		webhookSecret: "secret",
 		sessionsDir: "/tmp/sessions",
 		archiveDir: "/tmp/sessions/archive",
-		cronsDir: "/tmp/crons",
+		memoryDir: "/tmp/memory",
 		defaultBranch: "main",
 		githubToken: "token",
 		githubUsername: "tars-bot",

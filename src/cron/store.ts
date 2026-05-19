@@ -1,6 +1,7 @@
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 
 export type CronScheduleType = "daily" | "weekly" | "interval" | "custom";
 
@@ -124,8 +125,6 @@ export function computeNextRunAt(
 	}
 
 	if (scheduleType === "custom") {
-		// custom: treat as "every N hours" if it matches interval format,
-		// otherwise default to daily at the specified time
 		try {
 			return computeNextRunAt("interval", scheduleValue, from);
 		} catch {
@@ -140,119 +139,165 @@ export function computeNextRunAt(
 	throw new Error(`Unsupported schedule type: ${scheduleType}`);
 }
 
+function rowToCronJob(row: Record<string, unknown>): CronJob {
+	return {
+		id: String(row.id),
+		owner: String(row.owner),
+		repo: String(row.repo),
+		name: String(row.name),
+		description: String(row.description),
+		prompt: String(row.prompt),
+		scheduleType: String(row.scheduleType) as CronScheduleType,
+		scheduleValue: String(row.scheduleValue),
+		branch: String(row.branch),
+		notificationChannel: row.notificationChannel === null ? null : String(row.notificationChannel),
+		enabled: Number(row.enabled) === 1,
+		nextRunAt: String(row.nextRunAt),
+		lastRunAt: row.lastRunAt === null ? null : String(row.lastRunAt),
+		lastRunStatus: row.lastRunStatus === null ? null : (String(row.lastRunStatus) as "success" | "failure"),
+		lastError: row.lastError === null ? null : String(row.lastError),
+		createdAt: String(row.createdAt),
+	};
+}
+
+function rowToCronRun(row: Record<string, unknown>): CronRun {
+	return {
+		id: String(row.id),
+		cronId: String(row.cronId),
+		owner: String(row.owner),
+		repo: String(row.repo),
+		startedAt: String(row.startedAt),
+		finishedAt: String(row.finishedAt),
+		status: String(row.status) as "success" | "failure",
+		output: String(row.output),
+		error: row.error === null ? null : String(row.error),
+	};
+}
+
 export class CronStore {
-	private readonly jobs = new Map<string, CronJob>();
-	private readonly runs = new Map<string, CronRun[]>();
+	private readonly db: DatabaseSync;
+	private readonly insertJobStmt: StatementSync;
+	private readonly updateJobStmt: StatementSync;
+	private readonly deleteJobStmt: StatementSync;
+	private readonly insertRunStmt: StatementSync;
 
-	public constructor(
-		private readonly cronsDir: string,
-		private readonly runsDir: string,
-	) {}
+	public constructor(dbPath: string) {
+		// Ensure parent directory exists
+		mkdirSync(path.dirname(dbPath), { recursive: true });
+		this.db = new DatabaseSync(dbPath);
+		this.db.exec("PRAGMA journal_mode = WAL;");
+		this._initTables();
 
-	private getJobDir(owner: string, repo: string): string {
-		return path.join(this.cronsDir, `${owner}-${repo}`);
+		this.insertJobStmt = this.db.prepare(
+			`INSERT INTO cron_jobs (id, owner, repo, name, description, prompt, scheduleType, scheduleValue, branch, notificationChannel, enabled, nextRunAt, lastRunAt, lastRunStatus, lastError, createdAt)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET
+			 owner=excluded.owner, repo=excluded.repo, name=excluded.name, description=excluded.description,
+			 prompt=excluded.prompt, scheduleType=excluded.scheduleType, scheduleValue=excluded.scheduleValue,
+			 branch=excluded.branch, notificationChannel=excluded.notificationChannel, enabled=excluded.enabled,
+			 nextRunAt=excluded.nextRunAt, lastRunAt=excluded.lastRunAt, lastRunStatus=excluded.lastRunStatus,
+			 lastError=excluded.lastError, createdAt=excluded.createdAt`,
+		);
+
+		this.updateJobStmt = this.db.prepare(
+			`UPDATE cron_jobs SET name=?, description=?, prompt=?, scheduleType=?, scheduleValue=?, branch=?, notificationChannel=?, enabled=?, nextRunAt=?, lastRunAt=?, lastRunStatus=?, lastError=? WHERE id=?`,
+		);
+
+		this.deleteJobStmt = this.db.prepare("DELETE FROM cron_jobs WHERE owner = ? AND repo = ? AND id = ?");
+
+		this.insertRunStmt = this.db.prepare(
+			`INSERT INTO cron_runs (id, cronId, owner, repo, startedAt, finishedAt, status, output, error)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		);
 	}
 
-	private getJobPath(owner: string, repo: string, id: string): string {
-		return path.join(this.getJobDir(owner, repo), `${id}.json`);
-	}
+	private _initTables(): void {
+		this.db.exec(`
+			CREATE TABLE IF NOT EXISTS cron_jobs (
+				id TEXT PRIMARY KEY,
+				owner TEXT NOT NULL,
+				repo TEXT NOT NULL,
+				name TEXT NOT NULL,
+				description TEXT NOT NULL,
+				prompt TEXT NOT NULL,
+				scheduleType TEXT NOT NULL,
+				scheduleValue TEXT NOT NULL,
+				branch TEXT NOT NULL,
+				notificationChannel TEXT,
+				enabled INTEGER NOT NULL DEFAULT 1,
+				nextRunAt TEXT NOT NULL,
+				lastRunAt TEXT,
+				lastRunStatus TEXT,
+				lastError TEXT,
+				createdAt TEXT NOT NULL
+			)
+		`);
 
-	private getRunsPath(owner: string, repo: string, cronId: string): string {
-		return path.join(this.runsDir, `${owner}-${repo}`, `${cronId}.jsonl`);
+		this.db.exec(`
+			CREATE TABLE IF NOT EXISTS cron_runs (
+				id TEXT PRIMARY KEY,
+				cronId TEXT NOT NULL,
+				owner TEXT NOT NULL,
+				repo TEXT NOT NULL,
+				startedAt TEXT NOT NULL,
+				finishedAt TEXT NOT NULL,
+				status TEXT NOT NULL,
+				output TEXT NOT NULL,
+				error TEXT
+			)
+		`);
+
+		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_owner_repo ON cron_jobs(owner, repo)`);
+		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_next_run ON cron_jobs(nextRunAt)`);
+		this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_runs_cronId ON cron_runs(cronId)`);
 	}
 
 	async get(owner: string, repo: string, id: string): Promise<CronJob | null> {
-		const key = `${owner}/${repo}#${id}`;
-		const cached = this.jobs.get(key);
-		if (cached) {
-			return cached;
-		}
-
-		const jobPath = this.getJobPath(owner, repo, id);
-		try {
-			const raw = await readFile(jobPath, "utf8");
-			const parsed = JSON.parse(raw) as CronJob;
-			this.jobs.set(key, parsed);
-			return parsed;
-		} catch {
-			return null;
-		}
+		const stmt = this.db.prepare("SELECT * FROM cron_jobs WHERE owner = ? AND repo = ? AND id = ?");
+		const row = stmt.get(owner, repo, id) as Record<string, unknown> | undefined;
+		if (!row) return null;
+		return rowToCronJob(row);
 	}
 
 	async getAll(): Promise<CronJob[]> {
-		const jobs: CronJob[] = [];
-		try {
-			const entries = await readdir(this.cronsDir, { withFileTypes: true });
-			for (const entry of entries) {
-				if (!entry.isDirectory()) continue;
-				const repoDir = path.join(this.cronsDir, entry.name);
-				const files = await readdir(repoDir);
-				for (const file of files) {
-					if (!file.endsWith(".json")) continue;
-					const filePath = path.join(repoDir, file);
-					try {
-						const raw = await readFile(filePath, "utf8");
-						const parsed = JSON.parse(raw) as CronJob;
-						jobs.push(parsed);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						process.stdout.write(`[cron-store] warning: invalid job file ${filePath}: ${message}\n`);
-					}
-				}
-			}
-		} catch {
-			// crons dir doesn't exist or isn't readable
-		}
-		return jobs;
+		const stmt = this.db.prepare("SELECT * FROM cron_jobs ORDER BY createdAt DESC");
+		const rows = stmt.all() as Array<Record<string, unknown>>;
+		return rows.map(rowToCronJob);
 	}
 
 	async listForRepo(owner: string, repo: string): Promise<CronJob[]> {
-		const jobs: CronJob[] = [];
-		try {
-			const repoDir = this.getJobDir(owner, repo);
-			const files = await readdir(repoDir);
-			for (const file of files) {
-				if (!file.endsWith(".json")) continue;
-				const filePath = path.join(repoDir, file);
-				try {
-					const raw = await readFile(filePath, "utf8");
-					const parsed = JSON.parse(raw) as CronJob;
-					jobs.push(parsed);
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					process.stdout.write(`[cron-store] warning: invalid job file ${filePath}: ${message}\n`);
-				}
-			}
-		} catch {
-			// repo dir doesn't exist
-		}
-		return jobs;
+		const stmt = this.db.prepare("SELECT * FROM cron_jobs WHERE owner = ? AND repo = ? ORDER BY createdAt DESC");
+		const rows = stmt.all(owner, repo) as Array<Record<string, unknown>>;
+		return rows.map(rowToCronJob);
 	}
 
 	async set(job: CronJob): Promise<CronJob> {
-		const jobPath = this.getJobPath(job.owner, job.repo, job.id);
-		await mkdir(path.dirname(jobPath), { recursive: true });
-		const key = `${job.owner}/${job.repo}#${job.id}`;
-		this.jobs.set(key, job);
-		await writeFile(jobPath, `${JSON.stringify(job, null, 2)}\n`, "utf8");
+		this.insertJobStmt.run(
+			job.id,
+			job.owner,
+			job.repo,
+			job.name,
+			job.description,
+			job.prompt,
+			job.scheduleType,
+			job.scheduleValue,
+			job.branch,
+			job.notificationChannel,
+			job.enabled ? 1 : 0,
+			job.nextRunAt,
+			job.lastRunAt,
+			job.lastRunStatus,
+			job.lastError,
+			job.createdAt,
+		);
 		return job;
 	}
 
 	async delete(owner: string, repo: string, id: string): Promise<void> {
-		const key = `${owner}/${repo}#${id}`;
-		this.jobs.delete(key);
-		const jobPath = this.getJobPath(owner, repo, id);
-		try {
-			await rm(jobPath, { force: true });
-		} catch {
-			// ignore
-		}
-		const runsPath = this.getRunsPath(owner, repo, id);
-		try {
-			await rm(runsPath, { force: true });
-		} catch {
-			// ignore
-		}
+		this.deleteJobStmt.run(owner, repo, id);
+		// Also delete runs for this cron
+		const delRuns = this.db.prepare("DELETE FROM cron_runs WHERE owner = ? AND repo = ? AND cronId = ?");
+		delRuns.run(owner, repo, id);
 	}
 
 	async createJob(
@@ -291,40 +336,24 @@ export class CronStore {
 	}
 
 	async addRun(run: CronRun): Promise<void> {
-		const runsPath = this.getRunsPath(run.owner, run.repo, run.cronId);
-		await mkdir(path.dirname(runsPath), { recursive: true });
-		const line = `${JSON.stringify(run)}\n`;
-		await writeFile(runsPath, line, { flag: "a" });
-		const key = `${run.owner}/${run.repo}#${run.cronId}`;
-		const existing = this.runs.get(key) ?? [];
-		existing.push(run);
-		this.runs.set(key, existing);
+		this.insertRunStmt.run(
+			run.id,
+			run.cronId,
+			run.owner,
+			run.repo,
+			run.startedAt,
+			run.finishedAt,
+			run.status,
+			run.output,
+			run.error,
+		);
 	}
 
 	async getRuns(owner: string, repo: string, cronId: string, limit = 50): Promise<CronRun[]> {
-		const key = `${owner}/${repo}#${cronId}`;
-		const cached = this.runs.get(key);
-		if (cached) {
-			return cached.slice(-limit);
-		}
-
-		const runs: CronRun[] = [];
-		const runsPath = this.getRunsPath(owner, repo, cronId);
-		try {
-			const raw = await readFile(runsPath, "utf8");
-			for (const line of raw.split("\n")) {
-				if (!line.trim()) continue;
-				try {
-					const parsed = JSON.parse(line) as CronRun;
-					runs.push(parsed);
-				} catch {
-					// skip invalid line
-				}
-			}
-		} catch {
-			// no runs file yet
-		}
-		this.runs.set(key, runs);
-		return runs.slice(-limit);
+		const stmt = this.db.prepare(
+			"SELECT * FROM cron_runs WHERE owner = ? AND repo = ? AND cronId = ? ORDER BY startedAt DESC LIMIT ?",
+		);
+		const rows = stmt.all(owner, repo, cronId, limit) as Array<Record<string, unknown>>;
+		return rows.map(rowToCronRun);
 	}
 }
