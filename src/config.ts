@@ -16,6 +16,7 @@ export interface AppConfig {
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
 	adminGithubUsername: string | undefined;
+	cronsDir: string;
 	cleanupRetentionDays: number | undefined;
 	staleThresholdMs: number;
 	maxWorktrees: number;
@@ -38,6 +39,7 @@ export function getConfig(): AppConfig {
 		webhookSecret: requireEnv("WEBHOOK_SECRET"),
 		sessionsDir,
 		archiveDir: path.resolve(process.env.ARCHIVE_DIR?.trim() || path.join(sessionsDir, "archive")),
+		cronsDir: path.resolve(process.env.CRONS_DIR?.trim() || path.join(process.cwd(), "crons")),
 		defaultBranch: process.env.DEFAULT_BRANCH?.trim() || "main",
 		githubToken: requireEnv("GITHUB_TOKEN"),
 		githubUsername: requireEnv("GITHUB_USERNAME"),

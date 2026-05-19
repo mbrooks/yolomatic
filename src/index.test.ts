@@ -10,6 +10,7 @@ vi.mock("./config.js", () => ({
 		webhookSecret: "secret",
 		sessionsDir: "/tmp/sessions",
 		archiveDir: "/tmp/sessions/archive",
+		cronsDir: "/tmp/crons",
 		defaultBranch: "main",
 		githubToken: "token",
 		githubUsername: "tars-bot",
@@ -89,7 +90,7 @@ import { SessionStore } from "./session/store.js";
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret", expect.any(Object), expect.any(Object), expect.any(Object), expect.any(String));
+		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret", expect.any(Object), expect.any(Object), expect.any(Object), expect.any(String), expect.anything());
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 	});

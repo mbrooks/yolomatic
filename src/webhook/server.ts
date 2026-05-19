@@ -8,6 +8,7 @@ import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
+import type { CronStore } from "../cron/store.js";
 
 import { systemClock } from "../ports/clock.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
@@ -57,6 +58,7 @@ export function createWebhookServer(
 	workspaceManager?: WorkspaceManager,
 	staleDetector?: StaleSessionDetector,
 	archiveDir?: string,
+	cronStore?: CronStore,
 	options: WebhookServerOptions = {},
 ) {
 	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
@@ -99,6 +101,7 @@ export function createWebhookServer(
 
 		// Admin routes handled by the thin HTTP adapter
 		const adminHandled = await handleAdminRoute(request, response, {
+			cronStore,
 			getAdminStatus,
 			getSession,
 			getSessionLog,

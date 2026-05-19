@@ -219,11 +219,14 @@ export class PiAgentExecutor {
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
+		overridePrompt?: string,
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
 
 		let prompt: string;
-		if (prReview) {
+		if (overridePrompt) {
+			prompt = overridePrompt;
+		} else if (prReview) {
 			prompt = buildPRReviewPrompt(state, prReview.comments, prReview.reviewBody);
 		} else if (newComment) {
 			prompt = buildFeedbackPrompt(newComment);
