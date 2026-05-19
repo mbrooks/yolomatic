@@ -644,3 +644,231 @@ a:hover {
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Repo tabs */
+.repo-tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+	flex-shrink: 0;
+}
+
+.repo-tab {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--muted);
+	cursor: pointer;
+	font-size: 0.875rem;
+	font-weight: 500;
+	padding: 0.35rem 0.75rem;
+}
+
+.repo-tab:hover {
+	border-color: var(--blue);
+	color: var(--text);
+}
+
+.repo-tab.active {
+	background: rgba(88, 166, 255, 0.12);
+	border-color: var(--blue);
+	color: var(--blue);
+}
+
+/* Cron list */
+.cron-list-header {
+	padding: 0.5rem 0.75rem;
+}
+
+.cron-name {
+	flex: 2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cron-schedule {
+	flex: 1.5;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cron-status {
+	flex: 0 0 5rem;
+}
+
+.cron-next {
+	flex: 1;
+	min-width: 4rem;
+}
+
+.cron-schedule-badge {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.7rem;
+	margin-right: 0.4rem;
+	padding: 0.1rem 0.35rem;
+	text-transform: uppercase;
+}
+
+.cron-status-dot {
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.cron-status-dot.success {
+	color: var(--green);
+}
+
+.cron-status-dot.failure {
+	color: var(--red);
+}
+
+.cron-paused-badge {
+	background: rgba(210, 153, 34, 0.15);
+	border: 1px solid var(--yellow);
+	border-radius: 4px;
+	color: var(--yellow);
+	font-size: 0.65rem;
+	margin-left: 0.4rem;
+	padding: 0.05rem 0.3rem;
+	text-transform: uppercase;
+}
+
+.new-cron-btn {
+	margin: 0.75rem;
+}
+
+/* Cron form */
+.cron-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.form-row {
+	display: flex;
+	gap: 0.75rem;
+}
+
+.form-row > .form-group {
+	flex: 1;
+}
+
+.form-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.form-group label {
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-family: inherit;
+	font-size: 0.875rem;
+	padding: 0.4rem 0.5rem;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+	border-color: var(--blue);
+	outline: none;
+}
+
+.form-group textarea {
+	resize: vertical;
+}
+
+.form-error {
+	color: var(--red);
+	font-size: 0.875rem;
+}
+
+/* Cron detail */
+.cron-prompt {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.8rem;
+	line-height: 1.4;
+	padding: 0.6rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* Cron runs */
+.cron-runs-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.cron-run-row {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 0.6rem;
+}
+
+.cron-run-meta {
+	align-items: center;
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.4rem;
+}
+
+.cron-run-status {
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.cron-run-status.success {
+	color: var(--green);
+}
+
+.cron-run-status.failure {
+	color: var(--red);
+}
+
+.cron-run-time {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
+.cron-run-output {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	margin: 0;
+	max-height: 12rem;
+	overflow: auto;
+	padding: 0.5rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.cron-run-error {
+	color: var(--red);
+	font-size: 0.8rem;
+	margin-top: 0.4rem;
+}

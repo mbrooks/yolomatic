@@ -4,6 +4,7 @@ import { useRoute, navigate, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { RepoListScreen } from "../features/repos/RepoListScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
+import { CronScreen } from "../features/crons/CronScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, Session } from "./types.js";
 
@@ -50,7 +51,7 @@ export function App(): React.ReactElement {
 		(session: Session) => {
 			const next: Route =
 				route.screen === "repo"
-					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber }
+					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: route.tab }
 					: {
 							screen: "working",
 							owner: session.owner,
@@ -58,6 +59,15 @@ export function App(): React.ReactElement {
 							issueNumber: session.issueNumber,
 						};
 			navigate(next);
+		},
+		[route],
+	);
+
+	const handleSelectTab = useCallback(
+		(tab: "sessions" | "crons") => {
+			if (route.screen === "repo") {
+				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
+			}
 		},
 		[route],
 	);
@@ -108,15 +118,29 @@ export function App(): React.ReactElement {
 					)}
 
 					{route.screen === "repo" && (
-						<SessionScreen
-							sessions={repoSessions}
-							selected={selectedSession}
-							onSelect={handleSelectSession}
-							onMutate={handleMutate}
-							breadcrumbLabel={`${route.owner}/${route.repo}`}
-							onBack={handleBackToRepos}
-							emptyMessage="No sessions for this repository."
-						/>
+						<>
+							{route.tab === "crons" ? (
+								<CronScreen
+									owner={route.owner}
+									repo={route.repo}
+									activeTab={route.tab ?? "sessions"}
+									onSelectTab={handleSelectTab}
+									onBack={handleBackToRepos}
+								/>
+							) : (
+								<SessionScreen
+									sessions={repoSessions}
+									selected={selectedSession}
+									onSelect={handleSelectSession}
+									onMutate={handleMutate}
+									breadcrumbLabel={`${route.owner}/${route.repo}`}
+									onBack={handleBackToRepos}
+									emptyMessage="No sessions for this repository."
+									activeTab={route.tab ?? "sessions"}
+									onSelectTab={handleSelectTab}
+								/>
+							)}
+						</>
 					)}
 				</>
 			)}
