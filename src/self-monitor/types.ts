@@ -3,7 +3,8 @@ export type FatalErrorCategory =
 	| "permission_denied"
 	| "disk_full"
 	| "git_worktree_failure"
-	| "missing_toolchain_binary";
+	| "missing_toolchain_binary"
+	| "github_pat_scope_missing";
 
 export interface ToolCallRecord {
 	toolName: string;
