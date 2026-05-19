@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useServerState } from "../hooks/useServerState.js";
 import { useRoute, navigate, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
+import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoListScreen } from "../features/repos/RepoListScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
@@ -85,6 +86,7 @@ export function App(): React.ReactElement {
 
 	return (
 		<div className="app">
+			{serverState.status === "ready" && serverState.data.draining && <RestartBanner />}
 			<header>
 				<h1>TARS Admin</h1>
 				<div className="header-actions">

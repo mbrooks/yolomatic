@@ -1,6 +1,7 @@
 import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
+import type { TaskControlService } from "../../ports/task-control-service.js";
 import {
 	buildRepoSummaries,
 	computeAgentStatus,
@@ -38,6 +39,7 @@ export interface AdminStatusSessionView {
 export interface AdminStatusView {
 	agent: "online" | "busy" | "feedback";
 	uptime: string;
+	draining: boolean;
 	repos: ReturnType<typeof buildRepoSummaries>;
 	sessions: AdminStatusSessionView[];
 }
@@ -47,6 +49,7 @@ export class GetAdminStatus {
 		private readonly sessions: SessionRepository,
 		private readonly stale: StaleSessionService,
 		private readonly clock: Clock,
+		private readonly taskControl: TaskControlService,
 	) {}
 
 	async execute(): Promise<AppResult<AdminStatusView>> {
@@ -66,6 +69,7 @@ export class GetAdminStatus {
 		const view: AdminStatusView = {
 			agent: computeAgentStatus(sorted),
 			uptime: formatUptime(this.clock.uptime()),
+			draining: this.taskControl.isDraining(),
 			repos: buildRepoSummaries(sorted),
 			sessions: sorted.map((s) => {
 				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
