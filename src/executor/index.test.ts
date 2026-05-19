@@ -24,6 +24,10 @@ vi.mock("../logging/llm-logger.js", () => ({
 	})),
 }));
 
+vi.mock("../logging/session-log-store.js", () => ({
+	recordSessionLog: vi.fn(),
+}));
+
 import {
 	buildFeedbackPrompt,
 	buildIssuePrompt,
