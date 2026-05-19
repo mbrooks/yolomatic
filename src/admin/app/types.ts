@@ -59,3 +59,36 @@ export type StatusResponse = {
 	repos: RepoSummary[];
 	sessions: Session[];
 };
+
+export type CronScheduleType = "daily" | "weekly" | "interval" | "custom";
+
+export type CronJob = {
+	id: string;
+	owner: string;
+	repo: string;
+	name: string;
+	description: string;
+	prompt: string;
+	scheduleType: CronScheduleType;
+	scheduleValue: string;
+	branch: string;
+	notificationChannel: string | null;
+	enabled: boolean;
+	nextRunAt: string;
+	lastRunAt: string | null;
+	lastRunStatus: "success" | "failure" | null;
+	lastError: string | null;
+	createdAt: string;
+};
+
+export type CronRun = {
+	id: string;
+	cronId: string;
+	owner: string;
+	repo: string;
+	startedAt: string;
+	finishedAt: string;
+	status: "success" | "failure";
+	output: string;
+	error: string | null;
+};

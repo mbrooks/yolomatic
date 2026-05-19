@@ -1,7 +1,10 @@
 import "dotenv/config";
 
+import path from "node:path";
 import { getConfig } from "./config.js";
 import { PiAgentExecutor } from "./executor/index.js";
+import { CronStore } from "./cron/store.js";
+import { startCronScheduler } from "./cron/scheduler.js";
 import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
@@ -9,6 +12,7 @@ import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { WorkspaceManager } from "./workspace/manager.js";
+import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 
 export async function main(): Promise<void> {
 	const config = getConfig();
@@ -46,6 +50,19 @@ export async function main(): Promise<void> {
 		config.staleThresholdMs,
 	);
 
+	const cronStore = new CronStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
+	const cronDeps = {
+		cronStore,
+		workspaceManager,
+		executor,
+		github,
+		memoryDir: config.memoryDir,
+		githubToken: config.githubToken,
+		githubUsername: config.githubUsername,
+	};
+	startCronScheduler(cronDeps);
+
 	const server = createWebhookServer(
 		config.webhookSecret,
 		handlers,
@@ -56,6 +73,7 @@ export async function main(): Promise<void> {
 		workspaceManager,
 		staleDetector,
 		config.archiveDir,
+		cronStore,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);

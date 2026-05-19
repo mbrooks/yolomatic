@@ -15,6 +15,8 @@ export function SessionScreen({
 	breadcrumbLabel,
 	onBack,
 	emptyMessage,
+	activeTab,
+	onSelectTab,
 }: {
 	sessions: Session[];
 	selected: Session | null;
@@ -23,9 +25,29 @@ export function SessionScreen({
 	breadcrumbLabel: string;
 	onBack: () => void;
 	emptyMessage: string;
+	activeTab?: "sessions" | "crons";
+	onSelectTab?: (tab: "sessions" | "crons") => void;
 }): React.ReactElement {
 	return (
 		<>
+			{onSelectTab && (
+				<div className="repo-tabs">
+					<button
+						className={`repo-tab${activeTab === "sessions" ? " active" : ""}`}
+						onClick={() => onSelectTab("sessions")}
+						type="button"
+						>
+						Sessions
+					</button>
+					<button
+						className={`repo-tab${activeTab === "crons" ? " active" : ""}`}
+						onClick={() => onSelectTab("crons")}
+						type="button"
+						>
+						Crons
+					</button>
+				</div>
+			)}
 			<Breadcrumb label={breadcrumbLabel} onBack={onBack} />
 			{sessions.length === 0 ? (
 				<EmptyState message={emptyMessage} />
