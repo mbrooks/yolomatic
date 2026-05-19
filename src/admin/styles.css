@@ -29,6 +29,28 @@ body {
 	padding: 1rem;
 }
 
+.restart-banner {
+	align-items: center;
+	background: rgba(210, 153, 34, 0.15);
+	border: 1px solid var(--yellow);
+	border-radius: 6px;
+	color: var(--yellow);
+	display: flex;
+	font-size: 0.875rem;
+	font-weight: 500;
+	gap: 0.5rem;
+	padding: 0.6rem 0.75rem;
+	flex-shrink: 0;
+}
+
+.restart-banner-icon {
+	font-size: 1rem;
+}
+
+.restart-banner-text {
+	line-height: 1.4;
+}
+
 header {
 	align-items: center;
 	display: flex;

@@ -86,6 +86,7 @@ describe("App", () => {
 			return mockStatusResponse({
 				agent: "online",
 				uptime: "1m",
+				draining: false,
 				repos: [
 					{ owner: "mbrooks", repo: "tars", sessionCount: 3, activeCount: 2 },
 					{ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 0 },
@@ -212,6 +213,7 @@ describe("App", () => {
 			return mockStatusResponse({
 				agent: "online",
 				uptime: "1m",
+				draining: false,
 				repos: [],
 				sessions: [
 					{
@@ -283,6 +285,36 @@ describe("App", () => {
 		await waitFor(() => {
 			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();
 		});
+	});
+
+	it("shows restart banner when draining is true", async () => {
+		fetchSpy.mockImplementation(async () => {
+			return mockStatusResponse({
+				agent: "online",
+				uptime: "1m",
+				draining: true,
+				repos: [
+					{ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 0 },
+				],
+				sessions: [],
+			});
+		});
+
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.queryByText("TARS is marked for restart. Maintenance mode active.")).not.toBeNull();
+		});
+	});
+
+	it("does not show restart banner when draining is false", async () => {
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+		});
+
+		expect(screen.queryByText("TARS is marked for restart. Maintenance mode active.")).toBeNull();
 	});
 });
 
