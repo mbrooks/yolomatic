@@ -11,9 +11,19 @@ export function parseHash(hash: string): Route {
 		if (path.length >= 3) {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
-			const issueNumber = path[3] ? Number.parseInt(path[3], 10) : undefined;
-			const tab = path[4] === "crons" ? "crons" : "sessions";
-			return { screen: "repo", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber, tab };
+			let issueNumber: number | undefined;
+			let tab: "sessions" | "crons" = "sessions";
+			if (path[3]) {
+				if (path[3] === "crons") {
+					tab = "crons";
+				} else {
+					issueNumber = Number.parseInt(path[3], 10);
+					if (Number.isNaN(issueNumber)) {
+						issueNumber = undefined;
+					}
+				}
+			}
+			return { screen: "repo", owner, repo, issueNumber, tab };
 		}
 		return { screen: "repos" };
 	}
