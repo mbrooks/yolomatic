@@ -58,7 +58,19 @@ export function classifyFatalError(event: ToolExecutionResult): FatalErrorDetail
 		};
 	}
 
-	// 4. Git command failures in worktrees
+	// 4. GitHub PAT scope missing (e.g., workflow scope for .github/workflows)
+	if (
+		text.includes("refusing to allow a personal access token") &&
+		text.includes("scope")
+	) {
+		return {
+			category: "github_pat_scope_missing",
+			message: `GitHub PAT scope missing during ${event.toolName}: ${output.slice(0, 200)}`,
+			toolName: event.toolName,
+		};
+	}
+
+	// 5. Git command failures in worktrees
 	if (
 		text.includes("fatal:") &&
 		(text.includes("worktree") ||
@@ -73,7 +85,7 @@ export function classifyFatalError(event: ToolExecutionResult): FatalErrorDetail
 		};
 	}
 
-	// 5. Missing toolchain binary even after successful-looking install.
+	// 6. Missing toolchain binary even after successful-looking install.
 	// Symptom: exit code 2 and "No such file or directory" in node_modules/.bin/
 	if (exitCode === 2 && text.includes("no such file or directory")) {
 		const pathMatch = /(node_modules\/[^'"\s]*)/i.exec(output);

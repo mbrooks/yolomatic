@@ -66,6 +66,20 @@ describe("classifyFatalError", () => {
 		expect(result?.category).toBe("disk_full");
 	});
 
+	it("detects missing workflow scope on PAT push", () => {
+		const result = classifyFatalError({
+			toolName: "bash",
+			result: {
+				output: "remote rejected: tars/issue-150 -> tars/issue-150 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
+				exitCode: 1,
+			},
+			isError: true,
+		});
+		expect(result).not.toBeNull();
+		expect(result?.category).toBe("github_pat_scope_missing");
+		expect(result?.message).toContain("refusing to allow a Personal Access Token");
+	});
+
 	it("detects git worktree failure", () => {
 		const result = classifyFatalError({
 			toolName: "bash",
