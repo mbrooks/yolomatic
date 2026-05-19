@@ -33,6 +33,8 @@ export interface SessionState {
 	archivedAt?: string;
 	resumeOnBoot?: boolean;
 	queuedComments?: string[];
+	/** Overrides the default `${repo}-issue-${issueNumber}` log tag */
+	sessionTag?: string;
 }
 
 export class SessionStore {
