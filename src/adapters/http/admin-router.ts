@@ -231,8 +231,9 @@ export async function handleAdminRoute(
 				sendJson(response, 400, { error: "Invalid issue number" });
 				return true;
 			}
+			const since = requestUrl.searchParams.get("since") ?? undefined;
 			try {
-				const result = await deps.getSessionLog.execute(owner, repo, issueNumber);
+				const result = await deps.getSessionLog.execute(owner, repo, issueNumber, since ?? undefined);
 				if (!result.success) {
 					sendJson(response, mapResultToStatus(result.code), { error: result.message });
 					return true;

@@ -1,16 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { GetSessionLog } from "./get-session-log.js";
+import { _resetSessionLogs, recordSessionLog } from "../../logging/session-log-store.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { SessionState } from "../../session/store.js";
 
 describe("GetSessionLog", () => {
-	it("returns log lines when log file exists", async () => {
-		const sessionsDir = await mkdtemp(join(tmpdir(), "tars-logs-"));
-		const sessionPath = join(sessionsDir, "issue-1.jsonl");
-		await writeFile(sessionPath, '{"type":"prompt"}\n{"type":"response"}\n');
+	it("returns logs when session exists and logs are recorded", async () => {
+		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
 			repo: "tars",
@@ -18,7 +14,7 @@ describe("GetSessionLog", () => {
 			title: "Test",
 			body: "Body",
 			status: "working",
-			sessionPath,
+			sessionPath: "/tmp/session.jsonl",
 			workspacePath: "/tmp/ws",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
@@ -26,24 +22,30 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
+		recordSessionLog("mbrooks/tars#1", { level: "info", message: "Prompt sent" });
+		recordSessionLog("mbrooks/tars#1", { level: "tool", message: "read file" });
+
 		const query = new GetSessionLog(repo);
 		const result = await query.execute("mbrooks", "tars", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
-			expect(result.data.lines).toEqual(['{"type":"prompt"}', '{"type":"response"}']);
+			expect(result.data.logs.length).toBe(2);
+			expect(result.data.logs[0].level).toBe("info");
+			expect(result.data.logs[1].level).toBe("tool");
 		}
 	});
 
-	it("returns unavailable when log file is missing", async () => {
+	it("returns empty logs when no logs recorded", async () => {
+		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
 			repo: "tars",
-			issueNumber: 1,
+			issueNumber: 2,
 			title: "Test",
 			body: "Body",
 			status: "working",
-			sessionPath: "/nonexistent/path.jsonl",
+			sessionPath: "/tmp/session2.jsonl",
 			workspacePath: "/tmp/ws",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
@@ -51,16 +53,52 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
+
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "tars", 1);
+		const result = await query.execute("mbrooks", "tars", 2);
 		expect(result.success).toBe(true);
 		if (result.success) {
-			expect(result.data.available).toBe(false);
-			expect(result.data.error).toBe("Log file not found");
+			expect(result.data.available).toBe(true);
+			expect(result.data.logs).toEqual([]);
+		}
+	});
+
+	it("filters logs by since timestamp", async () => {
+		_resetSessionLogs();
+		const state: SessionState = {
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: 3,
+			title: "Test",
+			body: "Body",
+			status: "working",
+			sessionPath: "/tmp/session3.jsonl",
+			workspacePath: "/tmp/ws",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		const repo: SessionRepository = {
+			get: vi.fn(async () => state),
+		} as unknown as SessionRepository;
+		recordSessionLog("mbrooks/tars#3", { level: "info", message: "old" });
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		recordSessionLog("mbrooks/tars#3", { level: "info", message: "new" });
+
+		const query = new GetSessionLog(repo);
+		const full = await query.execute("mbrooks", "tars", 3);
+		expect(full.success).toBe(true);
+		if (!full.success) return;
+		const since = full.data.logs[0].timestamp;
+		const filtered = await query.execute("mbrooks", "tars", 3, since);
+		expect(filtered.success).toBe(true);
+		if (filtered.success) {
+			expect(filtered.data.logs.length).toBe(1);
+			expect(filtered.data.logs[0].message).toBe("new");
 		}
 	});
 
 	it("returns not_found when session does not exist", async () => {
+		_resetSessionLogs();
 		const repo: SessionRepository = {
 			get: vi.fn(async () => null),
 		} as unknown as SessionRepository;

@@ -18,12 +18,16 @@ export type StaleInfo = {
 	prState: string | null;
 };
 
+export type LogEntry = {
+	timestamp: string;
+	level: "info" | "error" | "warn" | "tool" | "assistant";
+	message: string;
+	details?: Record<string, unknown>;
+};
+
 export type SessionLogResponse = {
 	available: boolean;
-	truncated?: boolean;
-	totalLines?: number;
-	lines?: string[];
-	error?: string;
+	logs: LogEntry[];
 };
 
 export type Session = {
