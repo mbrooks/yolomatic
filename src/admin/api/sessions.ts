@@ -1,9 +1,15 @@
 import { apiGet, apiPost } from "./client.js";
-import type { Session, SessionLogResponse } from "../app/types.js";
+import type { LogEntry, Session, SessionLogResponse } from "../app/types.js";
 
-export function fetchSessionLog(owner: string, repo: string, issueNumber: number): Promise<SessionLogResponse> {
+export function fetchSessionLog(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+	since?: string,
+): Promise<SessionLogResponse> {
+	const qs = since ? `?since=${encodeURIComponent(since)}` : "";
 	return apiGet<SessionLogResponse>(
-		`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log`,
+		`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log${qs}`,
 	);
 }
 

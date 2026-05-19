@@ -286,18 +286,26 @@ describe("App", () => {
 	});
 });
 
-function mockLogResponse(overrides: Record<string, unknown> = {}): Response {
-	return new Response(
-		JSON.stringify({
-			available: true,
-			lines: ["line 1", "line 2"],
-			...overrides,
-		}),
-		{
-			status: 200,
-			headers: { "content-type": "application/json" },
-		},
-	);
+function mockLogResponse(overrides: Record<string, unknown> = {}) {
+	return async (input: RequestInfo | URL) => {
+		const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
+		const since = url.searchParams.get("since");
+		const baseLogs = (overrides.logs as { timestamp: string }[]) ?? [
+			{ timestamp: "2025-01-01T00:00:00.000Z", level: "info", message: "line 1" },
+			{ timestamp: "2025-01-01T00:00:01.000Z", level: "info", message: "line 2" },
+		];
+		const filtered = since ? baseLogs.filter((l) => l.timestamp > since) : baseLogs;
+		return new Response(
+			JSON.stringify({
+				available: true,
+				logs: filtered,
+			}),
+			{
+				status: 200,
+				headers: { "content-type": "application/json" },
+			},
+		);
+	};
 }
 
 function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
@@ -322,7 +330,7 @@ describe("useSessionLog", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
-		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => mockLogResponse());
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(mockLogResponse);
 	});
 
 	afterEach(() => {
@@ -341,7 +349,7 @@ describe("useSessionLog", () => {
 		});
 
 		expect(result.current.status).toBe("ready");
-		expect(result.current.data?.lines).toEqual(["line 1", "line 2"]);
+		expect(result.current.logs).toEqual([{ timestamp: "2025-01-01T00:00:00.000Z", level: "info", message: "line 1" }, { timestamp: "2025-01-01T00:00:01.000Z", level: "info", message: "line 2" }]);
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 	});
 
@@ -360,7 +368,7 @@ describe("useSessionLog", () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
 		await act(async () => {
-			vi.advanceTimersByTime(5000);
+			vi.advanceTimersByTime(2500);
 			await Promise.resolve();
 			await Promise.resolve();
 			await Promise.resolve();
@@ -385,7 +393,7 @@ describe("useSessionLog", () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
 		await act(async () => {
-			vi.advanceTimersByTime(5000);
+			vi.advanceTimersByTime(2500);
 			await Promise.resolve();
 			await Promise.resolve();
 			await Promise.resolve();
@@ -413,7 +421,7 @@ describe("useSessionLog", () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
 		await act(async () => {
-			vi.advanceTimersByTime(5000);
+			vi.advanceTimersByTime(2500);
 			await Promise.resolve();
 			await Promise.resolve();
 			await Promise.resolve();
@@ -436,7 +444,7 @@ describe("useSessionLog", () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(3);
 
 		await act(async () => {
-			vi.advanceTimersByTime(5000);
+			vi.advanceTimersByTime(2500);
 			await Promise.resolve();
 			await Promise.resolve();
 			await Promise.resolve();
@@ -449,7 +457,7 @@ describe("useSessionLog", () => {
 
 	it("keeps log content visible after polling stops", async () => {
 		vi.useFakeTimers();
-		fetchSpy.mockImplementation(async () => mockLogResponse({ lines: ["old content"] }));
+		fetchSpy.mockImplementation(mockLogResponse({ logs: [{ timestamp: "2025-01-01T00:00:00.000Z", level: "info", message: "old content" }] }));
 
 		const { rerender, result } = renderHook(
 			({ session }) => useSessionLog(session),
@@ -463,7 +471,7 @@ describe("useSessionLog", () => {
 			await Promise.resolve();
 		});
 
-		expect(result.current.data?.lines).toEqual(["old content"]);
+		expect(result.current.logs).toEqual([{ timestamp: "2025-01-01T00:00:00.000Z", level: "info", message: "old content" }]);
 
 		rerender({ session: makeSession("complete") });
 
@@ -474,6 +482,6 @@ describe("useSessionLog", () => {
 			await Promise.resolve();
 		});
 
-		expect(result.current.data?.lines).toEqual(["old content"]);
+		expect(result.current.logs).toEqual([{ timestamp: "2025-01-01T00:00:00.000Z", level: "info", message: "old content" }]);
 	});
 });

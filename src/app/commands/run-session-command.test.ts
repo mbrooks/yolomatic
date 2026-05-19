@@ -6,6 +6,11 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionState } from "../../session/store.js";
 
+vi.mock("../../logging/session-log-store.js", () => ({
+	clearSessionLogs: vi.fn(),
+	recordSessionLog: vi.fn(),
+}));
+
 function makeMockRepo(state: SessionState | null = null): SessionRepository {
 	return {
 		get: vi.fn(async () => state),

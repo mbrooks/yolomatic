@@ -10,7 +10,9 @@ import {
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
+import { recordSessionLog } from "../logging/session-log-store.js";
 import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
+import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
@@ -221,6 +223,7 @@ export class PiAgentExecutor {
 		onSessionCreated?: (session: AgentSession) => void,
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber);
+		const key = buildSessionKey(state.owner, state.repo, state.issueNumber);
 
 		let prompt: string;
 		if (prReview) {
@@ -231,6 +234,7 @@ export class PiAgentExecutor {
 			prompt = buildIssuePrompt(state);
 		}
 		logger.logPrompt(prompt);
+		recordSessionLog(key, { level: "info", message: `Prompt sent`, details: { type: "prompt", length: prompt.length } });
 
 		const piSessionManager = PiSessionManager.open(state.sessionPath, undefined, state.workspacePath);
 
@@ -280,15 +284,26 @@ export class PiAgentExecutor {
 			if (event.type === "message_update") {
 				if (event.assistantMessageEvent.type === "thinking_end") {
 					logger.logThought(event.assistantMessageEvent.content);
+					recordSessionLog(key, { level: "info", message: event.assistantMessageEvent.content, details: { type: "thinking" } });
 				}
 			}
 
 			if (event.type === "tool_execution_start") {
 				logger.logToolCall(event.toolName, event.args as Record<string, unknown>);
+				recordSessionLog(key, {
+					level: "tool",
+					message: `${event.toolName} ${JSON.stringify(event.args).slice(0, 200)}`,
+					details: { type: "tool_execution_start", toolName: event.toolName, args: event.args },
+				});
 			}
 
 			if (event.type === "tool_execution_end") {
 				logger.logToolResult(event.toolName, event.result);
+				recordSessionLog(key, {
+					level: event.isError ? "error" : "info",
+					message: `${event.toolName} ${event.isError ? "failed" : "done"}`,
+					details: { type: "tool_execution_end", toolName: event.toolName, result: event.result, isError: event.isError },
+				});
 				selfMonitor.recordToolEnd(event.toolName, event.result, event.isError);
 				if (selfMonitor.hasFatalError()) {
 					void session.abort();
@@ -300,10 +315,20 @@ export class PiAgentExecutor {
 					new Error(event.errorMessage),
 					`Auto-retry attempt ${event.attempt}/${event.maxAttempts}`,
 				);
+				recordSessionLog(key, {
+					level: "warn",
+					message: `Auto-retry ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`,
+					details: { type: "auto_retry_start", attempt: event.attempt, maxAttempts: event.maxAttempts, errorMessage: event.errorMessage },
+				});
 			}
 
 			if (event.type === "auto_retry_end" && !event.success && event.finalError) {
 				logger.logError(new Error(event.finalError), "Auto-retry failed");
+				recordSessionLog(key, {
+					level: "error",
+					message: `Auto-retry failed: ${event.finalError}`,
+					details: { type: "auto_retry_end", success: false, finalError: event.finalError },
+				});
 			}
 		});
 
@@ -316,6 +341,11 @@ export class PiAgentExecutor {
 			await session.prompt(prompt);
 		} catch (error) {
 			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
+			recordSessionLog(key, {
+				level: "error",
+				message: `Prompt execution failed: ${error instanceof Error ? error.message : String(error)}`,
+				details: { type: "prompt_error", error: error instanceof Error ? error.message : String(error) },
+			});
 			if (abortSignal?.aborted) {
 				return {
 					status: "cancelled",
@@ -342,13 +372,28 @@ export class PiAgentExecutor {
 			const assistantMsg = lastMessage as { errorMessage?: string; stopReason?: string };
 			if (assistantMsg.errorMessage) {
 				logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
+				recordSessionLog(key, {
+					level: "error",
+					message: `Assistant error: ${assistantMsg.errorMessage}`,
+					details: { type: "assistant_error", errorMessage: assistantMsg.errorMessage, stopReason: assistantMsg.stopReason },
+				});
 			} else if (assistantMsg.stopReason === "error") {
 				logger.logError(new Error("Assistant stopped with error reason"), "Assistant error");
+				recordSessionLog(key, {
+					level: "error",
+					message: "Assistant stopped with error reason",
+					details: { type: "assistant_error", stopReason: assistantMsg.stopReason },
+				});
 			}
 		}
 
 		const rawResponse = getLastAssistantText(session);
 		logger.logResponse(rawResponse);
+		recordSessionLog(key, {
+			level: "assistant",
+			message: rawResponse || "(no response)",
+			details: { type: "response", status: parseExecutionResult(rawResponse).status },
+		});
 
 		return parseExecutionResult(rawResponse);
 	}
