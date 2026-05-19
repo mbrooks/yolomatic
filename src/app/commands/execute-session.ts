@@ -7,6 +7,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
+import type { FatalErrorCategory } from "../../self-monitor/types.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { generateCommitMessage } from "../../workspace/manager.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
@@ -360,6 +361,17 @@ export class ExecuteSession {
 		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 	}
 
+	private classifyDeliveryError(message: string): FatalErrorCategory {
+		const lower = message.toLowerCase();
+		if (
+			lower.includes("refusing to allow a personal access token") &&
+			lower.includes("scope")
+		) {
+			return "github_pat_scope_missing";
+		}
+		return "git_worktree_failure";
+	}
+
 	private createDeliveryFatalError(state: SessionState, message: string): FatalSystemError {
 		return new FatalSystemError({
 			toolHistory: [
@@ -372,7 +384,7 @@ export class ExecuteSession {
 				},
 			],
 			fatalError: {
-				category: "git_worktree_failure",
+				category: this.classifyDeliveryError(message),
 				message,
 				toolName: "workspace.commitAndPush/createPR",
 			},
