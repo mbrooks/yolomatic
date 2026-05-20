@@ -61,6 +61,7 @@ export function createSessionStateForCron(
 	workspacePath: string;
 	lastActivity: string;
 	seeded: boolean;
+	sessionTag: string;
 } {
 	return {
 		owner: job.owner,
