@@ -140,9 +140,9 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 
 		const remoteBranch = `origin/${job.branch || "main"}`;
 		if (worktreeExists) {
-			await execFileAsync("git", ["branch", "-f", branchName, remoteBranch], { cwd: repoBarePath });
 			await execFileAsync("git", ["checkout", "-f", branchName], { cwd: cronWorktreePath });
 			await execFileAsync("git", ["reset", "--hard", remoteBranch], { cwd: cronWorktreePath });
+			await execFileAsync("git", ["clean", "-fd"], { cwd: cronWorktreePath });
 		} else {
 			// Check if branch exists locally
 			let branchExists = false;
