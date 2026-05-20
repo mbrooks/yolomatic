@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CronJob, CronRun } from "./store.js";
@@ -130,35 +130,36 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 		const { promisify } = await import("node:util");
 		const execFileAsync = promisify(execFile);
 
-		// Check if worktree exists
-		let worktreeExists = false;
+		// Determine whether the cron worktree already exists on disk.
+		// Checking the filesystem is more reliable than parsing git worktree list,
+		// because stale worktree registry entries can mislead us.
+		let worktreeDirExists = false;
 		try {
-			const { stdout } = await execFileAsync("git", ["worktree", "list", "--porcelain"], { cwd: repoBarePath });
-			worktreeExists = stdout.split("\n").some((line) => line.startsWith("worktree ") && line.includes(`cron-${job.id}`));
+			const stats = await stat(cronWorktreePath);
+			worktreeDirExists = stats.isDirectory();
 		} catch {
 			// ignore
 		}
 
 		const remoteBranch = `origin/${job.branch || "main"}`;
-		if (worktreeExists) {
+		if (worktreeDirExists) {
 			await execFileAsync("git", ["checkout", "-f", branchName], { cwd: cronWorktreePath });
 			await execFileAsync("git", ["reset", "--hard", remoteBranch], { cwd: cronWorktreePath });
 			await execFileAsync("git", ["clean", "-fd"], { cwd: cronWorktreePath });
 		} else {
-			// Check if branch exists locally
-			let branchExists = false;
+			// Directory is missing, so prune any stale worktree references
+			// and delete the local branch before creating a fresh worktree.
 			try {
-				await execFileAsync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], { cwd: repoBarePath });
-				branchExists = true;
+				await execFileAsync("git", ["worktree", "prune", "--expire=now"], { cwd: repoBarePath });
 			} catch {
-				branchExists = false;
+				// ignore
 			}
-			if (branchExists) {
-				await execFileAsync("git", ["branch", "-f", branchName, remoteBranch], { cwd: repoBarePath });
-				await execFileAsync("git", ["worktree", "add", "--force", cronWorktreePath, branchName], { cwd: repoBarePath });
-			} else {
-				await execFileAsync("git", ["worktree", "add", cronWorktreePath, "-b", branchName, remoteBranch], { cwd: repoBarePath });
+			try {
+				await execFileAsync("git", ["branch", "-D", branchName], { cwd: repoBarePath });
+			} catch {
+				// ignore
 			}
+			await execFileAsync("git", ["worktree", "add", cronWorktreePath, "-b", branchName, remoteBranch], { cwd: repoBarePath });
 		}
 
 		// Set git identity
