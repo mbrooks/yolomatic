@@ -223,7 +223,7 @@ export class PiAgentExecutor {
 		onSessionCreated?: (session: AgentSession) => void,
 		overridePrompt?: string,
 	): Promise<ExecutionResult> {
-		const logger = new LlmLogger(state.repo, state.issueNumber);
+		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
 		const key = buildSessionKey(state.owner, state.repo, state.issueNumber);
 
 		let prompt: string;

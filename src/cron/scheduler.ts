@@ -73,6 +73,7 @@ export function createSessionStateForCron(
 		workspacePath,
 		lastActivity: new Date().toISOString(),
 		seeded: true,
+		sessionTag: `${job.repo}-cron-${job.id}`,
 	};
 }
 
