@@ -983,6 +983,12 @@ a:hover {
 	min-height: 0;
 }
 
+.new-issue-hint {
+	color: var(--muted);
+	font-size: 0.875rem;
+	line-height: 1.5;
+}
+
 .chat-header {
 	align-items: center;
 	display: flex;
