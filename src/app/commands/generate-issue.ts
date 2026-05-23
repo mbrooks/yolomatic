@@ -23,6 +23,32 @@ function stripMarkdownFences(text: string): string {
 	return match ? match[1].trim() : text.trim();
 }
 
+export function extractJson(text: string): Record<string, unknown> {
+	// Try raw parse first
+	try {
+		return JSON.parse(text) as Record<string, unknown>;
+	} catch {}
+
+	// Try after stripping fences
+	const noFences = stripMarkdownFences(text);
+	try {
+		return JSON.parse(noFences) as Record<string, unknown>;
+	} catch {}
+
+	// Try extracting content between first { and last }
+	const start = text.indexOf("{");
+	const end = text.lastIndexOf("}");
+	if (start >= 0 && end > start) {
+		try {
+			return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+		} catch {}
+	}
+
+	throw new Error(
+		`Could not extract valid JSON from LLM response. Raw output:\n${text}`,
+	);
+}
+
 export async function generateIssueViaLLM(
 	owner: string,
 	repo: string,
@@ -65,14 +91,7 @@ export async function generateIssueViaLLM(
 
 	const result = await completeSimple(configuredModel, context, { maxTokens: 4096 });
 	const text = extractTextFromMessage(result);
-	const jsonText = stripMarkdownFences(text);
-
-	let parsed: Record<string, unknown>;
-	try {
-		parsed = JSON.parse(jsonText) as Record<string, unknown>;
-	} catch {
-		throw new Error("LLM response was not valid JSON.");
-	}
+	const parsed = extractJson(text);
 
 	return {
 		title: typeof parsed.title === "string" ? parsed.title : "Untitled",
