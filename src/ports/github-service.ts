@@ -17,6 +17,11 @@ export interface CreatedPR {
 	html_url: string;
 }
 
+export interface CreatedIssue {
+	number: number;
+	html_url: string;
+}
+
 export interface GitHubService {
 	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
 	postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<void>;
@@ -37,6 +42,7 @@ export interface GitHubService {
 		options: { head: string; base: string; state: string },
 	): Promise<CreatedPR[]>;
 	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string } | null>;
+	createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<CreatedIssue>;
 	fileSelfReport(title: string, body: string, labels: string[]): Promise<string>;
 	listReviewComments(owner: string, repo: string, prNumber: number, reviewId: number): Promise<ReviewComment[]>;
 }

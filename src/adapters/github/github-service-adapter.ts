@@ -82,6 +82,11 @@ export class GitHubServiceAdapter implements GitHubService {
 		}
 	}
 
+	async createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<{ number: number; html_url: string }> {
+		const { data } = await this.octokit.issues.create({ owner, repo, title, body, labels, assignees });
+		return { number: data.number, html_url: data.html_url };
+	}
+
 	async fileSelfReport(title: string, body: string, labels: string[]): Promise<string> {
 		const { SelfMonitor } = await import("../../self-monitor/index.js");
 		const { owner, repo } = SelfMonitor.getTargetRepo();
