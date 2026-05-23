@@ -90,7 +90,33 @@ import { SessionStore } from "./session/store.js";
 describe("main", () => {
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith("secret", expect.any(Object), expect.any(Object), "admin", "secret", expect.any(Object), expect.any(Object), expect.any(Object), expect.any(String), expect.anything());
+		expect(createWebhookServer).toHaveBeenCalledWith(
+			"secret",
+			expect.objectContaining({
+				handleIssueEvent: expect.any(Function),
+				handleCommentEvent: expect.any(Function),
+				handlePullRequestReviewCommentEvent: expect.any(Function),
+				handlePullRequestReviewEvent: expect.any(Function),
+			}),
+			expect.objectContaining({
+				get: expect.any(Function),
+				set: expect.any(Function),
+				getAll: expect.any(Function),
+			}),
+			"admin",
+			"secret",
+			expect.any(Object),
+			expect.objectContaining({
+				createOrGetWorktree: expect.any(Function),
+				commitAndPush: expect.any(Function),
+				removeWorktree: expect.any(Function),
+			}),
+			expect.any(Object),
+			expect.any(String),
+			expect.anything(),
+			undefined,
+			expect.any(Object),
+		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
 	});
