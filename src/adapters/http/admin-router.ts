@@ -9,6 +9,7 @@ import type { RunSessionCommand, SessionCommand } from "../../app/commands/run-s
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { CronStore } from "../../cron/store.js";
 import { computeNextRunAt } from "../../cron/store.js";
+import { generateIssueViaLLM } from "../../app/commands/generate-issue.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
 
 export interface AdminRouterDeps {
@@ -517,6 +518,34 @@ export async function handleAdminRoute(
 			}
 			return true;
 		}
+	}
+
+	// POST /api/issues/generate
+	if (request.method === "POST" && pathname === "/api/issues/generate") {
+		if (!deps.adminUsername || !deps.adminPassword) {
+			sendJson(response, 404, { error: "Not found" });
+			return true;
+		}
+		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+			return true;
+		}
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+				owner?: string;
+				repo?: string;
+				prompt?: string;
+			};
+			if (!body.owner || !body.repo || !body.prompt) {
+				sendJson(response, 400, { error: "Missing required fields: owner, repo, prompt" });
+				return true;
+			}
+			const generated = await generateIssueViaLLM(body.owner, body.repo, body.prompt);
+			sendJson(response, 200, generated);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
 	}
 
 	// POST /api/issues
