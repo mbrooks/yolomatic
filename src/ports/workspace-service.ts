@@ -4,4 +4,6 @@ export interface WorkspaceService {
 	commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean>;
 	hasChanges(workspacePath: string, cached?: boolean): Promise<boolean>;
 	getWorktreePath(owner: string, repo: string, issueNumber: number): string;
+	getGitStatus(owner: string, repo: string, issueNumber: number): Promise<string>;
+	getGitDiff(owner: string, repo: string, issueNumber: number): Promise<string>;
 }

@@ -26,6 +26,7 @@ export interface SystemEvidence {
 	workspacePath: string;
 	lsWorkspace: string;
 	gitStatus: string;
+	gitDiff: string;
 	gitBranch: string;
 	nodeVersion: string;
 	timestamp: string;
