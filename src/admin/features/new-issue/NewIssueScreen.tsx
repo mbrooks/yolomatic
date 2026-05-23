@@ -1,203 +1,125 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { createIssue, type CreateIssuePayload } from "../../api/issues.js";
+import { createIssue, generateIssue, type CreateIssuePayload } from "../../api/issues.js";
 
-type ChatRole = "user" | "tars";
+type Step = "prompt" | "review" | "creating" | "done";
 
-interface ChatMessage {
-	role: ChatRole;
-	text: string;
+function parseRepo(text: string): { owner: string; repo: string } | null {
+	const parts = text.trim().split("/").filter(Boolean);
+	if (parts.length === 2) {
+		return { owner: parts[0], repo: parts[1] };
+	}
+	return null;
 }
 
-interface IssueDraft {
-	owner: string;
-	repo: string;
-	title: string;
-	body: string;
-	labels: string[];
-	assignees: string[];
+function commaList(text: string): string[] {
+	const trimmed = text.trim();
+	if (!trimmed) return [];
+	return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-type Step = "repo" | "title" | "body" | "labels" | "assignees" | "confirm" | "creating" | "done";
-
-const WELCOME_MESSAGE = "Hello. I'm TARS. I can create a new GitHub issue for you. Which repository should I create it in? (format: owner/repo)";
+function joinList(items: string[]): string {
+	return items.join(", ");
+}
 
 export function NewIssueScreen({
 	onBack,
 }: {
 	onBack: () => void;
 }): React.ReactElement {
-	const [messages, setMessages] = useState<ChatMessage[]>([{ role: "tars", text: WELCOME_MESSAGE }]);
-	const [input, setInput] = useState("");
-	const [step, setStep] = useState<Step>("repo");
-	const [draft, setDraft] = useState<Partial<IssueDraft>>({ labels: [], assignees: [] });
+	const [step, setStep] = useState<Step>("prompt");
+	const [repoInput, setRepoInput] = useState("");
+	const [prompt, setPrompt] = useState("");
+	const [title, setTitle] = useState("");
+	const [body, setBody] = useState("");
+	const [labels, setLabels] = useState("");
+	const [assignees, setAssignees] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [issueUrl, setIssueUrl] = useState<string | null>(null);
 	const [issueNumber, setIssueNumber] = useState<number | null>(null);
-	const scrollRef = useRef<HTMLDivElement>(null);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const [generationLoading, setGenerationLoading] = useState(false);
 
-	const resetChat = useCallback(() => {
-		setMessages([{ role: "tars", text: WELCOME_MESSAGE }]);
-		setInput("");
-		setStep("repo");
-		setDraft({ labels: [], assignees: [] });
+	const reset = useCallback(() => {
+		setStep("prompt");
+		setRepoInput("");
+		setPrompt("");
+		setTitle("");
+		setBody("");
+		setLabels("");
+		setAssignees("");
 		setError(null);
 		setIssueUrl(null);
 		setIssueNumber(null);
+		setGenerationLoading(false);
 	}, []);
 
-	useEffect(() => {
-		if (scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-		}
-	}, [messages]);
-
-	useEffect(() => {
-		inputRef.current?.focus();
-	}, [step]);
-
-	const addMessage = useCallback((role: ChatRole, text: string) => {
-		setMessages((prev) => [...prev, { role, text }]);
-	}, []);
-
-	const parseRepo = useCallback((text: string): { owner: string; repo: string } | null => {
-		const parts = text.trim().split("/").filter(Boolean);
-		if (parts.length === 2) {
-			return { owner: parts[0], repo: parts[1] };
-		}
-		return null;
-	}, []);
-
-	const parseCommaList = useCallback((text: string): string[] => {
-		const trimmed = text.trim();
-		if (!trimmed || trimmed.toLowerCase() === "none") return [];
-		return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
-	}, []);
-
-	const handleSend = useCallback(async () => {
-		const text = input.trim();
-		if (!text) return;
-		setInput("");
+	const handleGenerate = useCallback(async () => {
 		setError(null);
-		addMessage("user", text);
-
-		if (step === "repo") {
-			const parsed = parseRepo(text);
-			if (!parsed) {
-				addMessage("tars", "I need the repository in the format `owner/repo`. Please try again.");
-				return;
-			}
-			setDraft((d) => ({ ...d, owner: parsed.owner, repo: parsed.repo }));
-			setStep("title");
-			setTimeout(() => {
-				addMessage("tars", `Got it. Creating an issue in **${parsed.owner}/${parsed.repo}**. What's the title?`);
-			}, 200);
+		const parsed = parseRepo(repoInput);
+		if (!parsed) {
+			setError("Repository must be in the format owner/repo.");
 			return;
 		}
-
-		if (step === "title") {
-			setDraft((d) => ({ ...d, title: text }));
-			setStep("body");
-			setTimeout(() => {
-				addMessage("tars", "What's the description for this issue?");
-			}, 200);
+		if (!prompt.trim()) {
+			setError("Please describe the issue you want to create.");
 			return;
 		}
+		setGenerationLoading(true);
+		try {
+			const result = await generateIssue({ owner: parsed.owner, repo: parsed.repo, prompt: prompt.trim() });
+			setTitle(result.title);
+			setBody(result.body);
+			setLabels(joinList(result.labels));
+			setAssignees(joinList(result.assignees));
+			setStep("review");
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			setError(`Generation failed: ${message}`);
+		} finally {
+			setGenerationLoading(false);
+		}
+	}, [repoInput, prompt]);
 
-		if (step === "body") {
-			setDraft((d) => ({ ...d, body: text }));
-			setStep("labels");
-			setTimeout(() => {
-				addMessage("tars", "Any labels? (comma-separated, or type `none` to skip)");
-			}, 200);
+	const handleCreate = useCallback(async () => {
+		setError(null);
+		const parsed = parseRepo(repoInput);
+		if (!parsed) {
+			setError("Invalid repository format.");
 			return;
 		}
-
-		if (step === "labels") {
-			const labels = parseCommaList(text);
-			setDraft((d) => ({ ...d, labels }));
-			setStep("assignees");
-			setTimeout(() => {
-				addMessage("tars", "Any assignees? (comma-separated GitHub usernames, or type `none` to skip)");
-			}, 200);
+		if (!title.trim()) {
+			setError("Title is required.");
 			return;
 		}
-
-		if (step === "assignees") {
-			const assignees = parseCommaList(text);
-			setDraft((d) => ({ ...d, assignees }));
-			setStep("confirm");
-			setTimeout(() => {
-				const currentDraft = { ...draft, assignees };
-				const lines = [
-					"Here's what I'll create:",
-					"",
-					`**Repository:** ${currentDraft.owner}/${currentDraft.repo}`,
-					`**Title:** ${currentDraft.title}`,
-					`**Description:** ${currentDraft.body || "(empty)"}`,
-					`**Labels:** ${currentDraft.labels?.length ? currentDraft.labels.join(", ") : "none"}`,
-					`**Assignees:** ${currentDraft.assignees?.length ? currentDraft.assignees.join(", ") : "none"}`,
-					"",
-					"Type **yes** to create this issue, or **no** to cancel.",
-				];
-				addMessage("tars", lines.join("\n"));
-			}, 200);
-			return;
+		setStep("creating");
+		try {
+			const payload: CreateIssuePayload = {
+				owner: parsed.owner,
+				repo: parsed.repo,
+				title: title.trim(),
+				body: body.trim(),
+				labels: commaList(labels),
+				assignees: commaList(assignees),
+			};
+			const result = await createIssue(payload);
+			setIssueUrl(result.html_url);
+			setIssueNumber(result.number);
+			setStep("done");
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			setError(message);
+			setStep("review");
 		}
-
-		if (step === "confirm") {
-			if (text.toLowerCase() !== "yes") {
-				addMessage("tars", "Cancelled. Refreshing...");
-				setTimeout(() => resetChat(), 1500);
-				return;
-			}
-			setStep("creating");
-			addMessage("tars", "Creating issue...");
-
-			try {
-				const payload: CreateIssuePayload = {
-					owner: draft.owner!,
-					repo: draft.repo!,
-					title: draft.title!,
-					body: draft.body || "",
-					labels: draft.labels,
-					assignees: draft.assignees,
-				};
-				const result = await createIssue(payload);
-				setIssueUrl(result.html_url);
-				setIssueNumber(result.number);
-				setStep("done");
-				addMessage(
-					"tars",
-					`Issue created successfully: [#${result.number}](${result.html_url})\n\nThis chat will reset shortly.`,
-				);
-				setTimeout(() => resetChat(), 4000);
-			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
-				setError(message);
-				setStep("confirm");
-				addMessage("tars", `Failed to create issue: ${message}. Type **yes** to try again, or **no** to cancel.`);
-			}
-		}
-	}, [step, input, draft, addMessage, parseRepo, parseCommaList, resetChat]);
-
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent<HTMLInputElement>) => {
-			if (e.key === "Enter" && !e.shiftKey) {
-				e.preventDefault();
-				void handleSend();
-			}
-		},
-		[handleSend],);
+	}, [repoInput, title, body, labels, assignees]);
 
 	return (
 		<div className="new-issue-screen">
 			<Breadcrumb label="Create New Issue" onBack={onBack} />
 			<div className="new-issue-hint">
-				TARS will guide you through creating a GitHub issue. Have the repository
-				owner/name ready, along with the title and description.
+				Describe the issue in natural language and TARS will generate the title,
+				description, labels, and assignees using the configured LLM.
 			</div>
+
 			<div className="chat-header">
 				<span className="chat-title">TARS — Create New Issue</span>
 				{step === "done" && issueUrl && (
@@ -207,39 +129,134 @@ export function NewIssueScreen({
 				)}
 			</div>
 
-			<div ref={scrollRef} className="chat-messages">
-				{messages.map((msg, i) => (
-					<div key={i} className={`chat-bubble ${msg.role}`}>
-						<div className="chat-sender">{msg.role === "tars" ? "TARS" : "You"}</div>
-						<div className="chat-text">{msg.text}</div>
-					</div>
-				))}
-			</div>
+			{error && <div className="chat-error">{error}</div>}
 
-			{error && (
-				<div className="chat-error">{error}</div>
+			{step === "prompt" && (
+				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+					<div className="form-group">
+						<label htmlFor="repo">Repository</label>
+						<input
+							id="repo"
+							type="text"
+							placeholder="owner/repo"
+							value={repoInput}
+							onChange={(e) => setRepoInput(e.target.value)}
+							disabled={generationLoading}
+						/>
+					</div>
+					<div className="form-group">
+						<label htmlFor="prompt">Describe the issue</label>
+						<textarea
+							id="prompt"
+							placeholder="e.g. Refactor the auth middleware to use JWT tokens instead of session cookies..."
+							value={prompt}
+							onChange={(e) => setPrompt(e.target.value)}
+							rows={8}
+							disabled={generationLoading}
+							style={{ resize: "vertical" }}
+						/>
+					</div>
+					<div style={{ display: "flex", gap: "0.5rem" }}>
+						<button
+							className="chat-send-btn"
+							type="button"
+							onClick={() => void handleGenerate()}
+							disabled={generationLoading || !repoInput.trim() || !prompt.trim()}
+						>
+							{generationLoading ? "Generating..." : "Generate Issue"}
+						</button>
+					</div>
+				</div>
 			)}
 
-			<div className="chat-input-row">
-				<input
-					ref={inputRef}
-					type="text"
-					className="chat-input"
-					placeholder={step === "creating" ? "Creating..." : "Type your message..."}
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					onKeyDown={handleKeyDown}
-					disabled={step === "creating" || step === "done"}
-				/>
-				<button
-					className="chat-send-btn"
-					onClick={() => void handleSend()}
-					disabled={step === "creating" || step === "done" || !input.trim()}
-					type="button"
-				>
-					Send
-				</button>
-			</div>
+			{step === "review" && (
+				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1, minHeight: 0 }}>
+					<div className="form-row">
+						<div className="form-group" style={{ flex: 1 }}>
+							<label htmlFor="title">Title</label>
+							<input
+								id="title"
+								type="text"
+								value={title}
+								onChange={(e) => setTitle(e.target.value)}
+							/>
+						</div>
+					</div>
+					<div className="form-group" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+						<label htmlFor="body">Description</label>
+						<textarea
+							id="body"
+							value={body}
+							onChange={(e) => setBody(e.target.value)}
+							rows={12}
+							style={{ resize: "vertical", flex: 1, minHeight: "8rem" }}
+						/>
+					</div>
+					<div className="form-row">
+						<div className="form-group" style={{ flex: 1 }}>
+							<label htmlFor="labels">Labels (comma-separated)</label>
+							<input
+								id="labels"
+								type="text"
+								placeholder="bug, enhancement"
+								value={labels}
+								onChange={(e) => setLabels(e.target.value)}
+							/>
+						</div>
+						<div className="form-group" style={{ flex: 1 }}>
+							<label htmlFor="assignees">Assignees (comma-separated)</label>
+							<input
+								id="assignees"
+								type="text"
+								placeholder="username1, username2"
+								value={assignees}
+								onChange={(e) => setAssignees(e.target.value)}
+							/>
+						</div>
+					</div>
+					<div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+						<button
+							className="chat-send-btn"
+							type="button"
+							onClick={() => void handleCreate()}
+						>
+							Create Issue
+						</button>
+						<button
+							className="chat-send-btn"
+							style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
+							type="button"
+							onClick={() => setStep("prompt")}
+						>
+							Back
+						</button>
+					</div>
+				</div>
+			)}
+
+			{step === "creating" && (
+				<div className="chat-bubble tars" style={{ alignSelf: "flex-start" }}>
+					<div className="chat-sender">TARS</div>
+					<div className="chat-text">Creating issue...</div>
+				</div>
+			)}
+
+			{step === "done" && (
+				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+					<div className="chat-bubble tars" style={{ alignSelf: "flex-start" }}>
+						<div className="chat-sender">TARS</div>
+						<div className="chat-text">
+							Issue created successfully:{" "}
+							<a href={issueUrl ?? undefined} target="_blank" rel="noreferrer">
+								#{issueNumber}
+							</a>
+						</div>
+					</div>
+					<button className="chat-send-btn" type="button" onClick={reset}>
+						Create Another
+					</button>
+				</div>
+			)}
 		</div>
 	);
 }
