@@ -90,6 +90,8 @@ export function createWebhookServer(
 			commitAndPush: async () => false,
 			hasChanges: async () => false,
 			getWorktreePath: () => "",
+			getGitStatus: async () => "",
+			getGitDiff: async () => "",
 		},
 		taskService ?? {
 			cancel: () => false,
@@ -194,6 +196,8 @@ export async function cleanupOldSessions(
 		commitAndPush: async () => false,
 		hasChanges: async () => false,
 		getWorktreePath: () => "",
+		getGitStatus: async () => "",
+		getGitDiff: async () => "",
 	});
 	return command.execute(retentionDays);
 }
