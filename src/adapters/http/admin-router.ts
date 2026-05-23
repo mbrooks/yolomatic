@@ -225,7 +225,7 @@ export async function handleAdminRoute(
 			return true;
 		}
 
-		const logMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/log$/u.exec(pathname);
+		const logMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/log$/u.exec(pathname);
 		if (logMatch) {
 			const [, owner, repo, issueNumberStr] = logMatch;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
@@ -262,7 +262,7 @@ export async function handleAdminRoute(
 			return true;
 		}
 
-		const commandMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/commands$/u.exec(pathname);
+		const commandMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/commands$/u.exec(pathname);
 		if (commandMatch) {
 			const [, owner, repo, issueNumberStr] = commandMatch;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
@@ -291,7 +291,7 @@ export async function handleAdminRoute(
 		}
 
 		// Legacy per-action endpoints mapped to commands for backward compat during transition
-		const legacyMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(\d+)\/(\w[\w-]*)$/u.exec(pathname);
+		const legacyMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/(\w[\w-]*)$/u.exec(pathname);
 		if (legacyMatch) {
 			const [, owner, repo, issueNumberStr, action] = legacyMatch;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
