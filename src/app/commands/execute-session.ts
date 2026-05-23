@@ -12,6 +12,10 @@ import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { generateCommitMessage } from "../../workspace/manager.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import { sessionKey } from "../../domain/session/model.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 export interface ExecuteSessionDeps {
 	sessions: SessionRepository;
@@ -157,16 +161,59 @@ export class ExecuteSession {
 
 		if (result.status === "complete") {
 			let prUrl: string | undefined;
+			let deliveryOutcome: "pr-created" | "pr-existed" | "no-changes" = "no-changes";
+
 			try {
+				const worktreePath = current.workspacePath;
+				const preStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+				process.stdout.write(`[execute] pre-commit status for ${repo}#${issueNumber} at ${worktreePath}:\n${preStatus}\n`);
+
 				const pushed = await this.deps.workspaces.commitAndPush(
 					owner,
 					repo,
 					issueNumber,
 					generateCommitMessage(current.labels, issueNumber, result.summary),
 				);
-				if (pushed) {
-					prUrl = await this.createPR(owner, repo, issueNumber, current.title, result.summary);
+
+				if (!pushed) {
+					const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+					process.stdout.write(`[execute] commitAndPush returned false for ${repo}#${issueNumber}. worktree=${worktreePath}\nstatus=${postStatus}\n`);
+
+					await this.deps.github.postComment(
+						owner,
+						repo,
+						issueNumber,
+						[
+							"**TARS Complete**",
+							"",
+							"Summary:",
+							result.summary || "No summary provided.",
+							"",
+							"No code changes were necessary.",
+							"",
+							"<details>",
+							"<summary>Delivery diagnostics</summary>",
+							"",
+							`Worktree: \`${worktreePath}\``,
+							"",
+							"Git status:",
+							"```",
+							postStatus || "(clean)",
+							"```",
+							"</details>",
+						].join("\n"),
+					);
+
+					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
+					return;
 				}
+
+				const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+				process.stdout.write(`[execute] post-commit status for ${repo}#${issueNumber}: ${postStatus}\n`);
+
+				const prResult = await this.createPR(owner, repo, issueNumber, current.title, result.summary);
+				prUrl = prResult.url;
+				deliveryOutcome = prResult.outcome;
 			} catch (error) {
 				await this.handleDeliveryFailure(owner, repo, issueNumber, current, error);
 				return;
@@ -174,7 +221,8 @@ export class ExecuteSession {
 
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
 			process.stdout.write(`[execute] marked complete ${repo}#${issueNumber}\n`);
-			if (prUrl) {
+
+			if (deliveryOutcome === "pr-created" && prUrl) {
 				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
 				await this.deps.github.postComment(
 					owner,
@@ -184,6 +232,23 @@ export class ExecuteSession {
 						"**TARS Complete**",
 						"",
 						`PR created: ${prUrl}`,
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+						"",
+						"Ready for review.",
+					].join("\n"),
+				);
+			} else if (deliveryOutcome === "pr-existed" && prUrl) {
+				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-pr-created"]);
+				await this.deps.github.postComment(
+					owner,
+					repo,
+					issueNumber,
+					[
+						"**TARS Complete**",
+						"",
+						`PR already exists: ${prUrl}`,
 						"",
 						"Summary:",
 						result.summary || "No summary provided.",
@@ -267,7 +332,7 @@ export class ExecuteSession {
 		issueNumber: number,
 		title: string,
 		summary: string,
-	): Promise<string | undefined> {
+	): Promise<{ url?: string; outcome: "pr-created" | "pr-existed" | "no-changes" }> {
 		const base = this.deps.defaultBranch;
 		const head = `tars/issue-${issueNumber}`;
 		try {
@@ -281,7 +346,7 @@ export class ExecuteSession {
 			);
 			if (pr) {
 				await this.deps.sessions.associatePR(owner, repo, issueNumber, pr.number, pr.html_url);
-				return pr.html_url;
+				return { url: pr.html_url, outcome: "pr-created" };
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -294,15 +359,15 @@ export class ExecuteSession {
 				if (existing.length > 0) {
 					const pr = existing[0];
 					await this.deps.sessions.associatePR(owner, repo, issueNumber, pr.number, pr.html_url);
-					return pr.html_url;
+					return { url: pr.html_url, outcome: "pr-existed" };
 				}
 			}
 			if (message.includes("No commits between")) {
-				return undefined;
+				return { outcome: "no-changes" };
 			}
 			throw error;
 		}
-		return undefined;
+		return { outcome: "no-changes" };
 	}
 
 	private async removeWorkflowLabels(owner: string, repo: string, issueNumber: number): Promise<void> {
@@ -344,21 +409,75 @@ export class ExecuteSession {
 		error: unknown,
 	): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
+		const diagnostics = await this.gatherDeliveryDiagnostics(owner, repo, issueNumber, state);
+		const scopeHint = this.getPATScopeHint(message);
+
+		let commentBody: string;
 		if (this.deps.selfReportEnabled) {
-			const issueUrl = await this.fileSelfReport(this.createDeliveryFatalError(state, message));
-			await this.deps.github.postComment(
-				owner,
-				repo,
-				issueNumber,
-				`TARS could not deliver the completed work. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
-			);
+			const issueUrl = await this.fileSelfReport(this.createDeliveryFatalError(state, message, diagnostics));
+			commentBody = [
+				"**TARS delivery failed.**",
+				"",
+				scopeHint,
+				`A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+				"",
+				"<details>",
+				"<summary>Delivery diagnostics</summary>",
+				"",
+				`Worktree: \`${state.workspacePath}\``,
+				"",
+				"Git status:",
+				"```",
+				diagnostics.gitStatus || "(clean)",
+				"```",
+				"",
+				"Git diff:",
+				"```",
+				diagnostics.gitDiff || "(none)",
+				"```",
+				"</details>",
+			].filter(Boolean).join("\n");
 			process.stdout.write(`[execute] delivery failure self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 		} else {
-			await this.postFailureComment(owner, repo, issueNumber, error, "Delivering completed work");
+			const stack = error instanceof Error ? (error.stack ?? "") : "";
+			const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
+			commentBody = [
+				"**TARS delivery failed.**",
+				"",
+				scopeHint,
+				`Context: Delivering completed work`,
+				`Error: ${message}`,
+				"",
+				"<details>",
+				"<summary>Delivery diagnostics</summary>",
+				"",
+				`Worktree: \`${state.workspacePath}\``,
+				"",
+				"Git status:",
+				"```",
+				diagnostics.gitStatus || "(clean)",
+				"```",
+				"",
+				"Git diff:",
+				"```",
+				diagnostics.gitDiff || "(none)",
+				"```",
+				"</details>",
+				"",
+				"<details>",
+				"<summary>Full trace</summary>",
+				`<pre>${truncatedStack}</pre>`,
+				"</details>",
+			].filter(Boolean).join("\n");
 		}
+
+		await this.deps.github.postComment(owner, repo, issueNumber, commentBody);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-		await this.removeWorkflowLabels(owner, repo, issueNumber);
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+		// Restore tars-working to show stalled state; remove others
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-pr-created");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-complete");
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working", "tars-delivery-failed"]);
 	}
 
 	private classifyDeliveryError(message: string): FatalErrorCategory {
@@ -372,7 +491,11 @@ export class ExecuteSession {
 		return "git_worktree_failure";
 	}
 
-	private createDeliveryFatalError(state: SessionState, message: string): FatalSystemError {
+	private createDeliveryFatalError(
+		state: SessionState,
+		message: string,
+		diagnostics: { gitStatus: string; gitDiff: string; lsWorkspace: string },
+	): FatalSystemError {
 		return new FatalSystemError({
 			toolHistory: [
 				{
@@ -392,13 +515,49 @@ export class ExecuteSession {
 				whoami: process.env.USER ?? process.env.LOGNAME ?? "unknown",
 				pwd: process.cwd(),
 				workspacePath: state.workspacePath,
-				lsWorkspace: "(not collected for delivery failure)",
-				gitStatus: "(not collected for delivery failure)",
+				lsWorkspace: diagnostics.lsWorkspace,
+				gitStatus: diagnostics.gitStatus,
+				gitDiff: diagnostics.gitDiff,
 				gitBranch: `tars/issue-${state.issueNumber}`,
 				nodeVersion: process.version,
 				timestamp: new Date().toISOString(),
 			},
 		});
+	}
+
+	private async gatherDeliveryDiagnostics(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		state: SessionState,
+	): Promise<{ gitStatus: string; gitDiff: string; lsWorkspace: string }> {
+		const [gitStatus, gitDiff, lsWorkspace] = await Promise.all([
+			this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(failed)"),
+			this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(() => "(failed)"),
+			this.getWorkspaceListing(state.workspacePath),
+		]);
+		return { gitStatus, gitDiff, lsWorkspace };
+	}
+
+	private async getWorkspaceListing(workspacePath: string): Promise<string> {
+		try {
+			const { stdout } = await execFileAsync("ls", ["-la", workspacePath], { timeout: 10000 });
+			return stdout;
+		} catch {
+			return "(failed to list workspace)";
+		}
+	}
+
+	private getPATScopeHint(message: string): string {
+		const lower = message.toLowerCase();
+		if (
+			lower.includes("refusing to allow a personal access token") &&
+			lower.includes("workflow") &&
+			lower.includes("scope")
+		) {
+			return "The GitHub PAT is missing the `workflow` scope. Update the token in GitHub settings and restart TARS.";
+		}
+		return "";
 	}
 
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {

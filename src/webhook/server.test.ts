@@ -1116,6 +1116,7 @@ describe("GitHubIssueHandlers", () => {
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
 				gitStatus: "",
+				gitDiff: "",
 				gitBranch: "main",
 				nodeVersion: "v20",
 				timestamp: "2024-01-01T00:00:00Z",
