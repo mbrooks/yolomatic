@@ -34,6 +34,11 @@ export interface AdminStatusSessionView {
 		issueState: string | null;
 		prState: string | null;
 	} | null;
+	sessionType: "github_issue" | "cron";
+	cronJobId?: string;
+	cronJobName?: string;
+	cronScheduleExpression?: string;
+	cronTriggerTime?: string;
 }
 
 export interface AdminStatusView {
@@ -79,7 +84,7 @@ export class GetAdminStatus {
 					issueNumber: s.issueNumber,
 					status: s.status,
 					workspacePath: s.workspacePath,
-					branch: `tars/issue-${s.issueNumber}`,
+					branch: s.branch ?? `tars/issue-${s.issueNumber}`,
 					lastActivity: s.lastActivity,
 					prUrl: s.prUrl ?? null,
 					prNumber: s.prNumber ?? null,
@@ -96,6 +101,11 @@ export class GetAdminStatus {
 								prState: stale.prState ?? null,
 							}
 						: null,
+					sessionType: s.sessionType ?? "github_issue",
+					cronJobId: s.cronJobId,
+					cronJobName: s.cronJobName,
+					cronScheduleExpression: s.cronScheduleExpression,
+					cronTriggerTime: s.cronTriggerTime,
 				};
 			}),
 		};

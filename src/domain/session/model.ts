@@ -19,6 +19,15 @@ export interface SessionRisk {
 export function detectSessionRisk(session: SessionState): SessionRisk {
 	const reasons: string[] = [];
 	let referencedIssueNumber: number | null = null;
+
+	if (session.sessionType === "cron") {
+		return {
+			suspectedMisroute: false,
+			reasons: [],
+			referencedIssueNumber: null,
+		};
+	}
+
 	const fixesMatch = /^Fixes #(\d+)/u.exec(session.body.trim());
 	if (fixesMatch) {
 		referencedIssueNumber = Number.parseInt(fixesMatch[1], 10);
