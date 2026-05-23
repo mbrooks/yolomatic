@@ -3548,6 +3548,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("returns unavailable log when log file is missing", async () => {
+		_resetSessionLogs();
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
@@ -3657,6 +3658,59 @@ describe("createWebhookServer", () => {
 		expect(body.error).toBe("Not found");
 
 		server.close();
+	});
+
+	it("returns log lines for cron sessions with negative issue numbers", async () => {
+		_resetSessionLogs();
+		recordSessionLog("mbrooks/case#-1779572101822", { level: "info", message: "cron started" });
+		recordSessionLog("mbrooks/case#-1779572101822", { level: "info", message: "cron finished" });
+
+		const mockStore = {
+			get: vi.fn(async () => ({
+				issueNumber: -1779572101822,
+				repo: "case",
+				owner: "mbrooks",
+				title: "Cron: test-job",
+				body: "test prompt",
+				status: "complete" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-case/issue--1779572101822.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-case/.worktrees/cron-test-job",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				sessionType: "cron" as const,
+				cronJobId: "test-job",
+				cronJobName: "test-job",
+			})),
+			set: vi.fn(),
+			exists: vi.fn(),
+			getAll: vi.fn(async () => []),
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			getStatePath: vi.fn(),
+		} as unknown as import("../session/store.js").SessionStore;
+
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const response = await makeRequest(port, {
+				method: "GET",
+				path: "/api/sessions/mbrooks/case/-1779572101822/log",
+				headers: {
+					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				},
+			});
+			expect(response.statusCode).toBe(200);
+			const body = JSON.parse(response.body);
+			expect(body.available).toBe(true);
+			expect(body.logs).toHaveLength(2);
+			expect(body.logs[0].message).toBe("cron started");
+			expect(body.logs[1].message).toBe("cron finished");
+		} finally {
+			server.close();
+		}
 	});
 
 	it("returns working status via GET /api/status/working", async () => {
