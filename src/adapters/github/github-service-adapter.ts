@@ -1,11 +1,12 @@
 import { Octokit } from "@octokit/rest";
 import type { CreatedPR, GitHubService, PullRequestInfo, ReviewComment } from "../../ports/github-service.js";
+import { createOctokit } from "./octokit.js";
 
 export class GitHubServiceAdapter implements GitHubService {
 	private readonly octokit: Octokit;
 
 	constructor(options: { githubToken: string; octokit?: Octokit }) {
-		this.octokit = options.octokit ?? new Octokit({ auth: options.githubToken });
+		this.octokit = options.octokit ?? createOctokit(options.githubToken);
 	}
 
 	async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
