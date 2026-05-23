@@ -362,7 +362,7 @@ describe("useSessionLog", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
-		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(mockLogResponse);
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(mockLogResponse());
 	});
 
 	afterEach(() => {
