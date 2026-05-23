@@ -58,6 +58,21 @@ export function getLastAssistantText(session: { messages: Array<{ role?: string;
 	for (let index = session.messages.length - 1; index >= 0; index -= 1) {
 		const message = session.messages[index];
 		if (message.role === "assistant") {
+			if (Array.isArray(message.content)) {
+				const visibleText = message.content
+					.map((item) => {
+						if (item && typeof item === "object" && "type" in item && item.type === "text" && "text" in item) {
+							return typeof item.text === "string" ? item.text : "";
+						}
+						return "";
+					})
+					.filter(Boolean)
+					.join("\n")
+					.trim();
+				if (visibleText) {
+					return visibleText;
+				}
+			}
 			return extractText(message.content).trim();
 		}
 	}
