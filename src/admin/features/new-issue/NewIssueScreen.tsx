@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { createIssue, type CreateIssuePayload } from "../../api/issues.js";
 
 type ChatRole = "user" | "tars";
@@ -21,7 +22,11 @@ type Step = "repo" | "title" | "body" | "labels" | "assignees" | "confirm" | "cr
 
 const WELCOME_MESSAGE = "Hello. I'm TARS. I can create a new GitHub issue for you. Which repository should I create it in? (format: owner/repo)";
 
-export function NewIssueScreen(): React.ReactElement {
+export function NewIssueScreen({
+	onBack,
+}: {
+	onBack: () => void;
+}): React.ReactElement {
 	const [messages, setMessages] = useState<ChatMessage[]>([{ role: "tars", text: WELCOME_MESSAGE }]);
 	const [input, setInput] = useState("");
 	const [step, setStep] = useState<Step>("repo");
@@ -188,6 +193,11 @@ export function NewIssueScreen(): React.ReactElement {
 
 	return (
 		<div className="new-issue-screen">
+			<Breadcrumb label="Create New Issue" onBack={onBack} />
+			<div className="new-issue-hint">
+				TARS will guide you through creating a GitHub issue. Have the repository
+				owner/name ready, along with the title and description.
+			</div>
 			<div className="chat-header">
 				<span className="chat-title">TARS — Create New Issue</span>
 				{step === "done" && issueUrl && (
