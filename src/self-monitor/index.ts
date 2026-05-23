@@ -94,11 +94,12 @@ export class SelfMonitor {
 
 	private async gatherSystemEvidence(): Promise<Evidence["systemEvidence"]> {
 		const timestamp = new Date().toISOString();
-		const [whoami, pwd, lsWorkspace, gitStatus, gitBranch, nodeVersion] = await Promise.all([
+		const [whoami, pwd, lsWorkspace, gitStatus, gitDiff, gitBranch, nodeVersion] = await Promise.all([
 			this.runCommand("whoami", []),
 			this.runCommand("pwd", []),
 			this.runCommand("ls", ["-la", this.workspacePath]),
 			this.runCommand("git", ["status", "--short"]),
+			this.runCommand("git", ["diff"]),
 			this.runCommand("git", ["branch", "--show-current"]),
 			this.runCommand("node", ["--version"]),
 		]);
@@ -109,6 +110,7 @@ export class SelfMonitor {
 			workspacePath: this.workspacePath,
 			lsWorkspace,
 			gitStatus,
+			gitDiff,
 			gitBranch,
 			nodeVersion,
 			timestamp,
@@ -134,6 +136,11 @@ export class SelfMonitor {
 			``,
 			"```",
 			systemEvidence.gitStatus || "(clean)",
+			"```",
+			`- **Git diff:**`,
+			``,
+			"```",
+			systemEvidence.gitDiff || "(none)",
 			"```",
 			`- **Workspace listing:**`,
 			`<details>`,
