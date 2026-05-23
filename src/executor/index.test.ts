@@ -208,6 +208,20 @@ describe("getLastAssistantText", () => {
 		};
 		expect(getLastAssistantText(session)).toBe("hello");
 	});
+
+	it("ignores thinking blocks when visible text is present", () => {
+		const session = {
+			messages: [{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "I need to explain this clearly." },
+					{ type: "text", text: "TARS_STATUS: complete\nDone." },
+				],
+			}],
+		};
+		expect(getLastAssistantText(session)).toBe("TARS_STATUS: complete\nDone.");
+		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
+	});
 });
 
 describe("buildIssuePrompt", () => {
