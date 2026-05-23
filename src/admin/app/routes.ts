@@ -3,10 +3,14 @@ import { useEffect, useState } from "react";
 export type Route =
 	| { screen: "repos" }
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" }
-	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number };
+	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
+	| { screen: "new-issue" };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
+	if (path[0] === "new-issue") {
+		return { screen: "new-issue" };
+	}
 	if (path[0] === "repos") {
 		if (path.length >= 3) {
 			const owner = decodeURIComponent(path[1]);
@@ -38,6 +42,7 @@ export function parseHash(hash: string): Route {
 
 export function buildHash(route: Route): string {
 	if (route.screen === "repos") return "#/repos";
+	if (route.screen === "new-issue") return "#/new-issue";
 	if (route.screen === "repo") {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
 		if (route.issueNumber !== undefined) {

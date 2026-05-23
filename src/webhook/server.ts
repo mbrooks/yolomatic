@@ -9,6 +9,7 @@ import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import type { CronStore } from "../cron/store.js";
+import type { GitHubService } from "../ports/github-service.js";
 
 import { systemClock } from "../ports/clock.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
@@ -60,6 +61,7 @@ export function createWebhookServer(
 	archiveDir?: string,
 	cronStore?: CronStore,
 	options: WebhookServerOptions = {},
+	githubService?: GitHubService,
 ) {
 	const adminAssetsDir = options.adminAssetsDir ?? resolve(process.cwd(), "dist/admin");
 
@@ -123,6 +125,7 @@ export function createWebhookServer(
 				isDraining: () => false,
 				setDraining: () => undefined,
 			},
+			githubService,
 			adminUsername,
 			adminPassword,
 			adminAssetsDir,

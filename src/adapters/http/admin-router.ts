@@ -18,6 +18,7 @@ export interface AdminRouterDeps {
 	getSessionLog: GetSessionLog;
 	runSessionCommand: RunSessionCommand;
 	taskController: TaskControlService;
+	githubService?: import("../../ports/github-service.js").GitHubService;
 	adminUsername?: string;
 	adminPassword?: string;
 	adminAssetsDir: string;
@@ -516,6 +517,48 @@ export async function handleAdminRoute(
 			}
 			return true;
 		}
+	}
+
+	// POST /api/issues
+	if (request.method === "POST" && pathname === "/api/issues") {
+		if (!deps.adminUsername || !deps.adminPassword) {
+			sendJson(response, 404, { error: "Not found" });
+			return true;
+		}
+		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+				owner?: string;
+				repo?: string;
+				title?: string;
+				body?: string;
+				labels?: string[];
+				assignees?: string[];
+			};
+			if (!body.owner || !body.repo || !body.title) {
+				sendJson(response, 400, { error: "Missing required fields: owner, repo, title" });
+				return true;
+			}
+			const issue = await deps.githubService.createIssue(
+				body.owner,
+				body.repo,
+				body.title,
+				body.body || "",
+				body.labels,
+				body.assignees,
+			);
+			sendJson(response, 201, issue);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
 	}
 
 	return false;

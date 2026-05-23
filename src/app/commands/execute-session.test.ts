@@ -51,6 +51,7 @@ function makeDeps(overrides?: {
 		listPullRequests: vi.fn(async () => []),
 		getPullRequest: vi.fn(),
 		createPullRequest: vi.fn(),
+		createIssue: vi.fn(),
 		postComment: vi.fn(),
 		postPRComment: vi.fn(),
 		addLabels: vi.fn(),
