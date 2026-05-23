@@ -158,7 +158,7 @@ export function App(): React.ReactElement {
 							)}
 						</>
 					)}
-					{route.screen === "new-issue" && <NewIssueScreen />}
+					{route.screen === "new-issue" && <NewIssueScreen onBack={handleBackToRepos} />}
 				</>
 			)}
 
