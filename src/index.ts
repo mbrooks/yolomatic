@@ -54,6 +54,7 @@ export async function main(): Promise<void> {
 	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
 	const cronDeps = {
 		cronStore,
+		sessionStore,
 		workspaceManager,
 		executor,
 		github,
@@ -106,7 +107,9 @@ export async function main(): Promise<void> {
 	// Resume any sessions that were interrupted by a restart
 	try {
 		const sessions = await sessionStore.getAll();
-		const sessionsToResume = sessions.filter((s) => s.resumeOnBoot || s.status === "working");
+		const sessionsToResume = sessions.filter(
+			(s) => (s.resumeOnBoot || s.status === "working") && s.sessionType !== "cron",
+		);
 		if (sessionsToResume.length > 0) {
 			process.stdout.write(`[startup] Found ${sessionsToResume.length} session(s) to resume after restart\n`);
 			for (const session of sessionsToResume) {

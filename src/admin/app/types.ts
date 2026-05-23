@@ -30,6 +30,8 @@ export type SessionLogResponse = {
 	logs: LogEntry[];
 };
 
+export type SessionType = "github_issue" | "cron";
+
 export type Session = {
 	owner: string;
 	repo: string;
@@ -48,6 +50,11 @@ export type Session = {
 	staleDetectedAt: string | null;
 	staleReason: string | null;
 	stale: StaleInfo | null;
+	sessionType: SessionType;
+	cronJobId?: string;
+	cronJobName?: string;
+	cronScheduleExpression?: string;
+	cronTriggerTime?: string;
 };
 
 export type RepoSummary = {

@@ -6,6 +6,7 @@ import { CronStore, computeNextRunAt } from "./store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import type { PiAgentExecutor } from "../executor/index.js";
 import type { GitHubService } from "../ports/github-service.js";
+import type { SessionState, SessionStore } from "../session/store.js";
 
 const REMINDER_TICK_MS = 60_000; // check every minute
 
@@ -16,6 +17,7 @@ const inFlightCronIds = new Set<string>();
 
 export interface CronSchedulerDeps {
 	cronStore: CronStore;
+	sessionStore: SessionStore;
 	workspaceManager: WorkspaceManager;
 	executor: PiAgentExecutor;
 	github: GitHubService;
@@ -50,31 +52,28 @@ export function createSessionStateForCron(
 	job: CronJob,
 	workspacePath: string,
 	sessionPath: string,
-): {
-	owner: string;
-	repo: string;
-	issueNumber: number;
-	title: string;
-	body: string;
-	status: import("../session/store.js").SessionStatus;
-	sessionPath: string;
-	workspacePath: string;
-	lastActivity: string;
-	seeded: boolean;
-	sessionTag: string;
-} {
+	issueNumber: number,
+	triggerTime: Date,
+): SessionState {
 	return {
 		owner: job.owner,
 		repo: job.repo,
-		issueNumber: 0,
+		issueNumber,
 		title: `Cron: ${job.name}`,
 		body: job.prompt,
 		status: "working",
 		sessionPath,
 		workspacePath,
 		lastActivity: new Date().toISOString(),
+		createdAt: new Date().toISOString(),
 		seeded: true,
 		sessionTag: `${job.repo}-cron-${job.id}`,
+		sessionType: "cron",
+		branch: `tars/cron-${job.id}`,
+		cronJobId: job.id,
+		cronJobName: job.name,
+		cronScheduleExpression: `${job.scheduleType}:${job.scheduleValue}`,
+		cronTriggerTime: triggerTime.toISOString(),
 	};
 }
 
@@ -87,6 +86,13 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 	let output = "";
 	let error: string | null = null;
 	let status: "success" | "failure" = "success";
+
+	// Generate a unique synthetic issueNumber for this cron session.
+	// Negative timestamps avoid collision with real GitHub issue numbers.
+	const issueNumber = -Date.now();
+
+	const state = createSessionStateForCron(job, cronWorktreePath, sessionPath, issueNumber, now);
+	await deps.sessionStore.set(state);
 
 	try {
 		// Ensure bare repo exists
@@ -166,7 +172,6 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 		await execFileAsync("git", ["config", "user.name", "TARS"], { cwd: cronWorktreePath });
 		await execFileAsync("git", ["config", "user.email", `${deps.githubUsername}@users.noreply.github.com`], { cwd: cronWorktreePath });
 
-		const state = createSessionStateForCron(job, cronWorktreePath, sessionPath);
 		const prompt = buildCronPrompt(job);
 
 		await mkdir(path.dirname(sessionPath), { recursive: true });
@@ -174,7 +179,7 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 		// Write a simple wrapper that overrides the prompt
 		// Since PiAgentExecutor.buildIssuePrompt uses state, we'll create a custom executor call
 		const result = await deps.executor.execute(
-			state as unknown as import("../session/store.js").SessionState,
+			state,
 			undefined,
 			undefined,
 			undefined,
@@ -193,6 +198,16 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 		output = error;
 		process.stdout.write(`[cron] Execution failed for ${job.owner}/${job.repo} cron ${job.id}: ${error}\n`);
 	}
+
+	// Update session status after execution
+	state.status = status === "success" ? "complete" : "failed";
+	state.lastActivity = new Date().toISOString();
+	if (error) {
+		state.summary = error;
+	} else if (output) {
+		state.summary = output;
+	}
+	await deps.sessionStore.set(state);
 
 	// Record run
 	const run: CronRun = {
