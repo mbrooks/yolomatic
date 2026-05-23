@@ -189,6 +189,103 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("commits and pushes from a custom worktree path", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-commit-path-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		expect(
+			await manager.commitAndPushPath(worktreePath, "tars/cron-test", "chore: Update deps", "main"),
+		).toBe(true);
+
+		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "TARS"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith("git", ["add", "-A"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["commit", "-m", "chore: Update deps"],
+			{ cwd: worktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["push", "origin", "tars/cron-test"],
+			{ cwd: worktreePath },
+		);
+	});
+
+	it("uses default branch for commitAndPushPath when baseBranch is omitted", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-default-base-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-list" && args[1] === "--count") {
+				return { stdout: "2\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(
+			{ ...createConfig(root), defaultBranch: "develop" },
+			runCommand,
+		);
+
+		expect(await manager.commitAndPushPath(worktreePath, "branch", "msg")).toBe(true);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["rev-list", "--count", "origin/develop..HEAD"],
+			{ cwd: worktreePath },
+		);
+	});
+
+	it("uses provided baseBranch for commitAndPushPath", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-custom-base-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-list" && args[1] === "--count") {
+				return { stdout: "1\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		expect(await manager.commitAndPushPath(worktreePath, "branch", "msg", "release")).toBe(true);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["rev-list", "--count", "origin/release..HEAD"],
+			{ cwd: worktreePath },
+		);
+	});
+
+	it("returns false when commitAndPushPath has no changes and no commits ahead", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-path-no-changes-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "rev-list" && args[1] === "--count") {
+				return { stdout: "0\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		expect(await manager.commitAndPushPath(worktreePath, "branch")).toBe(false);
+	});
+
 	it("returns false when there are no changes and no commits ahead of base", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-no-changes-no-commits-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
