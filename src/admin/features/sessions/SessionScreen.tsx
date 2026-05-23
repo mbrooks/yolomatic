@@ -17,6 +17,7 @@ export function SessionScreen({
 	emptyMessage,
 	activeTab,
 	onSelectTab,
+	onNewIssue,
 }: {
 	sessions: Session[];
 	selected: Session | null;
@@ -27,6 +28,7 @@ export function SessionScreen({
 	emptyMessage: string;
 	activeTab?: "sessions" | "crons";
 	onSelectTab?: (tab: "sessions" | "crons") => void;
+	onNewIssue?: () => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -46,6 +48,15 @@ export function SessionScreen({
 						>
 						Crons
 					</button>
+					{onNewIssue && (
+						<button
+							className="repo-tab new-issue"
+							onClick={onNewIssue}
+							type="button"
+						>
+							+ New Issue
+						</button>
+					)}
 				</div>
 			)}
 			<Breadcrumb label={breadcrumbLabel} onBack={onBack} />
