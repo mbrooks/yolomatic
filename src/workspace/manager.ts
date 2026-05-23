@@ -482,10 +482,12 @@ export class WorkspaceManager {
 		}
 	}
 
-	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
-		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
-		const branchName = this.getBranchName(issueNumber);
-
+	async commitAndPushPath(
+		worktreePath: string,
+		branchName: string,
+		message?: string,
+		baseBranch?: string,
+	): Promise<boolean> {
 		await this.ensureGitIdentity(worktreePath);
 		await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
 
@@ -493,7 +495,7 @@ export class WorkspaceManager {
 		if (hasStagedChanges) {
 			await this.runCommand(
 				"git",
-				["commit", "-m", message ?? `TARS: Changes for issue #${issueNumber}`],
+				["commit", "-m", message ?? `TARS: Changes for branch ${branchName}`],
 				{ cwd: worktreePath },
 			);
 		}
@@ -501,7 +503,7 @@ export class WorkspaceManager {
 		// If there are no staged changes and the branch has no commits ahead of the
 		// base branch, there's nothing to deliver. Pushing would create an empty branch
 		// that causes GitHub to reject PR creation with "No commits between ...".
-		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath))) {
+		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath, baseBranch))) {
 			return false;
 		}
 
@@ -509,11 +511,17 @@ export class WorkspaceManager {
 		return true;
 	}
 
-	private async branchHasCommitsAhead(worktreePath: string): Promise<boolean> {
+	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		const branchName = this.getBranchName(issueNumber);
+		return this.commitAndPushPath(worktreePath, branchName, message ?? `TARS: Changes for issue #${issueNumber}`);
+	}
+
+	private async branchHasCommitsAhead(worktreePath: string, baseBranch?: string): Promise<boolean> {
 		try {
 			const { stdout } = await this.runCommand(
 				"git",
-				["rev-list", "--count", `origin/${this.config.defaultBranch}..HEAD`],
+				["rev-list", "--count", `origin/${baseBranch ?? this.config.defaultBranch}..HEAD`],
 				{ cwd: worktreePath },
 			);
 			return parseInt(stdout.trim(), 10) > 0;
