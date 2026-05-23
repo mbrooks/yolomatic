@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CronJob, CronRun } from "./store.js";
 import { CronStore, computeNextRunAt } from "./store.js";
+import { generateCommitMessage } from "../workspace/manager.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import type { PiAgentExecutor } from "../executor/index.js";
 import type { GitHubService } from "../ports/github-service.js";
@@ -77,7 +78,7 @@ export function createSessionStateForCron(
 	};
 }
 
-async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date): Promise<void> {
+export async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date): Promise<void> {
 	const worktreePath = deps.workspaceManager.getWorktreePath(job.owner, job.repo, 0);
 	const cronWorktreePath = path.join(path.dirname(worktreePath), `cron-${job.id}`);
 	const sessionPath = path.join(deps.memoryDir, "sessions", `${job.owner}-${job.repo}-${job.id}.jsonl`);
@@ -191,6 +192,69 @@ async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date):
 		if (result.status === "cancelled") {
 			status = "failure";
 			error = "Task was cancelled.";
+		}
+
+		// Deliver changes if the agent completed successfully
+		if (status === "success" && result.status === "complete") {
+			const commitMessage = generateCommitMessage(undefined, issueNumber, result.summary);
+			try {
+				const pushed = await deps.workspaceManager.commitAndPushPath(
+					cronWorktreePath,
+					branchName,
+					commitMessage,
+					job.branch,
+				);
+
+				if (pushed) {
+					const prTitle = `TARS: ${job.name}`;
+					const prBody = `Cron job: ${job.name}\n\n${result.summary || output}`;
+					const base = job.branch || "main";
+					try {
+						const pr = await deps.github.createPullRequest(
+							job.owner,
+							job.repo,
+							prTitle,
+							prBody,
+							branchName,
+							base,
+						);
+						if (pr) {
+							output = `PR created: ${pr.html_url}\n\n${output}`;
+							state.prNumber = pr.number;
+							state.prUrl = pr.html_url;
+						} else {
+							output = `No PR created (no commits).\n\n${output}`;
+						}
+					} catch (prError) {
+						const prMessage = prError instanceof Error ? prError.message : String(prError);
+						if (prMessage.includes("A pull request already exists")) {
+							const existing = await deps.github.listPullRequests(job.owner, job.repo, {
+								head: `${job.owner}:${branchName}`,
+								base,
+								state: "open",
+							});
+							if (existing.length > 0) {
+								output = `PR already exists: ${existing[0].html_url}\n\n${output}`;
+								state.prNumber = existing[0].number;
+								state.prUrl = existing[0].html_url;
+							} else {
+								throw prError;
+							}
+						} else if (prMessage.includes("No commits between")) {
+							output = `No PR created (no changes).\n\n${output}`;
+						} else {
+							throw prError;
+						}
+					}
+				} else {
+					output = `No changes to deliver.\n\n${output}`;
+				}
+			} catch (deliveryError) {
+				status = "failure";
+				error = deliveryError instanceof Error ? deliveryError.message : String(deliveryError);
+				output = error;
+				process.stdout.write(`[cron] Delivery failed for ${job.owner}/${job.repo} cron ${job.id}: ${error}\n`);
+			}
 		}
 	} catch (execError) {
 		status = "failure";
