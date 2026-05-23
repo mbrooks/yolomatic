@@ -44,6 +44,10 @@ describe("parseHash", () => {
 		expect(parseHash("#/new-issue")).toEqual({ screen: "new-issue" });
 	});
 
+	it("parses new-issue view with owner and repo", () => {
+		expect(parseHash("#/new-issue/mbrooks/tars")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "tars" });
+	});
+
 	it("defaults to repos for unknown", () => {
 		expect(parseHash("")).toEqual({ screen: "repos" });
 	});
@@ -74,6 +78,10 @@ describe("buildHash", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
 		).toBe("#/repos/mbrooks/tars/140");
+	});
+
+	it("builds new-issue view with owner and repo", () => {
+		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
 	});
 
 	it("round-trips crons tab", () => {

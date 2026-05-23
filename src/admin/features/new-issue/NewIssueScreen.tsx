@@ -24,11 +24,15 @@ function joinList(items: string[]): string {
 
 export function NewIssueScreen({
 	onBack,
+	prefillOwner,
+	prefillRepo,
 }: {
 	onBack: () => void;
+	prefillOwner?: string;
+	prefillRepo?: string;
 }): React.ReactElement {
 	const [step, setStep] = useState<Step>("prompt");
-	const [repoInput, setRepoInput] = useState("");
+	const [repoInput, setRepoInput] = useState(prefillOwner && prefillRepo ? `${prefillOwner}/${prefillRepo}` : "");
 	const [prompt, setPrompt] = useState("");
 	const [title, setTitle] = useState("");
 	const [body, setBody] = useState("");
