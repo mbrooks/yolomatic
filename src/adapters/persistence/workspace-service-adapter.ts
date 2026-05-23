@@ -23,4 +23,12 @@ export class WorkspaceServiceAdapter implements WorkspaceService {
 	getWorktreePath(owner: string, repo: string, issueNumber: number): string {
 		return this.manager.getWorktreePath(owner, repo, issueNumber);
 	}
+
+	getGitStatus(owner: string, repo: string, issueNumber: number): Promise<string> {
+		return this.manager.getGitStatus(owner, repo, issueNumber);
+	}
+
+	getGitDiff(owner: string, repo: string, issueNumber: number): Promise<string> {
+		return this.manager.getGitDiff(owner, repo, issueNumber);
+	}
 }

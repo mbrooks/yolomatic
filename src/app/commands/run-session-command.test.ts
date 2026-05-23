@@ -60,6 +60,8 @@ function makeCommand(
 		commitAndPush: vi.fn(),
 		hasChanges: vi.fn(async () => false),
 		getWorktreePath: vi.fn(() => "/tmp/ws"),
+		getGitStatus: vi.fn(async () => ""),
+		getGitDiff: vi.fn(async () => ""),
 	};
 	const tasks: TaskControlService = deps?.tasks ?? {
 		cancel: vi.fn(() => false),

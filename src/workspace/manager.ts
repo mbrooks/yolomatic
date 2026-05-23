@@ -780,4 +780,24 @@ export class WorkspaceManager {
 			return true;
 		}
 	}
+
+	async getGitStatus(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["status", "--porcelain"], { cwd: worktreePath });
+			return stdout;
+		} catch {
+			return "(failed to get git status)";
+		}
+	}
+
+	async getGitDiff(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["diff"], { cwd: worktreePath });
+			return stdout;
+		} catch {
+			return "(failed to get git diff)";
+		}
+	}
 }

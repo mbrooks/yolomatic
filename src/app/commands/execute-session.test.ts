@@ -10,6 +10,7 @@ import type { SessionState } from "../../session/store.js";
 
 function makeDeps(overrides?: {
 	commitAndPush?: () => Promise<boolean>;
+	createPullRequest?: () => Promise<{ number: number; html_url: string } | null>;
 	fileSelfReport?: () => Promise<string>;
 }) {
 	const sessions: SessionRepository = {
@@ -39,6 +40,8 @@ function makeDeps(overrides?: {
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
 		hasChanges: vi.fn(async () => false),
 		getWorktreePath: vi.fn(() => "/tmp/ws"),
+		getGitStatus: vi.fn(async () => " M src/main.ts"),
+		getGitDiff: vi.fn(async () => "diff --git a/src/main.ts"),
 	};
 
 	const executor: ExecutionService = {
@@ -50,7 +53,7 @@ function makeDeps(overrides?: {
 		getIssue: vi.fn(),
 		listPullRequests: vi.fn(async () => []),
 		getPullRequest: vi.fn(),
-		createPullRequest: vi.fn(),
+		createPullRequest: overrides?.createPullRequest ? vi.fn(overrides.createPullRequest) : vi.fn(async () => null),
 		createIssue: vi.fn(),
 		postComment: vi.fn(),
 		postPRComment: vi.fn(),
@@ -123,8 +126,9 @@ describe("ExecuteSession", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("could not deliver"),
+			expect.stringContaining("TARS delivery failed"),
 		);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working", "tars-delivery-failed"]);
 	});
 
 	it("falls back to git_worktree_failure for other push errors", async () => {
@@ -152,6 +156,127 @@ describe("ExecuteSession", () => {
 			expect.stringContaining("TARS self-report"),
 			expect.stringContaining("git_worktree_failure"),
 			expect.arrayContaining(["tars-self-report", "bug"]),
+		);
+	});
+
+	it("posts diagnostic comment and keeps tars-working when commitAndPush returns false", async () => {
+		const deps = makeDeps({
+			commitAndPush: vi.fn(async () => false),
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("Delivery diagnostics"),
+		);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+	});
+
+	it("posts 'PR created' comment when a new PR is created", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" })),
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("PR created: https://github.com/mbrooks/tars/pull/42"),
+		);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-pr-created"]);
+	});
+
+	it("posts 'PR already exists' comment when PR already exists", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => {
+				throw new Error("A pull request already exists for tars/issue-1");
+			}),
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" },
+		]);
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("PR already exists: https://github.com/mbrooks/tars/pull/42"),
+		);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-pr-created"]);
+	});
+
+	it("includes PAT scope hint in delivery failure comment", async () => {
+		const deps = makeDeps({
+			commitAndPush: vi.fn(async () => {
+				throw new Error(
+					"Command failed: git push origin tars/issue-1\n" +
+					" ! [remote rejected] tars/issue-1 -> tars/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
+				);
+			}),
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("missing the `workflow` scope"),
 		);
 	});
 });
