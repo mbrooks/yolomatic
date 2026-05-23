@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { SessionState, SessionStore } from "./store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
+import { createOctokit } from "../adapters/github/octokit.js";
 
 export type StaleClassification =
 	| "stale-complete-candidate"
@@ -30,7 +31,7 @@ export class StaleSessionDetector {
 		private readonly isInFlight: (owner: string, repo: string, issueNumber: number) => boolean,
 		private readonly thresholdMs: number,
 	) {
-		this.octokit = new Octokit({ auth: githubToken });
+		this.octokit = createOctokit(githubToken);
 	}
 
 	async detectStaleSessions(): Promise<StaleSessionInfo[]> {

@@ -11,6 +11,7 @@ import {
 	extractIssueNumberFromBranch,
 	validatePRSessionMapping,
 } from "./session-invariant.js";
+import { createOctokit } from "../adapters/github/octokit.js";
 
 export interface PRReviewComment {
 	id: number;
@@ -74,7 +75,7 @@ export class PRReviewHandler {
 	private readonly inFlight = new Set<string>();
 
 	public constructor(private readonly deps: PRReviewHandlerDeps) {
-		this.octokit = deps.octokit ?? new Octokit({ auth: deps.githubToken });
+		this.octokit = deps.octokit ?? createOctokit(deps.githubToken);
 	}
 
 	private extractIssueNumber(branch: string): number | null {
