@@ -195,6 +195,27 @@ h1 {
 	flex: 0 0 3.5rem;
 }
 
+.list-col.type {
+	flex: 0 0 4rem;
+}
+
+.type-badge {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.7rem;
+	padding: 0.1rem 0.35rem;
+	text-transform: uppercase;
+}
+
+.type-badge.github_issue {
+	color: var(--blue);
+}
+
+.type-badge.cron {
+	color: var(--yellow);
+}
+
 .list-col.status {
 	flex: 0 0 6.5rem;
 }
