@@ -38,8 +38,13 @@ export function extractText(content: unknown): string {
 	if (Array.isArray(content)) {
 		return content
 			.map((item) => {
-				if (item && typeof item === "object" && "type" in item && item.type === "text" && "text" in item) {
-					return typeof item.text === "string" ? item.text : "";
+				if (item && typeof item === "object" && "type" in item) {
+					if (item.type === "text" && "text" in item) {
+						return typeof item.text === "string" ? item.text : "";
+					}
+					if (item.type === "thinking" && "thinking" in item) {
+						return typeof item.thinking === "string" ? item.thinking : "";
+					}
 				}
 				return "";
 			})

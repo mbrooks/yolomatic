@@ -1,21 +1,11 @@
-import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
-import { completeSimple } from "@mariozechner/pi-ai";
-import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { resolveConfiguredModel } from "../../executor/index.js";
+import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "@mariozechner/pi-coding-agent";
+import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
 
 export interface GeneratedIssue {
 	title: string;
 	body: string;
 	labels: string[];
 	assignees: string[];
-}
-
-function extractTextFromMessage(message: AssistantMessage): string {
-	return message.content
-		.filter((c): c is { type: "text"; text: string } => c.type === "text")
-		.map((c) => c.text)
-		.join("")
-		.trim();
 }
 
 function stripMarkdownFences(text: string): string {
@@ -78,20 +68,57 @@ export async function generateIssueViaLLM(
 		'  "assignees": ["string array of GitHub usernames, or empty"]\n' +
 		"}";
 
-	const context = {
-		systemPrompt,
-		messages: [
-			{
-				role: "user" as const,
-				content: fullPrompt,
-				timestamp: Date.now(),
-			},
-		],
-	};
+	const { session } = await createAgentSession({
+		sessionManager: SessionManager.inMemory(),
+		authStorage,
+		modelRegistry,
+		model: configuredModel,
+		noTools: "all",
+	});
 
-	const result = await completeSimple(configuredModel, context, { maxTokens: 4096 });
-	const text = extractTextFromMessage(result);
-	const parsed = extractJson(text);
+	// Override the harness system prompt for this single-purpose call
+	session.agent.state.systemPrompt = systemPrompt;
+
+	let parsed: Record<string, unknown> | undefined;
+	let lastError: string | undefined;
+	const maxTurns = 3;
+
+	try {
+		for (let turn = 0; turn < maxTurns; turn++) {
+			if (turn === 0) {
+				await session.prompt(fullPrompt);
+			} else {
+				const feedback = `Your previous response was not valid JSON. Error: ${lastError}. Please respond ONLY with valid JSON matching the requested format.`;
+				await session.prompt(feedback);
+			}
+
+			const lastAssistant = [...session.messages].reverse().find(
+				(m) => m.role === "assistant",
+			);
+			if (lastAssistant && "errorMessage" in lastAssistant && lastAssistant.errorMessage) {
+				throw new Error(`LLM request failed: ${lastAssistant.errorMessage}`);
+			}
+
+			const text = getLastAssistantText(session);
+			try {
+				parsed = extractJson(text);
+				break;
+			} catch (error) {
+				lastError = error instanceof Error ? error.message : String(error);
+				if (turn === maxTurns - 1) {
+					throw new Error(
+						`Could not extract valid JSON from LLM response after ${maxTurns} attempts. Last error: ${lastError}\nRaw output:\n${text}`,
+					);
+				}
+			}
+		}
+	} finally {
+		session.dispose();
+	}
+
+	if (!parsed) {
+		throw new Error("Could not extract valid JSON from LLM response.");
+	}
 
 	return {
 		title: typeof parsed.title === "string" ? parsed.title : "Untitled",
