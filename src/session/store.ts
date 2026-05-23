@@ -9,6 +9,8 @@ export function isTerminalStatus(status: SessionStatus): boolean {
 	return TERMINAL_STATUSES.includes(status);
 }
 
+export type SessionType = "github_issue" | "cron";
+
 export interface SessionState {
 	issueNumber: number;
 	repo: string;
@@ -35,6 +37,15 @@ export interface SessionState {
 	queuedComments?: string[];
 	/** Overrides the default `${repo}-issue-${issueNumber}` log tag */
 	sessionTag?: string;
+	/** Session type discriminator. Defaults to 'github_issue' for backward compatibility. */
+	sessionType?: SessionType;
+	/** Branch associated with this session. Defaults to `tars/issue-${issueNumber}` for issues. */
+	branch?: string;
+	/** Cron-specific metadata */
+	cronJobId?: string;
+	cronJobName?: string;
+	cronScheduleExpression?: string;
+	cronTriggerTime?: string;
 }
 
 export class SessionStore {

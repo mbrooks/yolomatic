@@ -68,6 +68,7 @@ export function SessionScreen({
 						<div className="list-header">
 							<div className="list-col repo">Repo</div>
 							<div className="list-col issue">Issue</div>
+							<div className="list-col type">Type</div>
 							<div className="list-col status">Status</div>
 							<div className="list-col activity">Activity</div>
 						</div>
@@ -94,7 +95,14 @@ export function SessionScreen({
 										<div className="list-col repo">
 											{session.owner}/{session.repo}
 										</div>
-										<div className="list-col issue">#{session.issueNumber}</div>
+										<div className="list-col issue">
+											{session.sessionType === "cron" ? "–" : `#${session.issueNumber}`}
+										</div>
+										<div className="list-col type">
+											<span className={`type-badge ${session.sessionType}`}>
+												{session.sessionType === "cron" ? "Cron" : "Issue"}
+											</span>
+										</div>
 										<div className="list-col status">
 											<span className={`status-badge ${session.status}`}>{session.status}</span>
 										</div>
@@ -131,10 +139,13 @@ function SessionDetail({
 		);
 	}
 
+	const isCron = selected.sessionType === "cron";
+
 	return (
 		<div className="detail-pane">
 			<div className="detail-title">
 				{selected.owner}/{selected.repo}#{selected.issueNumber}
+				{isCron && selected.cronJobName ? ` — ${selected.cronJobName}` : ""}
 			</div>
 
 			<div className="detail-section">
@@ -150,26 +161,48 @@ function SessionDetail({
 					<dd>{selected.workspacePath}</dd>
 					<dt>Last activity</dt>
 					<dd>{formatRelative(selected.lastActivity)}</dd>
-					<dt>Issue</dt>
-					<dd>
-						<a
-							href={`https://github.com/${selected.owner}/${selected.repo}/issues/${selected.issueNumber}`}
-							target="_blank"
-							rel="noreferrer"
-						>
-							#{selected.issueNumber}
-						</a>
-					</dd>
-					<dt>Pull request</dt>
-					<dd>
-						{selected.prUrl ? (
-							<a href={selected.prUrl} target="_blank" rel="noreferrer">
-								PR #{selected.prNumber ?? "open"}
-							</a>
-						) : (
-							"None"
-						)}
-					</dd>
+					{!isCron && (
+						<>
+							<dt>Issue</dt>
+							<dd>
+								<a
+									href={`https://github.com/${selected.owner}/${selected.repo}/issues/${selected.issueNumber}`}
+									target="_blank"
+									rel="noreferrer"
+								>
+									#{selected.issueNumber}
+								</a>
+							</dd>
+							<dt>Pull request</dt>
+							<dd>
+								{selected.prUrl ? (
+									<a href={selected.prUrl} target="_blank" rel="noreferrer">
+										PR #{selected.prNumber ?? "open"}
+									</a>
+								) : (
+									"None"
+								)}
+							</dd>
+						</>
+					)}
+					{isCron && selected.cronJobId && (
+						<>
+							<dt>Cron job</dt>
+							<dd>{selected.cronJobName ?? selected.cronJobId}</dd>
+							{selected.cronScheduleExpression && (
+								<>
+									<dt>Schedule</dt>
+									<dd>{selected.cronScheduleExpression}</dd>
+								</>
+							)}
+							{selected.cronTriggerTime && (
+								<>
+									<dt>Trigger time</dt>
+									<dd>{formatRelative(selected.cronTriggerTime)}</dd>
+								</>
+							)}
+						</>
+					)}
 				</dl>
 			</div>
 
