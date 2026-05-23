@@ -40,6 +40,10 @@ describe("parseHash", () => {
 		expect(parseHash("#/working")).toEqual({ screen: "working" });
 	});
 
+	it("parses new-issue view", () => {
+		expect(parseHash("#/new-issue")).toEqual({ screen: "new-issue" });
+	});
+
 	it("defaults to repos for unknown", () => {
 		expect(parseHash("")).toEqual({ screen: "repos" });
 	});
@@ -48,6 +52,10 @@ describe("parseHash", () => {
 describe("buildHash", () => {
 	it("builds repos list", () => {
 		expect(buildHash({ screen: "repos" })).toBe("#/repos");
+	});
+
+	it("builds new-issue view", () => {
+		expect(buildHash({ screen: "new-issue" })).toBe("#/new-issue");
 	});
 
 	it("builds repo detail", () => {

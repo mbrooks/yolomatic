@@ -74,6 +74,8 @@ export async function main(): Promise<void> {
 		staleDetector,
 		config.archiveDir,
 		cronStore,
+		undefined,
+		github,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);

@@ -6,6 +6,7 @@ import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoListScreen } from "../features/repos/RepoListScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
+import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, Session } from "./types.js";
 
@@ -26,7 +27,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "repos") return null;
+		if (route.screen === "repos" || route.screen === "new-issue") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
@@ -73,6 +74,12 @@ export function App(): React.ReactElement {
 		[route],
 	);
 
+	const isNewIssueActive = route.screen === "new-issue";
+
+	const handleNewIssue = useCallback(() => {
+		navigate({ screen: "new-issue" });
+	}, []);
+
 	const lastUpdated = useMemo(() => {
 		if (serverState.status === "loading") return "Loading...";
 		if (serverState.status === "error") return `Error: ${serverState.error}`;
@@ -90,6 +97,13 @@ export function App(): React.ReactElement {
 			<header>
 				<h1>TARS Admin</h1>
 				<div className="header-actions">
+					<button
+						className={`global-tab${isNewIssueActive ? " active" : ""}`}
+						onClick={handleNewIssue}
+						type="button"
+					>
+						Create New Issue
+					</button>
 					<StatusBadge status={agentStatus} />
 				</div>
 			</header>
@@ -144,6 +158,7 @@ export function App(): React.ReactElement {
 							)}
 						</>
 					)}
+					{route.screen === "new-issue" && <NewIssueScreen />}
 				</>
 			)}
 
