@@ -9,7 +9,7 @@
       "apiKey": "ollama",
       "models": [
         {
-          "id": "deepseek-v4-pro:cloud",
+          "id": "kimi-k2.6:cloud",
           "input": [
             "text",
             "image"
