@@ -1132,6 +1132,18 @@ a:hover {
 	scrollbar-color: var(--border) var(--surface);
 }
 
+.repo-tab.new-issue {
+	background: rgba(63, 185, 80, 0.12);
+	border-color: var(--green);
+	color: var(--green);
+}
+
+.repo-tab.new-issue:hover {
+	background: rgba(63, 185, 80, 0.2);
+	border-color: var(--green);
+	color: var(--green);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
 	.workspace {

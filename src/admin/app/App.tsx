@@ -80,6 +80,14 @@ export function App(): React.ReactElement {
 		navigate({ screen: "new-issue" });
 	}, []);
 
+	const handleNewIssueForRepo = useCallback(() => {
+		if (route.screen === "repo") {
+			navigate({ screen: "new-issue", owner: route.owner, repo: route.repo });
+		} else {
+			navigate({ screen: "new-issue" });
+		}
+	}, [route]);
+
 	const lastUpdated = useMemo(() => {
 		if (serverState.status === "loading") return "Loading...";
 		if (serverState.status === "error") return `Error: ${serverState.error}`;
@@ -142,6 +150,7 @@ export function App(): React.ReactElement {
 									activeTab={route.tab ?? "sessions"}
 									onSelectTab={handleSelectTab}
 									onBack={handleBackToRepos}
+									onNewIssue={handleNewIssueForRepo}
 								/>
 							) : (
 								<SessionScreen
@@ -154,11 +163,18 @@ export function App(): React.ReactElement {
 									emptyMessage="No sessions for this repository."
 									activeTab={route.tab ?? "sessions"}
 									onSelectTab={handleSelectTab}
+									onNewIssue={handleNewIssueForRepo}
 								/>
 							)}
 						</>
 					)}
-					{route.screen === "new-issue" && <NewIssueScreen onBack={handleBackToRepos} />}
+					{route.screen === "new-issue" && (
+						<NewIssueScreen
+							onBack={handleBackToRepos}
+							prefillOwner={route.owner}
+							prefillRepo={route.repo}
+						/>
+					)}
 				</>
 			)}
 
