@@ -158,11 +158,16 @@ export function CronScreen({
 							onComplete={handleMutate}
 							onCancel={() => {
 								setShowForm(false);
-								setSelectedCron(null);
 							}}
 						/>
 					) : (
-						<CronDetail cron={selectedCron} owner={owner} repo={repo} onMutate={handleMutate} />
+						<CronDetail
+							cron={selectedCron}
+							owner={owner}
+							repo={repo}
+							onMutate={handleMutate}
+							onEdit={() => setShowForm(true)}
+						/>
 					)}
 				</div>
 			)}
@@ -328,11 +333,13 @@ function CronDetail({
 	owner,
 	repo,
 	onMutate,
+	onEdit,
 }: {
 	cron: CronJob | null;
 	owner: string;
 	repo: string;
 	onMutate: () => void;
+	onEdit: () => void;
 }): React.ReactElement {
 	const [runs, setRuns] = useState<CronRun[]>([]);
 	const [loadingRuns, setLoadingRuns] = useState(false);
@@ -392,6 +399,9 @@ function CronDetail({
 			<div className="detail-section">
 				<h3>Actions</h3>
 				<div className="detail-actions">
+					<button className="action-btn" type="button" onClick={onEdit}>
+						Edit
+					</button>
 					<CronActionControl
 						owner={owner}
 						repo={repo}
