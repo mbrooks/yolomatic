@@ -19,12 +19,14 @@ export function CronScreen({
 	activeTab,
 	onSelectTab,
 	onBack,
+	onNewIssue,
 }: {
 	owner: string;
 	repo: string;
 	activeTab: "sessions" | "crons";
 	onSelectTab: (tab: "sessions" | "crons") => void;
 	onBack: () => void;
+	onNewIssue?: () => void;
 }): React.ReactElement {
 	const [crons, setCrons] = useState<CronJob[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -70,6 +72,15 @@ export function CronScreen({
 				>
 					Crons
 				</button>
+				{onNewIssue && (
+					<button
+						className="repo-tab new-issue"
+						onClick={onNewIssue}
+						type="button"
+					>
+						+ New Issue
+					</button>
+				)}
 			</div>
 			<Breadcrumb label={`${owner}/${repo}`} onBack={onBack} />
 			{loading ? (
