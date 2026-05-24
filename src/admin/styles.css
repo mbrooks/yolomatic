@@ -1165,6 +1165,137 @@ a:hover {
 	color: var(--green);
 }
 
+/* Chat preview card */
+.chat-preview-card {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 0.75rem;
+	max-width: 100%;
+}
+
+.chat-preview-title {
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin-bottom: 0.4rem;
+	line-height: 1.35;
+}
+
+.chat-preview-body {
+	font-size: 0.875rem;
+	line-height: 1.5;
+	color: var(--text);
+	margin-bottom: 0.5rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.chat-preview-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	border-top: 1px solid var(--border);
+	padding-top: 0.5rem;
+	margin-top: 0.25rem;
+}
+
+.chat-preview-meta-row {
+	display: flex;
+	gap: 0.4rem;
+	align-items: baseline;
+}
+
+.chat-preview-meta-label {
+	font-size: 0.75rem;
+	color: var(--muted);
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	flex-shrink: 0;
+}
+
+.chat-preview-meta-value {
+	font-size: 0.8rem;
+	color: var(--text);
+}
+
+/* Chat action chips */
+.chat-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-self: flex-start;
+	padding: 0.25rem 0;
+}
+
+.chat-action-chip {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 0.8rem;
+	font-weight: 500;
+	padding: 0.3rem 0.7rem;
+}
+
+.chat-action-chip:hover {
+	border-color: var(--blue);
+	color: var(--blue);
+}
+
+.chat-action-chip.primary {
+	background: rgba(63, 185, 80, 0.12);
+	border-color: var(--green);
+	color: var(--green);
+}
+
+.chat-action-chip.primary:hover {
+	background: rgba(63, 185, 80, 0.2);
+	border-color: var(--green);
+	color: var(--green);
+}
+
+/* Quick repo selector */
+.chat-quick-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}
+
+/* Typing indicator */
+.chat-typing {
+	display: flex;
+	gap: 0.25rem;
+	align-items: center;
+	height: 1.2rem;
+}
+
+.chat-typing span {
+	width: 6px;
+	height: 6px;
+	background: var(--blue);
+	border-radius: 50%;
+	animation: chat-typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.chat-typing span:nth-child(1) {
+	animation-delay: -0.32s;
+}
+
+.chat-typing span:nth-child(2) {
+	animation-delay: -0.16s;
+}
+
+@keyframes chat-typing-bounce {
+	0%, 80%, 100% {
+		transform: scale(0);
+	}
+	40% {
+		transform: scale(1);
+	}
+}
+
 /* Responsive */
 @media (max-width: 768px) {
 	.workspace {
