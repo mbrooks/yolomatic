@@ -141,6 +141,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -239,6 +241,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -384,6 +388,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => false),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -491,6 +497,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -557,6 +565,8 @@ describe("GitHubIssueHandlers", () => {
 			createOrGetWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(),
@@ -657,6 +667,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -778,6 +790,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -891,6 +905,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => {
@@ -967,6 +983,8 @@ describe("GitHubIssueHandlers", () => {
 			createOrGetWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = { execute: vi.fn() };
 		const handlers = new GitHubIssueHandlers({
@@ -1022,6 +1040,8 @@ describe("GitHubIssueHandlers", () => {
 			createOrGetWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = { execute: vi.fn() };
 		const handlers = new GitHubIssueHandlers({
@@ -1104,6 +1124,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 
 		const { FatalSystemError, SelfMonitor } = await import("../self-monitor/index.js");
@@ -1240,6 +1262,8 @@ describe("GitHubIssueHandlers", () => {
 				throw new Error("Author identity unknown");
 			}),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -1288,7 +1312,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "teamhub-case",
 				issue_number: 1,
-				body: expect.stringContaining("could not deliver"),
+				body: expect.stringContaining("TARS delivery failed"),
 			}),
 		);
 		expect(sessionManager.updateStatus).not.toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "complete");
@@ -1333,6 +1357,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(),
@@ -1429,6 +1455,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -1509,6 +1537,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -1596,6 +1626,8 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -1697,6 +1729,8 @@ describe("GitHubIssueHandlers", () => {
 			createOrGetWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = { execute: vi.fn() };
 		const taskController = {
@@ -1784,6 +1818,8 @@ describe("GitHubIssueHandlers", () => {
 			createOrGetWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = { execute: vi.fn() };
 		const taskController = {
