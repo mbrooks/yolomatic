@@ -114,7 +114,7 @@ export function SessionScreen({
 						</div>
 					</div>
 
-					<SessionDetail selected={selected} onMutate={onMutate} />
+					<SessionDetail selected={selected} onMutate={onMutate} activeTab={activeTab} />
 				</div>
 			)}
 		</>
@@ -124,9 +124,11 @@ export function SessionScreen({
 function SessionDetail({
 	selected,
 	onMutate,
+	activeTab,
 }: {
 	selected: Session | null;
 	onMutate: () => void;
+	activeTab?: "sessions" | "crons";
 }): React.ReactElement {
 	const [paused, setPaused] = useState(false);
 	const logState = useSessionLog(selected, paused);
@@ -249,7 +251,12 @@ function SessionDetail({
 
 			<div className="detail-section">
 				<h3>Log</h3>
-				<SessionLogPanel state={logState} paused={paused} onPauseToggle={() => setPaused((p) => !p)} />
+				<SessionLogPanel
+					state={logState}
+					paused={paused}
+					onPauseToggle={() => setPaused((p) => !p)}
+					suppressRefreshNotice={activeTab !== undefined || selected?.sessionType === "cron"}
+				/>
 			</div>
 		</div>
 	);
@@ -292,10 +299,12 @@ function SessionLogPanel({
 	state,
 	paused,
 	onPauseToggle,
+	suppressRefreshNotice = false,
 }: {
 	state: ReturnType<typeof useSessionLog>;
 	paused: boolean;
 	onPauseToggle: () => void;
+	suppressRefreshNotice?: boolean;
 }): React.ReactElement {
 	const [autoScroll, setAutoScroll] = useState(true);
 	const logFeedRef = useRef<HTMLDivElement>(null);
@@ -352,7 +361,7 @@ function SessionLogPanel({
 						})
 						)}
 					</div>
-					{state.refreshing ? <div className="log-refresh-notice">Refreshing…</div> : null}
+					{state.refreshing && !suppressRefreshNotice ? <div className="log-refresh-notice">Refreshing…</div> : null}
 				</>
 			);
 }
