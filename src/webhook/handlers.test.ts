@@ -92,6 +92,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
