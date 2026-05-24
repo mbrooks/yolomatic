@@ -1,8 +1,38 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { createIssue, generateIssue, type CreateIssuePayload } from "../../api/issues.js";
 
-type Step = "prompt" | "review" | "creating" | "done";
+type ChatRole = "tars" | "user";
+
+type ChatMessage =
+	| { id: string; role: "tars"; type: "text"; text: string }
+	| { id: string; role: "user"; type: "text"; text: string }
+	| {
+			id: string;
+			role: "tars";
+			type: "preview";
+			title: string;
+			body: string;
+			labels: string[];
+			assignees: string[];
+	  }
+	| { id: string; role: "tars"; type: "done"; url: string; number: number };
+
+type Phase =
+	| "repo"
+	| "prompt"
+	| "generating"
+	| "review"
+	| "edit-title"
+	| "edit-body"
+	| "edit-labels"
+	| "edit-assignees"
+	| "creating"
+	| "done";
+
+function uid(): string {
+	return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 function parseRepo(text: string): { owner: string; repo: string } | null {
 	const parts = text.trim().split("/").filter(Boolean);
@@ -13,13 +43,62 @@ function parseRepo(text: string): { owner: string; repo: string } | null {
 }
 
 function commaList(text: string): string[] {
-	const trimmed = text.trim();
-	if (!trimmed) return [];
-	return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+	return text
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 }
 
 function joinList(items: string[]): string {
 	return items.join(", ");
+}
+
+function ChatTypingBubble(): React.ReactElement {
+	return (
+		<div className="chat-bubble tars chat-typing-bubble">
+			<div className="chat-sender">TARS</div>
+			<div className="chat-typing">
+				<span />
+				<span />
+				<span />
+			</div>
+		</div>
+	);
+}
+
+function PreviewCard({
+	title,
+	body,
+	labels,
+	assignees,
+}: {
+	title: string;
+	body: string;
+	labels: string[];
+	assignees: string[];
+}): React.ReactElement {
+	return (
+		<div className="chat-preview-card">
+			<div className="chat-preview-title">{title}</div>
+			{body && <div className="chat-preview-body">{body}</div>}
+			{(labels.length > 0 || assignees.length > 0) && (
+				<div className="chat-preview-meta">
+					{labels.length > 0 && (
+						<div className="chat-preview-meta-row">
+							<span className="chat-preview-meta-label">Labels</span>
+							<span className="chat-preview-meta-value">{joinList(labels)}</span>
+						</div>
+					)}
+					{assignees.length > 0 && (
+						<div className="chat-preview-meta-row">
+							<span className="chat-preview-meta-label">Assignees</span>
+							<span className="chat-preview-meta-value">{joinList(assignees)}</span>
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
 }
 
 export function NewIssueScreen({
@@ -31,236 +110,413 @@ export function NewIssueScreen({
 	prefillOwner?: string;
 	prefillRepo?: string;
 }): React.ReactElement {
-	const [step, setStep] = useState<Step>("prompt");
-	const [repoInput, setRepoInput] = useState(prefillOwner && prefillRepo ? `${prefillOwner}/${prefillRepo}` : "");
-	const [prompt, setPrompt] = useState("");
+	const [messages, setMessages] = useState<ChatMessage[]>(() => {
+		const initial: ChatMessage[] = [
+			{ id: uid(), role: "tars", type: "text", text: "Which repository should I create the issue in?" },
+		];
+		return initial;
+	});
+	const [phase, setPhase] = useState<Phase>("repo");
+	const [input, setInput] = useState("");
+	const [error, setError] = useState<string | null>(null);
+
+	const [owner, setOwner] = useState("");
+	const [repo, setRepo] = useState("");
 	const [title, setTitle] = useState("");
 	const [body, setBody] = useState("");
-	const [labels, setLabels] = useState("");
-	const [assignees, setAssignees] = useState("");
-	const [error, setError] = useState<string | null>(null);
+	const [labels, setLabels] = useState<string[]>([]);
+	const [assignees, setAssignees] = useState<string[]>([]);
 	const [issueUrl, setIssueUrl] = useState<string | null>(null);
 	const [issueNumber, setIssueNumber] = useState<number | null>(null);
-	const [generationLoading, setGenerationLoading] = useState(false);
 
-	const reset = useCallback(() => {
-		setStep("prompt");
-		setRepoInput("");
-		setPrompt("");
-		setTitle("");
-		setBody("");
-		setLabels("");
-		setAssignees("");
-		setError(null);
-		setIssueUrl(null);
-		setIssueNumber(null);
-		setGenerationLoading(false);
+	const messagesEndRef = useRef<HTMLDivElement | null>(null);
+	const inputRef = useRef<HTMLInputElement | null>(null);
+
+	const scrollToBottom = useCallback(() => {
+		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, []);
 
-	const handleGenerate = useCallback(async () => {
+	useEffect(() => {
+		scrollToBottom();
+	}, [messages, scrollToBottom]);
+
+	useEffect(() => {
+		inputRef.current?.focus();
+	}, [phase]);
+
+	const appendMessage = useCallback((msg: ChatMessage) => {
+		setMessages((prev) => [...prev, msg]);
+	}, []);
+
+	const handleReset = useCallback(() => {
+		setMessages([
+			{ id: uid(), role: "tars", type: "text", text: "Which repository should I create the issue in?" },
+		]);
+		setPhase("repo");
+		setInput("");
 		setError(null);
-		const parsed = parseRepo(repoInput);
-		if (!parsed) {
-			setError("Repository must be in the format owner/repo.");
+		setOwner("");
+		setRepo("");
+		setTitle("");
+		setBody("");
+		setLabels([]);
+		setAssignees([]);
+		setIssueUrl(null);
+		setIssueNumber(null);
+	}, []);
+
+	const addPreview = useCallback(
+		(
+			t: string,
+			b: string,
+			l: string[],
+			a: string[],
+			introText?: string,
+		) => {
+			if (introText) {
+				appendMessage({ id: uid(), role: "tars", type: "text", text: introText });
+			}
+			appendMessage({
+				id: uid(),
+				role: "tars",
+				type: "preview",
+				title: t,
+				body: b,
+				labels: l,
+				assignees: a,
+			});
+		},
+		[appendMessage],
+	);
+
+	const handleSubmit = useCallback(async () => {
+		const value = input.trim();
+		if (!value) return;
+		setInput("");
+		setError(null);
+		appendMessage({ id: uid(), role: "user", type: "text", text: value });
+
+		if (phase === "repo") {
+			const parsed = parseRepo(value);
+			if (!parsed) {
+				setError("Repository must be in the format owner/repo.");
+				appendMessage({
+					id: uid(),
+					role: "tars",
+					type: "text",
+					text: "That doesn't look like a valid repository. Please use the format owner/repo.",
+				});
+				return;
+			}
+			setOwner(parsed.owner);
+			setRepo(parsed.repo);
+			setPhase("prompt");
+			appendMessage({
+				id: uid(),
+				role: "tars",
+				type: "text",
+				text: `Got it — ${parsed.owner}/${parsed.repo}. Now describe the issue in your own words and I'll draft the title and description.`,
+			});
 			return;
 		}
-		if (!prompt.trim()) {
-			setError("Please describe the issue you want to create.");
+
+		if (phase === "prompt") {
+			if (!owner || !repo) return;
+			setPhase("generating");
+			try {
+				const result = await generateIssue({ owner, repo, prompt: value });
+				setTitle(result.title);
+				setBody(result.body);
+				setLabels(result.labels);
+				setAssignees(result.assignees);
+				setPhase("review");
+				addPreview(result.title, result.body, result.labels, result.assignees, "Here's a draft:");
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				setError(`Generation failed: ${message}`);
+				setPhase("prompt");
+				appendMessage({
+					id: uid(),
+					role: "tars",
+					type: "text",
+					text: `I couldn't generate the issue: ${message}. Want to try again?`,
+				});
+			}
 			return;
 		}
-		setGenerationLoading(true);
-		try {
-			const result = await generateIssue({ owner: parsed.owner, repo: parsed.repo, prompt: prompt.trim() });
-			setTitle(result.title);
-			setBody(result.body);
-			setLabels(joinList(result.labels));
-			setAssignees(joinList(result.assignees));
-			setStep("review");
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			setError(`Generation failed: ${message}`);
-		} finally {
-			setGenerationLoading(false);
+
+		if (phase === "edit-title") {
+			setTitle(value);
+			setPhase("review");
+			addPreview(value, body, labels, assignees, "Title updated. Here's the latest draft:");
+			return;
 		}
-	}, [repoInput, prompt]);
+
+		if (phase === "edit-body") {
+			setBody(value);
+			setPhase("review");
+			addPreview(title, value, labels, assignees, "Description updated. Here's the latest draft:");
+			return;
+		}
+
+		if (phase === "edit-labels") {
+			const list = commaList(value);
+			setLabels(list);
+			setPhase("review");
+			addPreview(title, body, list, assignees, "Labels updated. Here's the latest draft:");
+			return;
+		}
+
+		if (phase === "edit-assignees") {
+			const list = commaList(value);
+			setAssignees(list);
+			setPhase("review");
+			addPreview(title, body, labels, list, "Assignees updated. Here's the latest draft:");
+			return;
+		}
+	}, [input, phase, owner, repo, body, labels, assignees, title, appendMessage, addPreview]);
 
 	const handleCreate = useCallback(async () => {
+		if (!owner || !repo || !title.trim()) return;
 		setError(null);
-		const parsed = parseRepo(repoInput);
-		if (!parsed) {
-			setError("Invalid repository format.");
-			return;
-		}
-		if (!title.trim()) {
-			setError("Title is required.");
-			return;
-		}
-		setStep("creating");
+		setPhase("creating");
 		try {
 			const payload: CreateIssuePayload = {
-				owner: parsed.owner,
-				repo: parsed.repo,
+				owner,
+				repo,
 				title: title.trim(),
 				body: body.trim(),
-				labels: commaList(labels),
-				assignees: commaList(assignees),
+				labels,
+				assignees,
 			};
 			const result = await createIssue(payload);
 			setIssueUrl(result.html_url);
 			setIssueNumber(result.number);
-			setStep("done");
+			setPhase("done");
+			appendMessage({
+				id: uid(),
+				role: "tars",
+				type: "done",
+				url: result.html_url,
+				number: result.number,
+			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setError(message);
-			setStep("review");
+			setPhase("review");
+			appendMessage({
+				id: uid(),
+				role: "tars",
+				type: "text",
+				text: `Something went wrong while creating the issue: ${message}. You can try again or adjust the draft.`,
+			});
 		}
-	}, [repoInput, title, body, labels, assignees]);
+	}, [owner, repo, title, body, labels, assignees, appendMessage]);
+
+	const askEdit = useCallback(
+		(field: string, promptText: string) => {
+			appendMessage({ id: uid(), role: "user", type: "text", text: `Edit ${field}` });
+			if (field === "title") setPhase("edit-title");
+			if (field === "description") setPhase("edit-body");
+			if (field === "labels") setPhase("edit-labels");
+			if (field === "assignees") setPhase("edit-assignees");
+			appendMessage({ id: uid(), role: "tars", type: "text", text: promptText });
+		},
+		[appendMessage],
+	);
+
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === "Enter" && !e.shiftKey) {
+				e.preventDefault();
+				void handleSubmit();
+			}
+		},
+		[handleSubmit],
+	);
+
+	const isInputDisabled = phase === "generating" || phase === "creating" || phase === "done";
+	const submitLabel =
+		phase === "generating"
+			? "Generating..."
+			: phase === "creating"
+				? "Creating..."
+				: "Send";
+
+	const showQuickRepo = phase === "repo" && prefillOwner && prefillRepo;
 
 	return (
 		<div className="new-issue-screen">
-			<Breadcrumb label="Create New Issue" onBack={onBack} />
-			<div className="new-issue-hint">
-				Describe the issue in natural language and TARS will generate the title,
-				description, labels, and assignees using the configured LLM.
-			</div>
+			<Breadcrumb
+				label="Create New Issue"
+				onBack={onBack}
+				onBackExtra={
+					phase !== "repo"
+						? {
+							label: "Reset",
+							onClick: handleReset,
+					  }
+						: undefined
+				}
+			/>
 
-			<div className="chat-header">
-				<span className="chat-title">TARS — Create New Issue</span>
-				{step === "done" && issueUrl && (
-					<a href={issueUrl} target="_blank" rel="noreferrer" className="issue-link">
-						#{issueNumber}
-					</a>
+			<div className="chat-messages">
+				{messages.map((msg) => {
+					if (msg.type === "text") {
+						return (
+							<div key={msg.id} className={`chat-bubble ${msg.role}`}>
+								<div className="chat-sender">{msg.role === "tars" ? "TARS" : "You"}</div>
+								<div className="chat-text">{msg.text}</div>
+							</div>
+						);
+					}
+					if (msg.type === "preview") {
+						return (
+							<div key={msg.id} className="chat-bubble tars">
+								<div className="chat-sender">TARS</div>
+								<PreviewCard
+									title={msg.title}
+									body={msg.body}
+									labels={msg.labels}
+									assignees={msg.assignees}
+								/>
+							</div>
+						);
+					}
+					if (msg.type === "done") {
+						return (
+							<div key={msg.id} className="chat-bubble tars">
+								<div className="chat-sender">TARS</div>
+								<div className="chat-text">
+									Issue created:{" "}
+									<a href={msg.url} target="_blank" rel="noreferrer">
+										#{msg.number}
+									</a>
+								</div>
+							</div>
+						);
+					}
+					return null;
+				})}
+				{(phase === "generating" || phase === "creating") && <ChatTypingBubble />}
+				{phase === "review" && (
+					<div className="chat-actions">
+						<button className="chat-action-chip primary" type="button" onClick={() => void handleCreate()}>
+							Looks good — create it
+						</button>
+						<button
+							className="chat-action-chip"
+							type="button"
+							onClick={() =>
+								askEdit("title", "What should the title be?")
+							}
+						>
+							Edit title
+						</button>
+						<button
+							className="chat-action-chip"
+							type="button"
+							onClick={() =>
+								askEdit("description", "Paste the new description.")
+							}
+						>
+							Edit description
+						</button>
+						<button
+							className="chat-action-chip"
+							type="button"
+							onClick={() =>
+								askEdit("labels", "What labels should it have? (comma-separated)")
+							}
+						>
+							Edit labels
+						</button>
+						<button
+							className="chat-action-chip"
+							type="button"
+							onClick={() =>
+								askEdit("assignees", "Who should be assigned? (comma-separated)")
+							}
+						>
+							Edit assignees
+						</button>
+						<button className="chat-action-chip" type="button" onClick={handleReset}>
+							Start over
+						</button>
+					</div>
 				)}
+				{phase === "done" && (
+					<div className="chat-actions">
+						<button className="chat-action-chip primary" type="button" onClick={handleReset}>
+							Create another
+						</button>
+					</div>
+				)}
+				<div ref={messagesEndRef} />
 			</div>
 
-			{error && <div className="chat-error">{error}</div>}
-
-			{step === "prompt" && (
-				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-					<div className="form-group">
-						<label htmlFor="repo">Repository</label>
-						<input
-							id="repo"
-							type="text"
-							placeholder="owner/repo"
-							value={repoInput}
-							onChange={(e) => setRepoInput(e.target.value)}
-							disabled={generationLoading}
-						/>
-					</div>
-					<div className="form-group">
-						<label htmlFor="prompt">Describe the issue</label>
-						<textarea
-							id="prompt"
-							placeholder="e.g. Refactor the auth middleware to use JWT tokens instead of session cookies..."
-							value={prompt}
-							onChange={(e) => setPrompt(e.target.value)}
-							rows={8}
-							disabled={generationLoading}
-							style={{ resize: "vertical" }}
-						/>
-					</div>
-					<div style={{ display: "flex", gap: "0.5rem" }}>
-						<button
-							className="chat-send-btn"
-							type="button"
-							onClick={() => void handleGenerate()}
-							disabled={generationLoading || !repoInput.trim() || !prompt.trim()}
-						>
-							{generationLoading ? "Generating..." : "Generate Issue"}
-						</button>
-					</div>
-				</div>
-			)}
-
-			{step === "review" && (
-				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1, minHeight: 0 }}>
-					<div className="form-row">
-						<div className="form-group" style={{ flex: 1 }}>
-							<label htmlFor="title">Title</label>
-							<input
-								id="title"
-								type="text"
-								value={title}
-								onChange={(e) => setTitle(e.target.value)}
-							/>
-						</div>
-					</div>
-					<div className="form-group" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-						<label htmlFor="body">Description</label>
-						<textarea
-							id="body"
-							value={body}
-							onChange={(e) => setBody(e.target.value)}
-							rows={12}
-							style={{ resize: "vertical", flex: 1, minHeight: "8rem" }}
-						/>
-					</div>
-					<div className="form-row">
-						<div className="form-group" style={{ flex: 1 }}>
-							<label htmlFor="labels">Labels (comma-separated)</label>
-							<input
-								id="labels"
-								type="text"
-								placeholder="bug, enhancement"
-								value={labels}
-								onChange={(e) => setLabels(e.target.value)}
-							/>
-						</div>
-						<div className="form-group" style={{ flex: 1 }}>
-							<label htmlFor="assignees">Assignees (comma-separated)</label>
-							<input
-								id="assignees"
-								type="text"
-								placeholder="username1, username2"
-								value={assignees}
-								onChange={(e) => setAssignees(e.target.value)}
-							/>
-						</div>
-					</div>
-					<div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-						<button
-							className="chat-send-btn"
-							type="button"
-							onClick={() => void handleCreate()}
-						>
-							Create Issue
-						</button>
-						<button
-							className="chat-send-btn"
-							style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
-							type="button"
-							onClick={() => setStep("prompt")}
-						>
-							Back
-						</button>
-					</div>
-				</div>
-			)}
-
-			{step === "creating" && (
-				<div className="chat-bubble tars" style={{ alignSelf: "flex-start" }}>
-					<div className="chat-sender">TARS</div>
-					<div className="chat-text">Creating issue...</div>
-				</div>
-			)}
-
-			{step === "done" && (
-				<div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-					<div className="chat-bubble tars" style={{ alignSelf: "flex-start" }}>
-						<div className="chat-sender">TARS</div>
-						<div className="chat-text">
-							Issue created successfully:{" "}
-							<a href={issueUrl ?? undefined} target="_blank" rel="noreferrer">
-								#{issueNumber}
-							</a>
-						</div>
-					</div>
-					<button className="chat-send-btn" type="button" onClick={reset}>
-						Create Another
+			{showQuickRepo && (
+				<div className="chat-quick-actions">
+					<button
+						className="chat-action-chip"
+						type="button"
+						onClick={() => {
+							const value = `${prefillOwner}/${prefillRepo}`;
+							setInput("");
+							setError(null);
+							appendMessage({ id: uid(), role: "user", type: "text", text: value });
+							setOwner(prefillOwner);
+							setRepo(prefillRepo);
+							setPhase("prompt");
+							appendMessage({
+								id: uid(),
+								role: "tars",
+								type: "text",
+								text: `Got it — ${prefillOwner}/${prefillRepo}. Now describe the issue in your own words and I'll draft the title and description.`,
+							});
+						}}
+					>
+						Use {prefillOwner}/{prefillRepo}
 					</button>
 				</div>
 			)}
+
+			{error && <div className="chat-error">{error}</div>}
+
+			<div className="chat-input-row">
+				<input
+					ref={inputRef}
+					className="chat-input"
+					type="text"
+					placeholder={
+						phase === "repo"
+							? "owner/repo"
+							: phase === "prompt"
+								? "Describe the issue..."
+								: phase === "edit-title"
+									? "New title..."
+									: phase === "edit-body"
+										? "New description..."
+										: phase === "edit-labels"
+											? "bug, enhancement..."
+											: phase === "edit-assignees"
+												? "username1, username2..."
+												: "Send"
+					}
+					value={input}
+					onChange={(e) => setInput(e.target.value)}
+					onKeyDown={handleKeyDown}
+					disabled={isInputDisabled}
+				/>
+				<button
+					className="chat-send-btn"
+					type="button"
+					onClick={() => void handleSubmit()}
+					disabled={isInputDisabled || !input.trim()}
+				>
+					{submitLabel}
+				</button>
+			</div>
 		</div>
 	);
 }
