@@ -66,6 +66,8 @@ PORT=6767
 NODE_ENV=production
 ```
 
+Compose also injects `OLLAMA_HOST=http://127.0.0.1:11434` so TARS talks to the Ollama sidecar over localhost inside the shared container network namespace.
+
 #### Docker Services
 
 | Service | Description |
@@ -80,7 +82,8 @@ NODE_ENV=production
 | `tars_sessions` | `/app/sessions` | Session files (pi jsonl + state) |
 | `tars_workspaces` | `/app/workspaces` | Repo checkouts + git worktrees |
 | `tars_pi` | `/home/tars/.pi/agent` | Pi config, settings, extensions |
-| `tars_ollama` | `/root/.ollama` | Ollama model data |
+
+Ollama model data is mounted from the host at `${HOME}/.ollama` so the sidecar reuses the same local model cache as `../case`.
 
 #### Webhook URL with Docker
 
@@ -143,7 +146,7 @@ curl -X POST http://localhost:6767/webhook \
   -d '{"zen":"Ping!"}'
 
 # Test Ollama (from container)
-docker exec tars curl http://ollama:11434/api/tags
+docker exec tars curl http://127.0.0.1:11434/api/tags
 ```
 
 #### Log Strategy: Console Only

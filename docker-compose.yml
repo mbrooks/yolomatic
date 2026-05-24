@@ -9,8 +9,8 @@ services:
       - "127.0.0.1:6767:6767"
     env_file:
       - .env
-    depends_on:
-      - ollama
+    environment:
+      OLLAMA_HOST: http://127.0.0.1:11434
     volumes:
       - tars_sessions:/app/sessions
       - tars_workspaces:/app/workspaces
@@ -20,13 +20,13 @@ services:
   ollama:
     image: alpine/ollama:0.20.5
     container_name: tars-ollama
+    network_mode: "service:tars"
     restart: unless-stopped
     volumes:
-      - tars_ollama:/root/.ollama
+      - ${HOME}/.ollama:/root/.ollama
 
 volumes:
   tars_sessions:
   tars_workspaces:
   tars_pi:
-  tars_ollama:
   tars_memory:
