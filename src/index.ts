@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import path from "node:path";
 import { getConfig } from "./config.js";
+import { SettingsStore } from "./settings/store.js";
 import { PiAgentExecutor } from "./executor/index.js";
 import { CronStore } from "./cron/store.js";
 import { startCronScheduler } from "./cron/scheduler.js";
@@ -15,7 +16,22 @@ import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 
 export async function main(): Promise<void> {
-	const config = getConfig();
+	const memoryDir = path.resolve(process.env.MEMORY_DIR?.trim() || path.join(process.cwd(), "memory"));
+	const settingsStore = new SettingsStore(path.join(memoryDir, "bot-state.sqlite"));
+	settingsStore.seedFromEnv();
+	settingsStore.applyDefaults();
+
+	const config = getConfig(settingsStore);
+
+	// Sync database settings to process.env so legacy code paths pick them up
+	process.env.PI_AGENT_MODEL = config.piAgentModel ?? "";
+	process.env.PI_AGENT_PROVIDER = config.piAgentProvider ?? "";
+	process.env.LOG_LEVEL = config.logLevel;
+	process.env.LOG_PROMPTS = config.logPrompts ? "true" : "";
+	process.env.LOG_THOUGHTS = config.logThoughts ? "true" : "";
+	process.env.LOG_TOOLS = config.logTools ? "true" : "";
+	process.env.LOG_RESPONSES = config.logResponses ? "true" : "";
+
 	const sessionStore = new SessionStore(config.sessionsDir);
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
 	const workspaceManager = new WorkspaceManager({
@@ -77,6 +93,7 @@ export async function main(): Promise<void> {
 		cronStore,
 		undefined,
 		github,
+		settingsStore,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);

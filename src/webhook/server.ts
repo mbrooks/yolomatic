@@ -7,6 +7,7 @@ import type { StaleSessionDetector } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import type { CronStore } from "../cron/store.js";
 import type { GitHubService } from "../ports/github-service.js";
+import type { SettingsStore } from "../settings/store.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
@@ -32,6 +33,7 @@ export function createWebhookServer(
 	cronStore?: CronStore,
 	options: WebhookServerOptions = {},
 	githubService?: GitHubService,
+	settingsStore?: SettingsStore,
 ) {
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -44,6 +46,7 @@ export function createWebhookServer(
 		cronStore,
 		options.adminAssetsDir,
 		githubService,
+		settingsStore,
 	);
 
 	return createServer(async (request, response) => {
@@ -88,7 +91,7 @@ export function createWebhookServer(
 			} else if (event === "pull_request_review_comment") {
 				await handlers.handlePullRequestReviewCommentEvent(payload);
 			} else if (event === "pull_request_review") {
-				await handlers.handlePullRequestReviewEvent(payload);
+			await handlers.handlePullRequestReviewEvent(payload);
 			} else {
 				process.stdout.write(`[webhook] ignored unsupported event=${event ?? "unknown"}\n`);
 			}

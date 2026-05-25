@@ -2,7 +2,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { runMigrations } from "./migrations.js";
+import { runMigrations } from "../migrations/index.js";
 
 export type CronScheduleType = "daily" | "weekly" | "interval" | "custom";
 
