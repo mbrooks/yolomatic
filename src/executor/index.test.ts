@@ -9,8 +9,11 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 	createAgentSession: vi.fn(),
 	DefaultResourceLoader: vi.fn(() => ({ reload: vi.fn() })),
 	getAgentDir: vi.fn(() => "/agent"),
-	ModelRegistry: { create: vi.fn() },
 	SessionManager: { open: vi.fn() },
+}));
+
+vi.mock("./model-registry.js", () => ({
+	createTarsModelRegistry: vi.fn(),
 }));
 
 vi.mock("../logging/llm-logger.js", () => ({
@@ -39,7 +42,8 @@ import {
 	resolveConfiguredModel,
 } from "./index.js";
 
-import { createAgentSession, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { createAgentSession } from "@mariozechner/pi-coding-agent";
+import { createTarsModelRegistry } from "./model-registry.js";
 
 interface TestModel {
 	provider: string;
@@ -362,7 +366,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -417,7 +421,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -468,7 +472,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -538,7 +542,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
