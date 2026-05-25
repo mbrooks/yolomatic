@@ -140,9 +140,8 @@ export function RepoInventoryScreen({
 									</td>
 								</tr>
 							))}
-							</tbody>
-						</table>
-					</div>
+						</tbody>
+					</table>
 					<div className="repo-inventory-count">{repos.length} repo{repos.length !== 1 ? "s" : ""}</div>
 				</div>
 			)}
