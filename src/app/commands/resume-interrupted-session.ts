@@ -1,4 +1,5 @@
 import { isTerminalStatus } from "../../session/store.js";
+import { issueSessionKey, markIssueWorking } from "./workflow-helpers.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
@@ -17,7 +18,7 @@ export class ResumeInterruptedSession {
 	}
 
 	async execute(owner: string, repo: string, issueNumber: number): Promise<void> {
-		const key = `${owner}/${repo}#${issueNumber}`;
+		const key = issueSessionKey(owner, repo, issueNumber);
 		const session = await this.deps.sessions.get(owner, repo, issueNumber);
 		if (!session) {
 			process.stdout.write(`[resume] no session for ${key}\n`);
@@ -43,18 +44,11 @@ export class ResumeInterruptedSession {
 				);
 				await this.executor.run(session, queuedComment);
 			} else if (session.status === "pending") {
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
-				await this.deps.github.postComment(
-					owner,
-					repo,
-					issueNumber,
-					"TARS was restarted while queued. Picking up work...",
-				);
+				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "TARS was restarted while queued. Picking up work...");
 				await this.executor.run(session, queuedComment);
 			} else if (session.status === "waiting-feedback") {
-				await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
-				await this.deps.github.postComment(
+				await markIssueWorking(
+					this.deps.github,
 					owner,
 					repo,
 					issueNumber,
@@ -62,13 +56,7 @@ export class ResumeInterruptedSession {
 				);
 				await this.executor.run(session, queuedComment);
 			} else {
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
-				await this.deps.github.postComment(
-					owner,
-					repo,
-					issueNumber,
-					"TARS was restarted. Resuming work...",
-				);
+				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "TARS was restarted. Resuming work...");
 				await this.executor.run(session, queuedComment);
 			}
 		} finally {

@@ -7,6 +7,7 @@ import { classifyComments } from "../../pr-review/classifier.js";
 import { generateCommitMessage } from "../../workspace/manager.js";
 import { extractIssueNumberFromBranch, validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import type { ExecutionResult } from "../../executor/index.js";
+import { issueSessionKey, queueResumeOnBoot } from "./workflow-helpers.js";
 
 export interface PRReviewPayload {
 	action: string;
@@ -73,7 +74,7 @@ export class HandlePRReview {
 			return;
 		}
 
-		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const inFlightKey = issueSessionKey(owner, repo, issueNumber);
 		if (this.inFlight.has(inFlightKey)) {
 			process.stdout.write(`[webhook] ${eventType} ignored: ${inFlightKey} is already being processed\n`);
 			return;
@@ -139,11 +140,7 @@ export class HandlePRReview {
 			process.stdout.write(`[webhook] ${eventType} ignored: draining mode for ${inFlightKey}\n`);
 			const commentBodies = [...(reviewBody ? [reviewBody] : []), ...comments.map((c) => c.body)];
 			if (commentBodies.length > 0) {
-				const queued = [...(session.queuedComments ?? []), ...commentBodies];
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, session.status, {
-					resumeOnBoot: true,
-					queuedComments: queued,
-				});
+				await queueResumeOnBoot(this.deps.sessions, session, commentBodies);
 			}
 			await this.deps.github.postPRComment(owner, repo, prNumber, "Deploy in progress. Review feedback will be processed after restart.");
 			return;
@@ -224,7 +221,7 @@ export class HandlePRReview {
 			`Picked up review feedback. Iteration ${(state.iterationCount ?? 0) + 1}/${this.deps.maxIterations}.`,
 		);
 
-		const inFlightKey = `${owner}/${repo}#${issueNumber}`;
+		const inFlightKey = issueSessionKey(owner, repo, issueNumber);
 		const abortController = new AbortController();
 		this.deps.tasks.register(inFlightKey, () => abortController.abort());
 

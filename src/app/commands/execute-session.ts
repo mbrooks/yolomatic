@@ -11,7 +11,7 @@ import type { FatalErrorCategory } from "../../self-monitor/types.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { generateCommitMessage } from "../../workspace/manager.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
-import { sessionKey } from "../../domain/session/model.js";
+import { issueSessionKey, removeWorkflowLabels } from "./workflow-helpers.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -34,7 +34,7 @@ export class ExecuteSession {
 
 	async run(state: SessionState, comment?: string): Promise<void> {
 		const { owner, repo, issueNumber } = state;
-		const key = sessionKey(owner, repo, issueNumber);
+		const key = issueSessionKey(owner, repo, issueNumber);
 
 		await this.deps.workspaces.createOrGetWorktree(owner, repo, issueNumber);
 
@@ -47,7 +47,7 @@ export class ExecuteSession {
 		if (preflightError) {
 			process.stdout.write(`[execute] execution blocked for ${key}: ${preflightError}\n`);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: preflightError });
-			await this.removeWorkflowLabels(owner, repo, issueNumber);
+			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 			await this.deps.github.postComment(
 				owner,
@@ -98,7 +98,7 @@ export class ExecuteSession {
 			if (abortController.signal.aborted) {
 				process.stdout.write(`[execute] execution aborted for ${key}\n`);
 				await this.deps.sessions.cancelSession(owner, repo, issueNumber);
-				await this.removeWorkflowLabels(owner, repo, issueNumber);
+				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
 				await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
 				return;
@@ -113,7 +113,7 @@ export class ExecuteSession {
 					`⛔ TARS stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
 				);
 				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-				await this.removeWorkflowLabels(owner, repo, issueNumber);
+				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 				process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 				return;
@@ -122,7 +122,7 @@ export class ExecuteSession {
 			const context = comment ? "Resuming from comment" : "Processing issue";
 			await this.postFailureComment(owner, repo, issueNumber, error, context);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-			await this.removeWorkflowLabels(owner, repo, issueNumber);
+			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 			throw error;
 		} finally {
@@ -141,7 +141,7 @@ export class ExecuteSession {
 			await this.deps.sessions.markSeeded(owner, repo, issueNumber);
 		}
 
-		await this.removeWorkflowLabels(owner, repo, issueNumber);
+		await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 
 		if (result.status === "waiting-feedback") {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "waiting-feedback");
@@ -277,7 +277,7 @@ export class ExecuteSession {
 		if (result.status === "cancelled") {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "cancelled");
 			process.stdout.write(`[execute] marked cancelled ${repo}#${issueNumber}\n`);
-			await this.removeWorkflowLabels(owner, repo, issueNumber);
+			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
 			await this.deps.github.postComment(
 				owner,
@@ -368,13 +368,6 @@ export class ExecuteSession {
 			throw error;
 		}
 		return { outcome: "no-changes" };
-	}
-
-	private async removeWorkflowLabels(owner: string, repo: string, issueNumber: number): Promise<void> {
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-working");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-pr-created");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-complete");
 	}
 
 	private async postFailureComment(
