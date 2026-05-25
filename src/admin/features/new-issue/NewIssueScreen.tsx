@@ -1,105 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { createIssue, generateIssue, type CreateIssuePayload } from "../../api/issues.js";
-
-type ChatRole = "tars" | "user";
-
-type ChatMessage =
-	| { id: string; role: "tars"; type: "text"; text: string }
-	| { id: string; role: "user"; type: "text"; text: string }
-	| {
-			id: string;
-			role: "tars";
-			type: "preview";
-			title: string;
-			body: string;
-			labels: string[];
-			assignees: string[];
-	  }
-	| { id: string; role: "tars"; type: "done"; url: string; number: number };
-
-type Phase =
-	| "repo"
-	| "prompt"
-	| "generating"
-	| "review"
-	| "edit-title"
-	| "edit-body"
-	| "edit-labels"
-	| "edit-assignees"
-	| "creating"
-	| "done";
-
-function uid(): string {
-	return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function parseRepo(text: string): { owner: string; repo: string } | null {
-	const parts = text.trim().split("/").filter(Boolean);
-	if (parts.length === 2) {
-		return { owner: parts[0], repo: parts[1] };
-	}
-	return null;
-}
-
-function commaList(text: string): string[] {
-	return text
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-function joinList(items: string[]): string {
-	return items.join(", ");
-}
-
-function ChatTypingBubble(): React.ReactElement {
-	return (
-		<div className="chat-bubble tars chat-typing-bubble">
-			<div className="chat-sender">TARS</div>
-			<div className="chat-typing">
-				<span />
-				<span />
-				<span />
-			</div>
-		</div>
-	);
-}
-
-function PreviewCard({
-	title,
-	body,
-	labels,
-	assignees,
-}: {
-	title: string;
-	body: string;
-	labels: string[];
-	assignees: string[];
-}): React.ReactElement {
-	return (
-		<div className="chat-preview-card">
-			<div className="chat-preview-title">{title}</div>
-			{body && <div className="chat-preview-body">{body}</div>}
-			{(labels.length > 0 || assignees.length > 0) && (
-				<div className="chat-preview-meta">
-					{labels.length > 0 && (
-						<div className="chat-preview-meta-row">
-							<span className="chat-preview-meta-label">Labels</span>
-							<span className="chat-preview-meta-value">{joinList(labels)}</span>
-						</div>
-					)}
-					{assignees.length > 0 && (
-						<div className="chat-preview-meta-row">
-							<span className="chat-preview-meta-label">Assignees</span>
-							<span className="chat-preview-meta-value">{joinList(assignees)}</span>
-						</div>
-					)}
-				</div>
-			)}
-		</div>
-	);
-}
+import {
+	ChatTranscript,
+	IssueReviewActions,
+	commaList,
+	parseRepo,
+	uid,
+	type ChatMessage,
+	type Phase,
+} from "./chat.js";
 
 export function NewIssueScreen({
 	onBack,
@@ -361,89 +271,27 @@ export function NewIssueScreen({
 			/>
 
 			<div className="chat-messages">
-				{messages.map((msg) => {
-					if (msg.type === "text") {
-						return (
-							<div key={msg.id} className={`chat-bubble ${msg.role}`}>
-								<div className="chat-sender">{msg.role === "tars" ? "TARS" : "You"}</div>
-								<div className="chat-text">{msg.text}</div>
-							</div>
-						);
-					}
-					if (msg.type === "preview") {
-						return (
-							<div key={msg.id} className="chat-bubble tars">
-								<div className="chat-sender">TARS</div>
-								<PreviewCard
-									title={msg.title}
-									body={msg.body}
-									labels={msg.labels}
-									assignees={msg.assignees}
-								/>
-							</div>
-						);
-					}
-					if (msg.type === "done") {
-						return (
-							<div key={msg.id} className="chat-bubble tars">
-								<div className="chat-sender">TARS</div>
-								<div className="chat-text">
-									Issue created:{" "}
-									<a href={msg.url} target="_blank" rel="noreferrer">
-										#{msg.number}
-									</a>
-								</div>
-							</div>
-						);
-					}
-					return null;
-				})}
-				{(phase === "generating" || phase === "creating") && <ChatTypingBubble />}
+				<ChatTranscript
+					messages={messages}
+					showTyping={phase === "generating" || phase === "creating"}
+				/>
 				{phase === "review" && (
-					<div className="chat-actions">
-						<button className="chat-action-chip primary" type="button" onClick={() => void handleCreate()}>
-							Looks good — create it
-						</button>
-						<button
-							className="chat-action-chip"
-							type="button"
-							onClick={() =>
-								askEdit("title", "What should the title be?")
-							}
-						>
-							Edit title
-						</button>
-						<button
-							className="chat-action-chip"
-							type="button"
-							onClick={() =>
-								askEdit("description", "Paste the new description.")
-							}
-						>
-							Edit description
-						</button>
-						<button
-							className="chat-action-chip"
-							type="button"
-							onClick={() =>
-								askEdit("labels", "What labels should it have? (comma-separated)")
-							}
-						>
-							Edit labels
-						</button>
-						<button
-							className="chat-action-chip"
-							type="button"
-							onClick={() =>
-								askEdit("assignees", "Who should be assigned? (comma-separated)")
-							}
-						>
-							Edit assignees
-						</button>
-						<button className="chat-action-chip" type="button" onClick={handleReset}>
-							Start over
-						</button>
-					</div>
+					<IssueReviewActions
+						onCreate={() => void handleCreate()}
+						onEdit={(field) =>
+							askEdit(
+								field,
+								field === "title"
+									? "What should the title be?"
+									: field === "description"
+										? "Paste the new description."
+										: field === "labels"
+											? "What labels should it have? (comma-separated)"
+											: "Who should be assigned? (comma-separated)",
+							)
+						}
+						onReset={handleReset}
+					/>
 				)}
 				{phase === "done" && (
 					<div className="chat-actions">
