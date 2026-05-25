@@ -52,9 +52,6 @@ COPY --from=build /app/AGENTS.md ./AGENTS.md
 COPY --from=build /app/SOUL.md ./SOUL.md
 COPY --from=build /app/WORKSPACES.md ./WORKSPACES.md
 
-# Copy models.json to agent directory
-COPY --from=build /app/models.json /home/tars/.pi/agent/models.json
-
 # Install pi packages (like CASE does)
 RUN cd /app/.pi/npm \
   && npm install @ollama/pi-web-search || true

@@ -1,4 +1,5 @@
-import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "@mariozechner/pi-coding-agent";
+import { AuthStorage, createAgentSession, SessionManager } from "@mariozechner/pi-coding-agent";
+import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
 
 export interface GeneratedIssue {
@@ -45,7 +46,7 @@ export async function generateIssueViaLLM(
 	userPrompt: string,
 ): Promise<GeneratedIssue> {
 	const authStorage = AuthStorage.create();
-	const modelRegistry = ModelRegistry.create(authStorage);
+	const modelRegistry = createTarsModelRegistry(authStorage);
 	const configuredModel = resolveConfiguredModel(modelRegistry);
 
 	if (!configuredModel) {
