@@ -2605,7 +2605,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for /api/sessions cancel when admin credentials are not configured", async () => {
+	it("returns 404 for /api/sessions commands when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2613,14 +2613,14 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/cancel",
-		});
+			path: "/api/sessions/mbrooks/tars/1/commands",
+		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});
 
-	it("cancels an active session via POST /api/sessions/:owner/:repo/:issueNumber/cancel", async () => {
+	it("cancels an active session via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
@@ -2656,11 +2656,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/cancel",
+			path: "/api/sessions/mbrooks/tars/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.cancelled).toBe(true);
@@ -2670,7 +2671,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("marks session as cancelled when not active via POST cancel", async () => {
+	it("marks session as cancelled when not active via POST commands cancel", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
@@ -2706,11 +2707,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/cancel",
+			path: "/api/sessions/mbrooks/tars/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.cancelled).toBe(false);
@@ -2720,7 +2722,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for cancel when session does not exist", async () => {
+	it("returns 404 for cancel command when session does not exist", async () => {
 		const mockStore = {
 			get: vi.fn(async () => null),
 			set: vi.fn(),
@@ -2738,11 +2740,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/cancel",
+			path: "/api/sessions/mbrooks/tars/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
@@ -2750,7 +2753,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("marks a session failed via POST /api/sessions/:owner/:repo/:issueNumber/mark-failed", async () => {
+	it("marks a session failed via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const session = {
 			issueNumber: 89,
 			repo: "tars",
@@ -2780,11 +2783,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/89/mark-failed",
+			path: "/api/sessions/mbrooks/tars/89/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "mark-failed" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.status).toBe("failed");
@@ -2798,7 +2802,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("deletes a terminal session via POST /api/sessions/:owner/:repo/:issueNumber/delete", async () => {
+	it("deletes a terminal session via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 3,
@@ -2832,11 +2836,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/3/delete",
+			path: "/api/sessions/mbrooks/tars/3/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.deleted).toBe(true);
@@ -2877,11 +2882,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/4/delete",
+			path: "/api/sessions/mbrooks/tars/4/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toContain("Cannot delete session in 'working' status");
@@ -2890,7 +2896,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for delete when session does not exist", async () => {
+	it("returns 404 for delete command when session does not exist", async () => {
 		const mockStore = {
 			get: vi.fn(async () => null),
 			set: vi.fn(),
@@ -2909,11 +2915,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/delete",
+			path: "/api/sessions/mbrooks/tars/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
@@ -2921,7 +2928,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for delete when admin credentials are not configured", async () => {
+	it("returns 404 for delete command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2929,14 +2936,14 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/delete",
-		});
+			path: "/api/sessions/mbrooks/tars/1/commands",
+		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});
 
-	it("returns 404 for pause when admin credentials are not configured", async () => {
+	it("returns 404 for pause command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2944,14 +2951,14 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/pause",
-		});
+			path: "/api/sessions/mbrooks/tars/1/commands",
+		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});
 
-	it("pauses a session via POST /api/sessions/:owner/:repo/:issueNumber/pause", async () => {
+	it("pauses a session via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
@@ -2980,11 +2987,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/pause",
+			path: "/api/sessions/mbrooks/tars/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.paused).toBe(true);
@@ -3023,11 +3031,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/pause",
+			path: "/api/sessions/mbrooks/tars/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session is already paused.");
@@ -3065,11 +3074,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/3/pause",
+			path: "/api/sessions/mbrooks/tars/3/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toContain("Cannot pause a session in 'complete' status");
@@ -3078,7 +3088,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for pause when session does not exist", async () => {
+	it("returns 404 for pause command when session does not exist", async () => {
 		const mockStore = {
 			get: vi.fn(async () => null),
 			set: vi.fn(),
@@ -3096,11 +3106,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/pause",
+			path: "/api/sessions/mbrooks/tars/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
@@ -3108,7 +3119,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for resume when admin credentials are not configured", async () => {
+	it("returns 404 for resume command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -3116,14 +3127,14 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/resume",
-		});
+			path: "/api/sessions/mbrooks/tars/1/commands",
+		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});
 
-	it("resumes a paused session via POST /api/sessions/:owner/:repo/:issueNumber/resume", async () => {
+	it("resumes a paused session via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
@@ -3152,11 +3163,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/resume",
+			path: "/api/sessions/mbrooks/tars/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.resumed).toBe(true);
@@ -3195,11 +3207,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/resume",
+			path: "/api/sessions/mbrooks/tars/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toContain("Cannot resume a session in 'working' status");
@@ -3208,7 +3221,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for resume when session does not exist", async () => {
+	it("returns 404 for resume command when session does not exist", async () => {
 		const mockStore = {
 			get: vi.fn(async () => null),
 			set: vi.fn(),
@@ -3226,11 +3239,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/resume",
+			path: "/api/sessions/mbrooks/tars/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
@@ -3238,7 +3252,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for restart when admin credentials are not configured", async () => {
+	it("returns 404 for restart command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -3246,14 +3260,14 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/restart",
-		});
+			path: "/api/sessions/mbrooks/tars/1/commands",
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(404);
 
 		server.close();
 	});
 
-	it("restarts a failed session via POST /api/sessions/:owner/:repo/:issueNumber/restart", async () => {
+	it("restarts a failed session via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 5,
@@ -3290,11 +3304,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/5/restart",
+			path: "/api/sessions/mbrooks/tars/5/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.restarted).toBe(true);
@@ -3315,7 +3330,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("restarts a cancelled session via POST restart", async () => {
+	it("restarts a cancelled session via POST commands restart", async () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 6,
@@ -3348,11 +3363,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/6/restart",
+			path: "/api/sessions/mbrooks/tars/6/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.restarted).toBe(true);
@@ -3390,11 +3406,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/7/restart",
+			path: "/api/sessions/mbrooks/tars/7/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toContain("Cannot restart a completed session");
@@ -3432,11 +3449,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/8/restart",
+			path: "/api/sessions/mbrooks/tars/8/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(400);
 		const body = JSON.parse(response.body);
 		expect(body.error).toContain("Cannot restart session in 'working' status");
@@ -3445,7 +3463,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for restart when session does not exist", async () => {
+	it("returns 404 for restart command when session does not exist", async () => {
 		const mockStore = {
 			get: vi.fn(async () => null),
 			set: vi.fn(),
@@ -3463,11 +3481,12 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/restart",
+			path: "/api/sessions/mbrooks/tars/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				"Content-Type": "application/json",
 			},
-		});
+		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(404);
 		const body = JSON.parse(response.body);
 		expect(body.error).toBe("Session not found");
