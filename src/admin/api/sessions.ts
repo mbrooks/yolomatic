@@ -32,10 +32,13 @@ export async function sendSessionCommand(
 	issueNumber: number,
 	command: SessionCommand,
 ): Promise<CommandResult> {
-	const path = `/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/${command.type}`;
-	const body = command.type === "prune-worktree" ? { confirmDirty: command.confirmDirty ?? true } : undefined;
+	const path = `/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/commands`;
+	const payload = command.type === "prune-worktree" ? { confirmDirty: command.confirmDirty ?? true } : undefined;
 	try {
-		const data = await apiPost<{ message?: string; error?: string }>(path, body);
+		const data = await apiPost<{ message?: string; error?: string }>(path, {
+			command: command.type,
+			payload,
+		});
 		return { ok: true, message: data.message ?? "Done." };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);

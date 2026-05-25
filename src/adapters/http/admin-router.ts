@@ -205,51 +205,6 @@ export async function handleAdminRoute(
 			return true;
 		}
 
-		// Legacy per-action endpoints mapped to commands for backward compat during transition
-		const legacyMatch = /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/(\w[\w-]*)$/u.exec(pathname);
-		if (legacyMatch) {
-			const [, owner, repo, issueNumberStr, action] = legacyMatch;
-			const issueNumber = Number.parseInt(issueNumberStr, 10);
-			if (Number.isNaN(issueNumber)) {
-				sendJson(response, 400, { error: "Invalid issue number" });
-				return true;
-			}
-			const commandMap: Record<string, SessionCommand> = {
-				cancel: "cancel",
-				restart: "restart",
-				pause: "pause",
-				resume: "resume",
-				delete: "delete",
-				"mark-failed": "mark-failed",
-				"mark-complete": "mark-complete",
-				archive: "archive",
-				"prune-worktree": "prune-worktree",
-			};
-			const command = commandMap[action];
-			if (!command) {
-				sendJson(response, 404, { error: "Not found" });
-				return true;
-			}
-			try {
-				let payload: Record<string, unknown> | undefined;
-				if (action === "prune-worktree") {
-					const body = JSON.parse((await readBody(request)).toString("utf8")) as { confirmDirty?: boolean };
-					payload = body;
-				}
-				const result = await deps.runSessionCommand.execute(owner, repo, issueNumber, command, payload);
-				if (!result.success) {
-					sendJson(response, mapResultToStatus(result.code), { error: result.message });
-					return true;
-				}
-				sendJson(response, 200, result.data);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				process.stdout.write(`[webhook] ${action} error: ${message}\n`);
-				sendJson(response, 500, { error: message });
-			}
-			return true;
-		}
-
 		sendJson(response, 404, { error: "Not found" });
 		return true;
 	}

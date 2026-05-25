@@ -8,7 +8,7 @@ import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
-import type { AgentStatus, Session } from "./types.js";
+import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
 export function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
@@ -102,83 +102,142 @@ export function App(): React.ReactElement {
 	return (
 		<div className="app">
 			{serverState.status === "ready" && serverState.data.draining && <RestartBanner />}
-			<header>
-				<h1>TARS Admin</h1>
-				<div className="header-actions">
-					<button
-						className={`global-tab${isNewIssueActive ? " active" : ""}`}
-						onClick={handleNewIssue}
-						type="button"
-					>
-						Create New Issue
-					</button>
-					<StatusBadge status={agentStatus} />
-				</div>
-			</header>
+			<AppHeader
+				agentStatus={agentStatus}
+				isNewIssueActive={isNewIssueActive}
+				onNewIssue={handleNewIssue}
+			/>
 
 			{serverState.status === "error" ? (
 				<div className="empty">Unable to reach API</div>
 			) : (
-				<>
-					{route.screen === "repos" && (
-						<RepoListScreen
-							repos={repos}
-							inProgressCount={inProgressCount}
-							onSelectRepo={handleSelectRepo}
-							onSelectWorking={handleSelectWorking}
-						/>
-					)}
-
-					{route.screen === "working" && (
-						<SessionScreen
-							sessions={workingSessions}
-							selected={selectedSession}
-							onSelect={handleSelectSession}
-							onMutate={handleMutate}
-							breadcrumbLabel="Active Tasks"
-							onBack={handleBackToRepos}
-							emptyMessage="No active tasks."
-						/>
-					)}
-
-					{route.screen === "repo" && (
-						<>
-							{route.tab === "crons" ? (
-								<CronScreen
-									owner={route.owner}
-									repo={route.repo}
-									activeTab={route.tab ?? "sessions"}
-									onSelectTab={handleSelectTab}
-									onBack={handleBackToRepos}
-									onNewIssue={handleNewIssueForRepo}
-								/>
-							) : (
-								<SessionScreen
-									sessions={repoSessions}
-									selected={selectedSession}
-									onSelect={handleSelectSession}
-									onMutate={handleMutate}
-									breadcrumbLabel={`${route.owner}/${route.repo}`}
-									onBack={handleBackToRepos}
-									emptyMessage="No sessions for this repository."
-									activeTab={route.tab ?? "sessions"}
-									onSelectTab={handleSelectTab}
-									onNewIssue={handleNewIssueForRepo}
-								/>
-							)}
-						</>
-					)}
-					{route.screen === "new-issue" && (
-						<NewIssueScreen
-							onBack={handleBackToRepos}
-							prefillOwner={route.owner}
-							prefillRepo={route.repo}
-						/>
-					)}
-				</>
+				<AppContent
+					route={route}
+					repos={repos}
+					inProgressCount={inProgressCount}
+					workingSessions={workingSessions}
+					repoSessions={repoSessions}
+					selectedSession={selectedSession}
+					onSelectRepo={handleSelectRepo}
+					onSelectWorking={handleSelectWorking}
+					onSelectSession={handleSelectSession}
+					onMutate={handleMutate}
+					onBack={handleBackToRepos}
+					onSelectTab={handleSelectTab}
+					onNewIssueForRepo={handleNewIssueForRepo}
+				/>
 			)}
 
 			<div className="last-updated">{lastUpdated}</div>
 		</div>
 	);
+}
+
+function AppHeader({
+	agentStatus,
+	isNewIssueActive,
+	onNewIssue,
+}: {
+	agentStatus: AgentStatus;
+	isNewIssueActive: boolean;
+	onNewIssue: () => void;
+}): React.ReactElement {
+	return (
+		<header>
+			<h1>TARS Admin</h1>
+			<div className="header-actions">
+				<button
+					className={`global-tab${isNewIssueActive ? " active" : ""}`}
+					onClick={onNewIssue}
+					type="button"
+				>
+					Create New Issue
+				</button>
+				<StatusBadge status={agentStatus} />
+			</div>
+		</header>
+	);
+}
+
+function AppContent({
+	route,
+	repos,
+	inProgressCount,
+	workingSessions,
+	repoSessions,
+	selectedSession,
+	onSelectRepo,
+	onSelectWorking,
+	onSelectSession,
+	onMutate,
+	onBack,
+	onSelectTab,
+	onNewIssueForRepo,
+}: {
+	route: Route;
+	repos: RepoSummary[];
+	inProgressCount: number;
+	workingSessions: Session[];
+	repoSessions: Session[];
+	selectedSession: Session | null;
+	onSelectRepo: (owner: string, repo: string) => void;
+	onSelectWorking: () => void;
+	onSelectSession: (session: Session) => void;
+	onMutate: () => void;
+	onBack: () => void;
+	onSelectTab: (tab: "sessions" | "crons") => void;
+	onNewIssueForRepo: () => void;
+}): React.ReactElement {
+	if (route.screen === "repos") {
+		return (
+			<RepoListScreen
+				repos={repos}
+				inProgressCount={inProgressCount}
+				onSelectRepo={onSelectRepo}
+				onSelectWorking={onSelectWorking}
+			/>
+		);
+	}
+
+	if (route.screen === "working") {
+		return (
+			<SessionScreen
+				sessions={workingSessions}
+				selected={selectedSession}
+				onSelect={onSelectSession}
+				onMutate={onMutate}
+				breadcrumbLabel="Active Tasks"
+				onBack={onBack}
+				emptyMessage="No active tasks."
+			/>
+		);
+	}
+
+	if (route.screen === "repo") {
+		return route.tab === "crons" ? (
+			<CronScreen
+				owner={route.owner}
+				repo={route.repo}
+				activeTab={route.tab ?? "sessions"}
+				onSelectTab={onSelectTab}
+				onBack={onBack}
+				onNewIssue={onNewIssueForRepo}
+			/>
+		) : (
+			<SessionScreen
+				sessions={repoSessions}
+				selected={selectedSession}
+				onSelect={onSelectSession}
+				onMutate={onMutate}
+				breadcrumbLabel={`${route.owner}/${route.repo}`}
+				onBack={onBack}
+				emptyMessage="No sessions for this repository."
+				activeTab={route.tab ?? "sessions"}
+				onSelectTab={onSelectTab}
+				onNewIssue={onNewIssueForRepo}
+			/>
+		);
+	}
+
+	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} />;
 }
