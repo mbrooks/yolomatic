@@ -26,6 +26,7 @@ vi.mock("./config.js", () => ({
 		maxWorktrees: 10,
 		evictionStrategy: "lru",
 	})),
+	isBootstrapComplete: vi.fn(() => true),
 }));
 
 vi.mock("./session/store.js", () => ({
