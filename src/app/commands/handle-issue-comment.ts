@@ -2,7 +2,8 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { isAdmin, isStopCommand, shouldIgnoreCommentEvent } from "../../domain/workflow/policy.js";
+import { hasTarsVisibleLabel, isAdmin, isStopCommand, shouldIgnoreCommentEvent } from "../../domain/workflow/policy.js";
+import { issueSessionKey, markIssueWorking, queueResumeOnBoot, stopSessionByAdmin } from "./workflow-helpers.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
 import type { HandlePRReview, PRReviewPayload } from "./handle-pr-review.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
@@ -52,7 +53,7 @@ export class HandleIssueComment {
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issueNumber = payload.issue.number;
-		const key = `${owner}/${repo}#${issueNumber}`;
+		const key = issueSessionKey(owner, repo, issueNumber);
 
 		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: comment from ${this.deps.githubUsername}\n`);
@@ -86,27 +87,20 @@ export class HandleIssueComment {
 				return;
 			}
 
-			const isStopCommand = payload.comment.body.trim().toLowerCase() === "/tars stop";
-			if (isStopCommand) {
+			if (isStopCommand(payload.comment.body)) {
 				if (!isAdmin(payload.sender.login, this.deps.adminGithubUsername)) {
 					await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
 					return;
 				}
-				const inFlightKey = `${owner}/${repo}#${mappedIssueNumber}`;
-				const cancelled = this.deps.tasks.cancel(inFlightKey);
-				if (cancelled) {
-					await this.deps.github.postComment(owner, repo, issueNumber, "Stopping TARS...");
-					return;
-				}
-				const session = await this.deps.sessions.get(owner, repo, mappedIssueNumber);
-				if (session && session.status === "working") {
-					await this.deps.sessions.cancelSession(owner, repo, mappedIssueNumber);
-					await this.deps.github.removeLabel(owner, repo, mappedIssueNumber, "tars-working");
-					await this.deps.github.addLabels(owner, repo, mappedIssueNumber, ["tars-cancelled"]);
-					await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
-				} else {
-					await this.deps.github.postComment(owner, repo, issueNumber, "TARS is not currently working on this issue.");
-				}
+				await stopSessionByAdmin(
+					this.deps.sessions,
+					this.deps.github,
+					this.deps.tasks,
+					owner,
+					repo,
+					mappedIssueNumber,
+					issueNumber,
+				);
 				return;
 			}
 
@@ -134,29 +128,24 @@ export class HandleIssueComment {
 		// Handle admin stop command
 		if (isStopCommand(payload.comment.body)) {
 			if (!isAdmin(payload.sender.login, this.deps.adminGithubUsername)) {
-				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
-				await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
-				return;
-			}
-			process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
-			const wasActive = this.deps.tasks.isActive(key);
-			const cancelled = this.deps.tasks.cancel(key);
-			if (cancelled) {
-				await this.deps.github.postComment(owner, repo, issueNumber, "Stopping TARS...");
-				return;
-			}
-			const session = await this.deps.sessions.get(owner, repo, issueNumber);
-			if (session && session.status === "working") {
-				await this.deps.sessions.cancelSession(owner, repo, issueNumber);
-				await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-working");
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
-				await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
-				process.stdout.write(`[webhook] stopped ${key} (not in-flight)\n`);
-			} else {
-				await this.deps.github.postComment(owner, repo, issueNumber, "TARS is not currently working on this issue.");
-			}
+			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
+			await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
 			return;
 		}
+		process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
+		const stopResult = await stopSessionByAdmin(
+			this.deps.sessions,
+			this.deps.github,
+			this.deps.tasks,
+			owner,
+			repo,
+			issueNumber,
+		);
+		if (stopResult === "cancelled") {
+			process.stdout.write(`[webhook] stopped ${key} (not in-flight)\n`);
+		}
+		return;
+	}
 
 		const check = shouldIgnoreCommentEvent(payload, this.deps.githubUsername);
 		if (check.ignore) {
@@ -173,10 +162,7 @@ export class HandleIssueComment {
 		}
 
 		// Auto-label on mention so future comments pass via label gate
-		const hasTarsLabel =
-			(payload.issue.labels ?? []).some(
-				(l) => l.name && ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete", "tars"].includes(l.name),
-			);
+		const hasTarsLabel = hasTarsVisibleLabel(payload.issue.labels);
 		if (check.isMentioned && !hasTarsLabel) {
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars"]);
 			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
@@ -199,11 +185,7 @@ export class HandleIssueComment {
 			process.stdout.write(`[webhook] comment ignored: draining mode for ${key}\n`);
 			const session = await this.deps.sessions.get(owner, repo, issueNumber);
 			if (session) {
-				const queued = [...(session.queuedComments ?? []), payload.comment.body];
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, session.status, {
-					resumeOnBoot: true,
-					queuedComments: queued,
-				});
+				await queueResumeOnBoot(this.deps.sessions, session, [payload.comment.body]);
 			}
 			await this.deps.github.postComment(owner, repo, issueNumber, "Deploy in progress. Feedback will be processed after restart.");
 			return;
@@ -229,12 +211,7 @@ export class HandleIssueComment {
 			);
 		}
 
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-pr-created");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-complete");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-working");
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
-		await this.deps.github.postComment(owner, repo, issueNumber, "Feedback received. Resuming work.");
+		await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Feedback received. Resuming work.");
 		await this.executor.run(session, payload.comment.body);
 	}
 }
