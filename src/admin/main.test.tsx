@@ -81,7 +81,7 @@ describe("App", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
-		window.location.hash = "#/repos";
+		window.location.hash = "#/dashboard";
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockStatusResponse({
 				agent: "online",
@@ -159,44 +159,48 @@ describe("App", () => {
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
-		window.location.hash = "#/repos";
+		window.location.hash = "#/dashboard";
 	});
 
-	it("renders landing page with repo cards and active tasks card", async () => {
+	it("renders dashboard with stats and quick links", async () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		expect(screen.queryByText("Active Tasks")).not.toBeNull();
-		expect(screen.queryByText("3 active tasks")).not.toBeNull();
-		expect(screen.queryByText("mbrooks/case")).not.toBeNull();
+		expect(screen.queryByText("Online")).not.toBeNull();
+		expect(screen.queryByText("Active Work")).not.toBeNull();
+		expect(screen.queryByText("Waiting Feedback")).not.toBeNull();
+		expect(screen.queryByText("Uptime")).not.toBeNull();
+		expect(screen.queryByText("Repositories")).not.toBeNull();
+		expect(screen.queryByText("Active Sessions")).not.toBeNull();
+		expect(screen.queryByText("New Issue")).not.toBeNull();
 	});
 
-	it("does not render active task list inline on the landing page", async () => {
+	it("does not render session list table inline on the dashboard", async () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Tasks")).not.toBeNull();
+			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		// The landing page should show repo cards, not a session list table
+		// The dashboard should show stats and quick links, not a session list table
 		expect(screen.queryByText("Repo")).toBeNull();
 		expect(screen.queryByText("Issue")).toBeNull();
 	});
 
-	it("navigates to working view when active tasks card is clicked", async () => {
+	it("navigates to working view via quick link", async () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Tasks")).not.toBeNull();
+			expect(screen.queryByText("Active Sessions")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByText("Active Tasks"));
+		fireEvent.click(screen.getByText("Active Sessions"));
 
 		await waitFor(() => {
-			expect(screen.queryByRole("button", { name: "Repos" })).not.toBeNull();
+			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
 		});
 
 		// Working view should show session list with in-progress sessions
@@ -238,32 +242,49 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Tasks")).not.toBeNull();
+			expect(screen.queryByText("Active Sessions")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByText("Active Tasks"));
+		fireEvent.click(screen.getByText("Active Sessions"));
 
 		await waitFor(() => {
 			expect(screen.queryByText("No active tasks.")).not.toBeNull();
 		});
 	});
 
-	it("returns to repos from working view via breadcrumb", async () => {
+	it("navigates to repo list via quick link", async () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Tasks")).not.toBeNull();
+			expect(screen.queryByText("Repositories")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByText("Active Tasks"));
-		await waitFor(() => {
-			expect(screen.queryByRole("button", { name: "Repos" })).not.toBeNull();
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: "Repos" }));
+		fireEvent.click(screen.getByText("Repositories"));
 
 		await waitFor(() => {
 			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+		});
+
+		expect(screen.queryByText("Active Tasks")).not.toBeNull();
+		expect(screen.queryByText("2 active tasks")).not.toBeNull();
+	});
+
+	it("returns to dashboard from working view via breadcrumb", async () => {
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.queryByText("Active Sessions")).not.toBeNull();
+		});
+
+		fireEvent.click(screen.getByText("Active Sessions"));
+		await waitFor(() => {
+			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
+
+		await waitFor(() => {
+			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 	});
 
@@ -271,10 +292,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Tasks")).not.toBeNull();
+			expect(screen.queryByText("Active Sessions")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByText("Active Tasks"));
+		fireEvent.click(screen.getByText("Active Sessions"));
 
 		await waitFor(() => {
 			expect(screen.queryByText("#1")).not.toBeNull();
@@ -311,7 +332,7 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
 		expect(screen.queryByText("TARS is marked for restart. Maintenance mode active.")).toBeNull();

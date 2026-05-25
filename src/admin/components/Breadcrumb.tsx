@@ -4,15 +4,17 @@ export function Breadcrumb({
 	label,
 	onBack,
 	onBackExtra,
+	backLabel = "Dashboard",
 }: {
 	label: string;
 	onBack: () => void;
 	onBackExtra?: { label: string; onClick: () => void };
+	backLabel?: string;
 }): React.ReactElement {
 	return (
 		<nav className="breadcrumb">
 			<button type="button" className="breadcrumb-link" onClick={onBack}>
-				Repos
+				{backLabel}
 			</button>
 			{onBackExtra && (
 				<>
