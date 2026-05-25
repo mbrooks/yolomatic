@@ -105,7 +105,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		return { octokit, sessionManager, workspaceManager, executor };
 	}
 
-	it("delegates handlePullRequestReviewCommentEvent to PRReviewHandler", async () => {
+	it("delegates review comment events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
@@ -131,7 +131,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
 	});
 
-	it("delegates handlePullRequestReviewEvent to PRReviewHandler", async () => {
+	it("delegates review submission events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
