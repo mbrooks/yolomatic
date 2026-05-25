@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CronJob, CronRun } from "./store.js";
 import { CronStore, computeNextRunAt } from "./store.js";
-import { generateCommitMessage } from "../workspace/manager.js";
+import { generateCommitMessage } from "../workspace/commit-message.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import type { PiAgentExecutor } from "../executor/index.js";
 import type { GitHubService } from "../ports/github-service.js";
