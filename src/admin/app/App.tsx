@@ -6,6 +6,7 @@ import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoListScreen } from "../features/repos/RepoListScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
+import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
@@ -27,7 +28,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "repos" || route.screen === "new-issue") return null;
+		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "new-issue") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
@@ -45,7 +46,11 @@ export function App(): React.ReactElement {
 		navigate({ screen: "working" });
 	}, []);
 
-	const handleBackToRepos = useCallback(() => {
+	const handleBackToDashboard = useCallback(() => {
+		navigate({ screen: "dashboard" });
+	}, []);
+
+	const handleSelectReposList = useCallback(() => {
 		navigate({ screen: "repos" });
 	}, []);
 
@@ -54,12 +59,20 @@ export function App(): React.ReactElement {
 			const next: Route =
 				route.screen === "repo"
 					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: route.tab }
-					: {
-							screen: "working",
-							owner: session.owner,
-							repo: session.repo,
-							issueNumber: session.issueNumber,
-						};
+					: route.screen === "working"
+						? {
+								screen: "working",
+								owner: session.owner,
+								repo: session.repo,
+								issueNumber: session.issueNumber,
+							}
+							: {
+									screen: "repo",
+									owner: session.owner,
+									repo: session.repo,
+									issueNumber: session.issueNumber,
+									tab: "sessions",
+								};
 			navigate(next);
 		},
 		[route],
@@ -118,11 +131,16 @@ export function App(): React.ReactElement {
 					workingSessions={workingSessions}
 					repoSessions={repoSessions}
 					selectedSession={selectedSession}
+					sessions={sessions}
+					agentStatus={agentStatus}
+					uptime={serverState.status === "ready" ? serverState.data.uptime : ""}
+					draining={serverState.status === "ready" ? serverState.data.draining : false}
 					onSelectRepo={handleSelectRepo}
 					onSelectWorking={handleSelectWorking}
 					onSelectSession={handleSelectSession}
 					onMutate={handleMutate}
-					onBack={handleBackToRepos}
+					onBack={handleBackToDashboard}
+					onSelectRepos={handleSelectReposList}
 					onSelectTab={handleSelectTab}
 					onNewIssueForRepo={handleNewIssueForRepo}
 				/>
@@ -166,11 +184,16 @@ function AppContent({
 	workingSessions,
 	repoSessions,
 	selectedSession,
+	agentStatus,
+	uptime,
+	draining,
+	sessions,
 	onSelectRepo,
 	onSelectWorking,
 	onSelectSession,
 	onMutate,
 	onBack,
+	onSelectRepos,
 	onSelectTab,
 	onNewIssueForRepo,
 }: {
@@ -180,14 +203,35 @@ function AppContent({
 	workingSessions: Session[];
 	repoSessions: Session[];
 	selectedSession: Session | null;
+	agentStatus: AgentStatus;
+	uptime: string;
+	draining: boolean;
+	sessions: Session[];
 	onSelectRepo: (owner: string, repo: string) => void;
 	onSelectWorking: () => void;
 	onSelectSession: (session: Session) => void;
 	onMutate: () => void;
 	onBack: () => void;
+	onSelectRepos: () => void;
 	onSelectTab: (tab: "sessions" | "crons") => void;
 	onNewIssueForRepo: () => void;
 }): React.ReactElement {
+	if (route.screen === "dashboard") {
+		return (
+			<DashboardScreen
+				agentStatus={agentStatus}
+				uptime={uptime}
+				draining={draining}
+				repos={repos}
+				sessions={sessions}
+				onSelectWorking={onSelectWorking}
+				onSelectRepos={onSelectRepos}
+				onNewIssue={onNewIssueForRepo}
+				onSelectSession={onSelectSession}
+			/>
+		);
+	}
+
 	if (route.screen === "repos") {
 		return (
 			<RepoListScreen

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 export type Route =
+	| { screen: "dashboard" }
 	| { screen: "repos" }
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
@@ -13,6 +14,9 @@ export function parseHash(hash: string): Route {
 			return { screen: "new-issue", owner: decodeURIComponent(path[1]), repo: decodeURIComponent(path[2]) };
 		}
 		return { screen: "new-issue" };
+	}
+	if (path[0] === "dashboard") {
+		return { screen: "dashboard" };
 	}
 	if (path[0] === "repos") {
 		if (path.length >= 3) {
@@ -40,10 +44,11 @@ export function parseHash(hash: string): Route {
 		const issueNumber = path[3] ? Number.parseInt(path[3], 10) : undefined;
 		return { screen: "working", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber };
 	}
-	return { screen: "repos" };
+	return { screen: "dashboard" };
 }
 
 export function buildHash(route: Route): string {
+	if (route.screen === "dashboard") return "#/dashboard";
 	if (route.screen === "repos") return "#/repos";
 	if (route.screen === "new-issue") {
 		if (route.owner && route.repo) {
@@ -66,7 +71,7 @@ export function buildHash(route: Route): string {
 		}
 		return base;
 	}
-	return "#/repos";
+	return "#/dashboard";
 }
 
 export function navigate(route: Route): void {

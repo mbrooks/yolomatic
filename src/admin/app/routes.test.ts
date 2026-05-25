@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { parseHash, buildHash } from "./routes.js";
 
 describe("parseHash", () => {
+	it("parses dashboard list", () => {
+		expect(parseHash("#/dashboard")).toEqual({ screen: "dashboard" });
+	});
+
 	it("parses repos list", () => {
 		expect(parseHash("#/repos")).toEqual({ screen: "repos" });
 	});
@@ -48,12 +52,16 @@ describe("parseHash", () => {
 		expect(parseHash("#/new-issue/mbrooks/tars")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "tars" });
 	});
 
-	it("defaults to repos for unknown", () => {
-		expect(parseHash("")).toEqual({ screen: "repos" });
+	it("defaults to dashboard for unknown", () => {
+		expect(parseHash("")).toEqual({ screen: "dashboard" });
 	});
 });
 
 describe("buildHash", () => {
+	it("builds dashboard view", () => {
+		expect(buildHash({ screen: "dashboard" })).toBe("#/dashboard");
+	});
+
 	it("builds repos list", () => {
 		expect(buildHash({ screen: "repos" })).toBe("#/repos");
 	});
