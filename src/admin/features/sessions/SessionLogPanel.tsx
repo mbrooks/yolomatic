@@ -5,12 +5,10 @@ export function SessionLogPanel({
 	state,
 	paused,
 	onPauseToggle,
-	suppressRefreshNotice = false,
 }: {
 	state: ReturnType<typeof useSessionLog>;
 	paused: boolean;
 	onPauseToggle: () => void;
-	suppressRefreshNotice?: boolean;
 }): React.ReactElement {
 	const [autoScroll, setAutoScroll] = useState(true);
 	const logFeedRef = useRef<HTMLDivElement>(null);
@@ -67,7 +65,6 @@ export function SessionLogPanel({
 					})
 				)}
 			</div>
-			{state.refreshing && !suppressRefreshNotice ? <div className="log-refresh-notice">Refreshing…</div> : null}
 		</>
 	);
 }
