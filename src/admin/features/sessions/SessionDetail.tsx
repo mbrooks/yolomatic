@@ -140,7 +140,6 @@ export function SessionDetail({
 					state={logState}
 					paused={paused}
 					onPauseToggle={() => setPaused((current) => !current)}
-					suppressRefreshNotice={activeTab !== undefined || selected.sessionType === "cron"}
 				/>
 			</div>
 		</div>
