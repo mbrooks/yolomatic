@@ -542,6 +542,97 @@ a:hover {
 	font-weight: 500;
 }
 
+.repo-inventory {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	flex: 1;
+	overflow: hidden;
+	padding: 0.5rem;
+}
+
+.repo-inventory-header {
+	flex-shrink: 0;
+}
+
+.repo-table-wrapper {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: auto;
+	flex: 1;
+	min-height: 0;
+}
+
+.repo-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+
+.repo-table thead {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.repo-th {
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
+	color: var(--muted);
+	cursor: pointer;
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	padding: 0.5rem 0.75rem;
+	text-align: left;
+	text-transform: uppercase;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.repo-th:hover {
+	color: var(--text);
+}
+
+.repo-td {
+	border-bottom: 1px solid var(--border);
+	padding: 0.6rem 0.75rem;
+	white-space: nowrap;
+}
+
+.repo-tr {
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+
+.repo-tr:hover {
+	background: rgba(48, 54, 61, 0.5);
+}
+
+.repo-tr:focus {
+	outline: none;
+	background: rgba(88, 166, 255, 0.1);
+}
+
+.repo-inventory-count {
+	color: var(--muted);
+	font-size: 0.75rem;
+	padding: 0.25rem 0.5rem;
+	flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+	.repo-table-wrapper {
+		overflow-x: auto;
+	}
+
+	.repo-th,
+	.repo-td {
+		padding: 0.5rem 0.5rem;
+	}
+}
+
 .repo-list {
 	display: grid;
 	gap: 1rem;
