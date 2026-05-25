@@ -82,8 +82,8 @@ describe("buildRepoSummaries", () => {
 		];
 		const summaries = buildRepoSummaries(sessions);
 		expect(summaries).toHaveLength(2);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1 });
-		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1 });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
 	});
 
 	it("returns empty array for no sessions", () => {
@@ -97,7 +97,7 @@ describe("buildRepoSummaries", () => {
 		];
 		const summaries = buildRepoSummaries(sessions);
 		expect(summaries).toHaveLength(1);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1 });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
 	});
 });
 

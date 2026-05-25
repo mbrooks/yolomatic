@@ -56,6 +56,8 @@ export interface RepoSummary {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
+	cronCount: number;
+	lastActivity: string | null;
 }
 
 export function buildRepoSummaries(sessions: SessionState[]): RepoSummary[] {
@@ -66,12 +68,17 @@ export function buildRepoSummaries(sessions: SessionState[]): RepoSummary[] {
 		if (existing) {
 			existing.sessionCount++;
 			if (!isTerminalStatus(s.status)) existing.activeCount++;
+			if (s.lastActivity > (existing.lastActivity ?? "")) {
+				existing.lastActivity = s.lastActivity;
+			}
 		} else {
 			map.set(key, {
 				owner: s.owner,
 				repo: s.repo,
 				sessionCount: 1,
 				activeCount: isTerminalStatus(s.status) ? 0 : 1,
+				cronCount: 0,
+				lastActivity: s.lastActivity,
 			});
 		}
 	}

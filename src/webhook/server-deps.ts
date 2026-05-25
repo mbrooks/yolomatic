@@ -59,7 +59,7 @@ export function createWebhookServerDeps(
 
 	return {
 		cronStore,
-		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService),
+		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, cronStore),
 		getSession: new GetSession(sessionRepo),
 		getSessionLog: new GetSessionLog(sessionRepo),
 		runSessionCommand: new RunSessionCommand(sessionRepo, workspaceService, taskService, systemClock, archiveDir),
