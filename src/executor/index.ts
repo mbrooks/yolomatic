@@ -4,9 +4,9 @@ import {
 	createAgentSession,
 	DefaultResourceLoader,
 	getAgentDir,
-	ModelRegistry,
 	SessionManager as PiSessionManager,
 } from "@mariozechner/pi-coding-agent";
+import { createTarsModelRegistry } from "./model-registry.js";
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
@@ -275,7 +275,7 @@ export class PiAgentExecutor {
 		await loader.reload();
 
 		const authStorage = AuthStorage.create();
-		const modelRegistry = ModelRegistry.create(authStorage);
+		const modelRegistry = createTarsModelRegistry(authStorage);
 		const configuredModel = resolveConfiguredModel(modelRegistry);
 		if (process.env.PI_AGENT_MODEL?.trim() && !configuredModel) {
 			process.stderr.write(
