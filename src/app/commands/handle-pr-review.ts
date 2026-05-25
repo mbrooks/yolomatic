@@ -4,7 +4,7 @@ import type { ExecutionService } from "../../ports/execution-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import { classifyComments } from "../../pr-review/classifier.js";
-import { generateCommitMessage } from "../../workspace/manager.js";
+import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { extractIssueNumberFromBranch, validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import { issueSessionKey, queueResumeOnBoot } from "./workflow-helpers.js";

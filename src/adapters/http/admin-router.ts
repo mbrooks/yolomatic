@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { readBody } from "../../webhook/server.js";
+import { readBody } from "../../webhook/http-utils.js";
 import { sendHtml, sendJson, sendText } from "./response-helpers.js";
+import { requireAdminJson, requireAdminText } from "./admin-auth.js";
 import type { GetAdminStatus } from "../../app/queries/get-admin-status.js";
 import type { GetSession } from "../../app/queries/get-session.js";
 import type { GetSessionLog } from "../../app/queries/get-session-log.js";
@@ -23,59 +23,6 @@ export interface AdminRouterDeps {
 	adminUsername?: string;
 	adminPassword?: string;
 	adminAssetsDir: string;
-}
-
-export function verifySignature(secret: string, payload: Buffer, signatureHeader: string | undefined): boolean {
-	if (!signatureHeader) {
-		return false;
-	}
-	const expected = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
-	const actual = Buffer.from(signatureHeader);
-	const target = Buffer.from(expected);
-	if (actual.length !== target.length) {
-		return false;
-	}
-	return timingSafeEqual(actual, target);
-}
-
-function checkBasicAuth(
-	request: IncomingMessage,
-	response: ServerResponse,
-	username: string | undefined,
-	password: string | undefined,
-): boolean {
-	if (!username || !password) {
-		return false;
-	}
-	const authHeader = request.headers["authorization"] as string | undefined;
-	if (!authHeader || !authHeader.startsWith("Basic ")) {
-		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="TARS Admin"');
-		response.setHeader("content-type", "text/plain; charset=utf-8");
-		response.end("Unauthorized");
-		return false;
-	}
-	const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
-	const colonIndex = decoded.indexOf(":");
-	const providedUser = colonIndex >= 0 ? decoded.slice(0, colonIndex) : decoded;
-	const providedPass = colonIndex >= 0 ? decoded.slice(colonIndex + 1) : "";
-	if (providedUser.length !== username.length || providedPass.length !== password.length) {
-		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="TARS Admin"');
-		response.setHeader("content-type", "text/plain; charset=utf-8");
-		response.end("Invalid credentials");
-		return false;
-	}
-	const userMatch = timingSafeEqual(Buffer.from(providedUser), Buffer.from(username));
-	const passMatch = timingSafeEqual(Buffer.from(providedPass), Buffer.from(password));
-	if (!userMatch || !passMatch) {
-		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="TARS Admin"');
-		response.setHeader("content-type", "text/plain; charset=utf-8");
-		response.end("Invalid credentials");
-		return false;
-	}
-	return true;
 }
 
 function mapResultToStatus(code: string): number {
@@ -102,11 +49,7 @@ export async function handleAdminRoute(
 	const pathname = requestUrl.pathname;
 
 	if (request.method === "GET" && (pathname === "/tarsadmin" || pathname === "/tarsadmin/")) {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendText(response, 404, "Not found");
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminText(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		sendHtml(response, 200, await adminHtml(deps.adminAssetsDir));
@@ -114,11 +57,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname.startsWith("/tarsadmin/")) {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendText(response, 404, "Not found");
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminText(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		await serveAdminAsset(response, deps.adminAssetsDir, pathname.slice("/tarsadmin/".length));
@@ -126,11 +65,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/status/working") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		try {
@@ -160,11 +95,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/maintenance") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		sendJson(response, 200, { draining: deps.taskController.isDraining() });
@@ -172,11 +103,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "POST" && pathname === "/api/maintenance") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		try {
@@ -194,11 +121,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/status") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		try {
@@ -217,11 +140,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname.startsWith("/api/sessions/")) {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 
@@ -254,11 +173,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "POST" && pathname.startsWith("/api/sessions/")) {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 
@@ -341,11 +256,7 @@ export async function handleAdminRoute(
 
 	// Cron routes
 	if (pathname.startsWith("/api/crons/")) {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		if (!deps.cronStore) {
@@ -522,11 +433,7 @@ export async function handleAdminRoute(
 
 	// POST /api/issues/generate
 	if (request.method === "POST" && pathname === "/api/issues/generate") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		try {
@@ -550,11 +457,7 @@ export async function handleAdminRoute(
 
 	// POST /api/issues
 	if (request.method === "POST" && pathname === "/api/issues") {
-		if (!deps.adminUsername || !deps.adminPassword) {
-			sendJson(response, 404, { error: "Not found" });
-			return true;
-		}
-		if (!checkBasicAuth(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
 			return true;
 		}
 		if (!deps.githubService) {

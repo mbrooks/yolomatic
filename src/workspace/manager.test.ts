@@ -5,8 +5,9 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceConfig } from "./config.js";
+import { generateCommitMessage } from "./commit-message.js";
 import type { CommandRunner } from "./manager.js";
-import { WorkspaceManager, generateCommitMessage } from "./manager.js";
+import { WorkspaceManager } from "./manager.js";
 
 function createConfig(workspacesDir: string): WorkspaceConfig {
 	return {
