@@ -5,7 +5,8 @@ interface IssueLabel {
 	name?: string;
 }
 
-const TARS_WORKFLOW_LABELS = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"];
+export const TARS_WORKFLOW_LABELS = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"] as const;
+export const TARS_VISIBLE_LABELS = [...TARS_WORKFLOW_LABELS, "tars"] as const;
 
 export function hasLabel(labels: IssueLabel[] | undefined, label: string): boolean {
 	return (labels ?? []).some((item) => item.name === label);
@@ -13,6 +14,10 @@ export function hasLabel(labels: IssueLabel[] | undefined, label: string): boole
 
 export function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: string[]): boolean {
 	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
+}
+
+export function hasTarsVisibleLabel(labels: IssueLabel[] | undefined): boolean {
+	return hasAnyLabel(labels, [...TARS_VISIBLE_LABELS]);
 }
 
 export function isAssignedToTars(
@@ -56,7 +61,7 @@ export function shouldIgnoreIssueEvent(
 	}
 
 	if (action === "edited") {
-		const hasTarsLabel = hasAnyLabel(issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(issue.labels, "tars");
+		const hasTarsLabel = hasTarsVisibleLabel(issue.labels);
 		if (!isAssignedToTars(issue, githubUsername) && !hasTarsLabel && issue.user?.login !== githubUsername) {
 			return { ignore: true, reason: "not a TARS issue" };
 		}
@@ -100,7 +105,7 @@ export function shouldIgnoreCommentEvent(
 		payload.comment.body.includes(`@${githubUsername}`) ||
 		payload.comment.body.toLowerCase().includes("@tars");
 	const hasTarsLabel =
-		hasAnyLabel(payload.issue.labels, TARS_WORKFLOW_LABELS) || hasLabel(payload.issue.labels, "tars");
+		hasTarsVisibleLabel(payload.issue.labels);
 
 	if (!isAssigned && !isCreatedByTars && !isMentioned) {
 		return { ignore: true, reason: "not assigned, not created by TARS, and no mention" };

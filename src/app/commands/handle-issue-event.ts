@@ -3,8 +3,9 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
-import { isAssignedToTars, shouldIgnoreIssueEvent } from "../../domain/workflow/policy.js";
+import { hasTarsVisibleLabel, isAssignedToTars, shouldIgnoreIssueEvent } from "../../domain/workflow/policy.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
+import { issueSessionKey, markIssueWorking, removeWorkflowLabels } from "./workflow-helpers.js";
 
 export interface IssueEventPayload {
 	action: string;
@@ -45,14 +46,14 @@ export class HandleIssueEvent {
 	}
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
-		return this.inFlight.has(`${owner}/${repo}#${issueNumber}`);
+		return this.inFlight.has(issueSessionKey(owner, repo, issueNumber));
 	}
 
 	async execute(payload: IssueEventPayload): Promise<void> {
 		const owner = payload.repository.owner.login;
 		const repo = payload.repository.name;
 		const issue = payload.issue;
-		const key = `${owner}/${repo}#${issue.number}`;
+		const key = issueSessionKey(owner, repo, issue.number);
 
 		if (payload.sender.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
@@ -68,20 +69,14 @@ export class HandleIssueEvent {
 			const state = await this.deps.sessions.get(owner, repo, issue.number);
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
 				await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending");
-				await this.deps.github.removeLabel(owner, repo, issue.number, "tars-working");
-				await this.deps.github.removeLabel(owner, repo, issue.number, "tars-feedback-required");
-				await this.deps.github.removeLabel(owner, repo, issue.number, "tars-pr-created");
-				await this.deps.github.removeLabel(owner, repo, issue.number, "tars-complete");
+				await removeWorkflowLabels(this.deps.github, owner, repo, issue.number);
 				await this.deps.github.postComment(owner, repo, issue.number, "TARS unassigned. Pausing work.");
 			}
 			return;
 		}
 
 		if (payload.action === "edited") {
-			const hasTarsLabel =
-				(issue.labels ?? []).some((l) =>
-					["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete", "tars"].includes(l.name ?? ""),
-				) || issue.user?.login === this.deps.githubUsername;
+			const hasTarsLabel = hasTarsVisibleLabel(issue.labels) || issue.user?.login === this.deps.githubUsername;
 			if (!isAssignedToTars(issue, this.deps.githubUsername) && !hasTarsLabel) {
 				process.stdout.write(`[webhook] issues.edited ignored: not a TARS issue\n`);
 				return;
@@ -160,8 +155,7 @@ export class HandleIssueEvent {
 		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
 		this.inFlight.add(key);
 		try {
-			await this.deps.github.addLabels(owner, repo, issue.number, ["tars-working"]);
-			await this.deps.github.postComment(owner, repo, issue.number, "Picked up by TARS. Working on it...");
+			await markIssueWorking(this.deps.github, owner, repo, issue.number, "Picked up by TARS. Working on it...");
 			await this.executor.run(session);
 		} finally {
 			this.inFlight.delete(key);
