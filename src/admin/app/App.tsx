@@ -8,6 +8,7 @@ import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
+import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
@@ -28,7 +29,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "new-issue") return null;
+		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "new-issue" || route.screen === "settings") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
@@ -88,9 +89,14 @@ export function App(): React.ReactElement {
 	);
 
 	const isNewIssueActive = route.screen === "new-issue";
+	const isSettingsActive = route.screen === "settings";
 
 	const handleNewIssue = useCallback(() => {
 		navigate({ screen: "new-issue" });
+	}, []);
+
+	const handleSelectSettings = useCallback(() => {
+		navigate({ screen: "settings" });
 	}, []);
 
 	const handleNewIssueForRepo = useCallback(() => {
@@ -118,7 +124,9 @@ export function App(): React.ReactElement {
 			<AppHeader
 				agentStatus={agentStatus}
 				isNewIssueActive={isNewIssueActive}
+				isSettingsActive={isSettingsActive}
 				onNewIssue={handleNewIssue}
+				onSettings={handleSelectSettings}
 			/>
 
 			{serverState.status === "error" ? (
@@ -143,6 +151,7 @@ export function App(): React.ReactElement {
 					onSelectRepos={handleSelectReposList}
 					onSelectTab={handleSelectTab}
 					onNewIssueForRepo={handleNewIssueForRepo}
+					onSelectSettings={handleSelectSettings}
 				/>
 			)}
 
@@ -154,16 +163,27 @@ export function App(): React.ReactElement {
 function AppHeader({
 	agentStatus,
 	isNewIssueActive,
+	isSettingsActive,
 	onNewIssue,
+	onSettings,
 }: {
 	agentStatus: AgentStatus;
 	isNewIssueActive: boolean;
+	isSettingsActive: boolean;
 	onNewIssue: () => void;
+	onSettings: () => void;
 }): React.ReactElement {
 	return (
 		<header>
 			<h1>TARS Admin</h1>
 			<div className="header-actions">
+				<button
+					className={`global-tab${isSettingsActive ? " active" : ""}`}
+					onClick={onSettings}
+					type="button"
+				>
+					Settings
+				</button>
 				<button
 					className={`global-tab${isNewIssueActive ? " active" : ""}`}
 					onClick={onNewIssue}
@@ -196,6 +216,7 @@ function AppContent({
 	onSelectRepos,
 	onSelectTab,
 	onNewIssueForRepo,
+	onSelectSettings,
 }: {
 	route: Route;
 	repos: RepoSummary[];
@@ -215,6 +236,7 @@ function AppContent({
 	onSelectRepos: () => void;
 	onSelectTab: (tab: "sessions" | "crons") => void;
 	onNewIssueForRepo: () => void;
+	onSelectSettings: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
 		return (
@@ -281,6 +303,10 @@ function AppContent({
 				onNewIssue={onNewIssueForRepo}
 			/>
 		);
+	}
+
+	if (route.screen === "settings") {
+		return <SettingsScreen onBack={onBack} />;
 	}
 
 	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} />;

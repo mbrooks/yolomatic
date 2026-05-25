@@ -11,6 +11,7 @@ import type { CronStore } from "../../cron/store.js";
 import { computeNextRunAt } from "../../cron/store.js";
 import { generateIssueViaLLM } from "../../app/commands/generate-issue.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
+import type { SettingsStore } from "../../settings/store.js";
 
 export interface AdminRouterDeps {
 	cronStore?: CronStore;
@@ -23,6 +24,7 @@ export interface AdminRouterDeps {
 	adminUsername?: string;
 	adminPassword?: string;
 	adminAssetsDir: string;
+	settingsStore?: SettingsStore;
 }
 
 function mapResultToStatus(code: string): number {
@@ -433,7 +435,7 @@ export async function handleAdminRoute(
 				return true;
 			}
 			const issue = await deps.githubService.createIssue(
-				body.owner,
+		body.owner,
 				body.repo,
 				body.title,
 				body.body || "",
@@ -446,6 +448,47 @@ export async function handleAdminRoute(
 			sendJson(response, 500, { error: message });
 		}
 		return true;
+	}
+
+	// Settings routes
+	if (pathname === "/api/settings") {
+		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+			return true;
+		}
+		if (!deps.settingsStore) {
+			sendJson(response, 500, { error: "Settings store not configured" });
+			return true;
+		}
+
+		if (request.method === "GET") {
+			try {
+				const settings = deps.settingsStore.getAllViews();
+				sendJson(response, 200, { settings });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 500, { error: message });
+			}
+			return true;
+		}
+
+		if (request.method === "PATCH") {
+			try {
+				const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, string | number | boolean>;
+				const requiresRestart: string[] = [];
+				for (const [key, value] of Object.entries(body)) {
+					deps.settingsStore.setTyped(key, value);
+					const def = deps.settingsStore.getAllViews().find((s) => s.key === key);
+					if (def?.requiresRestart) {
+						requiresRestart.push(key);
+					}
+				}
+				sendJson(response, 200, { updated: Object.keys(body), requiresRestart });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 400, { error: message });
+			}
+			return true;
+		}
 	}
 
 	return false;

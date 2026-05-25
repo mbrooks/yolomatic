@@ -49,6 +49,19 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_runs_cronId ON cron_runs(cronId)`);
 		},
 	},
+	{
+		id: 2,
+		name: "create_settings_table",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS settings (
+					key TEXT PRIMARY KEY,
+					value TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

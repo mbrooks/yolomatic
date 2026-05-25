@@ -5,7 +5,8 @@ export type Route =
 	| { screen: "repos" }
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
-	| { screen: "new-issue"; owner?: string; repo?: string };
+	| { screen: "new-issue"; owner?: string; repo?: string }
+	| { screen: "settings" };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
@@ -14,6 +15,9 @@ export function parseHash(hash: string): Route {
 			return { screen: "new-issue", owner: decodeURIComponent(path[1]), repo: decodeURIComponent(path[2]) };
 		}
 		return { screen: "new-issue" };
+	}
+	if (path[0] === "settings") {
+		return { screen: "settings" };
 	}
 	if (path[0] === "dashboard") {
 		return { screen: "dashboard" };
@@ -48,6 +52,7 @@ export function parseHash(hash: string): Route {
 }
 
 export function buildHash(route: Route): string {
+	if (route.screen === "settings") return "#/settings";
 	if (route.screen === "dashboard") return "#/dashboard";
 	if (route.screen === "repos") return "#/repos";
 	if (route.screen === "new-issue") {

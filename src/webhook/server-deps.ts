@@ -9,14 +9,16 @@ import { GetAdminStatus } from "../app/queries/get-admin-status.js";
 import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
 import { RunSessionCommand } from "../app/commands/run-session-command.js";
-import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
+import type { TaskControlService } from "../ports/task-control-service.js";
+import type { CronStore } from "../cron/store.js";
 import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
-import type { CronStore } from "../cron/store.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
+import type { SettingsStore } from "../settings/store.js";
+import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -49,6 +51,7 @@ export function createWebhookServerDeps(
 	cronStore?: CronStore,
 	adminAssetsDir = resolve(process.cwd(), "dist/admin"),
 	githubService?: GitHubService,
+	settingsStore?: SettingsStore,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -68,6 +71,7 @@ export function createWebhookServerDeps(
 		adminUsername,
 		adminPassword,
 		adminAssetsDir,
+		settingsStore,
 		cleanupCommand: new CleanupOldSessions(sessionRepo, workspaceService),
 	};
 }
