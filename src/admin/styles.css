@@ -1701,3 +1701,49 @@ a:hover {
 	font-size: 0.875rem;
 	padding: 0.6rem 0.75rem;
 }
+
+/* Onboarding wizard */
+.onboarding-screen {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100%;
+	padding: 2rem;
+}
+
+.onboarding-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	max-width: 480px;
+	padding: 2rem;
+	width: 100%;
+}
+
+.onboarding-card h1 {
+	font-size: 1.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.onboarding-card h2 {
+	font-size: 1.25rem;
+	margin-bottom: 0.5rem;
+}
+
+.onboarding-subtitle {
+	color: var(--muted);
+	font-size: 0.875rem;
+	margin-bottom: 1.5rem;
+}
+
+.onboarding-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.onboarding-form .form-group label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}

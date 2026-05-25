@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import path from "node:path";
-import { getConfig } from "./config.js";
+import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 import { PiAgentExecutor } from "./executor/index.js";
 import { CronStore } from "./cron/store.js";
@@ -10,10 +10,19 @@ import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
 import { TaskController } from "./task-controller.js";
-import { GitHubIssueHandlers } from "./webhook/handlers.js";
+import { GitHubIssueHandlers, type WebhookHandlers } from "./webhook/handlers.js";
 import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
+import { createWebhookServerDeps } from "./webhook/server-deps.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
+
+const noOpHandlers: WebhookHandlers = {
+	async handleIssueEvent() {},
+	async handleCommentEvent() {},
+	async handlePullRequestReviewCommentEvent() {},
+	async handlePullRequestReviewEvent() {},
+	isInFlight() { return false; },
+};
 
 export async function main(): Promise<void> {
 	const memoryDir = path.resolve(process.env.MEMORY_DIR?.trim() || path.join(process.cwd(), "memory"));
@@ -22,6 +31,51 @@ export async function main(): Promise<void> {
 	settingsStore.applyDefaults();
 
 	const config = getConfig(settingsStore);
+
+	const sessionStore = new SessionStore(config.sessionsDir);
+	const taskController = new TaskController();
+
+	if (!isBootstrapComplete(config)) {
+		process.stdout.write("[onboarding] Required settings missing. Starting in onboarding mode.\n");
+
+		const serverDeps = createWebhookServerDeps(
+			sessionStore,
+			undefined,
+			undefined,
+			taskController,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			settingsStore,
+		);
+
+		const server = createWebhookServer(
+			config.webhookSecret || "dummy-onboarding-secret",
+			noOpHandlers,
+			sessionStore,
+			undefined,
+			undefined,
+			taskController,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			settingsStore,
+		);
+
+		serverDeps.adminUsername = config.adminUsername;
+		serverDeps.adminPassword = config.adminPassword;
+
+		server.listen(config.port, () => {
+			process.stdout.write(`[onboarding] Server listening on port ${config.port}\n`);
+		});
+		return;
+	}
 
 	// Sync database settings to process.env so legacy code paths pick them up
 	process.env.PI_AGENT_MODEL = config.piAgentModel ?? "";
@@ -32,7 +86,6 @@ export async function main(): Promise<void> {
 	process.env.LOG_TOOLS = config.logTools ? "true" : "";
 	process.env.LOG_RESPONSES = config.logResponses ? "true" : "";
 
-	const sessionStore = new SessionStore(config.sessionsDir);
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
 	const workspaceManager = new WorkspaceManager({
 		workspacesDir: config.workspacesDir,
@@ -43,7 +96,6 @@ export async function main(): Promise<void> {
 		evictionStrategy: config.evictionStrategy,
 	});
 	const executor = new PiAgentExecutor({ soulPath: config.soulPath });
-	const taskController = new TaskController();
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,

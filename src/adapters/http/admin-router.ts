@@ -42,6 +42,33 @@ function mapResultToStatus(code: string): number {
 	}
 }
 
+function getCredentials(deps: AdminRouterDeps): { username?: string; password?: string } {
+	if (deps.adminUsername && deps.adminPassword) {
+		return { username: deps.adminUsername, password: deps.adminPassword };
+	}
+	const u = deps.settingsStore?.get("admin_username") ?? undefined;
+	const p = deps.settingsStore?.get("admin_password") ?? undefined;
+	if (u && p) return { username: u, password: p };
+	return {};
+}
+
+function checkAdminJson(request: IncomingMessage, response: ServerResponse, deps: AdminRouterDeps): boolean {
+	const { username, password } = getCredentials(deps);
+	if (!username || !password) {
+		sendJson(response, 503, { error: "Server is in onboarding mode. Complete setup first." });
+		return false;
+	}
+	return requireAdminJson(request, response, username, password);
+}
+
+function checkAdminTextAllowOnboarding(request: IncomingMessage, response: ServerResponse, deps: AdminRouterDeps): boolean {
+	const { username, password } = getCredentials(deps);
+	if (!username || !password) {
+		return true; // allow without auth during onboarding
+	}
+	return requireAdminText(request, response, username, password);
+}
+
 export async function handleAdminRoute(
 	request: IncomingMessage,
 	response: ServerResponse,
@@ -50,8 +77,46 @@ export async function handleAdminRoute(
 	const requestUrl = new URL(request.url ?? "/", "http://localhost");
 	const pathname = requestUrl.pathname;
 
+	if (request.method === "GET" && pathname === "/api/onboarding/status") {
+		if (!deps.settingsStore) {
+			sendJson(response, 500, { error: "Settings store not configured" });
+			return true;
+		}
+		const required = ["github_token", "github_username", "webhook_secret", "admin_username", "admin_password"];
+		const missing = required.filter((k) => {
+			const val = deps.settingsStore!.get(k);
+			return val === undefined || val === "";
+		});
+		sendJson(response, 200, { complete: missing.length === 0, missing });
+		return true;
+	}
+
+	if (request.method === "POST" && pathname === "/api/onboarding") {
+		if (!deps.settingsStore) {
+			sendJson(response, 500, { error: "Settings store not configured" });
+			return true;
+		}
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, string>;
+			const required = ["github_token", "github_username", "webhook_secret", "admin_username", "admin_password"];
+			const missing = required.filter((k) => !body[k]?.trim());
+			if (missing.length > 0) {
+				sendJson(response, 400, { error: `Missing required fields: ${missing.join(", ")}` });
+				return true;
+			}
+			for (const key of required) {
+				deps.settingsStore.set(key, body[key].trim());
+			}
+			sendJson(response, 200, { success: true, requiresRestart: required });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 400, { error: message });
+		}
+		return true;
+	}
+
 	if (request.method === "GET" && (pathname === "/tarsadmin" || pathname === "/tarsadmin/")) {
-		if (!requireAdminText(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
 			return true;
 		}
 		sendHtml(response, 200, await adminHtml(deps.adminAssetsDir));
@@ -59,7 +124,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname.startsWith("/tarsadmin/")) {
-		if (!requireAdminText(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
 			return true;
 		}
 		await serveAdminAsset(response, deps.adminAssetsDir, pathname.slice("/tarsadmin/".length));
@@ -67,7 +132,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/status/working") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		try {
@@ -97,7 +162,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/maintenance") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		sendJson(response, 200, { draining: deps.taskController.isDraining() });
@@ -105,7 +170,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "POST" && pathname === "/api/maintenance") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		try {
@@ -123,7 +188,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname === "/api/status") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		try {
@@ -142,7 +207,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "GET" && pathname.startsWith("/api/sessions/")) {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 
@@ -175,7 +240,7 @@ export async function handleAdminRoute(
 	}
 
 	if (request.method === "POST" && pathname.startsWith("/api/sessions/")) {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 
@@ -213,7 +278,7 @@ export async function handleAdminRoute(
 
 	// Cron routes
 	if (pathname.startsWith("/api/crons/")) {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		if (!deps.cronStore) {
@@ -390,7 +455,7 @@ export async function handleAdminRoute(
 
 	// POST /api/issues/generate
 	if (request.method === "POST" && pathname === "/api/issues/generate") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		try {
@@ -414,7 +479,7 @@ export async function handleAdminRoute(
 
 	// POST /api/issues
 	if (request.method === "POST" && pathname === "/api/issues") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		if (!deps.githubService) {
@@ -452,7 +517,7 @@ export async function handleAdminRoute(
 
 	// Settings routes
 	if (pathname === "/api/settings") {
-		if (!requireAdminJson(request, response, deps.adminUsername, deps.adminPassword)) {
+		if (!checkAdminJson(request, response, deps)) {
 			return true;
 		}
 		if (!deps.settingsStore) {

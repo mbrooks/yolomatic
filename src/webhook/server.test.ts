@@ -2124,26 +2124,26 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for /tarsadmin when credentials are not configured", async () => {
+	it("returns 200 for /tarsadmin when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		const response = await makeRequest(port, { method: "GET", path: "/tarsadmin" });
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(200);
 
 		server.close();
 	});
 
-	it("returns 404 for /api/status when credentials are not configured", async () => {
+	it("returns 503 for /api/status when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -2605,7 +2605,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for /api/sessions commands when admin credentials are not configured", async () => {
+	it("returns 503 for /api/sessions commands when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2615,7 +2615,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/tars/1/commands",
 		}, JSON.stringify({ command: "cancel" }));
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -2928,7 +2928,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for delete command when admin credentials are not configured", async () => {
+	it("returns 503 for delete command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2938,12 +2938,12 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/tars/1/commands",
 		}, JSON.stringify({ command: "delete" }));
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
 
-	it("returns 404 for pause command when admin credentials are not configured", async () => {
+	it("returns 503 for pause command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2953,7 +2953,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/tars/1/commands",
 		}, JSON.stringify({ command: "pause" }));
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -3119,7 +3119,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for resume command when admin credentials are not configured", async () => {
+	it("returns 503 for resume command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -3129,7 +3129,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/tars/1/commands",
 		}, JSON.stringify({ command: "resume" }));
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -3252,7 +3252,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for restart command when admin credentials are not configured", async () => {
+	it("returns 503 for restart command when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -3262,7 +3262,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/tars/1/commands",
 		}, JSON.stringify({ command: "restart" }));
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -3494,7 +3494,7 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for log when admin credentials are not configured", async () => {
+	it("returns 503 for log when admin credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -3504,7 +3504,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/sessions/mbrooks/tars/1/log",
 		});
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
@@ -3914,14 +3914,14 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 404 for /api/status/working when credentials are not configured", async () => {
+	it("returns 503 for /api/status/working when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		const response = await makeRequest(port, { method: "GET", path: "/api/status/working" });
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(503);
 
 		server.close();
 	});
