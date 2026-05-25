@@ -1,7 +1,7 @@
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { runMigrations } from "../cron/migrations.js";
+import { runMigrations } from "../migrations/index.js";
 import {
 	getSettingDefinition,
 	parseSettingValue,

@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { unlinkSync } from "node:fs";
-import { runMigrations, MIGRATIONS } from "./migrations.js";
-import { CronStore } from "./store.js";
+import { runMigrations, MIGRATIONS } from "./index.js";
+import { CronStore } from "../cron/store.js";
 
 describe("cron migrations", () => {
 	const dbPath = "/tmp/tars-cron-migrations-test.sqlite";
