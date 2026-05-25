@@ -4,16 +4,17 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 	AuthStorage: {
 		create: vi.fn(() => ({})),
 	},
-	ModelRegistry: {
-		create: vi.fn(() => ({
-			find: vi.fn(),
-			getAll: vi.fn(() => []),
-		})),
-	},
 	createAgentSession: vi.fn(),
 	SessionManager: {
 		inMemory: vi.fn(() => ({})),
 	},
+}));
+
+vi.mock("../../executor/model-registry.js", () => ({
+	createTarsModelRegistry: vi.fn(() => ({
+		find: vi.fn(),
+		getAll: vi.fn(() => []),
+	})),
 }));
 
 vi.mock("../../executor/index.js", () => ({
