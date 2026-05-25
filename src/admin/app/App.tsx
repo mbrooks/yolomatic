@@ -3,7 +3,7 @@ import { useServerState } from "../hooks/useServerState.js";
 import { useRoute, navigate, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
-import { RepoListScreen } from "../features/repos/RepoListScreen.js";
+import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { CronScreen } from "../features/crons/CronScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
@@ -234,7 +234,7 @@ function AppContent({
 
 	if (route.screen === "repos") {
 		return (
-			<RepoListScreen
+			<RepoInventoryScreen
 				repos={repos}
 				inProgressCount={inProgressCount}
 				onSelectRepo={onSelectRepo}

@@ -62,6 +62,8 @@ export type RepoSummary = {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
+	cronCount: number;
+	lastActivity: string | null;
 };
 
 export type StatusResponse = {

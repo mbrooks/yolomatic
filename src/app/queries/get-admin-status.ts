@@ -1,3 +1,4 @@
+import type { CronStore } from "../../cron/store.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
@@ -55,6 +56,7 @@ export class GetAdminStatus {
 		private readonly stale: StaleSessionService,
 		private readonly clock: Clock,
 		private readonly taskControl: TaskControlService,
+		private readonly cronStore?: CronStore,
 	) {}
 
 	async execute(): Promise<AppResult<AdminStatusView>> {
@@ -71,11 +73,46 @@ export class GetAdminStatus {
 			// ignore stale detection errors
 		}
 
+		let repos = buildRepoSummaries(sorted);
+
+		if (this.cronStore) {
+			try {
+				const crons = await this.cronStore.getAll();
+				const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`, r]));
+				for (const cron of crons) {
+					const key = `${cron.owner}/${cron.repo}`;
+					const existing = repoMap.get(key);
+					if (existing) {
+						existing.cronCount++;
+						const cronActivity = cron.lastRunAt ?? cron.createdAt;
+						if (cronActivity > (existing.lastActivity ?? "")) {
+							existing.lastActivity = cronActivity;
+						}
+					} else {
+						repoMap.set(key, {
+							owner: cron.owner,
+							repo: cron.repo,
+							sessionCount: 0,
+							activeCount: 0,
+							cronCount: 1,
+							lastActivity: cron.lastRunAt ?? cron.createdAt,
+						});
+					}
+				}
+				repos = Array.from(repoMap.values()).sort((a, b) => {
+					if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+					return a.repo.localeCompare(b.repo);
+				});
+			} catch {
+				// ignore cron store errors
+			}
+		}
+
 		const view: AdminStatusView = {
 			agent: computeAgentStatus(sorted),
 			uptime: formatUptime(this.clock.uptime()),
 			draining: this.taskControl.isDraining(),
-			repos: buildRepoSummaries(sorted),
+			repos,
 			sessions: sorted.map((s) => {
 				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
 				return {
