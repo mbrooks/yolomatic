@@ -1,6 +1,22 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
+import { unlinkSync } from "node:fs";
 
 import { getConfig } from "./config.js";
+import { SettingsStore } from "./settings/store.js";
+
+const TEST_DB = "/tmp/tars-config-test.sqlite";
+
+function createStore(): SettingsStore {
+	try {
+		unlinkSync(TEST_DB);
+	} catch {
+		// ignore
+	}
+	const store = new SettingsStore(TEST_DB);
+	store.seedFromEnv();
+	store.applyDefaults();
+	return store;
+}
 
 describe("getConfig", () => {
 	const originalEnv = process.env;
@@ -24,6 +40,11 @@ describe("getConfig", () => {
 
 	afterEach(() => {
 		process.env = originalEnv;
+		try {
+			unlinkSync(TEST_DB);
+		} catch {
+			// ignore
+		}
 	});
 
 	it("returns defaults for optional values", () => {
@@ -31,7 +52,7 @@ describe("getConfig", () => {
 		process.env.GITHUB_TOKEN = "token";
 		process.env.GITHUB_USERNAME = "user";
 
-		const config = getConfig();
+		const config = getConfig(createStore());
 		expect(config.port).toBe(3000);
 		expect(config.autoStart).toBe(false);
 		expect(config.defaultBranch).toBe("main");
@@ -58,7 +79,7 @@ describe("getConfig", () => {
 		process.env.ADMIN_USERNAME = "admin";
 		process.env.ADMIN_PASSWORD = "secret";
 
-		const config = getConfig();
+		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
 		expect(config.autoStart).toBe(true);
 		expect(config.webhookSecret).toBe("secret");
@@ -80,7 +101,7 @@ describe("getConfig", () => {
 		process.env.GITHUB_USERNAME = "user";
 		process.env.TARS_SELF_REPORT_ENABLED = "false";
 
-		const config = getConfig();
+		const config = getConfig(createStore());
 		expect(config.selfReportEnabled).toBe(false);
 	});
 
@@ -88,20 +109,20 @@ describe("getConfig", () => {
 		process.env.WEBHOOK_SECRET = "";
 		process.env.GITHUB_TOKEN = "token";
 		process.env.GITHUB_USERNAME = "user";
-		expect(() => getConfig()).toThrow("WEBHOOK_SECRET environment variable is required");
+		expect(() => getConfig(createStore())).toThrow("Setting webhook_secret is required");
 	});
 
 	it("throws when GITHUB_TOKEN is missing", () => {
 		process.env.WEBHOOK_SECRET = "secret";
 		process.env.GITHUB_TOKEN = "";
 		process.env.GITHUB_USERNAME = "user";
-		expect(() => getConfig()).toThrow("GITHUB_TOKEN environment variable is required");
+		expect(() => getConfig(createStore())).toThrow("Setting github_token is required");
 	});
 
 	it("throws when GITHUB_USERNAME is missing", () => {
 		process.env.WEBHOOK_SECRET = "secret";
 		process.env.GITHUB_TOKEN = "token";
 		process.env.GITHUB_USERNAME = "";
-		expect(() => getConfig()).toThrow("GITHUB_USERNAME environment variable is required");
+		expect(() => getConfig(createStore())).toThrow("Setting github_username is required");
 	});
 });

@@ -2570,8 +2570,8 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.repos).toHaveLength(2);
-		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1 });
-		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1 });
+		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
+		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
 
 		server.close();
 	});
