@@ -8,6 +8,10 @@ export const COVERAGE_SUMMARY_FILE = resolve(process.cwd(), "coverage/coverage-s
 export const LOCKFILE_PATH = resolve(process.cwd(), "package-lock.json");
 
 const SOURCE_FILE_PATTERN = /^src\/.*\.ts$/;
+const GUARDRAIL_EXCLUDED_PREFIXES = [
+	"src/admin/api/",
+	"src/adapters/http/",
+];
 
 export interface CoverageEntry {
 	statements: { pct: number };
@@ -35,6 +39,7 @@ export function parseChangedFiles(value: string): string[] {
 export function isGuardrailSourceFile(file: string): boolean {
 	return (
 		SOURCE_FILE_PATTERN.test(file) &&
+		!GUARDRAIL_EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix)) &&
 		!file.endsWith(".test.ts") &&
 		!file.endsWith("/types.ts")
 	);

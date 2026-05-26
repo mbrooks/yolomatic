@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent, renderHook, act } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, renderHook, act, within } from "@testing-library/react";
 import React from "react";
 
 import { App } from "./app/App.js";
@@ -175,11 +175,11 @@ describe("App", () => {
 
 		expect(screen.queryAllByText("Online").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Active Work")).not.toBeNull();
-		expect(screen.queryByText("Waiting Feedback")).not.toBeNull();
+		expect(screen.queryAllByText("Waiting Feedback").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Uptime")).not.toBeNull();
 		expect(screen.queryAllByText("Repositories").length).toBeGreaterThan(0);
-		expect(screen.queryByText("Active Sessions")).not.toBeNull();
-		expect(screen.queryByText("New Issue")).not.toBeNull();
+		expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+		expect(screen.queryAllByRole("button", { name: /New Issue/ }).length).toBeGreaterThan(0);
 	});
 
 	it("renders active sessions panel inline on the dashboard", async () => {
@@ -189,25 +189,29 @@ describe("App", () => {
 			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
+		const activeSessionsPanel = document.querySelector(".active-sessions-panel");
+		expect(activeSessionsPanel).not.toBeNull();
+		const panel = within(activeSessionsPanel as HTMLElement);
+
 		// The dashboard should show the inline active sessions panel with column headers
-		expect(screen.queryByText("Repo")).not.toBeNull();
-		expect(screen.queryByText("Issue")).not.toBeNull();
-		expect(screen.queryByText("Duration")).not.toBeNull();
-		expect(screen.queryByText("#1")).not.toBeNull();
-		expect(screen.queryByText("#2")).not.toBeNull();
-		expect(screen.queryByText("#4")).not.toBeNull();
+		expect(panel.queryByText("Repo")).not.toBeNull();
+		expect(panel.queryByText("Issue")).not.toBeNull();
+		expect(panel.queryByText("Duration")).not.toBeNull();
+		expect(panel.queryByText("#1")).not.toBeNull();
+		expect(panel.queryByText("#2")).not.toBeNull();
+		expect(panel.queryByText("#4")).not.toBeNull();
 		// Complete session should not appear in active panel
-		expect(screen.queryByText("#3")).toBeNull();
+		expect(panel.queryByText("#3")).toBeNull();
 	});
 
 	it("navigates to working view via quick link", async () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Sessions")).not.toBeNull();
+			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByText("Active Sessions"));
+		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
 
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
@@ -253,10 +257,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Sessions")).not.toBeNull();
+			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByText("Active Sessions"));
+		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
 
 		await waitFor(() => {
 			expect(screen.queryByText("No active tasks.")).not.toBeNull();
@@ -281,10 +285,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Sessions")).not.toBeNull();
+			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByText("Active Sessions"));
+		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
 		});
@@ -300,16 +304,16 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Active Sessions")).not.toBeNull();
+			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByText("Active Sessions"));
+		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("#1")).not.toBeNull();
+			expect(screen.queryByRole("button", { name: /mbrooks\/tars #1/i })).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByText("#1"));
+		fireEvent.click(screen.getByRole("button", { name: /mbrooks\/tars #1/i }));
 
 		await waitFor(() => {
 			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();

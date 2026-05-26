@@ -5,16 +5,9 @@ import React from "react";
 
 import { NewIssueScreen } from "./NewIssueScreen.js";
 
-function mockOkResponse(data: unknown): Response {
+function mockJsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
-		status: 200,
-		headers: { "content-type": "application/json" },
-	});
-}
-
-function mockPostResponse(data: unknown): Response {
-	return new Response(JSON.stringify(data), {
-		status: 200,
+		status,
 		headers: { "content-type": "application/json" },
 	});
 }
@@ -23,28 +16,70 @@ describe("NewIssueScreen", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
-		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = typeof input === "string" ? input : input.toString();
+
 			if (url.includes("/api/repos/")) {
-				return mockOkResponse({
+				return mockJsonResponse({
 					labels: ["bug", "enhancement"],
 					templates: [{ name: "Bug Report", body: "## Steps\n" }],
 					recentCommits: ["abc123: fix"],
 					relatedIssues: [{ number: 1, title: "Old", state: "closed" }],
 				});
 			}
-			if (url.includes("/api/issues/generate")) {
-				return mockPostResponse({
-					title: "Generated Title",
-					body: "Generated body",
-					labels: ["bug"],
-					assignees: [],
-				});
+
+			if (url.includes("/api/issues/chat")) {
+				const body = JSON.parse(String(init?.body ?? "{}")) as {
+					messages?: Array<{ role: string; text: string }>;
+				};
+				const lastUserMessage = [...(body.messages ?? [])].reverse().find((message) => message.role === "user")?.text ?? "";
+
+				if (lastUserMessage === "mbrooks/tars") {
+					return mockJsonResponse({
+						message: "Working in mbrooks/tars. Describe the issue you want to create.",
+						owner: "mbrooks",
+						repo: "tars",
+						draft: { title: "", body: "", labels: [], assignees: [] },
+						readyToCreate: false,
+						shouldCreate: false,
+					});
+				}
+
+				if (lastUserMessage === "something is broken") {
+					return mockJsonResponse({
+						message: "I drafted the issue. If this is right, tell me to create it.",
+						owner: "mbrooks",
+						repo: "tars",
+						draft: {
+							title: "Generated Title",
+							body: "Generated body",
+							labels: ["bug"],
+							assignees: [],
+						},
+						readyToCreate: true,
+						shouldCreate: false,
+					});
+				}
+
+				if (lastUserMessage === "create it") {
+					return mockJsonResponse({
+						message: "Creating the issue now.",
+						owner: "mbrooks",
+						repo: "tars",
+						draft: {
+							title: "Generated Title",
+							body: "Generated body",
+							labels: ["bug"],
+							assignees: [],
+						},
+						readyToCreate: true,
+						shouldCreate: true,
+						createdIssue: { number: 42, html_url: "http://issue/42" },
+					});
+				}
 			}
-			if (url.includes("/api/issues")) {
-				return mockPostResponse({ number: 42, html_url: "http://issue/42" });
-			}
-			return mockOkResponse({});
+
+			return mockJsonResponse({});
 		});
 	});
 
@@ -52,28 +87,11 @@ describe("NewIssueScreen", () => {
 		fetchSpy.mockRestore();
 	});
 
-	it("renders chat interface by default", () => {
+	it("renders the conversational interface by default", () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 		expect(screen.queryByText("Which repository should I create the issue in?")).not.toBeNull();
-		expect(screen.queryByPlaceholderText("owner/repo")).not.toBeNull();
-	});
-
-	it("switches to classic form and back", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
-
-		const classicBtn = screen.getByText("Classic form");
-		expect(classicBtn).not.toBeNull();
-
-		fireEvent.click(classicBtn);
-		await waitFor(() => {
-			expect(screen.queryByText("Title *")).not.toBeNull();
-		});
-
-		const backBtn = screen.getByText("Back");
-		fireEvent.click(backBtn);
-		await waitFor(() => {
-			expect(screen.queryByPlaceholderText("owner/repo")).not.toBeNull();
-		});
+		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
+		expect(screen.queryByText("Issue draft")).not.toBeNull();
 	});
 
 	it("allows toggling privacy mode", () => {
@@ -84,48 +102,36 @@ describe("NewIssueScreen", () => {
 		expect((checkbox as HTMLInputElement).checked).toBe(true);
 	});
 
-	it("generates an issue via conversation", async () => {
+	it("continues the conversation and updates the draft preview", async () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
-		const input = screen.getByPlaceholderText("owner/repo");
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
-			expect(screen.queryByPlaceholderText("Describe the issue...")).not.toBeNull();
+			expect(screen.queryByText("Working in mbrooks/tars. Describe the issue you want to create.")).not.toBeNull();
 		});
-
-		const promptInput = screen.getByPlaceholderText("Describe the issue...");
-		fireEvent.change(promptInput, { target: { value: "something is broken" } });
-		fireEvent.keyDown(promptInput, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByText("Here's a draft:")).not.toBeNull();
-		});
-
-		await waitFor(() => {
-			expect(screen.queryAllByText("Generated Title").length).toBeGreaterThan(0);
-		});
-	});
-
-	it("loads repo context after repo is entered", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
-
-		const input = screen.getByPlaceholderText("owner/repo");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
-		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
 			expect(fetchSpy).toHaveBeenCalledWith(
 				expect.stringContaining("/api/repos/mbrooks/tars/context"),
 			);
 		});
+
+		fireEvent.change(input, { target: { value: "something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+		expect(screen.queryByText("Generated body")).not.toBeNull();
 	});
 
-	it("shows template selector when templates are available", async () => {
+	it("shows the template selector when templates are available", async () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
-		const input = screen.getByPlaceholderText("owner/repo");
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
@@ -134,46 +140,29 @@ describe("NewIssueScreen", () => {
 		});
 	});
 
-	it("allows selecting a template", async () => {
+	it("creates the issue through the conversation", async () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
-		const input = screen.getByPlaceholderText("owner/repo");
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
-			expect(screen.queryByText("Template:")).not.toBeNull();
+			expect(screen.queryByText("Working in mbrooks/tars. Describe the issue you want to create.")).not.toBeNull();
 		});
 
-		const select = screen.getByDisplayValue("None (auto-detect)");
-		fireEvent.change(select, { target: { value: "Bug Report" } });
-		expect((select as HTMLSelectElement).value).toBe("Bug Report");
-	});
-
-	it("creates issue from review state", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
-
-		const input = screen.getByPlaceholderText("owner/repo");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
+		fireEvent.change(input, { target: { value: "something is broken" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
-			expect(screen.queryByPlaceholderText("Describe the issue...")).not.toBeNull();
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
 		});
 
-		const promptInput = screen.getByPlaceholderText("Describe the issue...");
-		fireEvent.change(promptInput, { target: { value: "broken" } });
-		fireEvent.keyDown(promptInput, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByText("Looks good - create it")).not.toBeNull();
-		});
-
-		fireEvent.click(screen.getByText("Looks good - create it"));
+		fireEvent.change(input, { target: { value: "create it" } });
+		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
 			expect(screen.queryByText("Issue created:")).not.toBeNull();
 		});
 	});
-
 });

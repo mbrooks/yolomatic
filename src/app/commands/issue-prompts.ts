@@ -10,12 +10,39 @@ export interface GenerateOptions {
 	selectedTemplate?: string;
 }
 
+export interface ConversationPromptOptions {
+	owner?: string;
+	repo?: string;
+	messages: Array<{ role: "assistant" | "user"; text: string }>;
+	draft?: Partial<{
+		title: string;
+		body: string;
+		labels: string[];
+		assignees: string[];
+	}>;
+	context?: RepoContext;
+	options?: GenerateOptions;
+}
+
 export function buildSystemPrompt(): string {
 	return (
 		"You are a helpful assistant that generates well-structured GitHub issues. " +
 		"Given a repository and a user description, produce a JSON object with the issue fields. " +
 		"Respond ONLY with valid JSON, no markdown fences, no commentary."
 	);
+}
+
+export function buildConversationSystemPrompt(): string {
+	return [
+		"You are a conversational GitHub issue drafting assistant.",
+		"You do exactly one job: help the user create a GitHub issue.",
+		"Do not offer coding help, debugging steps, architecture design, or unrelated task execution except as needed to phrase the GitHub issue.",
+		"Ask concise follow-up questions when the issue is underspecified.",
+		"Keep a best-effort draft updated on every turn, even if some fields remain incomplete.",
+		"Set shouldCreate to true only when the user has clearly asked you to create/publish/open the issue now.",
+		"Set readyToCreate to true only when repository owner, repository name, and a usable issue title are present.",
+		"Respond ONLY with valid JSON and no markdown fences or commentary.",
+	].join(" ");
 }
 
 export function buildUserPrompt(
@@ -79,6 +106,108 @@ export function buildUserPrompt(
 		'  "labels": ["string array of relevant labels, or empty"],\n' +
 		'  "assignees": ["string array of GitHub usernames, or empty"]\n' +
 		"}";
+
+	return prompt;
+}
+
+function appendRepoContext(prompt: string, context?: RepoContext, options?: GenerateOptions): string {
+	if (!context || options?.privacyMode) {
+		return prompt;
+	}
+
+	if (context.labels.length > 0) {
+		prompt += `Available labels in this repository: ${context.labels.join(", ")}\n`;
+		prompt += "Choose only from this label set. If none fit, return an empty array.\n\n";
+	}
+
+	if (context.templates.length > 0) {
+		prompt += "Available issue templates:\n";
+		for (const template of context.templates) {
+			prompt += `- ${template.name}\n`;
+		}
+		if (options?.selectedTemplate) {
+			const selected = context.templates.find((template) => template.name === options.selectedTemplate);
+			if (selected) {
+				prompt += `\nSelected template "${selected.name}". Use this structure:\n${selected.body}\n\n`;
+			}
+		} else {
+			prompt += "If one of these templates fits the issue type, structure the body accordingly.\n\n";
+		}
+	}
+
+	if (context.recentCommits.length > 0) {
+		prompt += "Recent commits (for context):\n";
+		for (const commit of context.recentCommits.slice(0, 5)) {
+			prompt += `- ${commit}\n`;
+		}
+		prompt += "\n";
+	}
+
+	if (context.relatedIssues.length > 0) {
+		prompt += "Potentially related issues:\n";
+		for (const issue of context.relatedIssues.slice(0, 5)) {
+			prompt += `- #${issue.number} (${issue.state}): ${issue.title}\n`;
+		}
+		prompt += "\n";
+	}
+
+	return prompt;
+}
+
+export function buildConversationPrompt({
+	owner,
+	repo,
+	messages,
+	draft,
+	context,
+	options,
+}: ConversationPromptOptions): string {
+	let prompt = "Help the user draft and, if explicitly requested, create a GitHub issue.\n\n";
+	prompt += `Current repository owner: ${owner ?? "(unknown)"}\n`;
+	prompt += `Current repository name: ${repo ?? "(unknown)"}\n\n`;
+
+	if (options?.privacyMode) {
+		prompt +=
+			"IMPORTANT: Privacy mode is enabled. Do NOT include code snippets, stack traces, secrets, or other sensitive details in the draft. Use generalized descriptions instead.\n\n";
+	}
+
+	prompt += "Current draft:\n";
+	prompt += `${JSON.stringify({
+		title: draft?.title ?? "",
+		body: draft?.body ?? "",
+		labels: draft?.labels ?? [],
+		assignees: draft?.assignees ?? [],
+	}, null, 2)}\n\n`;
+
+	prompt += "Conversation so far:\n";
+	for (const message of messages) {
+		prompt += `${message.role === "assistant" ? "Assistant" : "User"}: ${message.text}\n`;
+	}
+	prompt += "\n";
+
+	prompt = appendRepoContext(prompt, context, options);
+
+	prompt +=
+		"Return JSON with this exact shape:\n" +
+		'{\n' +
+		'  "message": "string assistant reply to show in the chat",\n' +
+		'  "owner": "string repository owner, or empty string if still unknown",\n' +
+		'  "repo": "string repository name, or empty string if still unknown",\n' +
+		'  "draft": {\n' +
+		'    "title": "string",\n' +
+		'    "body": "string",\n' +
+		'    "labels": ["string"],\n' +
+		'    "assignees": ["string"]\n' +
+		"  },\n" +
+		'  "readyToCreate": true,\n' +
+		'  "shouldCreate": false\n' +
+		"}\n\n" +
+		"Rules:\n" +
+		"- If the user supplied an owner/repo anywhere in the conversation, extract it.\n" +
+		"- If repository information is missing, ask for it.\n" +
+		"- If the draft is weak, ask the next highest-value clarifying question.\n" +
+		"- If the user asked to create the issue and the draft is ready, set shouldCreate to true.\n" +
+		"- If the user has not clearly asked to create it yet, keep shouldCreate false.";
 
 	return prompt;
 }

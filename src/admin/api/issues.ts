@@ -37,12 +37,48 @@ export interface GeneratedIssueResponse {
 	assignees: string[];
 }
 
+export interface IssueDraft {
+	title: string;
+	body: string;
+	labels: string[];
+	assignees: string[];
+}
+
+export interface IssueChatMessage {
+	role: "assistant" | "user";
+	text: string;
+}
+
+export interface IssueChatPayload {
+	owner?: string;
+	repo?: string;
+	privacyMode?: boolean;
+	selectedTemplate?: string;
+	context?: RepoContext;
+	draft?: Partial<IssueDraft>;
+	messages: IssueChatMessage[];
+}
+
+export interface IssueChatResponse {
+	message: string;
+	owner: string;
+	repo: string;
+	draft: IssueDraft;
+	readyToCreate: boolean;
+	shouldCreate: boolean;
+	createdIssue?: CreatedIssueResponse;
+}
+
 export async function createIssue(payload: CreateIssuePayload): Promise<CreatedIssueResponse> {
 	return apiPost<CreatedIssueResponse>("/api/issues", payload);
 }
 
 export async function generateIssue(payload: GenerateIssuePayload): Promise<GeneratedIssueResponse> {
 	return apiPost<GeneratedIssueResponse>("/api/issues/generate", payload);
+}
+
+export async function chatIssue(payload: IssueChatPayload): Promise<IssueChatResponse> {
+	return apiPost<IssueChatResponse>("/api/issues/chat", payload);
 }
 
 export async function fetchRepoContext(owner: string, repo: string): Promise<RepoContext> {
