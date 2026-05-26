@@ -1,4 +1,4 @@
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { ExecutionService } from "../../ports/execution-service.js";

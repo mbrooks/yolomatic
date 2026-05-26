@@ -17,7 +17,7 @@
     "guardrail:test": "npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.73.1",
+    "@earendil-works/pi-coding-agent": "^0.75.5",
     "@octokit/rest": "^21.1.1",
     "dotenv": "^17.4.2",
     "react": "^19.2.6",

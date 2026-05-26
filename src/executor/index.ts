@@ -5,7 +5,7 @@ import {
 	DefaultResourceLoader,
 	getAgentDir,
 	SessionManager as PiSessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "./model-registry.js";
 import { readFile } from "node:fs/promises";
 

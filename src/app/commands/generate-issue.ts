@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { AuthStorage, createAgentSession, SessionManager } from "@mariozechner/pi-coding-agent";
+import { AuthStorage, createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
 import { buildSystemPrompt, buildUserPrompt, type RepoContext, type GenerateOptions } from "./issue-prompts.js";
