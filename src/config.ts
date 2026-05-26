@@ -40,13 +40,13 @@ export function getConfig(store: SettingsStore): AppConfig {
 	return {
 		port: store.getNumber("port", 3000),
 		autoStart: store.getBoolean("auto_start", false),
-		webhookSecret: store.getString("webhook_secret"),
+		webhookSecret: store.get("webhook_secret") ?? "",
 		sessionsDir,
 		archiveDir,
 		memoryDir: path.resolve(store.getString("memory_dir", "./memory")),
 		defaultBranch: store.getString("default_branch", "main"),
-		githubToken: store.getString("github_token"),
-		githubUsername: store.getString("github_username"),
+		githubToken: store.get("github_token") ?? "",
+		githubUsername: store.get("github_username") ?? "",
 		workspacesDir: path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		soulPath: path.resolve(store.getString("soul_path", "./SOUL.md")),
 		selfReportEnabled: store.getBoolean("self_report_enabled", true),
@@ -70,4 +70,24 @@ export function getConfig(store: SettingsStore): AppConfig {
 		logTools: store.getBoolean("log_tools", true),
 		logResponses: store.getBoolean("log_responses", true),
 	};
+}
+
+export function isBootstrapComplete(config: AppConfig): boolean {
+	return (
+		config.webhookSecret !== "" &&
+		config.githubToken !== "" &&
+		config.githubUsername !== "" &&
+		!!config.adminUsername &&
+		!!config.adminPassword
+	);
+}
+
+export function getBootstrapMissingFields(config: AppConfig): string[] {
+	const missing: string[] = [];
+	if (!config.webhookSecret) missing.push("webhook_secret");
+	if (!config.githubToken) missing.push("github_token");
+	if (!config.githubUsername) missing.push("github_username");
+	if (!config.adminUsername) missing.push("admin_username");
+	if (!config.adminPassword) missing.push("admin_password");
+	return missing;
 }
