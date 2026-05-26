@@ -169,11 +169,11 @@ describe("App", () => {
 			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		expect(screen.queryByText("Online")).not.toBeNull();
+		expect(screen.queryAllByText("Online").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Active Work")).not.toBeNull();
 		expect(screen.queryByText("Waiting Feedback")).not.toBeNull();
 		expect(screen.queryByText("Uptime")).not.toBeNull();
-		expect(screen.queryByText("Repositories")).not.toBeNull();
+		expect(screen.queryAllByText("Repositories").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Active Sessions")).not.toBeNull();
 		expect(screen.queryByText("New Issue")).not.toBeNull();
 	});
@@ -256,10 +256,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Repositories")).not.toBeNull();
+			expect(screen.queryAllByText("Repositories").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByText("Repositories"));
+		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
 
 		await waitFor(() => {
 			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
