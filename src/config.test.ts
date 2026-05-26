@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { unlinkSync } from "node:fs";
 
-import { getConfig } from "./config.js";
+import { getConfig, isBootstrapComplete, getBootstrapMissingFields } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 
 const TEST_DB = "/tmp/tars-config-test.sqlite";
@@ -95,6 +95,13 @@ describe("getConfig", () => {
 		expect(config.adminPassword).toBe("secret");
 	});
 
+	it("returns empty strings for missing required settings without throwing", () => {
+		const config = getConfig(createStore());
+		expect(config.webhookSecret).toBe("");
+		expect(config.githubToken).toBe("");
+		expect(config.githubUsername).toBe("");
+	});
+
 	it("reads TARS_SELF_REPORT_ENABLED", () => {
 		process.env.WEBHOOK_SECRET = "secret";
 		process.env.GITHUB_TOKEN = "token";
@@ -104,25 +111,43 @@ describe("getConfig", () => {
 		const config = getConfig(createStore());
 		expect(config.selfReportEnabled).toBe(false);
 	});
+});
 
-	it("throws when WEBHOOK_SECRET is missing", () => {
-		process.env.WEBHOOK_SECRET = "";
-		process.env.GITHUB_TOKEN = "token";
-		process.env.GITHUB_USERNAME = "user";
-		expect(() => getConfig(createStore())).toThrow("Setting webhook_secret is required");
+describe("isBootstrapComplete", () => {
+	it("returns false when required fields are missing", () => {
+		expect(isBootstrapComplete({
+			webhookSecret: "",
+			githubToken: "",
+			githubUsername: "",
+			adminUsername: undefined,
+			adminPassword: undefined,
+		} as unknown as import("./config.js").AppConfig)).toBe(false);
 	});
 
-	it("throws when GITHUB_TOKEN is missing", () => {
-		process.env.WEBHOOK_SECRET = "secret";
-		process.env.GITHUB_TOKEN = "";
-		process.env.GITHUB_USERNAME = "user";
-		expect(() => getConfig(createStore())).toThrow("Setting github_token is required");
+	it("returns true when all required fields are present", () => {
+		expect(isBootstrapComplete({
+			webhookSecret: "secret",
+			githubToken: "token",
+			githubUsername: "user",
+			adminUsername: "admin",
+			adminPassword: "pass",
+		} as unknown as import("./config.js").AppConfig)).toBe(true);
 	});
+});
 
-	it("throws when GITHUB_USERNAME is missing", () => {
-		process.env.WEBHOOK_SECRET = "secret";
-		process.env.GITHUB_TOKEN = "token";
-		process.env.GITHUB_USERNAME = "";
-		expect(() => getConfig(createStore())).toThrow("Setting github_username is required");
+describe("getBootstrapMissingFields", () => {
+	it("lists all missing fields", () => {
+		const missing = getBootstrapMissingFields({
+			webhookSecret: "",
+			githubToken: "tok",
+			githubUsername: "",
+			adminUsername: undefined,
+			adminPassword: "pass",
+		} as unknown as import("./config.js").AppConfig);
+		expect(missing).toContain("webhook_secret");
+		expect(missing).toContain("github_username");
+		expect(missing).toContain("admin_username");
+		expect(missing).not.toContain("github_token");
+		expect(missing).not.toContain("admin_password");
 	});
 });
