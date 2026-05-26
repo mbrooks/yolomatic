@@ -23,6 +23,8 @@ export interface CronJob {
 	lastRunStatus: "success" | "failure" | null;
 	lastError: string | null;
 	createdAt: string;
+	prUrl: string | null;
+	prNumber: number | null;
 }
 
 export interface CronRun {
@@ -158,6 +160,8 @@ function rowToCronJob(row: Record<string, unknown>): CronJob {
 		lastRunStatus: row.lastRunStatus === null ? null : (String(row.lastRunStatus) as "success" | "failure"),
 		lastError: row.lastError === null ? null : String(row.lastError),
 		createdAt: String(row.createdAt),
+		prUrl: row.prUrl === null || row.prUrl === undefined ? null : String(row.prUrl),
+		prNumber: row.prNumber === null || row.prNumber === undefined ? null : Number(row.prNumber),
 	};
 }
 
@@ -190,18 +194,18 @@ export class CronStore {
 		runMigrations(this.db);
 
 		this.insertJobStmt = this.db.prepare(
-			`INSERT INTO cron_jobs (id, owner, repo, name, description, prompt, scheduleType, scheduleValue, branch, notificationChannel, enabled, nextRunAt, lastRunAt, lastRunStatus, lastError, createdAt)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO cron_jobs (id, owner, repo, name, description, prompt, scheduleType, scheduleValue, branch, notificationChannel, enabled, nextRunAt, lastRunAt, lastRunStatus, lastError, createdAt, prUrl, prNumber)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(id) DO UPDATE SET
 			 owner=excluded.owner, repo=excluded.repo, name=excluded.name, description=excluded.description,
 			 prompt=excluded.prompt, scheduleType=excluded.scheduleType, scheduleValue=excluded.scheduleValue,
 			 branch=excluded.branch, notificationChannel=excluded.notificationChannel, enabled=excluded.enabled,
 			 nextRunAt=excluded.nextRunAt, lastRunAt=excluded.lastRunAt, lastRunStatus=excluded.lastRunStatus,
-			 lastError=excluded.lastError, createdAt=excluded.createdAt`,
+			 lastError=excluded.lastError, createdAt=excluded.createdAt, prUrl=excluded.prUrl, prNumber=excluded.prNumber`,
 		);
 
 		this.updateJobStmt = this.db.prepare(
-			`UPDATE cron_jobs SET name=?, description=?, prompt=?, scheduleType=?, scheduleValue=?, branch=?, notificationChannel=?, enabled=?, nextRunAt=?, lastRunAt=?, lastRunStatus=?, lastError=? WHERE id=?`,
+			`UPDATE cron_jobs SET name=?, description=?, prompt=?, scheduleType=?, scheduleValue=?, branch=?, notificationChannel=?, enabled=?, nextRunAt=?, lastRunAt=?, lastRunStatus=?, lastError=?, prUrl=?, prNumber=? WHERE id=?`,
 		);
 
 		this.deleteJobStmt = this.db.prepare("DELETE FROM cron_jobs WHERE owner = ? AND repo = ? AND id = ?");
@@ -249,6 +253,8 @@ export class CronStore {
 			job.lastRunStatus,
 			job.lastError,
 			job.createdAt,
+			job.prUrl,
+			job.prNumber,
 		);
 		return job;
 	}
@@ -291,6 +297,8 @@ export class CronStore {
 			lastRunStatus: null,
 			lastError: null,
 			createdAt: now,
+			prUrl: null,
+			prNumber: null,
 		};
 		return this.set(job);
 	}

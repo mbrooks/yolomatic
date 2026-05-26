@@ -66,6 +66,16 @@ export function CronDetail({
 					<dd>{cron.lastRunAt ? formatRelative(cron.lastRunAt) : "Never"}</dd>
 					<dt>Notification</dt>
 					<dd>{cron.notificationChannel || "None"}</dd>
+					<dt>Pull Request</dt>
+					<dd>
+						{cron.prUrl ? (
+							<a href={cron.prUrl} target="_blank" rel="noreferrer">
+								PR #{cron.prNumber ?? "open"}
+							</a>
+						) : (
+							"None"
+						)}
+					</dd>
 				</dl>
 			</div>
 

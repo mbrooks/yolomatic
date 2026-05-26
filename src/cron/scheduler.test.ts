@@ -37,6 +37,8 @@ function makeCronJob(partial: Partial<CronJob> = {}): CronJob {
 		lastRunStatus: null,
 		lastError: null,
 		createdAt: new Date().toISOString(),
+		prUrl: null,
+		prNumber: null,
 		...partial,
 	};
 }
@@ -129,6 +131,10 @@ describe("executeCronJob", () => {
 		);
 		expect(deps.calls.setCron).toHaveBeenCalled();
 		expect(deps.calls.addRun).toHaveBeenCalled();
+		const setCronCalls = deps.calls.setCron.mock.calls as unknown as Array<[CronJob]>;
+		const lastCron = setCronCalls[setCronCalls.length - 1][0];
+		expect(lastCron.prNumber).toBe(123);
+		expect(lastCron.prUrl).toBe("https://github.com/mbrooks/tars/pull/123");
 		const sessionCalls = deps.calls.setSession.mock.calls as unknown as Array<[SessionState]>;
 		const lastState = sessionCalls[sessionCalls.length - 1][0];
 		expect(lastState.status).toBe("complete");
@@ -146,6 +152,10 @@ describe("executeCronJob", () => {
 
 		expect(deps.calls.createPullRequest).not.toHaveBeenCalled();
 		expect(deps.calls.setCron).toHaveBeenCalled();
+		const setCronCalls = deps.calls.setCron.mock.calls as unknown as Array<[CronJob]>;
+		const lastCron = setCronCalls[setCronCalls.length - 1][0];
+		expect(lastCron.prNumber).toBeNull();
+		expect(lastCron.prUrl).toBeNull();
 		const sessionCalls = deps.calls.setSession.mock.calls as unknown as Array<[SessionState]>;
 		const lastState = sessionCalls[sessionCalls.length - 1][0];
 		expect(lastState.status).toBe("complete");
@@ -164,6 +174,8 @@ describe("executeCronJob", () => {
 		const setCronArgs = deps.calls.setCron.mock.calls[0] as unknown as [CronJob];
 		expect(setCronArgs[0].lastRunStatus).toBe("failure");
 		expect(setCronArgs[0].lastError).toBe("Push failed");
+		expect(setCronArgs[0].prNumber).toBeNull();
+		expect(setCronArgs[0].prUrl).toBeNull();
 	});
 
 	it("reuses existing PR when createPullRequest reports PR already exists", async () => {
@@ -183,6 +195,10 @@ describe("executeCronJob", () => {
 			state: "open",
 		});
 		expect(deps.calls.setCron).toHaveBeenCalled();
+		const setCronCalls = deps.calls.setCron.mock.calls as unknown as Array<[CronJob]>;
+		const lastCron = setCronCalls[setCronCalls.length - 1][0];
+		expect(lastCron.prNumber).toBe(99);
+		expect(lastCron.prUrl).toBe("https://github.com/mbrooks/tars/pull/99");
 	 const sessionCalls = deps.calls.setSession.mock.calls as unknown as Array<[SessionState]>;
 		const lastState = sessionCalls[sessionCalls.length - 1][0];
 		expect(lastState.prNumber).toBe(99);

@@ -291,6 +291,8 @@ export async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now:
 	job.lastRunAt = now.toISOString();
 	job.lastRunStatus = status;
 	job.lastError = error;
+	job.prUrl = state.prUrl ?? job.prUrl ?? null;
+	job.prNumber = state.prNumber ?? job.prNumber ?? null;
 	if (status === "success") {
 		job.nextRunAt = computeNextRunAt(job.scheduleType, job.scheduleValue, now);
 	} else {
