@@ -38,7 +38,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 	const rawCleanup = store.get("cleanup_retention_days");
 
 	return {
-		port: store.getNumber("port", 3000),
+		port: store.getNumber("port", 6767),
 		autoStart: store.getBoolean("auto_start", false),
 		webhookSecret: store.get("webhook_secret") ?? "",
 		sessionsDir,

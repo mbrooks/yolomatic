@@ -70,7 +70,7 @@ describe("SettingsStore", () => {
 
 	it("isEmpty returns true for fresh store", () => {
 		expect(store.isEmpty()).toBe(true);
-		store.set("port", "3000");
+		store.set("port", "6767");
 		expect(store.isEmpty()).toBe(false);
 	});
 });

@@ -42,7 +42,7 @@ REMOTE="origin"
 
 cd "${REPO_ROOT}"
 
-API_BASE="http://localhost:${PORT:-3000}"
+API_BASE="http://localhost:${PORT:-6767}"
 ADMIN_USER="${ADMIN_USERNAME:-}"
 ADMIN_PASS="${ADMIN_PASSWORD:-}"
 SLEEP_DURATION="${SLEEP_DURATION:-30}"
