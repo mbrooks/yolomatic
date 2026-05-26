@@ -100,6 +100,7 @@ describe("App", () => {
 						workspacePath: "/ws/1",
 						branch: "tars/issue-1",
 						lastActivity: new Date().toISOString(),
+						createdAt: new Date(Date.now() - 3600000).toISOString(),
 						prUrl: null,
 						prNumber: null,
 						risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
@@ -115,6 +116,7 @@ describe("App", () => {
 						workspacePath: "/ws/2",
 						branch: "tars/issue-2",
 						lastActivity: new Date().toISOString(),
+						createdAt: new Date(Date.now() - 7200000).toISOString(),
 						prUrl: null,
 						prNumber: null,
 						risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
@@ -130,6 +132,7 @@ describe("App", () => {
 						workspacePath: "/ws/3",
 						branch: "tars/issue-3",
 						lastActivity: new Date().toISOString(),
+						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
 						prNumber: null,
 						risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
@@ -145,6 +148,7 @@ describe("App", () => {
 						workspacePath: "/ws/4",
 						branch: "tars/issue-4",
 						lastActivity: new Date().toISOString(),
+						createdAt: new Date(Date.now() - 1800000).toISOString(),
 						prUrl: null,
 						prNumber: null,
 						risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
@@ -178,16 +182,22 @@ describe("App", () => {
 		expect(screen.queryByText("New Issue")).not.toBeNull();
 	});
 
-	it("does not render session list table inline on the dashboard", async () => {
+	it("renders active sessions panel inline on the dashboard", async () => {
 		render(<App />);
 
 		await waitFor(() => {
 			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		// The dashboard should show stats and quick links, not a session list table
-		expect(screen.queryByText("Repo")).toBeNull();
-		expect(screen.queryByText("Issue")).toBeNull();
+		// The dashboard should show the inline active sessions panel with column headers
+		expect(screen.queryByText("Repo")).not.toBeNull();
+		expect(screen.queryByText("Issue")).not.toBeNull();
+		expect(screen.queryByText("Duration")).not.toBeNull();
+		expect(screen.queryByText("#1")).not.toBeNull();
+		expect(screen.queryByText("#2")).not.toBeNull();
+		expect(screen.queryByText("#4")).not.toBeNull();
+		// Complete session should not appear in active panel
+		expect(screen.queryByText("#3")).toBeNull();
 	});
 
 	it("navigates to working view via quick link", async () => {
@@ -228,6 +238,7 @@ describe("App", () => {
 						workspacePath: "/ws/1",
 						branch: "tars/issue-1",
 						lastActivity: new Date().toISOString(),
+						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
 						prNumber: null,
 						risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
@@ -367,6 +378,7 @@ function makeSession(status: "working" | "pending" | "waiting-feedback" | "compl
 		workspacePath: "/ws/1",
 		branch: "tars/issue-1",
 		lastActivity: new Date().toISOString(),
+		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,
 		prNumber: null,
 		risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
