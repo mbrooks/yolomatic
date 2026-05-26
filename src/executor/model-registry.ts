@@ -1,4 +1,4 @@
-import { type AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { type AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 /**
  * Creates a TARS model registry with custom providers defined in code.

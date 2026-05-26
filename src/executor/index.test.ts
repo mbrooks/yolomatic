@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn() },
 	createAgentSession: vi.fn(),
 	DefaultResourceLoader: vi.fn(() => ({ reload: vi.fn() })),
@@ -42,7 +42,7 @@ import {
 	resolveConfiguredModel,
 } from "./index.js";
 
-import { createAgentSession } from "@mariozechner/pi-coding-agent";
+import { createAgentSession } from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "./model-registry.js";
 
 interface TestModel {
