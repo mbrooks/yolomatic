@@ -22,6 +22,7 @@ export interface AdminStatusSessionView {
 	workspacePath: string;
 	branch: string;
 	lastActivity: string;
+	createdAt: string | null;
 	prUrl: string | null;
 	prNumber: number | null;
 	risk: ReturnType<typeof detectSessionRisk>;
@@ -123,6 +124,7 @@ export class GetAdminStatus {
 					workspacePath: s.workspacePath,
 					branch: s.branch ?? `tars/issue-${s.issueNumber}`,
 					lastActivity: s.lastActivity,
+					createdAt: s.createdAt ?? null,
 					prUrl: s.prUrl ?? null,
 					prNumber: s.prNumber ?? null,
 					risk: detectSessionRisk(s),
