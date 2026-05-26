@@ -37,15 +37,11 @@ function sortRepos(repos: RepoSummary[], key: SortKey, dir: SortDir): RepoSummar
 
 export function RepoInventoryScreen({
 	repos,
-	inProgressCount,
 	onSelectRepo,
-	onSelectWorking,
 	onBack,
 }: {
 	repos: RepoSummary[];
-	inProgressCount: number;
 	onSelectRepo: (owner: string, repo: string) => void;
-	onSelectWorking: () => void;
 	onBack: () => void;
 }): React.ReactElement {
 	const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "lastActivity", dir: "desc" });
@@ -70,26 +66,6 @@ export function RepoInventoryScreen({
 	return (
 		<div className="repo-inventory">
 			<Breadcrumb label="Repositories" onBack={onBack} />
-			<div className="repo-inventory-header">
-				<div
-					className="repo-card working-card"
-					onClick={onSelectWorking}
-					tabIndex={0}
-					role="button"
-					onKeyDown={(e) => {
-						if (e.key === "Enter" || e.key === " ") {
-							e.preventDefault();
-							onSelectWorking();
-						}
-					}}
-				>
-					<div className="repo-card-name">Active Tasks</div>
-					<div className="repo-card-meta">
-						{inProgressCount} active task{inProgressCount !== 1 ? "s" : ""}
-					</div>
-				</div>
-			</div>
-
 			{repos.length === 0 ? (
 				<div className="empty-state">
 					<p>No repositories have been used yet.</p>
