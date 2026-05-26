@@ -95,6 +95,12 @@ export function DashboardScreen({
 					</div>
 				) : (
 					<div className="activity-list">
+						<div className="activity-list-header">
+							<div className="activity-repo">Repo</div>
+							<div className="activity-issue">Issue</div>
+							<div className="activity-status">Status</div>
+							<div className="activity-time">Activity</div>
+						</div>
 						{recentSessions.map((session) => (
 							<div
 								key={`${session.owner}/${session.repo}#${session.issueNumber}`}
