@@ -48,9 +48,9 @@ describe("isGuardrailSourceFile", () => {
 		expect(isGuardrailSourceFile("tests/foo.test.ts")).toBe(false);
 	});
 
-	it("returns false for excluded transport-layer files", () => {
-		expect(isGuardrailSourceFile("src/admin/api/issues.ts")).toBe(false);
-		expect(isGuardrailSourceFile("src/adapters/http/admin-router.ts")).toBe(false);
+	it("returns true for transport-layer files in src/", () => {
+		expect(isGuardrailSourceFile("src/admin/api/issues.ts")).toBe(true);
+		expect(isGuardrailSourceFile("src/adapters/http/admin-router.ts")).toBe(true);
 	});
 
 	it("returns false for test files", () => {
@@ -74,7 +74,12 @@ describe("getChangedSourceFiles", () => {
 			"src/admin/api/issues.ts",
 			"src/adapters/http/admin-router.ts",
 		]);
-		expect(result).toEqual(["src/index.ts", "src/foo/bar.ts"]);
+		expect(result).toEqual([
+			"src/index.ts",
+			"src/foo/bar.ts",
+			"src/admin/api/issues.ts",
+			"src/adapters/http/admin-router.ts",
+		]);
 	});
 });
 
