@@ -61,6 +61,10 @@ function makeDeps(overrides?: {
 		removeLabel: vi.fn(),
 		fileSelfReport: overrides?.fileSelfReport ? vi.fn(overrides.fileSelfReport) : vi.fn(async () => "https://github.com/mbrooks/tars/issues/999"),
 		listReviewComments: vi.fn(async () => []),
+		listLabels: vi.fn(async () => []),
+		getIssueTemplates: vi.fn(async () => []),
+		listRecentCommits: vi.fn(async () => []),
+		listRelatedIssues: vi.fn(async () => []),
 	};
 
 	const tasks: TaskControlService = {
