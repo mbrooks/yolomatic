@@ -1,6 +1,7 @@
 import { AuthStorage, createAgentSession, SessionManager } from "@mariozechner/pi-coding-agent";
 import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
+import { buildSystemPrompt, buildUserPrompt, type RepoContext, type GenerateOptions } from "./issue-prompts.js";
 
 export interface GeneratedIssue {
 	title: string;
@@ -44,6 +45,8 @@ export async function generateIssueViaLLM(
 	owner: string,
 	repo: string,
 	userPrompt: string,
+	context?: RepoContext,
+	options?: GenerateOptions,
 ): Promise<GeneratedIssue> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = createTarsModelRegistry(authStorage);
@@ -55,19 +58,8 @@ export async function generateIssueViaLLM(
 		);
 	}
 
-	const systemPrompt =
-		"You are a helpful assistant that generates well-structured GitHub issues. " +
-		"Given a repository and a user description, produce a JSON object with the issue fields. " +
-		'Respond ONLY with valid JSON, no markdown fences, no commentary.';
-
-	const fullPrompt = `Repository: ${owner}/${repo}\n\nUser request: ${userPrompt}\n\n` +
-		"Generate a GitHub issue with these fields in JSON format:\n" +
-		'{\n' +
-		'  "title": "string (concise, descriptive title)",\n' +
-		'  "body": "string (detailed description with any relevant sections)",\n' +
-		'  "labels": ["string array of relevant labels, or empty"],\n' +
-		'  "assignees": ["string array of GitHub usernames, or empty"]\n' +
-		"}";
+	const systemPrompt = buildSystemPrompt();
+	const fullPrompt = buildUserPrompt(owner, repo, userPrompt, context, options);
 
 	const { session } = await createAgentSession({
 		sessionManager: SessionManager.inMemory(),

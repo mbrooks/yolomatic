@@ -1,0 +1,137 @@
+import { describe, expect, it } from "vitest";
+import { buildSystemPrompt, buildUserPrompt, type RepoContext } from "./issue-prompts.js";
+
+describe("buildSystemPrompt", () => {
+	it("contains JSON-only instruction", () => {
+		const prompt = buildSystemPrompt();
+		expect(prompt).toContain("Respond ONLY with valid JSON");
+		expect(prompt).toContain("no markdown fences");
+	});
+});
+
+describe("buildUserPrompt", () => {
+	it("includes repo and user request", () => {
+		const prompt = buildUserPrompt("owner", "repo", "fix the bug");
+		expect(prompt).toContain("Repository: owner/repo");
+		expect(prompt).toContain("User request: fix the bug");
+		expect(prompt).toContain("Generate a GitHub issue");
+	});
+
+	it("adds privacy warning when privacyMode is true", () => {
+		const prompt = buildUserPrompt("o", "r", "crash", undefined, { privacyMode: true });
+		expect(prompt).toContain("Privacy mode is enabled");
+		expect(prompt).toContain("Do NOT include any code snippets");
+	});
+
+	it("omits privacy warning when privacyMode is false", () => {
+		const prompt = buildUserPrompt("o", "r", "crash", undefined, { privacyMode: false });
+		expect(prompt).not.toContain("Privacy mode is enabled");
+	});
+
+	it("includes available labels when context provided", () => {
+		const context: RepoContext = {
+			labels: ["bug", "enhancement"],
+			templates: [],
+			recentCommits: [],
+			relatedIssues: [],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("Available labels in this repository: bug, enhancement");
+		expect(prompt).toContain("Choose only from this label set");
+	});
+
+	it("includes templates when context provided", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [{ name: "Bug Report", body: "## Steps to reproduce\n" }],
+			recentCommits: [],
+			relatedIssues: [],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("Available issue templates:");
+		expect(prompt).toContain("Bug Report");
+	});
+
+	it("includes selected template body when specified", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [{ name: "Bug Report", body: "## Steps to reproduce\n" }],
+			recentCommits: [],
+			relatedIssues: [],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context, { privacyMode: false, selectedTemplate: "Bug Report" });
+		expect(prompt).toContain('Selected template "Bug Report"');
+		expect(prompt).toContain("## Steps to reproduce");
+	});
+
+	it("includes recent commits when context provided", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [],
+			recentCommits: ["abc123: fix parser", "def456: update deps"],
+			relatedIssues: [],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("Recent commits (for context):");
+		expect(prompt).toContain("abc123: fix parser");
+		expect(prompt).toContain("def456: update deps");
+	});
+
+	it("includes related issues when context provided", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [],
+			recentCommits: [],
+			relatedIssues: [{ number: 42, title: "Old bug", state: "closed" }],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("Potentially related issues:");
+		expect(prompt).toContain("#42 (closed): Old bug");
+	});
+
+	it("suppresses context enrichment when privacyMode is true", () => {
+		const context: RepoContext = {
+			labels: ["bug"],
+			templates: [{ name: "T", body: "B" }],
+			recentCommits: ["c1"],
+			relatedIssues: [{ number: 1, title: "X", state: "open" }],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context, { privacyMode: true });
+		expect(prompt).not.toContain("Available labels");
+		expect(prompt).not.toContain("Available issue templates");
+		expect(prompt).not.toContain("Recent commits");
+		expect(prompt).not.toContain("Potentially related issues");
+	});
+
+	it("limits recent commits to five entries", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [],
+			recentCommits: ["c1", "c2", "c3", "c4", "c5", "c6", "c7"],
+			relatedIssues: [],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("c5");
+		expect(prompt).not.toContain("c6");
+		expect(prompt).not.toContain("c7");
+	});
+
+	it("limits related issues to five entries", () => {
+		const context: RepoContext = {
+			labels: [],
+			templates: [],
+			recentCommits: [],
+			relatedIssues: [
+				{ number: 1, title: "a", state: "open" },
+				{ number: 2, title: "b", state: "open" },
+				{ number: 3, title: "c", state: "open" },
+				{ number: 4, title: "d", state: "open" },
+				{ number: 5, title: "e", state: "open" },
+				{ number: 6, title: "f", state: "open" },
+			],
+		};
+		const prompt = buildUserPrompt("o", "r", "fix", context);
+		expect(prompt).toContain("#5");
+		expect(prompt).not.toContain("#6");
+	});
+});

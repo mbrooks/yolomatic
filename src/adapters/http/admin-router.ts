@@ -453,6 +453,37 @@ export async function handleAdminRoute(
 		}
 	}
 
+	// GET /api/repos/:owner/:repo/context
+	const repoContextMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/context$/u.exec(pathname);
+	if (repoContextMatch && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		const [, owner, repo] = repoContextMatch;
+		try {
+			const [labels, templates, recentCommits, relatedIssues] = await Promise.all([
+				deps.githubService.listLabels(owner, repo),
+				deps.githubService.getIssueTemplates(owner, repo),
+				deps.githubService.listRecentCommits(owner, repo, 5),
+				deps.githubService.listRelatedIssues(owner, repo, "bug OR feature OR enhancement", 5),
+			]);
+			sendJson(response, 200, {
+				labels,
+				templates,
+				recentCommits,
+				relatedIssues,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	// POST /api/issues/generate
 	if (request.method === "POST" && pathname === "/api/issues/generate") {
 		if (!checkAdminJson(request, response, deps)) {
@@ -463,12 +494,21 @@ export async function handleAdminRoute(
 				owner?: string;
 				repo?: string;
 				prompt?: string;
+				privacyMode?: boolean;
+				selectedTemplate?: string;
+				context?: import("../../app/commands/issue-prompts.js").RepoContext;
 			};
 			if (!body.owner || !body.repo || !body.prompt) {
 				sendJson(response, 400, { error: "Missing required fields: owner, repo, prompt" });
 				return true;
 			}
-			const generated = await generateIssueViaLLM(body.owner, body.repo, body.prompt);
+			const generated = await generateIssueViaLLM(
+				body.owner,
+				body.repo,
+				body.prompt,
+				body.context,
+				{ privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
+			);
 			sendJson(response, 200, generated);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
