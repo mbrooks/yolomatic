@@ -474,38 +474,6 @@ export function NewIssueScreen({
 					</div>
 				</div>
 
-				<div className="preview-pane">
-					<div className="preview-pane-header">Live Preview</div>
-					<div className="preview-pane-body">
-						<PreviewCard
-							title={title || "(no title yet)"}
-							body={body}
-							labels={labels}
-							assignees={assignees}
-						/>
-						{repoContext && repoContext.labels.length > 0 && (
-							<div className="preview-context">
-								<div className="preview-context-header">Available Labels</div>
-								<div className="preview-context-tags">
-									{repoContext.labels.map((l) => (
-										<button
-											key={l}
-											className={`preview-context-tag${labels.includes(l) ? " active" : ""}`}
-											type="button"
-											onClick={() => {
-												setLabels((prev) =>
-													prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
-												);
-											}}
-										>
-											{l}
-										</button>
-									))}
-								</div>
-							</div>
-						)}
-					</div>
-				</div>
 			</div>
 		</div>
 	);

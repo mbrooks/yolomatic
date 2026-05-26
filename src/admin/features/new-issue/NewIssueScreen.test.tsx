@@ -176,42 +176,4 @@ describe("NewIssueScreen", () => {
 		});
 	});
 
-	it("shows live preview of draft fields", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
-
-		const input = screen.getByPlaceholderText("owner/repo");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
-		fireEvent.keyDown(input, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByPlaceholderText("Describe the issue...")).not.toBeNull();
-		});
-
-		const promptInput = screen.getByPlaceholderText("Describe the issue...");
-		fireEvent.change(promptInput, { target: { value: "bug" } });
-		fireEvent.keyDown(promptInput, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByText("Live Preview")).not.toBeNull();
-		});
-	});
-
-	it("allows clicking available labels in preview pane", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
-
-		const input = screen.getByPlaceholderText("owner/repo");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
-		fireEvent.keyDown(input, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByText("Available Labels")).not.toBeNull();
-		});
-
-		const bugLabel = screen.getByText("bug");
-		fireEvent.click(bugLabel);
-
-		await waitFor(() => {
-			expect(bugLabel.classList.contains("active")).toBe(true);
-		});
-	});
 });
