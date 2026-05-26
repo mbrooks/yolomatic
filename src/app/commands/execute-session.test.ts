@@ -7,11 +7,14 @@ import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionState } from "../../session/store.js";
+import { FatalSystemError } from "../../self-monitor/index.js";
 
 function makeDeps(overrides?: {
 	commitAndPush?: () => Promise<boolean>;
 	createPullRequest?: () => Promise<{ number: number; html_url: string } | null>;
 	fileSelfReport?: () => Promise<string>;
+	executor?: ExecutionService;
+	sessions?: Partial<SessionRepository>;
 }) {
 	const sessions: SessionRepository = {
 		get: vi.fn(async () => state),
@@ -32,6 +35,7 @@ function makeDeps(overrides?: {
 		markComplete: vi.fn(),
 		markFailed: vi.fn(),
 		markStale: vi.fn(),
+		...overrides?.sessions,
 	} as unknown as SessionRepository;
 
 	const workspaces: WorkspaceService = {
@@ -44,7 +48,7 @@ function makeDeps(overrides?: {
 		getGitDiff: vi.fn(async () => "diff --git a/src/main.ts"),
 	};
 
-	const executor: ExecutionService = {
+	const executor: ExecutionService = overrides?.executor ?? {
 		execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." })),
 		executePRReview: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." })),
 	};
@@ -257,6 +261,7 @@ describe("ExecuteSession", () => {
 			commitAndPush: vi.fn(async () => {
 				throw new Error(
 					"Command failed: git push origin tars/issue-1\n" +
+					"To https://github.com/mbrooks/tars.git\n" +
 					" ! [remote rejected] tars/issue-1 -> tars/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				);
 			}),
@@ -282,5 +287,398 @@ describe("ExecuteSession", () => {
 			1,
 			expect.stringContaining("missing the `workflow` scope"),
 		);
+	});
+
+	it("blocks execution with preflight error for bad workspace path", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...state,
+			workspacePath: "/tmp/ws/.worktrees/issue-999",
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.any(Object));
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("TARS stopped before execution"),
+		);
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("handles waiting-feedback status", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({ status: "waiting-feedback" as const, summary: "Need more info.", rawResponse: "TARS_STATUS: waiting-feedback\nNeed more info." })),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "waiting-feedback");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-feedback-required"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("Need clarification:"),
+		);
+	});
+
+	it("handles cancelled status", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({ status: "cancelled" as const, summary: "Stopped.", rawResponse: "TARS_STATUS: cancelled\nStopped." })),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "cancelled");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-cancelled"]);
+	});
+
+	it("handles working status continuation", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({ status: "working" as const, summary: "Still going.", rawResponse: "TARS_STATUS: working\nStill going." })),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "working");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working"]);
+	});
+
+	it("marks seeded when session is not seeded and there is no comment", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, seeded: false });
+		(deps.sessions.updateStatus as ReturnType<typeof vi.fn>).mockImplementation(async (_o, _r, _i, status: string) => ({ ...state, status, seeded: false } as SessionState));
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.markSeeded).toHaveBeenCalledWith("mbrooks", "tars", 1);
+	});
+
+	it("does not mark seeded when resuming from comment", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, seeded: false });
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state, "human comment");
+
+		expect(deps.sessions.markSeeded).not.toHaveBeenCalled();
+	});
+
+	it("suppresses transitions when session is paused post-execution", async () => {
+		const deps = makeDeps();
+		let callCount = 0;
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+			callCount++;
+			if (callCount === 1) return state;
+			return { ...state, status: "paused" };
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+	});
+
+	it("self-reports on fatal system error when enabled", async () => {
+		const error = new FatalSystemError({
+			toolHistory: [],
+			fatalError: { category: "permission_denied", message: "EACCES", toolName: "bash" },
+			systemEvidence: {
+				whoami: "tars",
+				pwd: "/tmp",
+				workspacePath: "/tmp/ws",
+				lsWorkspace: "",
+				gitStatus: "",
+				gitDiff: "",
+				gitBranch: "main",
+				nodeVersion: "v24",
+				timestamp: new Date().toISOString(),
+			},
+		});
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					throw error;
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.fileSelfReport).toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+	});
+
+	it("posts failure comment on fatal system error when self-report is disabled", async () => {
+		const error = new FatalSystemError({
+			toolHistory: [],
+			fatalError: { category: "permission_denied", message: "EACCES", toolName: "bash" },
+			systemEvidence: {
+				whoami: "tars",
+				pwd: "/tmp",
+				workspacePath: "/tmp/ws",
+				lsWorkspace: "",
+				gitStatus: "",
+				gitDiff: "",
+				gitBranch: "main",
+				nodeVersion: "v24",
+				timestamp: new Date().toISOString(),
+			},
+		});
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					throw error;
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: false,
+		});
+
+		await expect(execute.run(state)).rejects.toThrow(error);
+
+		expect(deps.github.fileSelfReport).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+	});
+
+	it("rethrows non-fatal execution errors", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					throw new Error("executor blew up");
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await expect(execute.run(state)).rejects.toThrow("executor blew up");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.tasks.unregister).toHaveBeenCalled();
+	});
+
+	it("returns cancelled when abort signal fires during execution", async () => {
+		let cancelCallback: (() => void) | undefined;
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					cancelCallback?.();
+					throw new Error("aborted");
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+		(deps.tasks.register as ReturnType<typeof vi.fn>).mockImplementation((key: string, cancel: () => void) => {
+			cancelCallback = cancel;
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-cancelled"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("Task cancelled by admin"),
+		);
+		expect(deps.tasks.unregister).toHaveBeenCalled();
+	});
+
+	it("validates PR session mapping when PR exists", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...state,
+			prNumber: 42,
+		});
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			head: { ref: "tars/issue-2" },
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.any(Object));
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("allows execution when PR does not exist", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+			...state,
+			prNumber: 42,
+		});
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.executor.execute).toHaveBeenCalled();
 	});
 });
