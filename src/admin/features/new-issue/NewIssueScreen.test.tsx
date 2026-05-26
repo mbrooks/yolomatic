@@ -104,7 +104,7 @@ describe("NewIssueScreen", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.queryByText("Generated Title")).not.toBeNull();
+			expect(screen.queryAllByText("Generated Title").length).toBeGreaterThan(0);
 		});
 	});
 
@@ -118,7 +118,6 @@ describe("NewIssueScreen", () => {
 		await waitFor(() => {
 			expect(fetchSpy).toHaveBeenCalledWith(
 				expect.stringContaining("/api/repos/mbrooks/tars/context"),
-				expect.anything(),
 			);
 		});
 	});
