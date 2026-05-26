@@ -53,7 +53,7 @@ describe("getConfig", () => {
 		process.env.GITHUB_USERNAME = "user";
 
 		const config = getConfig(createStore());
-		expect(config.port).toBe(3000);
+		expect(config.port).toBe(6767);
 		expect(config.autoStart).toBe(false);
 		expect(config.defaultBranch).toBe("main");
 		expect(config.sessionsDir).toBeTruthy();

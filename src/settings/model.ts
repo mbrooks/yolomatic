@@ -133,7 +133,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		key: "port",
 		type: "number",
 		description: "HTTP server port",
-		default: "3000",
+		default: "6767",
 		requiresRestart: true,
 		sensitive: false,
 		envVar: "PORT",

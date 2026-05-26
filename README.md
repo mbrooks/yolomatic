@@ -21,7 +21,7 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 2. Copy `.env.example` to `.env`
 3. Fill in GitHub credentials, `WEBHOOK_SECRET`, and PI agent auth
 4. Run the receiver with `npm run dev`
-5. Expose the local server if needed, for example `ngrok http 3000`
+5. Expose the local server if needed, for example `ngrok http 6767`
 6. Point the GitHub webhook to `POST /webhook`
 
 ### Docker Deployment
