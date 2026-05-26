@@ -1,4 +1,4 @@
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ExecutionService } from "../../ports/execution-service.js";
 import type { ExecutionResult, PiAgentExecutor, PRReviewComment } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";

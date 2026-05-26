@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: {
 		create: vi.fn(() => ({})),
 	},
@@ -48,7 +48,7 @@ vi.mock("../../executor/index.js", () => ({
 	}),
 }));
 
-import { createAgentSession } from "@mariozechner/pi-coding-agent";
+import { createAgentSession } from "@earendil-works/pi-coding-agent";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
 import { extractJson, generateIssueViaLLM } from "./generate-issue.js";
 
