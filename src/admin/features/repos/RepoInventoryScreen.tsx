@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { Breadcrumb } from "../../components/Breadcrumb.js";
 import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
 
@@ -39,11 +40,13 @@ export function RepoInventoryScreen({
 	inProgressCount,
 	onSelectRepo,
 	onSelectWorking,
+	onBack,
 }: {
 	repos: RepoSummary[];
 	inProgressCount: number;
 	onSelectRepo: (owner: string, repo: string) => void;
 	onSelectWorking: () => void;
+	onBack: () => void;
 }): React.ReactElement {
 	const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "lastActivity", dir: "desc" });
 
@@ -66,6 +69,7 @@ export function RepoInventoryScreen({
 
 	return (
 		<div className="repo-inventory">
+			<Breadcrumb label="Repositories" onBack={onBack} />
 			<div className="repo-inventory-header">
 				<div
 					className="repo-card working-card"
