@@ -62,6 +62,14 @@ export const MIGRATIONS: Migration[] = [
 			`);
 		},
 	},
+	{
+		id: 3,
+		name: "add_cron_pr_columns",
+		up(db) {
+			db.exec(`ALTER TABLE cron_jobs ADD COLUMN prUrl TEXT`);
+			db.exec(`ALTER TABLE cron_jobs ADD COLUMN prNumber INTEGER`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

@@ -93,6 +93,8 @@ export type CronJob = {
 	lastRunStatus: "success" | "failure" | null;
 	lastError: string | null;
 	createdAt: string;
+	prUrl: string | null;
+	prNumber: number | null;
 };
 
 export type CronRun = {
