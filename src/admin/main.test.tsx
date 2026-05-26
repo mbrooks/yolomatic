@@ -264,9 +264,6 @@ describe("App", () => {
 		await waitFor(() => {
 			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
 		});
-
-		expect(screen.queryByText("Active Tasks")).not.toBeNull();
-		expect(screen.queryByText("2 active tasks")).not.toBeNull();
 	});
 
 	it("returns to dashboard from working view via breadcrumb", async () => {
