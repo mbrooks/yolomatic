@@ -1,7 +1,26 @@
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { AuthStorage, createAgentSession, SessionManager } from "@mariozechner/pi-coding-agent";
 import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
 import { buildSystemPrompt, buildUserPrompt, type RepoContext, type GenerateOptions } from "./issue-prompts.js";
+
+const ISSUE_AGENT_TOOLS = [
+	"read",
+	"grep",
+	"find",
+	"ls",
+	"github_get_authenticated_user",
+	"github_query_issues",
+	"github_fetch_issue",
+	"github_set_comment",
+	"github_set_status",
+	"github_set_labels",
+	"github_assigned_open_issues",
+];
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const AGENT_CWD = resolve(__dirname, "../../..");
 
 export interface GeneratedIssue {
 	title: string;
@@ -62,11 +81,12 @@ export async function generateIssueViaLLM(
 	const fullPrompt = buildUserPrompt(owner, repo, userPrompt, context, options);
 
 	const { session } = await createAgentSession({
+		cwd: AGENT_CWD,
 		sessionManager: SessionManager.inMemory(),
 		authStorage,
 		modelRegistry,
 		model: configuredModel,
-		noTools: "all",
+		tools: ISSUE_AGENT_TOOLS,
 	});
 
 	// Override the harness system prompt for this single-purpose call
