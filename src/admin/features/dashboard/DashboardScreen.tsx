@@ -2,6 +2,7 @@ import React from "react";
 import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
 import { StatusBadge } from "../../components/StatusBadge.js";
 import { formatRelative } from "../../lib/format.js";
+import { ActiveSessionsPanel } from "./ActiveSessionsPanel.js";
 
 export function DashboardScreen({
 	agentStatus,
@@ -80,6 +81,10 @@ export function DashboardScreen({
 						<span className="quick-link-label">New Issue</span>
 					</button>
 				</div>
+			</div>
+
+			<div className="dashboard-section">
+				<ActiveSessionsPanel sessions={sessions} onSelectSession={onSelectSession} />
 			</div>
 
 			<div className="dashboard-section">

@@ -40,6 +40,7 @@ export type Session = {
 	workspacePath: string;
 	branch: string;
 	lastActivity: string;
+	createdAt: string | null;
 	prUrl: string | null;
 	prNumber: number | null;
 	risk: {
