@@ -22,7 +22,6 @@ export function App(): React.ReactElement {
 	const repos = serverState.status === "ready" ? serverState.data.repos : [];
 
 	const workingSessions = useMemo(() => sessions.filter((s) => isInProgressStatus(s.status)), [sessions]);
-	const inProgressCount = workingSessions.length;
 
 	const handleMutate = useCallback(() => {
 		setTick((t) => t + 1);
@@ -135,7 +134,6 @@ export function App(): React.ReactElement {
 				<AppContent
 					route={route}
 					repos={repos}
-					inProgressCount={inProgressCount}
 					workingSessions={workingSessions}
 					repoSessions={repoSessions}
 					selectedSession={selectedSession}
@@ -200,7 +198,6 @@ function AppHeader({
 function AppContent({
 	route,
 	repos,
-	inProgressCount,
 	workingSessions,
 	repoSessions,
 	selectedSession,
@@ -220,7 +217,6 @@ function AppContent({
 }: {
 	route: Route;
 	repos: RepoSummary[];
-	inProgressCount: number;
 	workingSessions: Session[];
 	repoSessions: Session[];
 	selectedSession: Session | null;
@@ -258,9 +254,7 @@ function AppContent({
 		return (
 			<RepoInventoryScreen
 				repos={repos}
-				inProgressCount={inProgressCount}
 				onSelectRepo={onSelectRepo}
-				onSelectWorking={onSelectWorking}
 				onBack={onBack}
 			/>
 		);
