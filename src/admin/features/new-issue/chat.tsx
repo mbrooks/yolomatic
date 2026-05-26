@@ -14,7 +14,15 @@ export type ChatMessage =
 			labels: string[];
 			assignees: string[];
 	  }
-	| { id: string; role: "tars"; type: "done"; url: string; number: number };
+	| { id: string; role: "tars"; type: "done"; url: string; number: number }
+	| {
+			id: string;
+			role: "tars";
+			type: "suggestion";
+			suggestionType: "title" | "labels";
+			value: string;
+			original: string;
+	  };
 
 export type Phase =
 	| "repo"
@@ -27,6 +35,8 @@ export type Phase =
 	| "edit-assignees"
 	| "creating"
 	| "done";
+
+export type ViewMode = "chat" | "classic";
 
 export function uid(): string {
 	return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -96,12 +106,34 @@ export function PreviewCard({
 	);
 }
 
+export function SuggestionChip({
+	label,
+	onAccept,
+	onReject,
+}: {
+	label: string;
+	onAccept: () => void;
+	onReject: () => void;
+}): React.ReactElement {
+	return (
+		<div className="chat-suggestion-chip">
+			<span className="chat-suggestion-text">{label}</span>
+			<button className="chat-suggestion-btn accept" type="button" onClick={onAccept}>✓</button>
+			<button className="chat-suggestion-btn reject" type="button" onClick={onReject}>✕</button>
+		</div>
+	);
+}
+
 export function ChatTranscript({
 	messages,
 	showTyping,
+	onAcceptSuggestion,
+	onRejectSuggestion,
 }: {
 	messages: ChatMessage[];
 	showTyping: boolean;
+	onAcceptSuggestion?: (id: string) => void;
+	onRejectSuggestion?: (id: string) => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -124,6 +156,21 @@ export function ChatTranscript({
 								labels={msg.labels}
 								assignees={msg.assignees}
 							/>
+						</div>
+					);
+				}
+				if (msg.type === "suggestion") {
+					return (
+						<div key={msg.id} className="chat-bubble tars">
+							<div className="chat-sender">TARS</div>
+							<div className="chat-text">
+								{msg.suggestionType === "title" ? "Suggested title:" : "Suggested labels:"}{" "}
+								<SuggestionChip
+									label={msg.value}
+									onAccept={() => onAcceptSuggestion?.(msg.id)}
+									onReject={() => onRejectSuggestion?.(msg.id)}
+								/>
+							</div>
 						</div>
 					);
 				}

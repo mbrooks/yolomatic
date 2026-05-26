@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import type { CreatedPR, GitHubService, PullRequestInfo, ReviewComment } from "../../ports/github-service.js";
+import type { CreatedPR, GitHubService, IssueTemplate, PullRequestInfo, ReviewComment } from "../../ports/github-service.js";
 import { createOctokit } from "./octokit.js";
 
 export class GitHubServiceAdapter implements GitHubService {
@@ -110,6 +110,68 @@ export class GitHubServiceAdapter implements GitHubService {
 				path: rc.path,
 				line: rc.line,
 			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async listLabels(owner: string, repo: string): Promise<string[]> {
+		try {
+			const { data } = await this.octokit.issues.listLabelsForRepo({ owner, repo });
+			return data.map((l) => l.name);
+		} catch {
+			return [];
+		}
+	}
+
+	async getIssueTemplates(owner: string, repo: string): Promise<IssueTemplate[]> {
+		try {
+			const { data } = await this.octokit.repos.getContent({
+				owner,
+				repo,
+				path: ".github/ISSUE_TEMPLATE",
+			});
+			if (!Array.isArray(data)) return [];
+			const templates: IssueTemplate[] = [];
+			for (const item of data) {
+				if (item.type !== "file") continue;
+				const name = item.name.replace(/\.md$/, "").replace(/\.yaml$/, "").replace(/\.yml$/, "");
+				try {
+					const { data: fileData } = await this.octokit.repos.getContent({
+						owner,
+						repo,
+						path: item.path,
+					});
+					if ("content" in fileData && typeof fileData.content === "string") {
+						const body = Buffer.from(fileData.content, "base64").toString("utf8");
+						templates.push({ name, body });
+					}
+				} catch {
+					// skip unreadable templates
+				}
+			}
+			return templates;
+		} catch {
+			return [];
+		}
+	}
+
+	async listRecentCommits(owner: string, repo: string, limit = 10): Promise<string[]> {
+		try {
+			const { data } = await this.octokit.repos.listCommits({ owner, repo, per_page: limit });
+			return data.map((c) => `${c.sha.slice(0, 7)}: ${c.commit.message.split("\n")[0]}`);
+		} catch {
+			return [];
+		}
+	}
+
+	async listRelatedIssues(owner: string, repo: string, query: string, limit = 10): Promise<Array<{ number: number; title: string; state: string }>> {
+		try {
+			const { data } = await this.octokit.search.issuesAndPullRequests({
+				q: `repo:${owner}/${repo} is:issue ${query} in:title`,
+				per_page: limit,
+			});
+			return data.items.map((i) => ({ number: i.number, title: i.title, state: i.state }));
 		} catch {
 			return [];
 		}
