@@ -39,6 +39,19 @@ TARS can be deployed with Docker Compose, including an Ollama sidecar.
    docker compose up --build -d
    ```
 
+   The default Compose build uses the `runtime` target (production dependencies only). To build a development image that includes `devDependencies` and makes binaries like `vitest` available in `$PATH`, build the `development` target directly:
+
+   ```bash
+   docker build --target development -t tars:dev .
+   docker run --rm -it tars:dev bash
+   ```
+
+   Inside the container, dev tools can be invoked directly:
+   ```bash
+   vitest run
+   vite --version
+   ```
+
 3. View logs (console only):
    ```bash
    docker logs -f tars
@@ -118,8 +131,14 @@ server {
 #### Docker Commands
 
 ```bash
-# Build
+# Build (production target — default)
 docker-compose build
+
+# Build development target with devDependencies
+docker build --target development -t tars:dev .
+
+# Run development container interactively
+docker run --rm -it tars:dev bash
 
 # Run
 docker-compose up -d
