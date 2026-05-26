@@ -261,6 +261,7 @@ function AppContent({
 				inProgressCount={inProgressCount}
 				onSelectRepo={onSelectRepo}
 				onSelectWorking={onSelectWorking}
+				onBack={onBack}
 			/>
 		);
 	}
