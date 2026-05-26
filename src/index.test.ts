@@ -5,7 +5,7 @@ vi.mock("dotenv/config", () => ({}));
 
 vi.mock("./config.js", () => ({
 	getConfig: vi.fn(() => ({
-		port: 3000,
+		port: 6767,
 		autoStart: true,
 		webhookSecret: "secret",
 		sessionsDir: "/tmp/sessions",
@@ -120,7 +120,7 @@ describe("main", () => {
 			expect.any(Object),
 		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		expect(server.listen).toHaveBeenCalledWith(3000, expect.any(Function));
+		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
 	});
 
 	it("resumes interrupted working sessions on startup", async () => {
