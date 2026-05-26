@@ -22,6 +22,7 @@ ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
 ENV SESSIONS_DIR=/app/sessions
 ENV WORKSPACES_DIR=/app/workspaces
 ENV MEMORY_DIR=/app/memory
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 # Install git (required for worktrees) and GitHub CLI
 RUN apt-get update && apt-get install -y git curl gnupg \
@@ -31,9 +32,9 @@ RUN apt-get update && apt-get install -y git curl gnupg \
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy production dependencies
+# Copy dependencies (including devDependencies)
+COPY --from=build /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash tars \
