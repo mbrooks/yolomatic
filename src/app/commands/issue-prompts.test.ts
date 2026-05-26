@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt, buildUserPrompt, type RepoContext } from "./issue-prompts.js";
+import {
+	buildConversationPrompt,
+	buildConversationSystemPrompt,
+	buildSystemPrompt,
+	buildUserPrompt,
+	type RepoContext,
+} from "./issue-prompts.js";
 
 describe("buildSystemPrompt", () => {
 	it("contains JSON-only instruction", () => {
@@ -133,5 +139,71 @@ describe("buildUserPrompt", () => {
 		const prompt = buildUserPrompt("o", "r", "fix", context);
 		expect(prompt).toContain("#5");
 		expect(prompt).not.toContain("#6");
+	});
+});
+
+describe("buildConversationSystemPrompt", () => {
+	it("limits the assistant to issue-drafting behavior", () => {
+		const prompt = buildConversationSystemPrompt();
+		expect(prompt).toContain("GitHub issue");
+		expect(prompt).toContain("Set shouldCreate to true only when the user has clearly asked");
+	});
+});
+
+describe("buildConversationPrompt", () => {
+	it("includes privacy guidance and conversation transcript", () => {
+		const prompt = buildConversationPrompt({
+			messages: [
+				{ role: "assistant", text: "Which repo?" },
+				{ role: "user", text: "mbrooks/tars" },
+			],
+			options: { privacyMode: true },
+		});
+		expect(prompt).toContain("Current repository owner: (unknown)");
+		expect(prompt).toContain("IMPORTANT: Privacy mode is enabled");
+		expect(prompt).toContain("Assistant: Which repo?");
+		expect(prompt).toContain("User: mbrooks/tars");
+	});
+
+	it("includes full repo context and selected template details when available", () => {
+		const prompt = buildConversationPrompt({
+			owner: "mbrooks",
+			repo: "tars",
+			messages: [{ role: "user", text: "create it" }],
+			draft: { title: "Draft title", body: "Draft body", labels: ["bug"], assignees: ["mbrooks"] },
+			context: {
+				labels: ["bug", "enhancement"],
+				templates: [{ name: "Bug Report", body: "## Steps" }],
+				recentCommits: ["c1", "c2", "c3", "c4", "c5", "c6"],
+				relatedIssues: [
+					{ number: 1, title: "one", state: "open" },
+					{ number: 2, title: "two", state: "closed" },
+				],
+			},
+			options: { privacyMode: false, selectedTemplate: "Bug Report" },
+		});
+		expect(prompt).toContain("Current repository owner: mbrooks");
+		expect(prompt).toContain('"title": "Draft title"');
+		expect(prompt).toContain("Available labels in this repository: bug, enhancement");
+		expect(prompt).toContain('Selected template "Bug Report". Use this structure:');
+		expect(prompt).toContain("Recent commits (for context):");
+		expect(prompt).toContain("- c5");
+		expect(prompt).not.toContain("- c6");
+		expect(prompt).toContain("Potentially related issues:");
+		expect(prompt).toContain("- #2 (closed): two");
+	});
+
+	it("mentions template auto-detection when templates exist but none is selected", () => {
+		const prompt = buildConversationPrompt({
+			messages: [{ role: "user", text: "help" }],
+			context: {
+				labels: [],
+				templates: [{ name: "Bug Report", body: "## Steps" }],
+				recentCommits: [],
+				relatedIssues: [],
+			},
+			options: { privacyMode: false },
+		});
+		expect(prompt).toContain("If one of these templates fits the issue type");
 	});
 });

@@ -12,7 +12,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "NODE_ENV=test vitest run --coverage",
+    "test:coverage": "NODE_ENV=test node ./scripts/run-guardrail-coverage.js",
     "guardrail:test": "npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {

@@ -10,6 +10,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { CronStore } from "../../cron/store.js";
 import { computeNextRunAt } from "../../cron/store.js";
 import { generateIssueViaLLM } from "../../app/commands/generate-issue.js";
+import { chatIssueViaLLM } from "../../app/commands/issue-chat.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
 import type { SettingsStore } from "../../settings/store.js";
 
@@ -510,6 +511,82 @@ export async function handleAdminRoute(
 				{ privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
 			);
 			sendJson(response, 200, generated);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	// POST /api/issues/chat
+	if (request.method === "POST" && pathname === "/api/issues/chat") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+				owner?: string;
+				repo?: string;
+				privacyMode?: boolean;
+				selectedTemplate?: string;
+				context?: import("../../app/commands/issue-prompts.js").RepoContext;
+				draft?: {
+					title?: string;
+					body?: string;
+					labels?: string[];
+					assignees?: string[];
+				};
+				messages?: Array<{ role?: "assistant" | "user"; text?: string }>;
+			};
+			if (!Array.isArray(body.messages) || body.messages.length === 0) {
+				sendJson(response, 400, { error: "Missing required field: messages" });
+				return true;
+			}
+			const chatResult = await chatIssueViaLLM({
+				owner: body.owner,
+				repo: body.repo,
+				draft: body.draft,
+				context: body.context,
+				options: { privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
+				messages: body.messages
+					.filter((message): message is { role: "assistant" | "user"; text: string } =>
+						(message.role === "assistant" || message.role === "user") && typeof message.text === "string",
+					),
+			});
+
+			if (chatResult.shouldCreate) {
+				if (!deps.githubService) {
+					sendJson(response, 500, { error: "GitHub service not configured" });
+					return true;
+				}
+				if (!chatResult.owner || !chatResult.repo || !chatResult.draft.title) {
+					sendJson(response, 200, {
+						...chatResult,
+						readyToCreate: false,
+						shouldCreate: false,
+						message: "I still need the repository and a clear title before I can create the issue.",
+					});
+					return true;
+				}
+				const createdIssue = await deps.githubService.createIssue(
+					chatResult.owner,
+					chatResult.repo,
+					chatResult.draft.title,
+					chatResult.draft.body,
+					chatResult.draft.labels,
+					chatResult.draft.assignees,
+				);
+				sendJson(response, 200, {
+					...chatResult,
+					createdIssue: {
+						number: createdIssue.number,
+						html_url: createdIssue.html_url,
+					},
+				});
+				return true;
+			}
+
+			sendJson(response, 200, chatResult);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			sendJson(response, 500, { error: message });

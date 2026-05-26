@@ -1461,6 +1461,11 @@ a:hover {
 	padding: 0.45rem 0.6rem;
 }
 
+.chat-input-area {
+	min-height: 4.5rem;
+	resize: vertical;
+}
+
 .chat-input:focus {
 	border-color: var(--blue);
 	outline: none;
@@ -2080,4 +2085,3 @@ a:hover {
 		max-height: 40%;
 	}
 }
-
