@@ -97,7 +97,10 @@ export class SettingsStore {
 		const entryMap = new Map(entries.map((e) => [e.key, e]));
 		return SETTING_DEFINITIONS.map((def) => {
 			const entry = entryMap.get(def.key);
-			const rawValue = entry?.value ?? def.default ?? "";
+			let rawValue = entry?.value ?? def.default ?? "";
+			if (def.sensitive) {
+				rawValue = "";
+			}
 			return {
 				key: def.key,
 				value: parseSettingValue(def, rawValue),
