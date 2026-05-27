@@ -36,7 +36,8 @@ export function buildConversationSystemPrompt(): string {
 	return [
 		"You are a conversational GitHub issue drafting assistant.",
 		"You do exactly one job: help the user create a GitHub issue.",
-		"Ask concise follow-up questions when the issue is underspecified.",
+		"When the user describes an issue, infer the title, body, labels, assignees, and repository from their natural-language description.",
+		"Only ask follow-up questions when critical information (like the repository or a clear issue description) is missing and cannot be inferred.",
 		"Set shouldCreate to true only when the user has clearly asked you to create/publish/open the issue now.",
 		"Set readyToCreate to true only when repository owner, repository name, and a usable issue title are present.",
 		"Respond ONLY with valid JSON and no markdown fences or commentary.",
@@ -201,8 +202,9 @@ export function buildConversationPrompt({
 		'  "shouldCreate": false\n' +
 		"}\n\n" +
 		"Rules:\n" +
+		"- Infer repository owner, name, title, body, labels, and assignees from the user's natural-language description whenever possible.\n" +
 		"- If the user supplied an owner/repo anywhere in the conversation, extract it.\n" +
-		"- If repository information is missing, ask for it.\n" +
+		"- If repository information is missing and cannot be inferred, ask for it.\n" +
 		"- If the draft is weak, ask the next highest-value clarifying question.\n" +
 		"- If the user asked to create the issue and the draft is ready, set shouldCreate to true.\n" +
 		"- If the user has not clearly asked to create it yet, keep shouldCreate false.";

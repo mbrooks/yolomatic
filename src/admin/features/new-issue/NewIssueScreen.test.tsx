@@ -34,18 +34,7 @@ describe("NewIssueScreen", () => {
 				};
 				const lastUserMessage = [...(body.messages ?? [])].reverse().find((message) => message.role === "user")?.text ?? "";
 
-				if (lastUserMessage === "mbrooks/tars") {
-					return mockJsonResponse({
-						message: "Working in mbrooks/tars. Describe the issue you want to create.",
-						owner: "mbrooks",
-						repo: "tars",
-						draft: { title: "", body: "", labels: [], assignees: [] },
-						readyToCreate: false,
-						shouldCreate: false,
-					});
-				}
-
-				if (lastUserMessage === "something is broken") {
+				if (lastUserMessage.includes("something is broken") || lastUserMessage.includes("broken in mbrooks/tars")) {
 					return mockJsonResponse({
 						message: "I drafted the issue. If this is right, tell me to create it.",
 						owner: "mbrooks",
@@ -89,7 +78,7 @@ describe("NewIssueScreen", () => {
 
 	it("renders the conversational interface by default", () => {
 		render(<NewIssueScreen onBack={() => {}} />);
-		expect(screen.queryByText("Which repository should I create the issue in?")).not.toBeNull();
+		expect(screen.queryByText("What issue do you want to create?")).not.toBeNull();
 		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
 		expect(screen.queryByText("Issue draft")).not.toBeNull();
 	});
@@ -106,11 +95,11 @@ describe("NewIssueScreen", () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
-			expect(screen.queryByText("Working in mbrooks/tars. Describe the issue you want to create.")).not.toBeNull();
+			expect(screen.queryByText("I drafted the issue. If this is right, tell me to create it.")).not.toBeNull();
 		});
 
 		await waitFor(() => {
@@ -118,9 +107,6 @@ describe("NewIssueScreen", () => {
 				expect.stringContaining("/api/repos/mbrooks/tars/context"),
 			);
 		});
-
-		fireEvent.change(input, { target: { value: "something is broken" } });
-		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
 			expect(screen.queryByText("Generated Title")).not.toBeNull();
@@ -132,7 +118,7 @@ describe("NewIssueScreen", () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
@@ -144,14 +130,7 @@ describe("NewIssueScreen", () => {
 		render(<NewIssueScreen onBack={() => {}} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
-		fireEvent.change(input, { target: { value: "mbrooks/tars" } });
-		fireEvent.keyDown(input, { key: "Enter" });
-
-		await waitFor(() => {
-			expect(screen.queryByText("Working in mbrooks/tars. Describe the issue you want to create.")).not.toBeNull();
-		});
-
-		fireEvent.change(input, { target: { value: "something is broken" } });
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
 		fireEvent.keyDown(input, { key: "Enter" });
 
 		await waitFor(() => {
