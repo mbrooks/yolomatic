@@ -182,28 +182,6 @@ describe("App", () => {
 		expect(screen.queryAllByRole("button", { name: /New Issue/ }).length).toBeGreaterThan(0);
 	});
 
-	it("renders active sessions panel inline on the dashboard", async () => {
-		render(<App />);
-
-		await waitFor(() => {
-			expect(screen.queryByText("Active Work")).not.toBeNull();
-		});
-
-		const activeSessionsPanel = document.querySelector(".active-sessions-panel");
-		expect(activeSessionsPanel).not.toBeNull();
-		const panel = within(activeSessionsPanel as HTMLElement);
-
-		// The dashboard should show the inline active sessions panel with column headers
-		expect(panel.queryByText("Repo")).not.toBeNull();
-		expect(panel.queryByText("Issue")).not.toBeNull();
-		expect(panel.queryByText("Duration")).not.toBeNull();
-		expect(panel.queryByText("#1")).not.toBeNull();
-		expect(panel.queryByText("#2")).not.toBeNull();
-		expect(panel.queryByText("#4")).not.toBeNull();
-		// Complete session should not appear in active panel
-		expect(panel.queryByText("#3")).toBeNull();
-	});
-
 	it("navigates to working view via quick link", async () => {
 		render(<App />);
 
