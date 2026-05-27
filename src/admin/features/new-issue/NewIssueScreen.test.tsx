@@ -12,6 +12,11 @@ function mockJsonResponse(data: unknown, status = 200): Response {
 	});
 }
 
+const mockRepos = [
+	{ owner: "mbrooks", repo: "tars", sessionCount: 5, activeCount: 2, cronCount: 0, lastActivity: "2024-01-01" },
+	{ owner: "other", repo: "repo", sessionCount: 1, activeCount: 0, cronCount: 0, lastActivity: null },
+];
+
 describe("NewIssueScreen", () => {
 	let fetchSpy: any;
 
@@ -77,14 +82,14 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("renders the conversational interface by default", () => {
-		render(<NewIssueScreen onBack={() => {}} />);
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 		expect(screen.queryByText("What issue do you want to create?")).not.toBeNull();
 		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
 		expect(screen.queryByText("Issue draft")).not.toBeNull();
 	});
 
 	it("allows toggling privacy mode", () => {
-		render(<NewIssueScreen onBack={() => {}} />);
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 		const checkbox = screen.getByLabelText("Privacy mode");
 		expect((checkbox as HTMLInputElement).checked).toBe(false);
 		fireEvent.click(checkbox);
@@ -92,7 +97,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("continues the conversation and updates the draft preview", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -115,7 +120,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("shows the template selector when templates are available", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -127,7 +132,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("creates the issue through the conversation", async () => {
-		render(<NewIssueScreen onBack={() => {}} />);
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -143,5 +148,42 @@ describe("NewIssueScreen", () => {
 		await waitFor(() => {
 			expect(screen.queryByText("Issue created:")).not.toBeNull();
 		});
+	});
+
+	it("renders repo quick-chips when repos are provided", () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		expect(screen.getByText("mbrooks/tars")).not.toBeNull();
+		expect(screen.getByText("other/repo")).not.toBeNull();
+	});
+
+	it("selects a repository via quick-chip and fetches context", async () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+
+		const chip = screen.getByText("mbrooks/tars");
+		fireEvent.click(chip);
+
+		await waitFor(() => {
+			expect(fetchSpy).toHaveBeenCalledWith(
+				expect.stringContaining("/api/repos/mbrooks/tars/context"),
+			);
+		});
+
+		const ownerInput = screen.getByLabelText("Repository owner") as HTMLInputElement;
+		const repoInput = screen.getByLabelText("Repository name") as HTMLInputElement;
+		expect(ownerInput.value).toBe("mbrooks");
+		expect(repoInput.value).toBe("tars");
+	});
+
+	it("allows manual owner/repo entry", () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+
+		const ownerInput = screen.getByLabelText("Repository owner") as HTMLInputElement;
+		const repoInput = screen.getByLabelText("Repository name") as HTMLInputElement;
+
+		fireEvent.change(ownerInput, { target: { value: "custom" } });
+		fireEvent.change(repoInput, { target: { value: "repo" } });
+
+		expect(ownerInput.value).toBe("custom");
+		expect(repoInput.value).toBe("repo");
 	});
 });
