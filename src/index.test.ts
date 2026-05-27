@@ -29,6 +29,17 @@ vi.mock("./config.js", () => ({
 	isBootstrapComplete: vi.fn(() => true),
 }));
 
+vi.mock("./settings/store.js", () => ({
+	SettingsStore: vi.fn(() => ({
+		seedFromEnv: vi.fn(),
+		applyDefaults: vi.fn(),
+	})),
+}));
+
+vi.mock("./cron/store.js", () => ({
+	CronStore: vi.fn(() => ({})),
+}));
+
 vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
 		get: vi.fn(),
@@ -61,6 +72,10 @@ vi.mock("./executor/index.js", () => ({
 	PiAgentExecutor: vi.fn(() => ({
 		execute: vi.fn(),
 	})),
+}));
+
+vi.mock("./cron/scheduler.js", () => ({
+	startCronScheduler: vi.fn(),
 }));
 
 vi.mock("./webhook/handlers.js", () => ({
