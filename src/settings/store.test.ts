@@ -68,6 +68,43 @@ describe("SettingsStore", () => {
 		expect(store.get("default_branch")).toBe("develop");
 	});
 
+	it("getAllViews blanks out sensitive field values", () => {
+		store.seedFromEnv({ WEBHOOK_SECRET: "secret123", GITHUB_TOKEN: "token456", ADMIN_PASSWORD: "pass789" });
+		const views = store.getAllViews();
+		const secretView = views.find((v) => v.key === "webhook_secret");
+		const tokenView = views.find((v) => v.key === "github_token");
+		const passView = views.find((v) => v.key === "admin_password");
+		expect(secretView?.value).toBe("");
+		expect(tokenView?.value).toBe("");
+		expect(passView?.value).toBe("");
+	});
+
+	it("getAllViews returns actual values for non-sensitive fields", () => {
+		store.seedFromEnv({ GITHUB_USERNAME: "tars-bot", PORT: "9090" });
+		const views = store.getAllViews();
+		const userView = views.find((v) => v.key === "github_username");
+		const portView = views.find((v) => v.key === "port");
+		expect(userView?.value).toBe("tars-bot");
+		expect(portView?.value).toBe(9090);
+	});
+
+	it("getBoolean falls back to definition default", () => {
+		// auto_start has default "false" in definitions
+		expect(store.getBoolean("auto_start")).toBe(false);
+	});
+
+	it("getBoolean returns false for unknown keys", () => {
+		expect(store.getBoolean("nonexistent_key")).toBe(false);
+	});
+
+	it("set throws for unknown keys", () => {
+		expect(() => store.set("nonexistent_key", "value")).toThrow("Unknown setting: nonexistent_key");
+	});
+
+	it("setTyped throws for unknown keys", () => {
+		expect(() => store.setTyped("nonexistent_key", "value")).toThrow("Unknown setting: nonexistent_key");
+	});
+
 	it("isEmpty returns true for fresh store", () => {
 		expect(store.isEmpty()).toBe(true);
 		store.set("port", "6767");
