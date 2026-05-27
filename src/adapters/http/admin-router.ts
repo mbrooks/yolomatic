@@ -13,6 +13,7 @@ import { generateIssueViaLLM } from "../../app/commands/generate-issue.js";
 import { chatIssueViaLLM } from "../../app/commands/issue-chat.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
 import type { SettingsStore } from "../../settings/store.js";
+import { getSettingDefinition } from "../../settings/model.js";
 
 export interface AdminRouterDeps {
 	cronStore?: CronStore;
@@ -657,14 +658,19 @@ export async function handleAdminRoute(
 			try {
 				const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, string | number | boolean>;
 				const requiresRestart: string[] = [];
+				const updated: string[] = [];
 				for (const [key, value] of Object.entries(body)) {
+					const def = getSettingDefinition(key);
+					if (def?.sensitive && value === "") {
+						continue;
+					}
 					deps.settingsStore.setTyped(key, value);
-					const def = deps.settingsStore.getAllViews().find((s) => s.key === key);
 					if (def?.requiresRestart) {
 						requiresRestart.push(key);
 					}
+					updated.push(key);
 				}
-				sendJson(response, 200, { updated: Object.keys(body), requiresRestart });
+				sendJson(response, 200, { updated, requiresRestart });
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				sendJson(response, 400, { error: message });
