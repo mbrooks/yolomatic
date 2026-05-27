@@ -30,10 +30,7 @@ export function NewIssueScreen({
 }): React.ReactElement {
 	const initialOwner = prefillOwner ?? "";
 	const initialRepo = prefillRepo ?? "";
-	const initialPrompt =
-		initialOwner && initialRepo
-			? `Working in ${initialOwner}/${initialRepo}. Describe the issue you want to create.`
-			: "Which repository should I create the issue in?";
+	const initialPrompt = "What issue do you want to create?";
 
 	const [messages, setMessages] = useState<Array<{ id: string; role: "tars" | "user"; type: "text"; text: string }>>([
 		{ id: uid(), role: "tars", type: "text", text: initialPrompt },
@@ -196,23 +193,6 @@ export function NewIssueScreen({
 						<ChatTranscript messages={transcriptMessages} showTyping={submitting} />
 						<div ref={messagesEndRef} />
 					</div>
-
-					{prefillOwner && prefillRepo && !owner && !repo ? (
-						<div className="chat-quick-actions">
-							<button
-								className="chat-action-chip"
-								type="button"
-								onClick={() => {
-									setOwner(prefillOwner);
-									setRepo(prefillRepo);
-									appendTextMessage("user", `${prefillOwner}/${prefillRepo}`);
-									appendTextMessage("tars", `Working in ${prefillOwner}/${prefillRepo}. Describe the issue you want to create.`);
-								}}
-							>
-								Use {prefillOwner}/{prefillRepo}
-							</button>
-						</div>
-					) : null}
 
 					{repoContext && repoContext.templates.length > 0 ? (
 						<div className="template-selector">
