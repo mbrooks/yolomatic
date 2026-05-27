@@ -304,5 +304,5 @@ function AppContent({
 		return <SettingsScreen onBack={onBack} />;
 	}
 
-	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} />;
+	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} repos={repos} />;
 }
