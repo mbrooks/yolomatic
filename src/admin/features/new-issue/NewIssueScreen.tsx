@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { chatIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type RepoContext } from "../../api/issues.js";
 import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
+import type { RepoSummary } from "../../app/types.js";
 
 function hasDraftContent(draft: IssueDraft): boolean {
 	return Boolean(
@@ -23,10 +24,12 @@ export function NewIssueScreen({
 	onBack,
 	prefillOwner,
 	prefillRepo,
+	repos,
 }: {
 	onBack: () => void;
 	prefillOwner?: string;
 	prefillRepo?: string;
+	repos?: RepoSummary[];
 }): React.ReactElement {
 	const initialOwner = prefillOwner ?? "";
 	const initialRepo = prefillRepo ?? "";
@@ -249,9 +252,38 @@ export function NewIssueScreen({
 						<div className="preview-context">
 							<div className="preview-context-header">Repository</div>
 							<div className="preview-context-tags">
-								<span className="preview-context-tag active">
-									{owner && repo ? `${owner}/${repo}` : "Not selected"}
-								</span>
+								<div className="repo-selector-fields">
+									<input
+										aria-label="Repository owner"
+										placeholder="owner"
+										value={owner}
+										onChange={(event) => setOwner(event.target.value)}
+									/>
+									<span className="repo-selector-slash">/</span>
+									<input
+										aria-label="Repository name"
+										placeholder="repo"
+										value={repo}
+										onChange={(event) => setRepo(event.target.value)}
+									/>
+								</div>
+								{repos && repos.length > 0 ? (
+									<div className="repo-quick-chips">
+										{repos.map((r) => (
+											<button
+												key={`${r.owner}/${r.repo}`}
+												type="button"
+												className={`preview-context-tag ${owner === r.owner && repo === r.repo ? "active" : ""}`}
+												onClick={() => {
+													setOwner(r.owner);
+													setRepo(r.repo);
+												}}
+											>
+												{r.owner}/{r.repo}
+											</button>
+										))}
+									</div>
+								) : null}
 							</div>
 						</div>
 
