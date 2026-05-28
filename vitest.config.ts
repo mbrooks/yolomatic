@@ -5,6 +5,13 @@ export default defineConfig({
 		globals: true,
 		environment: "node",
 		include: ["tests/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
+		poolOptions: {
+			threads: {
+				env: {
+					NODE_ENV: "development",
+				},
+			},
+		},
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],

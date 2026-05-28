@@ -99,15 +99,63 @@ describe("NewIssueScreen", () => {
 		connectionStatusSpy.mockRestore();
 	});
 
-	it("renders the conversational interface by default", () => {
+	it("shows repository selector when no prefill is provided", () => {
 		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		expect(screen.queryByText("Select a repository")).not.toBeNull();
+		expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).toBeNull();
+	});
+
+	it("skips selector when prefill owner and repo are provided", () => {
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+		expect(screen.queryByText("Select a repository")).toBeNull();
+		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
+		expect(screen.queryByText("Issue draft")).not.toBeNull();
+	});
+
+	it("auto-selects the only available repository and proceeds to chat", async () => {
+		const singleRepo = [mockRepos[0]];
+		render(<NewIssueScreen onBack={() => {}} repos={singleRepo} />);
+		await waitFor(() => {
+			expect(screen.queryByText("Select a repository")).toBeNull();
+		});
+		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
+	});
+
+	it("selects a repository from the selector and proceeds to chat", async () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		expect(screen.queryByText("Select a repository")).not.toBeNull();
+		const card = screen.getByText("mbrooks/tars");
+		fireEvent.click(card);
+		await waitFor(() => {
+			expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
+		});
+		expect(screen.queryByText("Select a repository")).toBeNull();
+	});
+
+	it("allows manual repository entry from the selector", async () => {
+		render(<NewIssueScreen onBack={() => {}} repos={[]} />);
+		expect(screen.queryByText("Select a repository")).not.toBeNull();
+		const ownerInput = screen.getByLabelText("Repository owner") as HTMLInputElement;
+		const repoInput = screen.getByLabelText("Repository name") as HTMLInputElement;
+		fireEvent.change(ownerInput, { target: { value: "custom" } });
+		fireEvent.change(repoInput, { target: { value: "repo" } });
+		const continueBtn = screen.getByRole("button", { name: /Continue/ });
+		fireEvent.click(continueBtn);
+		await waitFor(() => {
+			expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
+		});
+	});
+
+	it("renders the conversational interface when repo is known", () => {
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		expect(screen.queryByText("What issue do you want to create?")).not.toBeNull();
 		expect(screen.queryByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.")).not.toBeNull();
 		expect(screen.queryByText("Issue draft")).not.toBeNull();
 	});
 
 	it("allows toggling privacy mode", () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		const checkbox = screen.getByLabelText("Privacy mode");
 		expect((checkbox as HTMLInputElement).checked).toBe(false);
 		fireEvent.click(checkbox);
@@ -115,7 +163,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("continues the conversation and updates the draft preview", async () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -138,7 +186,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("shows the template selector when templates are available", async () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -150,7 +198,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("creates the issue through the conversation", async () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
@@ -169,13 +217,13 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("renders repo quick-chips when repos are provided", () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		expect(screen.getByText("mbrooks/tars")).not.toBeNull();
 		expect(screen.getByText("other/repo")).not.toBeNull();
 	});
 
 	it("selects a repository via quick-chip and fetches context", async () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="other" prefillRepo="repo" repos={mockRepos} />);
 
 		const chip = screen.getByText("mbrooks/tars");
 		fireEvent.click(chip);
@@ -193,7 +241,7 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("allows manual owner/repo entry", async () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="other" prefillRepo="repo" repos={mockRepos} />);
 
 		const ownerInput = screen.getByLabelText("Repository owner") as HTMLInputElement;
 		const repoInput = screen.getByLabelText("Repository name") as HTMLInputElement;
@@ -211,12 +259,12 @@ describe("NewIssueScreen", () => {
 	});
 
 	it("subscribes to websocket status", () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		expect(subscribeStatusSpy).toHaveBeenCalledWith(expect.any(Function));
 	});
 
 	it("shows websocket connection indicator", () => {
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		const indicator = screen.queryByTitle(/WebSocket:/i);
 		expect(indicator).not.toBeNull();
 	});
@@ -242,7 +290,7 @@ describe("NewIssueScreen", () => {
 			};
 		});
 
-		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 
 		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
 		fireEvent.change(input, { target: { value: "create it" } });
