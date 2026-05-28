@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { chatIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type RepoContext } from "../../api/issues.js";
 import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
+import { webSocketManager } from "../../api/websocket.js";
 import type { RepoSummary } from "../../app/types.js";
 
 function hasDraftContent(draft: IssueDraft): boolean {
@@ -54,12 +55,25 @@ export function NewIssueScreen({
 	const [loadingContext, setLoadingContext] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [createdIssue, setCreatedIssue] = useState<{ number: number; html_url: string } | null>(null);
+	const [wsStatus, setWsStatus] = useState(webSocketManager.connectionStatus);
 
 	const messagesEndRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const scrollToBottom = useCallback(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, []);
+
+	useEffect(() => {
+		const unsubscribe = webSocketManager.onStatusChange(setWsStatus);
+		// Ensure websocket is connected for real-time status
+		const unsubStatus = webSocketManager.subscribeStatus(() => {
+			// No-op: subscription keeps the connection alive
+		});
+		return () => {
+			unsubscribe();
+			unsubStatus();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -183,6 +197,9 @@ export function NewIssueScreen({
 					Privacy mode
 				</label>
 				{loadingContext ? <span className="context-loading">Loading repo context…</span> : null}
+				<span className={`ws-status ws-status-${wsStatus}`} title={`WebSocket: ${wsStatus}`}>
+					{wsStatus === "open" ? "● Live" : wsStatus === "connecting" ? "● Connecting…" : "● Offline"}
+				</span>
 				{createdIssue ? (
 					<a className="issue-link" href={createdIssue.html_url} target="_blank" rel="noreferrer">
 						Issue #{createdIssue.number}

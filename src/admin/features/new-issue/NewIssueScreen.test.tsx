@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 
 import { NewIssueScreen } from "./NewIssueScreen.js";
+import { webSocketManager } from "../../api/websocket.js";
 
 function mockJsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -19,6 +20,7 @@ const mockRepos = [
 
 describe("NewIssueScreen", () => {
 	let fetchSpy: any;
+	let subscribeStatusSpy: any;
 
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -75,10 +77,15 @@ describe("NewIssueScreen", () => {
 
 			return mockJsonResponse({});
 		});
+
+		subscribeStatusSpy = vi.spyOn(webSocketManager, "subscribeStatus").mockImplementation(() => {
+			return () => {};
+		});
 	});
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
+		subscribeStatusSpy.mockRestore();
 	});
 
 	it("renders the conversational interface by default", () => {
@@ -185,5 +192,16 @@ describe("NewIssueScreen", () => {
 
 		expect(ownerInput.value).toBe("custom");
 		expect(repoInput.value).toBe("repo");
+	});
+
+	it("subscribes to websocket status", () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		expect(subscribeStatusSpy).toHaveBeenCalledWith(expect.any(Function));
+	});
+
+	it("shows websocket connection indicator", () => {
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+		const indicator = screen.queryByTitle(/WebSocket:/i);
+		expect(indicator).not.toBeNull();
 	});
 });

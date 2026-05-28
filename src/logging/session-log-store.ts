@@ -1,3 +1,5 @@
+import { emitSessionLogEvent } from "./log-events.js";
+
 export interface SessionLogEntry {
 	timestamp: string;
 	level: "info" | "error" | "warn" | "tool" | "assistant";
@@ -22,10 +24,12 @@ export function recordSessionLog(
 		logs = [];
 		logsMap.set(sessionKey, logs);
 	}
-	logs.push({ ...entry, timestamp: new Date().toISOString() });
+	const fullEntry = { ...entry, timestamp: new Date().toISOString() };
+	logs.push(fullEntry);
 	if (logs.length > MAX_LOGS_PER_SESSION) {
 		logs.splice(0, logs.length - MAX_LOGS_PER_SESSION);
 	}
+	emitSessionLogEvent(sessionKey, fullEntry);
 }
 
 export function getSessionLogs(sessionKey: string, since?: string): SessionLogEntry[] {

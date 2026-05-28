@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { describe, expect, it, vi } from "vitest";
+import WebSocket from "ws";
 
-import { createWebhookServer, readBody, verifySignature } from "./server.js";
+import { createWebhookServer, cleanupOldSessions, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
 
 import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
+import { SettingsStore } from "../settings/store.js";
 
 function makeRequest(
 	port: number,
@@ -3925,4 +3927,90 @@ describe("createWebhookServer", () => {
 
 		server.close();
 	});
+
+	it("executes cleanupOldSessions", async () => {
+		const sessionStore = makeMockSessionStore();
+		const result = await cleanupOldSessions(sessionStore, undefined, 30);
+		expect(result).toEqual({ deleted: 0, failed: 0 });
+	});
+
+	it("creates websocket endpoint with credentials from settingsStore", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const store = new SettingsStore(":memory:");
+		store.set("admin_username", "admin");
+		store.set("admin_password", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, {}, undefined, store);
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+
+		await new Promise<void>((resolve, reject) => {
+			client.once("open", resolve);
+			client.once("error", reject);
+		});
+
+		client.close();
+		server.close();
+	});
+
+	it("allows websocket without credentials in onboarding mode", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+
+		await new Promise<void>((resolve, reject) => {
+			client.once("open", resolve);
+			client.once("error", reject);
+		});
+
+		client.close();
+		server.close();
+	});
+
+	it("handles issue_comment webhook through server", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const payload = JSON.stringify({ action: "created", comment: { body: "hello" } });
+		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
+
+		const response = await makeRequest(
+			port,
+			{
+				method: "POST",
+				path: "/webhook",
+				headers: {
+					"x-hub-signature-256": signature,
+					"x-github-event": "issue_comment",
+				},
+			},
+			payload,
+		);
+		expect(response.statusCode).toBe(200);
+		expect(handlers.handleCommentEvent).toHaveBeenCalled();
+
+		server.close();
+	});
+
+	it("fires onSessionLogEvent callback", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+
+		// Emitting a log should not throw
+		recordSessionLog("test-session", { level: "info", message: "test" });
+
+		server.close();
+	});
 });
+

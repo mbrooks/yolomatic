@@ -1870,6 +1870,25 @@ a:hover {
 	font-style: italic;
 }
 
+.ws-status {
+	font-size: 0.75rem;
+	font-weight: 500;
+	margin-left: auto;
+}
+
+.ws-status-open {
+	color: var(--green);
+}
+
+.ws-status-connecting {
+	color: var(--yellow);
+}
+
+.ws-status-closed,
+.ws-status-error {
+	color: var(--red);
+}
+
 /* Template selector */
 .template-selector {
 	align-items: center;

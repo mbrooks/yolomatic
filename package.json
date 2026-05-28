@@ -10,11 +10,11 @@
     "build:server": "tsc -p tsconfig.json",
     "build:admin": "tsc -p tsconfig.admin.json && vite build",
     "start": "node dist/index.js",
-    "test": "vitest run",
+    "test": "NODE_ENV=development vitest run",
     "test:watch": "vitest",
-    "test:coverage": "NODE_ENV=test node ./scripts/run-guardrail-coverage.js",
+    "test:coverage": "NODE_ENV=development node ./scripts/run-guardrail-coverage.js",
     "guardrail": "npm run guardrail:test",
-    "guardrail:test": "NODE_ENV=test npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
+    "guardrail:test": "NODE_ENV=development npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.75.5",
@@ -22,13 +22,15 @@
     "dotenv": "^17.4.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "scheduler": "^0.27.0"
+    "scheduler": "^0.27.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.12.4",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/coverage-v8": "^3.2.4",
     "happy-dom": "^20.9.0",
