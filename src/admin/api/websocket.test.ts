@@ -91,7 +91,7 @@ describe("webSocketManager", () => {
 		const socket = sockets[0];
 		socket.triggerOpen();
 
-		expect(socket.url).toBe("ws://localhost:6767/ws");
+		expect(socket.url).toBe("ws://localhost:6767/tarsadmin/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
 		expect(socket.sent).toContain(
 			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 }),

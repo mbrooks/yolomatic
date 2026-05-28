@@ -67,7 +67,7 @@ export function createAdminWebSocketServer(
 
 	const wss = new WebSocketServer({
 		server: httpServer,
-		path: "/ws",
+		path: "/tarsadmin/ws",
 		verifyClient: (info, callback) => {
 			const req = info.req as IncomingMessage;
 			const { username, password } = credentialProvider.getCredentials();
