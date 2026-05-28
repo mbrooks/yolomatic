@@ -101,13 +101,23 @@ async function loadSoulContent(soulPath: string): Promise<string> {
 export function parseExecutionResult(rawResponse: string): ExecutionResult {
 	const trimmed = rawResponse.trim();
 	const lines = trimmed.split(/\r?\n/u);
-	const firstLine = lines[0]?.trim() || "";
-	const match = /^TARS_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(firstLine);
-	const status = match?.[1] as ExecutionResult["status"] | undefined;
+
+	let statusLineIndex = -1;
+	let status: ExecutionResult["status"] | undefined;
+
+	for (let i = lines.length - 1; i >= 0; i -= 1) {
+		const line = lines[i]?.trim() || "";
+		const match = /^TARS_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(line);
+		if (match) {
+			statusLineIndex = i;
+			status = match[1] as ExecutionResult["status"];
+			break;
+		}
+	}
 
 	return {
 		status: status ?? "working",
-		summary: lines.slice(match ? 1 : 0).join("\n").trim() || trimmed,
+		summary: lines.slice(statusLineIndex >= 0 ? statusLineIndex + 1 : 0).join("\n").trim() || trimmed,
 		rawResponse: trimmed,
 	};
 }
