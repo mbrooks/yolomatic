@@ -5,6 +5,75 @@ import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
 import { webSocketManager } from "../../api/websocket.js";
 import type { RepoSummary } from "../../app/types.js";
 
+function RepoSelectorStep({
+	repos,
+	onSelect,
+}: {
+	repos: RepoSummary[];
+	onSelect: (owner: string, repo: string) => void;
+}): React.ReactElement {
+	const [manualOwner, setManualOwner] = useState("");
+	const [manualRepo, setManualRepo] = useState("");
+
+	const canContinue = Boolean(manualOwner.trim() && manualRepo.trim());
+
+	return (
+		<div className="repo-selector-step">
+			<h2 className="repo-selector-title">Select a repository</h2>
+			<p className="repo-selector-hint">Choose the repository where the new issue should be created.</p>
+
+			{repos.length > 0 ? (
+				<div className="repo-selector-grid">
+					{repos.map((r) => (
+						<button
+							key={`${r.owner}/${r.repo}`}
+							type="button"
+							className="repo-selector-card"
+							onClick={() => onSelect(r.owner, r.repo)}
+						>
+							<div className="repo-selector-card-name">
+								{r.owner}/{r.repo}
+							</div>
+							<div className="repo-selector-card-meta">
+								{r.activeCount} active · {r.sessionCount} sessions
+							</div>
+						</button>
+					))}
+				</div>
+			) : (
+				<div className="repo-selector-empty">No repositories have been configured yet.</div>
+			)}
+
+			<div className="repo-selector-manual">
+				<div className="repo-selector-manual-label">Or enter a repository manually</div>
+				<div className="repo-selector-manual-fields">
+					<input
+						aria-label="Repository owner"
+						placeholder="owner"
+						value={manualOwner}
+						onChange={(e) => setManualOwner(e.target.value)}
+					/>
+					<span className="repo-selector-slash">/</span>
+					<input
+						aria-label="Repository name"
+						placeholder="repo"
+						value={manualRepo}
+						onChange={(e) => setManualRepo(e.target.value)}
+					/>
+					<button
+						type="button"
+						className="chat-send-btn"
+						disabled={!canContinue}
+						onClick={() => onSelect(manualOwner.trim(), manualRepo.trim())}
+					>
+						Continue
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function hasDraftContent(draft: IssueDraft): boolean {
 	return Boolean(
 		draft.title.trim() ||
@@ -47,6 +116,7 @@ export function NewIssueScreen({
 	});
 	const [owner, setOwner] = useState(initialOwner);
 	const [repo, setRepo] = useState(initialRepo);
+	const [repoSelected, setRepoSelected] = useState(() => Boolean(initialOwner && initialRepo));
 	const [input, setInput] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [privacyMode, setPrivacyMode] = useState(false);
@@ -82,8 +152,18 @@ export function NewIssueScreen({
 	}, [messages, scrollToBottom]);
 
 	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
+		if (repoSelected) {
+			inputRef.current?.focus();
+		}
+	}, [repoSelected]);
+
+	useEffect(() => {
+		if (!repoSelected && !owner && !repo && repos && repos.length === 1) {
+			setOwner(repos[0].owner);
+			setRepo(repos[0].repo);
+			setRepoSelected(true);
+		}
+	}, [repoSelected, owner, repo, repos]);
 
 	useEffect(() => {
 		if (!owner || !repo) {
@@ -110,8 +190,7 @@ export function NewIssueScreen({
 	const handleReset = useCallback(() => {
 		setMessages([{ id: uid(), role: "tars", type: "text", text: initialPrompt }]);
 		setDraft({ title: "", body: "", labels: [], assignees: [] });
-		setOwner(initialOwner);
-		setRepo(initialRepo);
+		// Preserve the selected repository across resets
 		setInput("");
 		setError(null);
 		setPrivacyMode(false);
@@ -120,7 +199,13 @@ export function NewIssueScreen({
 		setSubmitting(false);
 		setCreatedIssue(null);
 		setProgressMessage(null);
-	}, [initialOwner, initialPrompt, initialRepo]);
+	}, [initialPrompt]);
+
+	const handleSelectRepo = useCallback((selectedOwner: string, selectedRepoName: string) => {
+		setOwner(selectedOwner);
+		setRepo(selectedRepoName);
+		setRepoSelected(true);
+	}, []);
 
 	const handleSubmit = useCallback(async () => {
 		const value = input.trim();
@@ -185,6 +270,15 @@ export function NewIssueScreen({
 	const transcriptMessages: ChatMessage[] = createdIssue
 		? [...messages, { id: `done-${createdIssue.number}`, role: "tars", type: "done", url: createdIssue.html_url, number: createdIssue.number }]
 		: messages;
+
+	if (!repoSelected) {
+		return (
+			<div className="new-issue-screen">
+				<Breadcrumb label="Create New Issue" onBack={onBack} />
+				<RepoSelectorStep repos={repos ?? []} onSelect={handleSelectRepo} />
+			</div>
+		);
+	}
 
 	return (
 		<div className="new-issue-screen">
