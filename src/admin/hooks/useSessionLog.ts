@@ -29,6 +29,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 		if (keyChanged) {
 			prevSessionKeyRef.current = sessionKey;
 			sinceRef.current = undefined;
+			wsConnectedRef.current = false;
 			setState({ status: "idle", logs: [], error: null, refreshing: false });
 		}
 		if (!session) {
@@ -88,6 +89,12 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 
 		void load(true);
 
+		const unsubscribeConnection = webSocketManager.onStatusChange((connectionStatus) => {
+			if (connectionStatus !== "open") {
+				wsConnectedRef.current = false;
+			}
+		});
+
 		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, (entry) => {
 			if (cancelled || pausedRef.current) return;
 			wsConnectedRef.current = true;
@@ -112,6 +119,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 
 		return () => {
 			cancelled = true;
+			unsubscribeConnection();
 			unsubscribe();
 			if (interval !== null) {
 				window.clearInterval(interval);

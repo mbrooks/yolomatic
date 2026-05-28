@@ -12,13 +12,14 @@ class MockWebSocket {
 	onclose: (() => void) | null = null;
 	onerror: ((err: Event) => void) | null = null;
 	onmessage: ((event: MessageEvent) => void) | null = null;
+	sent: string[] = [];
 
 	private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
 
 	constructor(public url: string) {}
 
 	send(data: string): void {
-		// no-op in mock
+		this.sent.push(data);
 	}
 
 	close(): void {
@@ -92,10 +93,9 @@ describe("webSocketManager", () => {
 
 		expect(socket.url).toBe("ws://localhost:6767/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
-
-		// Verify subscription message was sent
-		const sendSpy = vi.spyOn(socket, "send");
-		socket.triggerOpen();
+		expect(socket.sent).toContain(
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 }),
+		);
 
 		unsub();
 	});
@@ -149,6 +149,18 @@ describe("webSocketManager", () => {
 		});
 	});
 
+	it("does not reconnect when all subscribers unsubscribe", () => {
+		vi.useFakeTimers();
+		const unsubscribe = webSocketManager.subscribeStatus(() => {});
+		const socket = sockets[0];
+		socket.triggerOpen();
+
+		unsubscribe();
+		vi.advanceTimersByTime(1200);
+
+		expect(sockets).toHaveLength(1);
+	});
+
 	it("notifies status change subscribers", () => {
 		const cb = vi.fn();
 		webSocketManager.onStatusChange(cb);
@@ -196,6 +208,69 @@ describe("webSocketManager", () => {
 		expect(sendSpy).toHaveBeenCalledWith(
 			JSON.stringify({ type: "subscribe-log", owner: "owner", repo: "repo", issueNumber: 99 }),
 		);
+	});
+
+	it("sends issue chat requests and resolves the response", async () => {
+		const responsePromise = webSocketManager.requestIssueChat(
+			{ owner: "mbrooks", repo: "tars", messages: [{ role: "user", text: "hello" }] },
+			vi.fn(),
+		);
+		const socket = sockets[0];
+		socket.triggerOpen();
+
+		const issueChatMessage = socket.sent
+			.map((entry) => JSON.parse(entry))
+			.find((entry) => entry.type === "issue-chat");
+		expect(issueChatMessage).toBeTruthy();
+
+		socket.triggerMessage({
+			type: "issue-chat-response",
+			requestId: issueChatMessage.requestId,
+			response: {
+				message: "done",
+				owner: "mbrooks",
+				repo: "tars",
+				draft: { title: "Title", body: "", labels: [], assignees: [] },
+				readyToCreate: false,
+				shouldCreate: false,
+			},
+		});
+
+		await expect(responsePromise).resolves.toMatchObject({ message: "done" });
+	});
+
+	it("forwards issue chat progress events", async () => {
+		const progress = vi.fn();
+		const responsePromise = webSocketManager.requestIssueChat(
+			{ owner: "mbrooks", repo: "tars", messages: [{ role: "user", text: "hello" }] },
+			progress,
+		);
+		const socket = sockets[0];
+		socket.triggerOpen();
+		const issueChatMessage = socket.sent
+			.map((entry) => JSON.parse(entry))
+			.find((entry) => entry.type === "issue-chat");
+
+		socket.triggerMessage({
+			type: "issue-chat-progress",
+			requestId: issueChatMessage.requestId,
+			event: { type: "started", message: "Thinking..." },
+		});
+		socket.triggerMessage({
+			type: "issue-chat-response",
+			requestId: issueChatMessage.requestId,
+			response: {
+				message: "done",
+				owner: "mbrooks",
+				repo: "tars",
+				draft: { title: "Title", body: "", labels: [], assignees: [] },
+				readyToCreate: false,
+				shouldCreate: false,
+			},
+		});
+
+		await responsePromise;
+		expect(progress).toHaveBeenCalledWith({ type: "started", message: "Thinking..." });
 	});
 
 	it("ignores invalid JSON messages", () => {

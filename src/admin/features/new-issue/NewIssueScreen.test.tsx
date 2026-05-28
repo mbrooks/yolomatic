@@ -21,6 +21,9 @@ const mockRepos = [
 describe("NewIssueScreen", () => {
 	let fetchSpy: any;
 	let subscribeStatusSpy: any;
+	let onStatusChangeSpy: any;
+	let requestIssueChatSpy: any;
+	let connectionStatusSpy: any;
 
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -81,11 +84,19 @@ describe("NewIssueScreen", () => {
 		subscribeStatusSpy = vi.spyOn(webSocketManager, "subscribeStatus").mockImplementation(() => {
 			return () => {};
 		});
+		onStatusChangeSpy = vi.spyOn(webSocketManager, "onStatusChange").mockImplementation(() => {
+			return () => {};
+		});
+		requestIssueChatSpy = vi.spyOn(webSocketManager, "requestIssueChat");
+		connectionStatusSpy = vi.spyOn(webSocketManager, "connectionStatus", "get").mockReturnValue("closed");
 	});
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
 		subscribeStatusSpy.mockRestore();
+		onStatusChangeSpy.mockRestore();
+		requestIssueChatSpy.mockRestore();
+		connectionStatusSpy.mockRestore();
 	});
 
 	it("renders the conversational interface by default", () => {
@@ -181,7 +192,7 @@ describe("NewIssueScreen", () => {
 		expect(repoInput.value).toBe("tars");
 	});
 
-	it("allows manual owner/repo entry", () => {
+	it("allows manual owner/repo entry", async () => {
 		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 
 		const ownerInput = screen.getByLabelText("Repository owner") as HTMLInputElement;
@@ -192,6 +203,11 @@ describe("NewIssueScreen", () => {
 
 		expect(ownerInput.value).toBe("custom");
 		expect(repoInput.value).toBe("repo");
+		await waitFor(() => {
+			expect(fetchSpy).toHaveBeenCalledWith(
+				expect.stringContaining("/api/repos/custom/repo/context"),
+			);
+		});
 	});
 
 	it("subscribes to websocket status", () => {
@@ -203,5 +219,40 @@ describe("NewIssueScreen", () => {
 		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
 		const indicator = screen.queryByTitle(/WebSocket:/i);
 		expect(indicator).not.toBeNull();
+	});
+
+	it("uses websocket issue chat when the connection is open", async () => {
+		connectionStatusSpy.mockReturnValue("open");
+		requestIssueChatSpy.mockImplementation(async (_payload, onProgress) => {
+			onProgress?.({ type: "started", message: "Thinking through the issue draft..." });
+			onProgress?.({ type: "creating", message: "Creating issue in mbrooks/tars..." });
+			return {
+				message: "Creating the issue now.",
+				owner: "mbrooks",
+				repo: "tars",
+				draft: {
+					title: "Generated Title",
+					body: "Generated body",
+					labels: ["bug"],
+					assignees: [],
+				},
+				readyToCreate: true,
+				shouldCreate: true,
+				createdIssue: { number: 42, html_url: "http://issue/42" },
+			};
+		});
+
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "create it" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(requestIssueChatSpy).toHaveBeenCalled();
+		});
+		await waitFor(() => {
+			expect(screen.queryByText("Issue created:")).not.toBeNull();
+		});
 	});
 });

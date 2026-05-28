@@ -50,6 +50,8 @@ describe("useSessionLog websocket", () => {
 	let fetchSpy: any;
 	let subscribeLogSpy: any;
 	let logCallback: ((entry: { timestamp: string; level: "info" | "error" | "warn" | "tool" | "assistant"; message: string }) => void) | null = null;
+	let connectionCallback: ((status: "connecting" | "open" | "closed" | "error") => void) | null = null;
+	let onStatusChangeSpy: any;
 
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(mockLogResponse());
@@ -61,12 +63,20 @@ describe("useSessionLog websocket", () => {
 				};
 			},
 		);
+		onStatusChangeSpy = vi.spyOn(webSocketManager, "onStatusChange").mockImplementation((callback) => {
+			connectionCallback = callback;
+			return () => {
+				connectionCallback = null;
+			};
+		});
 	});
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
 		subscribeLogSpy.mockRestore();
+		onStatusChangeSpy.mockRestore();
 		logCallback = null;
+		connectionCallback = null;
 		vi.useRealTimers();
 	});
 
@@ -212,6 +222,36 @@ describe("useSessionLog websocket", () => {
 		expect(result.current.status).toBe("ready");
 		expect(result.current.logs.length).toBeGreaterThanOrEqual(0);
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it("resumes polling after websocket closes", async () => {
+		vi.useFakeTimers();
+		renderHook(() => useSessionLog(makeSession("working")));
+
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		await act(async () => {
+			logCallback?.({ timestamp: "2025-01-01T00:00:02.000Z", level: "info", message: "ws line" });
+			await Promise.resolve();
+		});
+
+		const callCount = fetchSpy.mock.calls.length;
+		connectionCallback?.("closed");
+
+		await act(async () => {
+			vi.advanceTimersByTime(2500);
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+
+		expect(fetchSpy.mock.calls.length).toBeGreaterThan(callCount);
 	});
 
 	it("does not fetch when paused", async () => {

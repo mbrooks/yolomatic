@@ -16,6 +16,7 @@ export function useServerState(refreshToken = 0): ServerState {
 
 	useEffect(() => {
 		let cancelled = false;
+		wsReceivedRef.current = false;
 
 		async function load(): Promise<void> {
 			if (wsReceivedRef.current) return;
@@ -34,6 +35,12 @@ export function useServerState(refreshToken = 0): ServerState {
 
 		void load();
 
+		const unsubscribeConnection = webSocketManager.onStatusChange((status) => {
+			if (status !== "open") {
+				wsReceivedRef.current = false;
+			}
+		});
+
 		const unsubscribe = webSocketManager.subscribeStatus((data) => {
 			if (cancelled) return;
 			wsReceivedRef.current = true;
@@ -49,6 +56,7 @@ export function useServerState(refreshToken = 0): ServerState {
 
 		return () => {
 			cancelled = true;
+			unsubscribeConnection();
 			unsubscribe();
 			window.clearInterval(interval);
 		};

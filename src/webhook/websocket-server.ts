@@ -3,16 +3,21 @@ import type { IncomingMessage } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
+import type { IssueChatProgressEvent, IssueChatRequestBody } from "../adapters/http/admin-router.js";
+import type { IssueChatResponse } from "../admin/api/issues.js";
 
 export type ClientMessage =
 	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "unsubscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "subscribe-status" }
-	| { type: "unsubscribe-status" };
+	| { type: "unsubscribe-status" }
+	| { type: "issue-chat"; requestId: string; payload: IssueChatRequestBody };
 
 export type ServerMessage =
 	| { type: "log-entry"; sessionKey: string; entry: SessionLogEntry }
 	| { type: "status"; data: unknown }
+	| { type: "issue-chat-progress"; requestId: string; event: IssueChatProgressEvent }
+	| { type: "issue-chat-response"; requestId: string; response: IssueChatResponse }
 	| { type: "error"; message: string };
 
 export interface CredentialProvider {
@@ -21,6 +26,13 @@ export interface CredentialProvider {
 
 export interface StatusProvider {
 	getStatus(): Promise<unknown>;
+}
+
+export interface IssueChatProvider {
+	runIssueChat(
+		payload: IssueChatRequestBody,
+		onProgress: (event: IssueChatProgressEvent) => void,
+	): Promise<IssueChatResponse>;
 }
 
 function verifyBasicAuth(request: IncomingMessage, username: string, password: string): boolean {
@@ -44,6 +56,7 @@ export function createAdminWebSocketServer(
 	httpServer: Server,
 	credentialProvider: CredentialProvider,
 	statusProvider?: StatusProvider,
+	issueChatProvider?: IssueChatProvider,
 ): {
 	broadcastLog: (sessionKey: string, entry: SessionLogEntry) => void;
 	broadcastStatus: (data: unknown) => void;
@@ -137,6 +150,42 @@ export function createAdminWebSocketServer(
 					if (!hasStatusSubscribers()) {
 						stopStatusPolling();
 					}
+				} else if (msg.type === "issue-chat") {
+					if (!issueChatProvider) {
+						if (ws.readyState === WebSocket.OPEN) {
+							ws.send(JSON.stringify({ type: "error", message: "Issue chat is not configured" } satisfies ServerMessage));
+						}
+						return;
+					}
+					void issueChatProvider.runIssueChat(msg.payload, (event) => {
+						if (ws.readyState !== WebSocket.OPEN) {
+							return;
+						}
+						ws.send(JSON.stringify({
+							type: "issue-chat-progress",
+							requestId: msg.requestId,
+							event,
+						} satisfies ServerMessage));
+					}).then((response) => {
+						if (ws.readyState !== WebSocket.OPEN) {
+							return;
+						}
+						ws.send(JSON.stringify({
+							type: "issue-chat-response",
+							requestId: msg.requestId,
+							response,
+						} satisfies ServerMessage));
+					}).catch((error: unknown) => {
+						if (ws.readyState !== WebSocket.OPEN) {
+							return;
+						}
+						const message = error instanceof Error ? error.message : String(error);
+						ws.send(JSON.stringify({
+							type: "issue-chat-progress",
+							requestId: msg.requestId,
+							event: { type: "error", message },
+						} satisfies ServerMessage));
+					});
 				}
 			} catch {
 				// ignore invalid messages
