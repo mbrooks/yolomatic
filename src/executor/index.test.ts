@@ -162,6 +162,24 @@ describe("parseExecutionResult", () => {
 		const result = parseExecutionResult("TARS_STATUS: complete\n   ");
 		expect(result.summary).toBe("TARS_STATUS: complete");
 	});
+
+	it("finds status line anywhere in the response", () => {
+		const result = parseExecutionResult("Some preamble.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("uses the last status line when multiple are present", () => {
+		const result = parseExecutionResult("TARS_STATUS: working\nStill going.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("ignores invalid status lines and finds a later valid one", () => {
+		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Fixed.");
+	});
 });
 
 describe("extractText", () => {
