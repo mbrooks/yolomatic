@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { chatIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type RepoContext } from "../../api/issues.js";
+import { chatIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type IssueChatPayload, type RepoContext } from "../../api/issues.js";
 import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
 import { webSocketManager } from "../../api/websocket.js";
 import type { RepoSummary } from "../../app/types.js";
@@ -56,6 +56,7 @@ export function NewIssueScreen({
 	const [submitting, setSubmitting] = useState(false);
 	const [createdIssue, setCreatedIssue] = useState<{ number: number; html_url: string } | null>(null);
 	const [wsStatus, setWsStatus] = useState(webSocketManager.connectionStatus);
+	const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
 	const messagesEndRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -118,6 +119,7 @@ export function NewIssueScreen({
 		setSelectedTemplate(undefined);
 		setSubmitting(false);
 		setCreatedIssue(null);
+		setProgressMessage(null);
 	}, [initialOwner, initialPrompt, initialRepo]);
 
 	const handleSubmit = useCallback(async () => {
@@ -133,17 +135,24 @@ export function NewIssueScreen({
 		setInput("");
 		setError(null);
 		setSubmitting(true);
+		setProgressMessage("Thinking through the issue draft...");
+
+		const payload: IssueChatPayload = {
+			owner: owner || undefined,
+			repo: repo || undefined,
+			draft,
+			context: repoContext ?? undefined,
+			privacyMode,
+			selectedTemplate,
+			messages: toApiMessages(nextMessages),
+		};
 
 		try {
-			const result = await chatIssue({
-				owner: owner || undefined,
-				repo: repo || undefined,
-				draft,
-				context: repoContext ?? undefined,
-				privacyMode,
-				selectedTemplate,
-				messages: toApiMessages(nextMessages),
-			});
+			const result = wsStatus === "open"
+				? await webSocketManager.requestIssueChat(payload, (event) => {
+					setProgressMessage(event.message);
+				})
+				: await chatIssue(payload);
 
 			setOwner(result.owner);
 			setRepo(result.repo);
@@ -158,6 +167,7 @@ export function NewIssueScreen({
 			setError(message);
 			appendTextMessage("tars", `I couldn't continue the issue draft: ${message}`);
 		} finally {
+			setProgressMessage(null);
 			setSubmitting(false);
 		}
 	}, [appendTextMessage, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting]);
@@ -240,6 +250,7 @@ export function NewIssueScreen({
 					) : null}
 
 					{error ? <div className="chat-error">{error}</div> : null}
+					{progressMessage ? <div className="context-loading">{progressMessage}</div> : null}
 
 					<div className="chat-input-row">
 						<textarea

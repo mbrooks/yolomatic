@@ -10,6 +10,7 @@ import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
+import { executeIssueChatRequest } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
@@ -134,11 +135,25 @@ export function createWebhookServer(
 		server,
 		credentialProvider,
 		statusProvider,
+		{
+			runIssueChat: (payload, onProgress) => executeIssueChatRequest(serverDeps, payload, onProgress),
+		},
 	);
 
-	onSessionLogEvent((sessionKey, entry) => {
+	const stopLogEvents = onSessionLogEvent((sessionKey, entry) => {
 		wsServer.broadcastLog(sessionKey, entry);
 	});
+
+	const originalClose = server.close.bind(server);
+	server.close = ((callback?: (err?: Error) => void) => {
+		stopLogEvents();
+		originalClose((err?: Error) => {
+			void wsServer.close().finally(() => {
+				callback?.(err);
+			});
+		});
+		return server;
+	}) as typeof server.close;
 
 	return server;
 }

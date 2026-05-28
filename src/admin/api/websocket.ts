@@ -1,3 +1,4 @@
+import type { IssueChatPayload, IssueChatProgressEvent, IssueChatResponse } from "./issues.js";
 import type { LogEntry } from "../app/types.js";
 
 export type WebSocketStatus = "connecting" | "open" | "closed" | "error";
@@ -13,10 +14,33 @@ export interface LogMessage {
 	entry: LogEntry;
 }
 
-type ServerMessage = StatusMessage | LogMessage | { type: "error"; message: string };
+export interface IssueChatProgressMessage {
+	type: "issue-chat-progress";
+	requestId: string;
+	event: IssueChatProgressEvent;
+}
+
+export interface IssueChatResponseMessage {
+	type: "issue-chat-response";
+	requestId: string;
+	response: IssueChatResponse;
+}
+
+type ServerMessage =
+	| StatusMessage
+	| LogMessage
+	| IssueChatProgressMessage
+	| IssueChatResponseMessage
+	| { type: "error"; message: string };
 
 type LogCallback = (entry: LogEntry) => void;
 type StatusCallback = (data: unknown) => void;
+type IssueChatProgressCallback = (event: IssueChatProgressEvent) => void;
+type PendingIssueChat = {
+	onProgress?: IssueChatProgressCallback;
+	resolve: (response: IssueChatResponse) => void;
+	reject: (error: Error) => void;
+};
 
 class WebSocketManager {
 	private ws: WebSocket | null = null;
@@ -27,6 +51,7 @@ class WebSocketManager {
 	private statusListeners = new Set<StatusCallback>();
 	private status: WebSocketStatus = "closed";
 	private statusSubscribers = new Set<(status: WebSocketStatus) => void>();
+	private pendingIssueChats = new Map<string, PendingIssueChat>();
 
 	get connectionStatus(): WebSocketStatus {
 		return this.status;
@@ -89,6 +114,19 @@ class WebSocketManager {
 					for (const cb of this.statusListeners) {
 						cb(msg.data);
 					}
+				} else if (msg.type === "issue-chat-progress") {
+					const pending = this.pendingIssueChats.get(msg.requestId);
+					pending?.onProgress?.(msg.event);
+					if (msg.event.type === "error") {
+						pending?.reject(new Error(msg.event.message));
+						this.pendingIssueChats.delete(msg.requestId);
+					}
+				} else if (msg.type === "issue-chat-response") {
+					const pending = this.pendingIssueChats.get(msg.requestId);
+					if (pending) {
+						pending.resolve(msg.response);
+						this.pendingIssueChats.delete(msg.requestId);
+					}
 				}
 			} catch {
 				// ignore invalid messages
@@ -97,7 +135,9 @@ class WebSocketManager {
 
 		this.ws.onclose = () => {
 			this.setStatus("closed");
-			this.scheduleReconnect();
+			if (this.hasSubscribers()) {
+				this.scheduleReconnect();
+			}
 		};
 
 		this.ws.onerror = () => {
@@ -116,6 +156,12 @@ class WebSocketManager {
 			this.ws.onerror = null;
 			this.ws.close();
 			this.ws = null;
+		}
+		if (this.pendingIssueChats.size > 0) {
+			for (const pending of this.pendingIssueChats.values()) {
+				pending.reject(new Error("WebSocket disconnected"));
+			}
+			this.pendingIssueChats.clear();
 		}
 		this.setStatus("closed");
 	}
@@ -140,6 +186,7 @@ class WebSocketManager {
 				if (this.ws?.readyState === WebSocket.OPEN) {
 					this.send({ type: "unsubscribe-log", owner, repo, issueNumber });
 				}
+				this.disconnectIfIdle();
 			}
 		};
 	}
@@ -157,13 +204,53 @@ class WebSocketManager {
 			if (this.statusListeners.size === 0 && this.ws?.readyState === WebSocket.OPEN) {
 				this.send({ type: "unsubscribe-status" });
 			}
+			this.disconnectIfIdle();
 		};
 	}
 
-	private send(msg: { type: string; owner?: string; repo?: string; issueNumber?: number }): void {
+	requestIssueChat(
+		payload: IssueChatPayload,
+		onProgress?: IssueChatProgressCallback,
+	): Promise<IssueChatResponse> {
+		const requestId = `issue-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+		return new Promise<IssueChatResponse>((resolve, reject) => {
+			this.pendingIssueChats.set(requestId, { onProgress, resolve, reject });
+			this.connect();
+			this.sendWhenOpen({
+				type: "issue-chat",
+				requestId,
+				payload,
+			}, () => {
+				const pending = this.pendingIssueChats.get(requestId);
+				if (pending) {
+					pending.reject(new Error("WebSocket disconnected"));
+					this.pendingIssueChats.delete(requestId);
+				}
+			});
+		});
+	}
+
+	private send(msg: Record<string, unknown>): void {
 		if (this.ws?.readyState === WebSocket.OPEN) {
 			this.ws.send(JSON.stringify(msg));
 		}
+	}
+
+	private sendWhenOpen(msg: Record<string, unknown>, onFailure: () => void): void {
+		if (this.ws?.readyState === WebSocket.OPEN) {
+			this.send(msg);
+			return;
+		}
+		const waitForOpen = (status: WebSocketStatus): void => {
+			if (status === "open") {
+				unsubscribe();
+				this.send(msg);
+			} else if (status === "closed" || status === "error") {
+				unsubscribe();
+				onFailure();
+			}
+		};
+		const unsubscribe = this.onStatusChange(waitForOpen);
 	}
 
 	private setStatus(status: WebSocketStatus): void {
@@ -174,12 +261,22 @@ class WebSocketManager {
 	}
 
 	private scheduleReconnect(): void {
-		if (this.reconnectTimer) return;
+		if (this.reconnectTimer || !this.hasSubscribers()) return;
 		this.reconnectTimer = setTimeout(() => {
 			this.reconnectTimer = null;
 			this.connect();
 		}, this.reconnectDelay);
 		this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+	}
+
+	private hasSubscribers(): boolean {
+		return this.logListeners.size > 0 || this.statusListeners.size > 0 || this.pendingIssueChats.size > 0;
+	}
+
+	private disconnectIfIdle(): void {
+		if (!this.hasSubscribers()) {
+			this.disconnect();
+		}
 	}
 }
 
