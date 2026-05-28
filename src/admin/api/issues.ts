@@ -69,6 +69,12 @@ export interface IssueChatResponse {
 	createdIssue?: CreatedIssueResponse;
 }
 
+export interface IssueChatProgressEvent {
+	type: "started" | "creating" | "completed" | "error";
+	message: string;
+	response?: IssueChatResponse;
+}
+
 export async function createIssue(payload: CreateIssuePayload): Promise<CreatedIssueResponse> {
 	return apiPost<CreatedIssueResponse>("/api/issues", payload);
 }

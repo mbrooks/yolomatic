@@ -14,6 +14,7 @@ import { chatIssueViaLLM } from "../../app/commands/issue-chat.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
 import type { SettingsStore } from "../../settings/store.js";
 import { getSettingDefinition } from "../../settings/model.js";
+import type { IssueChatResponse } from "../../admin/api/issues.js";
 
 export interface AdminRouterDeps {
 	cronStore?: CronStore;
@@ -27,6 +28,27 @@ export interface AdminRouterDeps {
 	adminPassword?: string;
 	adminAssetsDir: string;
 	settingsStore?: SettingsStore;
+}
+
+export interface IssueChatRequestBody {
+	owner?: string;
+	repo?: string;
+	privacyMode?: boolean;
+	selectedTemplate?: string;
+	context?: import("../../app/commands/issue-prompts.js").RepoContext;
+	draft?: {
+		title?: string;
+		body?: string;
+		labels?: string[];
+		assignees?: string[];
+	};
+	messages?: Array<{ role?: "assistant" | "user"; text?: string }>;
+}
+
+export interface IssueChatProgressEvent {
+	type: "started" | "creating" | "completed" | "error";
+	message: string;
+	response?: IssueChatResponse;
 }
 
 function mapResultToStatus(code: string): number {
@@ -69,6 +91,87 @@ function checkAdminTextAllowOnboarding(request: IncomingMessage, response: Serve
 		return true; // allow without auth during onboarding
 	}
 	return requireAdminText(request, response, username, password);
+}
+
+export async function executeIssueChatRequest(
+	deps: AdminRouterDeps,
+	body: IssueChatRequestBody,
+	onProgress?: (event: IssueChatProgressEvent) => void,
+): Promise<IssueChatResponse> {
+	if (!Array.isArray(body.messages) || body.messages.length === 0) {
+		throw new Error("Missing required field: messages");
+	}
+
+	onProgress?.({
+		type: "started",
+		message: "Thinking through the issue draft...",
+	});
+
+	const chatResult = await chatIssueViaLLM({
+		owner: body.owner,
+		repo: body.repo,
+		draft: body.draft,
+		context: body.context,
+		options: { privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
+		messages: body.messages
+			.filter((message): message is { role: "assistant" | "user"; text: string } =>
+				(message.role === "assistant" || message.role === "user") && typeof message.text === "string",
+			),
+	});
+
+	if (chatResult.shouldCreate) {
+		if (!deps.githubService) {
+			throw new Error("GitHub service not configured");
+		}
+		if (!chatResult.owner || !chatResult.repo || !chatResult.draft.title) {
+			const response = {
+				...chatResult,
+				readyToCreate: false,
+				shouldCreate: false,
+				message: "I still need the repository and a clear title before I can create the issue.",
+			};
+			onProgress?.({
+				type: "completed",
+				message: response.message,
+				response,
+			});
+			return response;
+		}
+
+		onProgress?.({
+			type: "creating",
+			message: `Creating issue in ${chatResult.owner}/${chatResult.repo}...`,
+		});
+
+		const createdIssue = await deps.githubService.createIssue(
+			chatResult.owner,
+			chatResult.repo,
+			chatResult.draft.title,
+			chatResult.draft.body,
+			chatResult.draft.labels,
+			chatResult.draft.assignees,
+		);
+		const response = {
+			...chatResult,
+			createdIssue: {
+				number: createdIssue.number,
+				html_url: createdIssue.html_url,
+			},
+		};
+		onProgress?.({
+			type: "completed",
+			message: response.message,
+			response,
+		});
+		return response;
+	}
+
+	onProgress?.({
+		type: "completed",
+		message: chatResult.message,
+		response: chatResult,
+	});
+	return chatResult;
 }
 
 export async function handleAdminRoute(
@@ -525,72 +628,15 @@ export async function handleAdminRoute(
 			return true;
 		}
 		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				owner?: string;
-				repo?: string;
-				privacyMode?: boolean;
-				selectedTemplate?: string;
-				context?: import("../../app/commands/issue-prompts.js").RepoContext;
-				draft?: {
-					title?: string;
-					body?: string;
-					labels?: string[];
-					assignees?: string[];
-				};
-				messages?: Array<{ role?: "assistant" | "user"; text?: string }>;
-			};
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as IssueChatRequestBody;
 			if (!Array.isArray(body.messages) || body.messages.length === 0) {
 				sendJson(response, 400, { error: "Missing required field: messages" });
 				return true;
 			}
-			const chatResult = await chatIssueViaLLM({
-				owner: body.owner,
-				repo: body.repo,
-				draft: body.draft,
-				context: body.context,
-				options: { privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
-				messages: body.messages
-					.filter((message): message is { role: "assistant" | "user"; text: string } =>
-						(message.role === "assistant" || message.role === "user") && typeof message.text === "string",
-					),
-			});
-
-			if (chatResult.shouldCreate) {
-				if (!deps.githubService) {
-					sendJson(response, 500, { error: "GitHub service not configured" });
-					return true;
-				}
-				if (!chatResult.owner || !chatResult.repo || !chatResult.draft.title) {
-					sendJson(response, 200, {
-						...chatResult,
-						readyToCreate: false,
-						shouldCreate: false,
-						message: "I still need the repository and a clear title before I can create the issue.",
-					});
-					return true;
-				}
-				const createdIssue = await deps.githubService.createIssue(
-					chatResult.owner,
-					chatResult.repo,
-					chatResult.draft.title,
-					chatResult.draft.body,
-					chatResult.draft.labels,
-					chatResult.draft.assignees,
-				);
-				sendJson(response, 200, {
-					...chatResult,
-					createdIssue: {
-						number: createdIssue.number,
-						html_url: createdIssue.html_url,
-					},
-				});
-				return true;
-			}
-
-			sendJson(response, 200, chatResult);
+			sendJson(response, 200, await executeIssueChatRequest(deps, body));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
+			sendJson(response, message === "Missing required field: messages" ? 400 : 500, { error: message });
 		}
 		return true;
 	}
