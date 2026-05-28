@@ -13,6 +13,8 @@ import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
+import { createAdminWebSocketServer, type CredentialProvider, type StatusProvider } from "./websocket-server.js";
+import { onSessionLogEvent } from "../logging/log-events.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
@@ -49,7 +51,29 @@ export function createWebhookServer(
 		settingsStore,
 	);
 
-	return createServer(async (request, response) => {
+	const credentialProvider: CredentialProvider = {
+		getCredentials(): { username?: string; password?: string } {
+			if (serverDeps.adminUsername && serverDeps.adminPassword) {
+				return { username: serverDeps.adminUsername, password: serverDeps.adminPassword };
+			}
+			const store = serverDeps.settingsStore;
+			if (store) {
+				const u = store.get("admin_username");
+				const p = store.get("admin_password");
+				if (u && p) return { username: u, password: p };
+			}
+			return {};
+		},
+	};
+
+	const statusProvider: StatusProvider = {
+		async getStatus(): Promise<unknown> {
+			const result = await serverDeps.getAdminStatus.execute();
+			return (result as { success: true; data: unknown }).data;
+		},
+	};
+
+	const server = createServer(async (request, response) => {
 		process.stdout.write(
 			`[webhook] ${new Date().toISOString()} ${request.method ?? "UNKNOWN"} ${request.url ?? ""}\n`,
 		);
@@ -91,7 +115,7 @@ export function createWebhookServer(
 			} else if (event === "pull_request_review_comment") {
 				await handlers.handlePullRequestReviewCommentEvent(payload);
 			} else if (event === "pull_request_review") {
-			await handlers.handlePullRequestReviewEvent(payload);
+				await handlers.handlePullRequestReviewEvent(payload);
 			} else {
 				process.stdout.write(`[webhook] ignored unsupported event=${event ?? "unknown"}\n`);
 			}
@@ -105,6 +129,18 @@ export function createWebhookServer(
 		process.stdout.write("[webhook] handled successfully\n");
 		sendText(response, 200, "OK");
 	});
+
+	const wsServer = createAdminWebSocketServer(
+		server,
+		credentialProvider,
+		statusProvider,
+	);
+
+	onSessionLogEvent((sessionKey, entry) => {
+		wsServer.broadcastLog(sessionKey, entry);
+	});
+
+	return server;
 }
 
 export async function cleanupOldSessions(

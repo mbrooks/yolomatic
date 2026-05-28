@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSessionLog } from "../api/sessions.js";
+import { webSocketManager } from "../api/websocket.js";
 import type { LogEntry, Session } from "../app/types.js";
 
 export type LogLoadState = {
@@ -21,6 +22,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 	pausedRef.current = paused;
 	const sessionKey = session ? `${session.owner}/${session.repo}#${session.issueNumber}` : null;
 	const prevSessionKeyRef = useRef<string | null>(null);
+	const wsConnectedRef = useRef(false);
 
 	useEffect(() => {
 		const keyChanged = sessionKey !== prevSessionKeyRef.current;
@@ -36,14 +38,16 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 		const { owner, repo, issueNumber, status } = session;
 		let cancelled = false;
 
-		async function load(): Promise<void> {
+		async function load(initial = false): Promise<void> {
 			if (pausedRef.current) return;
-			setState((current) => {
-				if (current.logs.length > 0) {
-					return { ...current, error: null, refreshing: true };
-				}
-				return { status: "loading", logs: [], error: null, refreshing: false };
-			});
+			if (initial) {
+				setState((current) => {
+					if (current.logs.length > 0) {
+						return { ...current, error: null, refreshing: true };
+					}
+					return { status: "loading", logs: [], error: null, refreshing: false };
+				});
+			}
 			try {
 				const data = await fetchSessionLog(owner, repo, issueNumber, sinceRef.current);
 				if (!cancelled) {
@@ -55,11 +59,16 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 							error: null,
 							refreshing: false,
 						}));
-					} else {
+					} else if (initial) {
 						setState((current) => ({
 							status: "ready",
 							logs: current.logs,
 							error: null,
+							refreshing: false,
+						}));
+					} else {
+						setState((current) => ({
+							...current,
 							refreshing: false,
 						}));
 					}
@@ -77,18 +86,36 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 			}
 		}
 
-		void load();
+		void load(true);
 
-		if (status === "complete") {
-			return () => {
-				cancelled = true;
-			};
+		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, (entry) => {
+			if (cancelled || pausedRef.current) return;
+			wsConnectedRef.current = true;
+			sinceRef.current = entry.timestamp;
+			setState((current) => ({
+				status: "ready",
+				logs: [...current.logs, entry],
+				error: null,
+				refreshing: false,
+			}));
+		});
+
+		// Fallback polling when websocket is not connected
+		let interval: number | null = null;
+		if (status !== "complete") {
+			interval = window.setInterval(() => {
+				if (!wsConnectedRef.current) {
+					void load(false);
+				}
+			}, 2500);
 		}
 
-		const interval = window.setInterval(() => void load(), 2500);
 		return () => {
 			cancelled = true;
-			window.clearInterval(interval);
+			unsubscribe();
+			if (interval !== null) {
+				window.clearInterval(interval);
+			}
 		};
 	}, [sessionKey, session?.status]);
 
