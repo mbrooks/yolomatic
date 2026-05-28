@@ -36,7 +36,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({}),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`);
 		await new Promise<void>((resolve, reject) => {
 			client.once("open", resolve);
 			client.once("error", reject);
@@ -49,7 +49,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`);
 		await expect(
 			new Promise<void>((resolve, reject) => {
 				client.once("open", resolve);
@@ -63,7 +63,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -80,7 +80,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -122,7 +122,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -160,7 +160,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		}, statusProvider);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -195,7 +195,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		}, statusProvider);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -221,7 +221,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -247,7 +247,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -280,7 +280,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -325,7 +325,7 @@ describe("createAdminWebSocketServer", () => {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		}, undefined, issueChatProvider);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},

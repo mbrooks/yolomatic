@@ -71,7 +71,7 @@ class WebSocketManager {
 
 		this.setStatus("connecting");
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const url = `${protocol}//${window.location.host}/ws`;
+		const url = `${protocol}//${window.location.host}/tarsadmin/ws`;
 
 		try {
 			this.ws = new WebSocket(url);
