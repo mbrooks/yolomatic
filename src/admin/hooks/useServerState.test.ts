@@ -172,7 +172,7 @@ describe("useServerState websocket", () => {
 
 	it("does not update state when unmounted during fetch", async () => {
 		vi.useFakeTimers();
-		let resolveFetch: (() => void) | null = null;
+		let resolveFetch: ((value: unknown) => void) | null = null;
 		fetchSpy.mockImplementation(() => new Promise((resolve) => {
 			resolveFetch = resolve;
 		}));
@@ -187,7 +187,7 @@ describe("useServerState websocket", () => {
 		unmount();
 
 		await act(async () => {
-			resolveFetch?.();
+			resolveFetch?.(undefined);
 			await Promise.resolve();
 			await Promise.resolve();
 			await Promise.resolve();
