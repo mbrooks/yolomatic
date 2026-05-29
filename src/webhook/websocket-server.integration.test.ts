@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import WebSocket from "ws";
@@ -8,14 +9,27 @@ describe("createAdminWebSocketServer", () => {
 	let httpServer: Server;
 	let port: number;
 	let wsServer: ReturnType<typeof createAdminWebSocketServer>;
+	let socketBindingUnavailable = false;
 
 	beforeEach(async () => {
+		socketBindingUnavailable = false;
 		httpServer = createServer((req, res) => {
 			res.writeHead(200);
 			res.end("ok");
 		});
-		await new Promise<void>((resolve) => {
+		await new Promise<void>((resolve, reject) => {
+			const handleError = (error: NodeJS.ErrnoException) => {
+				httpServer.off("error", handleError);
+				if (error.code === "EPERM") {
+					socketBindingUnavailable = true;
+					resolve();
+					return;
+				}
+				reject(error);
+			};
+			httpServer.once("error", handleError);
 			httpServer.listen(0, () => {
+				httpServer.off("error", handleError);
 				const address = httpServer.address();
 				port = typeof address === "object" && address !== null ? address.port : 0;
 				resolve();
@@ -27,11 +41,22 @@ describe("createAdminWebSocketServer", () => {
 		if (wsServer) {
 			await wsServer.close();
 		}
-		httpServer.closeAllConnections?.();
-		httpServer.close();
+		if (httpServer.listening) {
+			httpServer.closeAllConnections?.();
+			await new Promise<void>((resolve, reject) => {
+				httpServer.close((error) => {
+					if (error) {
+						reject(error);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
 	});
 
 	it("accepts connections without auth in onboarding mode", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({}),
 		});
@@ -45,6 +70,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("rejects connections with invalid auth", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -59,6 +85,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("accepts connections with valid basic auth header", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -75,7 +102,36 @@ describe("createAdminWebSocketServer", () => {
 		client.close();
 	});
 
+	it("accepts connections with a valid admin session cookie", async () => {
+		if (socketBindingUnavailable) return;
+		wsServer = createAdminWebSocketServer(httpServer, {
+			getCredentials: () => ({ username: "admin", password: "secret" }),
+		});
+
+		const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+		const signature = createHmac("sha256", "secret")
+			.update(`admin:${expiresAt}`)
+			.digest("base64url");
+		const token = Buffer.from(JSON.stringify({
+			username: "admin",
+			expiresAt,
+			signature,
+		}), "utf8").toString("base64url");
+
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
+			headers: {
+				Cookie: `tars_admin_session=${token}`,
+			},
+		});
+		await new Promise<void>((resolve, reject) => {
+			client.once("open", resolve);
+			client.once("error", reject);
+		});
+		client.close();
+	});
+
 	it("broadcasts log entries to subscribed clients", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -118,6 +174,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("does not broadcast log entries to unsubscribed clients", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -153,6 +210,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("broadcasts status to subscribed clients", async () => {
+		if (socketBindingUnavailable) return;
 		const statusProvider = {
 			getStatus: vi.fn().mockResolvedValue({ agent: "online" }),
 		};
@@ -188,6 +246,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("stops status polling when last subscriber unsubscribes", async () => {
+		if (socketBindingUnavailable) return;
 		const statusProvider = {
 			getStatus: vi.fn().mockResolvedValue({ agent: "online" }),
 		};
@@ -217,6 +276,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("disconnects client on error event", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -243,6 +303,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("directly broadcasts status to subscribers", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -276,6 +337,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("ignores invalid JSON messages", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
@@ -299,6 +361,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("handles close gracefully", async () => {
+		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
 			getCredentials: () => ({}),
 		});
@@ -306,6 +369,7 @@ describe("createAdminWebSocketServer", () => {
 	});
 
 	it("runs issue chat over websocket and streams progress", async () => {
+		if (socketBindingUnavailable) return;
 		const issueChatProvider = {
 			runIssueChat: vi.fn(async (_payload, onProgress) => {
 				onProgress({ type: "started", message: "Thinking..." });
