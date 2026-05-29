@@ -303,4 +303,31 @@ describe("NewIssueScreen", () => {
 			expect(screen.queryByText("Issue created:")).not.toBeNull();
 		});
 	});
+
+	it("falls back to http issue chat when websocket chat fails before progress starts", async () => {
+		connectionStatusSpy.mockReturnValue("open");
+		requestIssueChatSpy.mockRejectedValue(new Error("WebSocket disconnected"));
+
+		render(<NewIssueScreen onBack={() => {}} repos={mockRepos} />);
+
+		fireEvent.click(screen.getByText("mbrooks/tars"));
+
+		const input = await screen.findByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "create it" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(requestIssueChatSpy).toHaveBeenCalled();
+		});
+		await waitFor(() => {
+			expect(fetchSpy).toHaveBeenCalledWith(
+				expect.stringContaining("/api/issues/chat"),
+				expect.objectContaining({ method: "POST" }),
+			);
+		});
+		await waitFor(() => {
+			expect(screen.queryByText("Issue created:")).not.toBeNull();
+		});
+		expect(screen.queryByText("I couldn't continue the issue draft: WebSocket disconnected")).toBeNull();
+	});
 });
