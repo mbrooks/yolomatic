@@ -130,6 +130,7 @@ describe("webSocketManager", () => {
 	});
 
 	it("reconnects after close", () => {
+		vi.useFakeTimers();
 		webSocketManager.subscribeStatus(() => {
 			/* no-op */
 		});
@@ -140,13 +141,8 @@ describe("webSocketManager", () => {
 		socket.triggerClose();
 		expect(webSocketManager.connectionStatus).toBe("closed");
 
-		// Should create a new socket after reconnect delay
-		return new Promise<void>((resolve) => {
-			setTimeout(() => {
-				expect(sockets.length).toBeGreaterThanOrEqual(1);
-				resolve();
-			}, 1200);
-		});
+		vi.advanceTimersByTime(1200);
+		expect(sockets.length).toBe(2);
 	});
 
 	it("does not reconnect when all subscribers unsubscribe", () => {
@@ -284,6 +280,7 @@ describe("webSocketManager", () => {
 	});
 
 	it("handles error on existing websocket", () => {
+		vi.useFakeTimers();
 		webSocketManager.subscribeStatus(() => {});
 		const socket = sockets[0];
 		socket.triggerOpen();
@@ -291,6 +288,20 @@ describe("webSocketManager", () => {
 		const closeSpy = vi.spyOn(socket, "close");
 		socket.triggerError();
 		expect(closeSpy).toHaveBeenCalled();
+		vi.advanceTimersByTime(1200);
+		expect(sockets.length).toBe(2);
+	});
+
+	it("does not reconnect after an initial connection failure", () => {
+		vi.useFakeTimers();
+		webSocketManager.subscribeStatus(() => {});
+		const socket = sockets[0];
+
+		socket.triggerError();
+		vi.advanceTimersByTime(5000);
+
+		expect(sockets).toHaveLength(1);
+		expect(webSocketManager.connectionStatus).toBe("closed");
 	});
 
 	it("unsubscribes log without error when ws is not open", () => {

@@ -1,9 +1,9 @@
 import type { Server } from "node:http";
 import type { IncomingMessage } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
 import type { IssueChatProgressEvent, IssueChatRequestBody } from "../adapters/http/admin-router.js";
+import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
 import type { IssueChatResponse } from "../admin/api/issues.js";
 
 export type ClientMessage =
@@ -35,23 +35,6 @@ export interface IssueChatProvider {
 	): Promise<IssueChatResponse>;
 }
 
-function verifyBasicAuth(request: IncomingMessage, username: string, password: string): boolean {
-	const authHeader = request.headers.authorization;
-	if (!authHeader || !authHeader.startsWith("Basic ")) {
-		return false;
-	}
-	const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
-	const colonIndex = decoded.indexOf(":");
-	const providedUser = colonIndex >= 0 ? decoded.slice(0, colonIndex) : decoded;
-	const providedPass = colonIndex >= 0 ? decoded.slice(colonIndex + 1) : "";
-	if (providedUser.length !== username.length || providedPass.length !== password.length) {
-		return false;
-	}
-	const userMatch = timingSafeEqual(Buffer.from(providedUser), Buffer.from(username));
-	const passMatch = timingSafeEqual(Buffer.from(providedPass), Buffer.from(password));
-	return userMatch && passMatch;
-}
-
 export function createAdminWebSocketServer(
 	httpServer: Server,
 	credentialProvider: CredentialProvider,
@@ -76,7 +59,7 @@ export function createAdminWebSocketServer(
 				callback(true);
 				return;
 			}
-			if (verifyBasicAuth(req, username, password)) {
+			if (isAdminAuthorized(req, username, password)) {
 				callback(true);
 			} else {
 				callback(false, 401, "Unauthorized");
@@ -228,11 +211,20 @@ export function createAdminWebSocketServer(
 
 	function close(): Promise<void> {
 		stopStatusPolling();
+		for (const ws of wss.clients) {
+			ws.terminate();
+		}
 		return new Promise<void>((resolve) => {
-			wss.close(() => resolve());
-			for (const ws of wss.clients) {
-				ws.terminate();
-			}
+			let settled = false;
+			const finish = () => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				resolve();
+			};
+			wss.close(() => finish());
+			setTimeout(finish, 0);
 		});
 	}
 
