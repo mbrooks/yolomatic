@@ -589,6 +589,36 @@ describe("ExecuteSession", () => {
 		expect(deps.tasks.unregister).toHaveBeenCalled();
 	});
 
+	it("triggers self-evolution on non-fatal error when enabled", async () => {
+		const prev = process.env.TARS_SELF_EVOLUTION_ENABLED;
+		process.env.TARS_SELF_EVOLUTION_ENABLED = "true";
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					throw new Error("executor blew up");
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await expect(execute.run(state)).rejects.toThrow("executor blew up");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.tasks.unregister).toHaveBeenCalled();
+		process.env.TARS_SELF_EVOLUTION_ENABLED = prev;
+	});
+
 	it("returns cancelled when abort signal fires during execution", async () => {
 		let cancelCallback: (() => void) | undefined;
 		const deps = makeDeps({
