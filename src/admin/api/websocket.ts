@@ -72,16 +72,17 @@ class WebSocketManager {
 		this.setStatus("connecting");
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 		const url = `${protocol}//${window.location.host}/tarsadmin/ws`;
+		let opened = false;
 
 		try {
 			this.ws = new WebSocket(url);
 		} catch {
 			this.setStatus("error");
-			this.scheduleReconnect();
 			return;
 		}
 
 		this.ws.onopen = () => {
+			opened = true;
 			this.reconnectDelay = 1000;
 			this.setStatus("open");
 			// Re-subscribe to any active log channels
@@ -134,8 +135,10 @@ class WebSocketManager {
 		};
 
 		this.ws.onclose = () => {
+			this.ws = null;
+			this.rejectPendingIssueChats(new Error("WebSocket disconnected"));
 			this.setStatus("closed");
-			if (this.hasSubscribers()) {
+			if (opened && this.hasSubscribers()) {
 				this.scheduleReconnect();
 			}
 		};
@@ -157,12 +160,7 @@ class WebSocketManager {
 			this.ws.close();
 			this.ws = null;
 		}
-		if (this.pendingIssueChats.size > 0) {
-			for (const pending of this.pendingIssueChats.values()) {
-				pending.reject(new Error("WebSocket disconnected"));
-			}
-			this.pendingIssueChats.clear();
-		}
+		this.rejectPendingIssueChats(new Error("WebSocket disconnected"));
 		this.setStatus("closed");
 	}
 
@@ -258,6 +256,17 @@ class WebSocketManager {
 		for (const cb of this.statusSubscribers) {
 			cb(status);
 		}
+	}
+
+	private rejectPendingIssueChats(error: Error): void {
+		if (this.pendingIssueChats.size === 0) {
+			return;
+		}
+
+		for (const pending of this.pendingIssueChats.values()) {
+			pending.reject(error);
+		}
+		this.pendingIssueChats.clear();
 	}
 
 	private scheduleReconnect(): void {

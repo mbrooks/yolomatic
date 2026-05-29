@@ -187,6 +187,17 @@ export function NewIssueScreen({
 		setMessages((prev) => [...prev, { id: uid(), role, type: "text", text }]);
 	}, []);
 
+	const applyChatResult = useCallback((result: Awaited<ReturnType<typeof chatIssue>>) => {
+		setOwner(result.owner);
+		setRepo(result.repo);
+		setDraft(result.draft);
+		appendTextMessage("tars", result.message || "Issue draft updated.");
+
+		if (result.createdIssue) {
+			setCreatedIssue(result.createdIssue);
+		}
+	}, [appendTextMessage]);
+
 	const handleReset = useCallback(() => {
 		setMessages([{ id: uid(), role: "tars", type: "text", text: initialPrompt }]);
 		setDraft({ title: "", body: "", labels: [], assignees: [] });
@@ -233,20 +244,25 @@ export function NewIssueScreen({
 		};
 
 		try {
-			const result = wsStatus === "open"
-				? await webSocketManager.requestIssueChat(payload, (event) => {
-					setProgressMessage(event.message);
-				})
-				: await chatIssue(payload);
-
-			setOwner(result.owner);
-			setRepo(result.repo);
-			setDraft(result.draft);
-			appendTextMessage("tars", result.message || "Issue draft updated.");
-
-			if (result.createdIssue) {
-				setCreatedIssue(result.createdIssue);
+			let sawWebSocketProgress = false;
+			let result;
+			if (wsStatus === "open") {
+				try {
+					result = await webSocketManager.requestIssueChat(payload, (event) => {
+						sawWebSocketProgress = true;
+						setProgressMessage(event.message);
+					});
+				} catch (error) {
+					if (sawWebSocketProgress) {
+						throw error;
+					}
+					setProgressMessage("Live connection failed. Retrying over HTTP...");
+					result = await chatIssue(payload);
+				}
+			} else {
+				result = await chatIssue(payload);
 			}
+			applyChatResult(result);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			setError(message);
@@ -255,7 +271,7 @@ export function NewIssueScreen({
 			setProgressMessage(null);
 			setSubmitting(false);
 		}
-	}, [appendTextMessage, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting]);
+	}, [appendTextMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting, wsStatus]);
 
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {

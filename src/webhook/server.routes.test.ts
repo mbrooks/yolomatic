@@ -3958,6 +3958,40 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
+	it("accepts websocket connections using the admin session cookie", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		const response = await makeRequest(port, {
+			method: "GET",
+			path: "/tarsadmin",
+			headers: {
+				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		const cookieHeader = response.headers["set-cookie"];
+		expect(cookieHeader).toBeTruthy();
+		const cookie = Array.isArray(cookieHeader) ? cookieHeader[0].split(";")[0] : String(cookieHeader).split(";")[0];
+
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
+			headers: {
+				Cookie: cookie,
+			},
+		});
+
+		await new Promise<void>((resolve, reject) => {
+			client.once("open", resolve);
+			client.once("error", reject);
+		});
+
+		client.close();
+		server.close();
+	});
+
 	it("allows websocket without credentials in onboarding mode", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
