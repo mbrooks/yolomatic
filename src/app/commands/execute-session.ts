@@ -8,6 +8,7 @@ import type { Clock } from "../../ports/clock.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
+import { SelfEvolutionEngine } from "../../self-evolution/index.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import { issueSessionKey, removeWorkflowLabels } from "./workflow-helpers.js";
 import { ExecuteSessionDelivery } from "./execute-session-delivery.js";
@@ -130,6 +131,21 @@ export class ExecuteSession {
 				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 				process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 				return;
+			}
+
+			if (process.env.TARS_SELF_EVOLUTION_ENABLED === "true") {
+				try {
+					const engine = new SelfEvolutionEngine({
+						github: this.deps.github,
+						repoPath: process.cwd(),
+						selfReportRepo: { owner: "mbrooks", repo: "tars" },
+					});
+					await engine.handleError(error as Error);
+				} catch (seError) {
+					process.stdout.write(
+						`[execute] self-evolution error: ${seError instanceof Error ? seError.message : String(seError)}\n`,
+					);
+				}
 			}
 
 			const context = comment ? "Resuming from comment" : "Processing issue";
