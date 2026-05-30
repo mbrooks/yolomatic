@@ -1,5 +1,37 @@
-import { describe, expect, it } from "vitest";
-import { parseHash, buildHash } from "./routes.js";
+// @vitest-environment happy-dom
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { parseHash, buildHash, navigate, useRoute } from "./routes.js";
+
+describe("navigate", () => {
+	beforeEach(() => {
+		window.location.hash = "#/dashboard";
+	});
+
+	afterEach(() => {
+		window.location.hash = "";
+	});
+
+	it("sets window.location.hash", () => {
+		navigate({ screen: "settings", tab: "general" });
+		expect(window.location.hash).toBe("#/settings");
+	});
+});
+
+describe("useRoute", () => {
+	beforeEach(() => {
+		window.location.hash = "#/repos/mbrooks/tars";
+	});
+
+	afterEach(() => {
+		window.location.hash = "";
+	});
+
+	it("returns current route from hash", () => {
+		const { result } = renderHook(() => useRoute());
+		expect(result.current).toEqual(expect.objectContaining({ screen: "repo", owner: "mbrooks", repo: "tars" }));
+	});
+});
 
 describe("parseHash", () => {
 	it("parses dashboard list", () => {
@@ -55,6 +87,20 @@ describe("parseHash", () => {
 	it("defaults to dashboard for unknown", () => {
 		expect(parseHash("")).toEqual({ screen: "dashboard" });
 	});
+
+	it("parses repo detail (skills tab)", () => {
+		expect(parseHash("#/repos/mbrooks/tars/skills")).toEqual({
+			screen: "repo",
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: undefined,
+			tab: "skills",
+		});
+	});
+
+	it("parses server-skills view", () => {
+		expect(parseHash("#/settings/skills")).toEqual({ screen: "settings", tab: "skills" });
+	});
 });
 
 describe("buildHash", () => {
@@ -92,8 +138,18 @@ describe("buildHash", () => {
 		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
 	});
 
-	it("round-trips crons tab", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "crons" as const });
-		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "crons" }));
+	it("builds repo detail with skills tab", () => {
+		expect(
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" }),
+		).toBe("#/repos/mbrooks/tars/skills");
+	});
+
+	it("builds server-skills view", () => {
+		expect(buildHash({ screen: "settings", tab: "skills" })).toBe("#/settings/skills");
+	});
+
+	it("round-trips skills tab", () => {
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "skills" }));
 	});
 });

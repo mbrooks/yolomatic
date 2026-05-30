@@ -13,6 +13,8 @@ import { TaskController } from "./task-controller.js";
 import { GitHubIssueHandlers, type WebhookHandlers } from "./webhook/handlers.js";
 import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { createWebhookServerDeps } from "./webhook/server-deps.js";
+import { SkillStore } from "./skills/store.js";
+import { RepoSkillService } from "./skills/repo-skill-service.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 
@@ -119,6 +121,13 @@ export async function main(): Promise<void> {
 	);
 
 	const cronStore = new CronStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const skillStore = new SkillStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const repoSkillService = new RepoSkillService({
+		workspacesDir: config.workspacesDir,
+		githubUsername: config.githubUsername,
+		githubToken: config.githubToken,
+		defaultBranch: config.defaultBranch,
+	});
 	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
 	const cronDeps = {
 		cronStore,
@@ -146,6 +155,8 @@ export async function main(): Promise<void> {
 		undefined,
 		github,
 		settingsStore,
+		skillStore,
+		repoSkillService,
 	);
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
@@ -205,7 +216,7 @@ export async function main(): Promise<void> {
 	}
 }
 
-/* c8 ignore start */
+/* v8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
 	main().catch((error) => {
 		const message = error instanceof Error ? error.stack ?? error.message : String(error);
@@ -213,4 +224,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 		process.exitCode = 1;
 	});
 }
-/* c8 ignore stop */
+/* v8 ignore stop */

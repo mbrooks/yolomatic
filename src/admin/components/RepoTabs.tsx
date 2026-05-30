@@ -5,8 +5,8 @@ export function RepoTabs({
 	onSelectTab,
 	onNewIssue,
 }: {
-	activeTab: "sessions" | "crons";
-	onSelectTab: (tab: "sessions" | "crons") => void;
+	activeTab: "sessions" | "crons" | "skills";
+	onSelectTab: (tab: "sessions" | "crons" | "skills") => void;
 	onNewIssue?: () => void;
 }): React.ReactElement {
 	return (
@@ -24,6 +24,13 @@ export function RepoTabs({
 				type="button"
 			>
 				Crons
+			</button>
+			<button
+				className={`repo-tab${activeTab === "skills" ? " active" : ""}`}
+				onClick={() => onSelectTab("skills")}
+				type="button"
+			>
+				Skills
 			</button>
 			{onNewIssue ? (
 				<button className="repo-tab new-issue" onClick={onNewIssue} type="button">

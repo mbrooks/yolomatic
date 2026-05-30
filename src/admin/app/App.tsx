@@ -9,6 +9,7 @@ import { CronScreen } from "../features/crons/CronScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
+import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
@@ -61,25 +62,25 @@ export function App(): React.ReactElement {
 					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: route.tab }
 					: route.screen === "working"
 						? {
-								screen: "working",
+							screen: "working",
+							owner: session.owner,
+							repo: session.repo,
+							issueNumber: session.issueNumber,
+						}
+							: {
+								screen: "repo",
 								owner: session.owner,
 								repo: session.repo,
 								issueNumber: session.issueNumber,
-							}
-							: {
-									screen: "repo",
-									owner: session.owner,
-									repo: session.repo,
-									issueNumber: session.issueNumber,
-									tab: "sessions",
-								};
+								tab: "sessions",
+							};
 			navigate(next);
 		},
 		[route],
 	);
 
 	const handleSelectTab = useCallback(
-		(tab: "sessions" | "crons") => {
+		(tab: "sessions" | "crons" | "skills") => {
 			if (route.screen === "repo") {
 				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
 			}
@@ -230,7 +231,7 @@ function AppContent({
 	onMutate: () => void;
 	onBack: () => void;
 	onSelectRepos: () => void;
-	onSelectTab: (tab: "sessions" | "crons") => void;
+	onSelectTab: (tab: "sessions" | "crons" | "skills") => void;
 	onNewIssueForRepo: () => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
@@ -275,16 +276,31 @@ function AppContent({
 	}
 
 	if (route.screen === "repo") {
-		return route.tab === "crons" ? (
-			<CronScreen
-				owner={route.owner}
-				repo={route.repo}
-				activeTab={route.tab ?? "sessions"}
-				onSelectTab={onSelectTab}
-				onBack={onBack}
-				onNewIssue={onNewIssueForRepo}
-			/>
-		) : (
+		if (route.tab === "crons") {
+			return (
+				<CronScreen
+					owner={route.owner}
+					repo={route.repo}
+					activeTab={route.tab ?? "sessions"}
+					onSelectTab={onSelectTab}
+					onBack={onBack}
+					onNewIssue={onNewIssueForRepo}
+				/>
+			);
+		}
+		if (route.tab === "skills") {
+			return (
+				<RepoSkillsScreen
+					owner={route.owner}
+					repo={route.repo}
+					activeTab={route.tab ?? "sessions"}
+					onSelectTab={onSelectTab}
+					onBack={onBack}
+					onNewIssue={onNewIssueForRepo}
+				/>
+			);
+		}
+		return (
 			<SessionScreen
 				sessions={repoSessions}
 				selected={selectedSession}
@@ -301,7 +317,7 @@ function AppContent({
 	}
 
 	if (route.screen === "settings") {
-		return <SettingsScreen onBack={onBack} />;
+		return <SettingsScreen onBack={onBack} tab={route.tab ?? "general"} />;
 	}
 
 	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} repos={repos} />;
