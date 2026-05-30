@@ -161,6 +161,15 @@ describe("NewIssueScreen", () => {
 		expect(screen.queryByText("Issue draft")).not.toBeNull();
 	});
 
+	it("renders the Issue Draft preview before the Chat pane", () => {
+		const { container } = render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+		const workspace = container.querySelector(".new-issue-workspace");
+		const children = workspace?.children;
+		expect(children?.length).toBe(2);
+		expect(children?.[0].classList.contains("preview-pane")).toBe(true);
+		expect(children?.[1].classList.contains("chat-pane")).toBe(true);
+	});
+
 	it("allows toggling privacy mode", () => {
 		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
 		const checkbox = screen.getByLabelText("Privacy mode");

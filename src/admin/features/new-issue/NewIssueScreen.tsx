@@ -355,62 +355,6 @@ export function NewIssueScreen({
 			</div>
 
 			<div className="new-issue-workspace">
-				<div className="chat-pane">
-					<div className="chat-messages">
-						<ChatTranscript messages={transcriptMessages} showTyping={submitting} />
-						<div ref={messagesEndRef} />
-					</div>
-
-					{repoContext && repoContext.templates.length > 0 ? (
-						<div className="template-selector">
-							<span className="template-selector-label">Template:</span>
-							<select
-								value={selectedTemplate ?? ""}
-								onChange={(event) => setSelectedTemplate(event.target.value || undefined)}
-							>
-								<option value="">None (auto-detect)</option>
-								{repoContext.templates.map((template) => (
-									<option key={template.name} value={template.name}>
-										{template.name}
-									</option>
-								))}
-							</select>
-						</div>
-					) : null}
-
-					{createdIssue ? (
-						<div className="chat-actions">
-							<button className="chat-action-chip primary" type="button" onClick={handleReset}>
-								Create another
-							</button>
-						</div>
-					) : null}
-
-					{error ? <div className="chat-error">{error}</div> : null}
-					{progressMessage ? <div className="context-loading">{progressMessage}</div> : null}
-
-					<div className="chat-input-row">
-						<textarea
-							ref={inputRef}
-							className="chat-input chat-input-area"
-							placeholder="Tell TARS what issue to create. Use Shift+Enter for a newline."
-							value={input}
-							onChange={(event) => setInput(event.target.value)}
-							onKeyDown={handleKeyDown}
-							disabled={submitting || createdIssue !== null}
-							rows={3}
-						/>
-						<button
-							className="chat-send-btn"
-							type="button"
-							onClick={() => void handleSubmit()}
-							disabled={submitting || createdIssue !== null || !input.trim()}
-						>
-							{submitting ? "Thinking..." : "Send"}
-						</button>
-					</div>
-				</div>
-
 				<div className="preview-pane">
 					<div className="preview-pane-header">Issue draft</div>
 					<div className="preview-pane-body">
@@ -489,6 +433,62 @@ export function NewIssueScreen({
 								</div>
 							)}
 						</div>
+					</div>
+				</div>
+
+				<div className="chat-pane">
+					<div className="chat-messages">
+						<ChatTranscript messages={transcriptMessages} showTyping={submitting} />
+						<div ref={messagesEndRef} />
+					</div>
+
+					{repoContext && repoContext.templates.length > 0 ? (
+						<div className="template-selector">
+							<span className="template-selector-label">Template:</span>
+							<select
+								value={selectedTemplate ?? ""}
+								onChange={(event) => setSelectedTemplate(event.target.value || undefined)}
+							>
+								<option value="">None (auto-detect)</option>
+								{repoContext.templates.map((template) => (
+									<option key={template.name} value={template.name}>
+										{template.name}
+									</option>
+								))}
+							</select>
+						</div>
+					) : null}
+
+					{createdIssue ? (
+						<div className="chat-actions">
+							<button className="chat-action-chip primary" type="button" onClick={handleReset}>
+								Create another
+							</button>
+						</div>
+					) : null}
+
+					{error ? <div className="chat-error">{error}</div> : null}
+					{progressMessage ? <div className="context-loading">{progressMessage}</div> : null}
+
+					<div className="chat-input-row">
+						<textarea
+							ref={inputRef}
+							className="chat-input chat-input-area"
+							placeholder="Tell TARS what issue to create. Use Shift+Enter for a newline."
+							value={input}
+							onChange={(event) => setInput(event.target.value)}
+							onKeyDown={handleKeyDown}
+							disabled={submitting || createdIssue !== null}
+							rows={3}
+						/>
+						<button
+							className="chat-send-btn"
+							type="button"
+							onClick={() => void handleSubmit()}
+							disabled={submitting || createdIssue !== null || !input.trim()}
+						>
+							{submitting ? "Thinking..." : "Send"}
+						</button>
 					</div>
 				</div>
 			</div>
