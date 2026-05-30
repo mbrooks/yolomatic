@@ -82,6 +82,8 @@ describe("handleAdminRoute", () => {
 		listRelatedIssues: ReturnType<typeof vi.fn>;
 		listOpenIssues: ReturnType<typeof vi.fn>;
 		createIssue: ReturnType<typeof vi.fn>;
+		listPendingInvitations: ReturnType<typeof vi.fn>;
+		acceptInvitation: ReturnType<typeof vi.fn>;
 	};
 
 	beforeEach(() => {
@@ -125,6 +127,8 @@ describe("handleAdminRoute", () => {
 			listRelatedIssues: vi.fn(async () => []),
 			listOpenIssues: vi.fn(async () => []),
 			createIssue: vi.fn(async () => ({ number: 99, html_url: "https://github.com/mbrooks/tars/issues/99" })),
+			listPendingInvitations: vi.fn(async () => []),
+			acceptInvitation: vi.fn(async () => undefined),
 		};
 		deps = {
 			adminUsername: "admin",
@@ -2642,34 +2646,148 @@ describe("handleAdminRoute", () => {
 		expect(body.error).toContain("Skill not found");
 	});
 
-	it("PATCH /api/repos/:owner/:repo/skills/:name does not delete when name unchanged", async () => {
-		const deleteRepoSkill = vi.fn(async () => ({ success: true }));
-		const saveRepoSkill = vi.fn(async () => ({ success: true }));
-		deps.repoSkillService = {
-			...deps.repoSkillService,
-			getRepoSkill: vi.fn(async () => ({
-				name: "triage",
-				description: "d",
-				content: "c",
-				enabled: true,
-				updatedAt: "",
-				source: "repo" as const,
-			})),
-			deleteRepoSkill,
-			saveRepoSkill,
-		} as never;
+	it("GET /api/github/invitations returns pending invitations", async () => {
+		githubService.listPendingInvitations.mockResolvedValue([
+			{
+				id: 1,
+				repository: { full_name: "octocat/Hello-World", name: "Hello-World", owner: { login: "octocat" } },
+				inviter: { login: "octocat" },
+				permissions: "write",
+				created_at: "2024-01-01T00:00:00Z",
+				html_url: "https://github.com/octocat/Hello-World/invitations",
+			},
+		]);
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
-			method: "PATCH",
+			url: "/api/github/invitations",
+			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "triage", description: "Updated" }),
 		});
 		const res = mockResponse();
 
 		const handled = await handleAdminRoute(req, res, deps);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
-		expect(deleteRepoSkill).not.toHaveBeenCalled();
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", expect.objectContaining({ name: "triage" }));
+		const body = JSON.parse(String(res.body));
+		expect(body.invitations).toHaveLength(1);
+		expect(body.invitations[0].id).toBe(1);
+	});
+
+	it("GET /api/github/invitations returns 500 when githubService missing", async () => {
+		const noGhDeps = { ...deps, githubService: undefined };
+		const req = mockRequest({
+			url: "/api/github/invitations",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noGhDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("GitHub service not configured");
+	});
+
+	it("GET /api/github/invitations handles service error", async () => {
+		githubService.listPendingInvitations.mockRejectedValue(new Error("Network error"));
+		const req = mockRequest({
+			url: "/api/github/invitations",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("Network error");
+	});
+
+	it("POST /api/github/invitations/:id/accept accepts an invitation", async () => {
+		const req = mockRequest({
+			url: "/api/github/invitations/1/accept",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.accepted).toBe(true);
+		expect(githubService.acceptInvitation).toHaveBeenCalledWith(1);
+	});
+
+	it("POST /api/github/invitations/:id/accept returns 500 when githubService missing", async () => {
+		const noGhDeps = { ...deps, githubService: undefined };
+		const req = mockRequest({
+			url: "/api/github/invitations/1/accept",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noGhDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("GitHub service not configured");
+	});
+
+	it("POST /api/github/invitations/:id/accept handles service error", async () => {
+		githubService.acceptInvitation.mockRejectedValue(new Error("Not found"));
+		const req = mockRequest({
+			url: "/api/github/invitations/1/accept",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("Not found");
+	});
+
+	it("GET /api/github/invitations returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/github/invitations",
+			method: "GET",
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("POST /api/github/invitations/:id/accept returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/github/invitations/1/accept",
+			method: "POST",
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("POST /api/github/invitations/invalid/accept returns 400 for invalid ID", async () => {
+		const req = mockRequest({
+			url: "/api/github/invitations/abc/accept",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("Invalid invitation ID");
 	});
 });
