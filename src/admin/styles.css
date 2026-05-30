@@ -2175,3 +2175,73 @@ a:hover {
 		max-height: 40%;
 	}
 }
+
+/* Issue list */
+.list-col.issue-number {
+	flex: 0 0 3.5rem;
+}
+
+.list-col.issue-title {
+	flex: 2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.list-col.issue-labels {
+	flex: 1;
+	min-width: 4rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.issue-label-summary {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
+.issue-label-empty {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
+/* Issue detail */
+.issue-body {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	padding: 0.75rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-height: 24rem;
+	overflow-y: auto;
+}
+
+.issue-body-empty {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.issue-tag {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	color: var(--text);
+	font-size: 0.75rem;
+	padding: 0.15rem 0.5rem;
+}
+
+.label-tag {
+	background: rgba(88, 166, 255, 0.1);
+	border-color: var(--blue);
+	color: var(--blue);
+}
+
+.assignee-tag {
+	background: var(--bg);
+}
+

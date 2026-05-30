@@ -26,7 +26,7 @@ export function SessionScreen({
 	onBack: () => void;
 	emptyMessage: string;
 	activeTab?: "sessions" | "crons" | "skills";
-	onSelectTab?: (tab: "sessions" | "crons" | "skills") => void;
+	onSelectTab?: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onNewIssue?: () => void;
 }): React.ReactElement {
 	return (

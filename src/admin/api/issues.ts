@@ -1,5 +1,15 @@
 import { apiPost, apiGet } from "./client.js";
 
+export interface OpenIssue {
+	number: number;
+	title: string;
+	body: string;
+	state: string;
+	labels: string[];
+	assignees: string[];
+	html_url: string;
+}
+
 export interface CreateIssuePayload {
 	owner: string;
 	repo: string;
@@ -89,4 +99,10 @@ export async function chatIssue(payload: IssueChatPayload): Promise<IssueChatRes
 
 export async function fetchRepoContext(owner: string, repo: string): Promise<RepoContext> {
 	return apiGet<RepoContext>(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/context`);
+}
+
+export async function fetchOpenIssues(owner: string, repo: string): Promise<OpenIssue[]> {
+	return apiGet<{ issues: OpenIssue[] }>(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`).then(
+		(r) => r.issues,
+	);
 }
