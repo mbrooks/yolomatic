@@ -28,6 +28,8 @@ function createMockOctokit(overrides?: Partial<{
 		repos: {
 			getContent: vi.fn(async () => ({ data: [] })),
 			listCommits: vi.fn(async () => ({ data: [] })),
+			listInvitationsForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
+			acceptInvitationForAuthenticatedUser: vi.fn(async () => ({ data: {} })),
 			...(overrides?.repos ?? {}),
 		},
 		search: {
@@ -457,6 +459,101 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listOpenIssues("mbrooks", "tars");
 			expect(result).toEqual([]);
+		});
+	});
+
+	describe("listPendingInvitations", () => {
+		it("returns mapped invitations", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					listInvitationsForAuthenticatedUser: vi.fn(async () => ({
+						data: [
+							{
+								id: 1,
+								repository: { full_name: "octocat/Hello-World", name: "Hello-World", owner: { login: "octocat" } },
+								inviter: { login: "octocat" },
+								permissions: "write",
+								created_at: "2024-01-01T00:00:00Z",
+								html_url: "https://github.com/octocat/Hello-World/invitations",
+							},
+						],
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listPendingInvitations();
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				id: 1,
+				repository: { full_name: "octocat/Hello-World", name: "Hello-World", owner: { login: "octocat" } },
+				inviter: { login: "octocat" },
+				permissions: "write",
+				created_at: "2024-01-01T00:00:00Z",
+				html_url: "https://github.com/octocat/Hello-World/invitations",
+			});
+		});
+
+		it("returns empty array on error", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					listInvitationsForAuthenticatedUser: vi.fn(async () => {
+						throw new Error("Network error");
+					}),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listPendingInvitations();
+			expect(result).toEqual([]);
+		});
+
+		it("handles sparse invitation data", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					listInvitationsForAuthenticatedUser: vi.fn(async () => ({
+						data: [
+							{
+								id: 3,
+								repository: { full_name: undefined, name: undefined, owner: undefined },
+								inviter: null,
+								permissions: undefined,
+								created_at: "2024-01-01T00:00:00Z",
+								html_url: undefined,
+							},
+						],
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listPendingInvitations();
+			expect(result[0]).toEqual({
+				id: 3,
+				repository: { full_name: "", name: "", owner: { login: "" } },
+				inviter: null,
+				permissions: "read",
+				created_at: "2024-01-01T00:00:00Z",
+				html_url: "",
+			});
+		});
+	});
+
+	describe("acceptInvitation", () => {
+		it("calls acceptInvitationForAuthenticatedUser", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.acceptInvitation(1);
+			expect(octokit.repos.acceptInvitationForAuthenticatedUser).toHaveBeenCalledWith({ invitation_id: 1 });
+		});
+
+		it("rethrows errors", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					acceptInvitationForAuthenticatedUser: vi.fn(async () => {
+						throw new Error("Not found");
+					}),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await expect(adapter.acceptInvitation(1)).rejects.toThrow("Not found");
 		});
 	});
 });
