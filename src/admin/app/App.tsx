@@ -88,12 +88,7 @@ export function App(): React.ReactElement {
 		[route],
 	);
 
-	const isNewIssueActive = route.screen === "new-issue";
 	const isSettingsActive = route.screen === "settings";
-
-	const handleNewIssue = useCallback(() => {
-		navigate({ screen: "new-issue" });
-	}, []);
 
 	const handleSelectSettings = useCallback(() => {
 		navigate({ screen: "settings" });
@@ -123,9 +118,7 @@ export function App(): React.ReactElement {
 			{serverState.status === "ready" && serverState.data.draining && <RestartBanner />}
 			<AppHeader
 				agentStatus={agentStatus}
-				isNewIssueActive={isNewIssueActive}
 				isSettingsActive={isSettingsActive}
-				onNewIssue={handleNewIssue}
 				onSettings={handleSelectSettings}
 			/>
 
@@ -161,15 +154,11 @@ export function App(): React.ReactElement {
 
 function AppHeader({
 	agentStatus,
-	isNewIssueActive,
 	isSettingsActive,
-	onNewIssue,
 	onSettings,
 }: {
 	agentStatus: AgentStatus;
-	isNewIssueActive: boolean;
 	isSettingsActive: boolean;
-	onNewIssue: () => void;
 	onSettings: () => void;
 }): React.ReactElement {
 	return (
@@ -182,13 +171,6 @@ function AppHeader({
 					type="button"
 				>
 					Settings
-				</button>
-				<button
-					className={`global-tab${isNewIssueActive ? " active" : ""}`}
-					onClick={onNewIssue}
-					type="button"
-				>
-					Create New Issue
 				</button>
 				<StatusBadge status={agentStatus} />
 			</div>
