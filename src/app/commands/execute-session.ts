@@ -213,6 +213,15 @@ export class ExecuteSession {
 			return;
 		}
 
+		if (result.status === "failed") {
+			const context = comment ? "Resuming from comment" : "Processing issue";
+			await this.reporter.postFailureComment(owner, repo, issueNumber, new Error(result.summary), context);
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
+			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+			return;
+		}
+
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
 		process.stdout.write(`[execute] left in working state ${repo}#${issueNumber}\n`);
 		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
