@@ -1626,6 +1626,29 @@ a:hover {
 	color: var(--green);
 }
 
+.create-issue-btn {
+	background: rgba(63, 185, 80, 0.12);
+	border: 1px solid var(--green);
+	border-radius: 6px;
+	color: var(--green);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	margin-top: 0.75rem;
+	padding: 0.5rem 0.75rem;
+	width: 100%;
+}
+
+.create-issue-btn:hover:not(:disabled) {
+	background: rgba(63, 185, 80, 0.2);
+}
+
+.create-issue-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 /* Quick repo selector */
 .chat-quick-actions {
 	display: flex;
