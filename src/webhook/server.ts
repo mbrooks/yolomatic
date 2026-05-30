@@ -8,6 +8,8 @@ import type { WorkspaceManager } from "../workspace/manager.js";
 import type { CronStore } from "../cron/store.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
+import type { SkillStore } from "../skills/store.js";
+import type { RepoSkillService } from "../skills/repo-skill-service.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { executeIssueChatRequest } from "../adapters/http/admin-router.js";
@@ -37,6 +39,8 @@ export function createWebhookServer(
 	options: WebhookServerOptions = {},
 	githubService?: GitHubService,
 	settingsStore?: SettingsStore,
+	skillStore?: SkillStore,
+	repoSkillService?: RepoSkillService,
 ) {
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -51,6 +55,9 @@ export function createWebhookServer(
 		githubService,
 		settingsStore,
 	);
+
+	serverDeps.skillStore = skillStore;
+	serverDeps.repoSkillService = repoSkillService;
 
 	const credentialProvider: CredentialProvider = {
 		getCredentials(): { username?: string; password?: string } {

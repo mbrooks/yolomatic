@@ -162,6 +162,19 @@ describe("handleAdminRoute", () => {
 				unregister: vi.fn(),
 			} as never,
 			settingsStore: store,
+			skillStore: {
+				listAll: vi.fn(async () => []),
+				get: vi.fn(async () => null),
+				create: vi.fn(async () => ({ id: "skill-1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+				update: vi.fn(async () => null),
+				delete: vi.fn(async () => true),
+			} as never,
+			repoSkillService: {
+				listRepoSkills: vi.fn(async () => []),
+				getRepoSkill: vi.fn(async () => null),
+				saveRepoSkill: vi.fn(async () => ({ success: true })),
+				deleteRepoSkill: vi.fn(async () => ({ success: true })),
+			} as never,
 			cronStore: cronStore as never,
 			githubService: githubService as never,
 		};
@@ -189,6 +202,41 @@ describe("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.complete).toBe(false);
 		expect(body.missing.length).toBeGreaterThan(0);
+	});
+
+	it("PATCH /api/repos/:owner/:repo/skills/:name preserves omitted fields", async () => {
+		const getRepoSkill = vi.fn(async () => ({
+			name: "triage",
+			description: "Existing description",
+			content: "Existing body",
+			enabled: false,
+			updatedAt: "",
+			source: "repo" as const,
+		}));
+		const saveRepoSkill = vi.fn(async () => ({ success: true }));
+		deps.repoSkillService = {
+			...deps.repoSkillService,
+			getRepoSkill,
+			saveRepoSkill,
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ description: "Updated description" }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		expect(getRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", "triage");
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", {
+			name: "triage",
+			description: "Updated description",
+			content: "Existing body",
+			enabled: false,
+		});
 	});
 
 	it("POST /api/onboarding creates settings", async () => {
@@ -1775,5 +1823,747 @@ describe("handleAdminRoute", () => {
 
 		const handled = await handleAdminRoute(req, res, deps);
 		expect(handled).toBe(false);
+	});
+
+	// Server Skills routes
+	it("GET /api/skills returns 500 when skillStore missing", async () => {
+		const noSkillDeps = { ...deps, skillStore: undefined };
+		const req = mockRequest({
+			url: "/api/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noSkillDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("Skill store not configured");
+	});
+
+	it("GET /api/skills lists server skills", async () => {
+		const req = mockRequest({
+			url: "/api/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.skills).toEqual([]);
+	});
+
+	it("POST /api/skills creates a server skill", async () => {
+		deps.skillStore = {
+			get: vi.fn(async () => null),
+			listAll: vi.fn(async () => []),
+			create: vi.fn(async (data: { name: string }) => ({ id: "skill-1", name: data.name, description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			update: vi.fn(async () => null),
+			delete: vi.fn(async () => true),
+		} as never;
+		const req = mockRequest({
+			url: "/api/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(201);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("triage");
+	});
+
+	it("GET /api/skills/:id returns a server skill", async () => {
+		deps.skillStore = {
+			get: vi.fn(async () => ({ id: "skill-1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			listAll: vi.fn(async () => []),
+			create: vi.fn(async () => ({ id: "skill-1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			update: vi.fn(async () => null),
+			delete: vi.fn(async () => true),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.id).toBe("skill-1");
+	});
+
+	it("PATCH /api/skills/:id updates a server skill", async () => {
+		deps.skillStore = {
+			get: vi.fn(async () => ({ id: "skill-1", name: "old", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			listAll: vi.fn(async () => []),
+			create: vi.fn(async () => ({ id: "skill-1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			update: vi.fn(async () => ({ id: "skill-1", name: "new", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			delete: vi.fn(async () => true),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "new" }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("new");
+	});
+
+	it("DELETE /api/skills/:id removes a server skill", async () => {
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.deleted).toBe(true);
+	});
+
+	it("DELETE /api/skills/:id returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "DELETE",
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("DELETE /api/skills/:id returns 500 when skillStore is missing", async () => {
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, { ...deps, skillStore: undefined });
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+	});
+
+	it("DELETE /api/skills/:id returns 500 when delete throws", async () => {
+		deps.skillStore = {
+			...deps.skillStore,
+			delete: vi.fn(async () => { throw new Error("delete failed"); }),
+		} as never;
+		const req = mockRequest({
+			url: "/api/skills/skill-1",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("delete failed");
+	});
+
+	// Repo Skills routes
+	it("GET /api/repos/:owner/:repo/skills returns 500 when repoSkillService missing", async () => {
+		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("Repo skill service not configured");
+	});
+
+	it("GET /api/repos/:owner/:repo/skills merges repo and server skills", async () => {
+		deps.skillStore = {
+			get: vi.fn(async () => null),
+			listAll: vi.fn(async () => [{ id: "s1", name: "server-only", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" }]),
+			create: vi.fn(async () => ({ id: "s1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+			update: vi.fn(async () => null),
+			delete: vi.fn(async () => true),
+		} as never;
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => [
+				{ name: "repo-only", description: "", content: "", enabled: true, updatedAt: "", source: "repo" as const },
+				{ name: "server-only", description: "", content: "", enabled: true, updatedAt: "", source: "repo" as const },
+			]),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.skills.length).toBe(2);
+		const names = body.skills.map((s: { name: string }) => s.name);
+		expect(names).toContain("server-only");
+		expect(names).toContain("repo-only");
+	});
+
+	it("GET /api/repos/:owner/:repo/skills lists repo skills", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.skills).toEqual([]);
+	});
+
+	it("GET /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("GET /api/repos/:owner/:repo/skills returns 500 when listRepoSkills throws", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => { throw new Error("list failed"); }),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("list failed");
+	});
+
+	it("POST /api/repos/:owner/:repo/skills creates a repo skill", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => [{ name: "triage", description: "", content: "", enabled: true, updatedAt: "", source: "repo" as const }]),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(201);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("triage");
+	});
+
+	it("POST /api/repos/:owner/:repo/skills returns 500 when saveRepoSkill fails", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: false, error: "save failed" })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("save failed");
+	});
+
+	it("POST /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("POST /api/repos/:owner/:repo/skills returns 400 on invalid json", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: "not-json",
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+	});
+
+	it("POST /api/repos/:owner/:repo/skills returns 500 when repoSkillService is missing", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage", content: "# Triage" }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, { ...deps, repoSkillService: undefined });
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+	});
+
+	it("POST /api/repos/:owner/:repo/skills requires name and content", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage" }),
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("Missing required fields");
+	});
+
+	it("DELETE returns 401 when not admin", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "DELETE",
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("DELETE returns 500 when repoSkillService missing", async () => {
+		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("not configured");
+	});
+
+	it("DELETE /api/repos/:owner/:repo/skills/:name removes a repo skill", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.deleted).toBe(true);
+	});
+
+	it("DELETE returns 500 when deleteRepoSkill fails", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: false, error: "git error" })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("git error");
+	});
+
+	it("DELETE returns 500 when deleteRepoSkill throws", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => { throw new Error("boom"); }),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "DELETE",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("boom");
+	});
+
+	it("GET merge includes inherited skills when not in repo", async () => {
+		const serverDeps = {
+			...deps,
+			repoSkillService: {
+				listRepoSkills: vi.fn(async () => [
+					{ name: "repo-only", description: "", content: "", enabled: true, updatedAt: "", source: "repo" as const },
+				]),
+				getRepoSkill: vi.fn(async () => null),
+				saveRepoSkill: vi.fn(async () => ({ success: true })),
+				deleteRepoSkill: vi.fn(async () => ({ success: true })),
+			} as never,
+			skillStore: {
+				get: vi.fn(async () => null),
+				listAll: vi.fn(async () => [
+					{ id: "s1", name: "server-only", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" },
+				]),
+				create: vi.fn(async () => ({ id: "s1", name: "test", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" })),
+				update: vi.fn(async () => null),
+				delete: vi.fn(async () => true),
+			} as never,
+		};
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, serverDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.skills.length).toBe(2);
+		const inherited = body.skills.find((s: { name: string; source: string }) => s.name === "server-only");
+		expect(inherited.source).toBe("inherited");
+	});
+
+	it("GET returns 500 when repoSkillService missing for detail", async () => {
+		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("not configured");
+	});
+
+	it("GET returns 500 when getRepoSkill throws", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => { throw new Error("boom"); }),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("boom");
+	});
+
+	it("PATCH returns 401 when not admin", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			body: JSON.stringify({ name: "triage" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("PATCH returns 500 when repoSkillService missing", async () => {
+		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("not configured");
+	});
+
+	it("PATCH returns 500 when saveRepoSkill fails", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => ({ name: "triage", description: "d", content: "c", enabled: true, updatedAt: "", source: "repo" as const })),
+			saveRepoSkill: vi.fn(async () => ({ success: false, error: "save error" })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("save error");
+	});
+
+	it("PATCH returns 400 on invalid json", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: "not-json",
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBeTruthy();
+	});
+
+	it("returns 404 for unknown routes inside skills", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/extra/path",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(false);
+	});
+
+	it("GET /api/repos/:owner/:repo/skills/:name returns a repo skill", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => ({ name: "triage", description: "d", content: "c", enabled: true, updatedAt: "", source: "repo" as const })),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("triage");
+	});
+
+	it("GET /api/repos/:owner/:repo/skills/:name returns 404 when missing", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(404);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("not found");
+	});
+
+	it("GET /api/repos/:owner/:repo/skills/:name returns 401 when not admin", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "GET",
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("PATCH /api/repos/:owner/:repo/skills/:name updates a repo skill", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => ({ name: "triage", description: "existing", content: "c", enabled: true, updatedAt: "", source: "repo" as const })),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage", description: "updated", content: "c", enabled: true }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("triage");
+	});
+
+	it("PATCH renames a repo skill when name changes", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => ({ name: "triage", description: "existing", content: "c", enabled: true, updatedAt: "", source: "repo" as const })),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "renamed" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.name).toBe("renamed");
+	});
+
+	it("PATCH returns 500 when saveRepoSkill fails", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => ({ name: "triage", description: "d", content: "c", enabled: true, updatedAt: "", source: "repo" as const })),
+			saveRepoSkill: vi.fn(async () => ({ success: false, error: "fail" })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ name: "triage" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("fail");
+	});
+
+	it("PATCH returns 404 when the existing repo skill is missing", async () => {
+		deps.repoSkillService = {
+			listRepoSkills: vi.fn(async () => []),
+			getRepoSkill: vi.fn(async () => null),
+			saveRepoSkill: vi.fn(async () => ({ success: true })),
+			deleteRepoSkill: vi.fn(async () => ({ success: true })),
+		} as never;
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/skills/triage",
+			method: "PATCH",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ description: "updated" }),
+		});
+		const res = mockResponse();
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(404);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("Skill not found");
 	});
 });

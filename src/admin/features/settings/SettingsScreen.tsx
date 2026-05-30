@@ -1,8 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
+import { navigate } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
+import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 
-export function SettingsScreen({ onBack }: { onBack: () => void }): React.ReactElement {
+export function SettingsScreen({
+	onBack,
+	tab = "general",
+}: {
+	onBack: () => void;
+	tab?: "general" | "skills";
+}): React.ReactElement {
 	const [settings, setSettings] = useState<SettingView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
@@ -64,6 +72,7 @@ export function SettingsScreen({ onBack }: { onBack: () => void }): React.ReactE
 					<button onClick={onBack} type="button">← Back</button>
 					<h2>Settings</h2>
 				</header>
+				<SettingsTabs activeTab={tab} />
 				<div className="empty">Loading settings...</div>
 			</div>
 		);
@@ -75,35 +84,62 @@ export function SettingsScreen({ onBack }: { onBack: () => void }): React.ReactE
 				<button onClick={onBack} type="button">← Back</button>
 				<h2>Settings</h2>
 			</header>
+			<SettingsTabs activeTab={tab} />
+			{tab === "skills" ? (
+				<ServerSkillsScreen showBreadcrumb={false} />
+			) : (
+				<>
+					{pendingRestart && (
+						<div className="restart-banner">
+							⚠️ A restart is required for some changes to take full effect.
+						</div>
+					)}
+					{error && <div className="error-banner">{error}</div>}
 
-			{pendingRestart && (
-				<div className="restart-banner">
-					⚠️ A restart is required for some changes to take full effect.
-				</div>
+					<div className="settings-list">
+						{settings.map((setting) => (
+							<SettingRow
+								key={setting.key}
+								setting={setting}
+								editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
+								onChange={handleChange}
+							/>
+						))}
+					</div>
+
+					<div className="settings-actions">
+						<button
+							className="action-btn restart"
+							onClick={handleSave}
+							disabled={saving || changedKeys.size === 0}
+							type="button"
+						>
+							{saving ? "Saving..." : "Save Changes"}
+						</button>
+					</div>
+				</>
 			)}
-			{error && <div className="error-banner">{error}</div>}
+		</div>
+	);
+}
 
-			<div className="settings-list">
-				{settings.map((setting) => (
-					<SettingRow
-						key={setting.key}
-						setting={setting}
-						editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
-						onChange={handleChange}
-					/>
-				))}
-			</div>
-
-			<div className="settings-actions">
-				<button
-					className="action-btn restart"
-					onClick={handleSave}
-					disabled={saving || changedKeys.size === 0}
-					type="button"
-				>
-					{saving ? "Saving..." : "Save Changes"}
-				</button>
-			</div>
+function SettingsTabs({ activeTab }: { activeTab: "general" | "skills" }): React.ReactElement {
+	return (
+		<div className="repo-tabs">
+			<button
+				className={`repo-tab${activeTab === "general" ? " active" : ""}`}
+				onClick={() => navigate({ screen: "settings", tab: "general" })}
+				type="button"
+			>
+				General
+			</button>
+			<button
+				className={`repo-tab${activeTab === "skills" ? " active" : ""}`}
+				onClick={() => navigate({ screen: "settings", tab: "skills" })}
+				type="button"
+			>
+				Skills
+			</button>
 		</div>
 	);
 }

@@ -18,8 +18,8 @@ export function CronScreen({
 }: {
 	owner: string;
 	repo: string;
-	activeTab: "sessions" | "crons";
-	onSelectTab: (tab: "sessions" | "crons") => void;
+	activeTab: "sessions" | "crons" | "skills";
+	onSelectTab: (tab: "sessions" | "crons" | "skills") => void;
 	onBack: () => void;
 	onNewIssue?: () => void;
 }): React.ReactElement {

@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 export type Route =
 	| { screen: "dashboard" }
 	| { screen: "repos" }
-	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" }
+	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
 	| { screen: "new-issue"; owner?: string; repo?: string }
-	| { screen: "settings" };
+	| { screen: "settings"; tab?: "general" | "skills" };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
@@ -17,7 +17,7 @@ export function parseHash(hash: string): Route {
 		return { screen: "new-issue" };
 	}
 	if (path[0] === "settings") {
-		return { screen: "settings" };
+		return { screen: "settings", tab: path[1] === "skills" ? "skills" : "general" };
 	}
 	if (path[0] === "dashboard") {
 		return { screen: "dashboard" };
@@ -27,10 +27,12 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			let issueNumber: number | undefined;
-			let tab: "sessions" | "crons" = "sessions";
+			let tab: "sessions" | "crons" | "skills" = "sessions";
 			if (path[3]) {
 				if (path[3] === "crons") {
 					tab = "crons";
+				} else if (path[3] === "skills") {
+					tab = "skills";
 				} else {
 					issueNumber = Number.parseInt(path[3], 10);
 					if (Number.isNaN(issueNumber)) {
@@ -52,7 +54,7 @@ export function parseHash(hash: string): Route {
 }
 
 export function buildHash(route: Route): string {
-	if (route.screen === "settings") return "#/settings";
+	if (route.screen === "settings") return route.tab === "skills" ? "#/settings/skills" : "#/settings";
 	if (route.screen === "dashboard") return "#/dashboard";
 	if (route.screen === "repos") return "#/repos";
 	if (route.screen === "new-issue") {
@@ -66,7 +68,7 @@ export function buildHash(route: Route): string {
 		if (route.issueNumber !== undefined) {
 			return `${base}/${route.issueNumber}`;
 		}
-		const tab = route.tab === "crons" ? "/crons" : "";
+		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : "";
 		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {
