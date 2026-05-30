@@ -2,7 +2,6 @@ import React from "react";
 import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
 import { StatusBadge } from "../../components/StatusBadge.js";
 import { formatRelative } from "../../lib/format.js";
-import { InvitationsSection } from "./InvitationsSection.js";
 
 export function DashboardScreen({
 	agentStatus,
@@ -82,8 +81,6 @@ export function DashboardScreen({
 					</button>
 				</div>
 			</div>
-
-			<InvitationsSection />
 
 			<div className="dashboard-section">
 				<h2>Recent Activity</h2>
