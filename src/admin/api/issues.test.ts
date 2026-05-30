@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues } from "./issues.js";
+import { assignIssue, chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues } from "./issues.js";
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -132,5 +132,17 @@ describe("issues api", () => {
 		]);
 
 		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues");
+	});
+
+	it("assigns issue via POST", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			jsonResponse({ assigned: true }),
+		);
+
+		await expect(assignIssue("mbrooks", "tars", 42)).resolves.toEqual({ assigned: true });
+
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/assign", {
+			method: "POST",
+		});
 	});
 });

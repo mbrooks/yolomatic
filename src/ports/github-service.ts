@@ -80,4 +80,5 @@ export interface GitHubService {
 	listOpenIssues(owner: string, repo: string): Promise<OpenIssue[]>;
 	listPendingInvitations(): Promise<PendingInvitation[]>;
 	acceptInvitation(invitationId: number): Promise<void>;
+	updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void>;
 }

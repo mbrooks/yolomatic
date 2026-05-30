@@ -84,6 +84,7 @@ describe("handleAdminRoute", () => {
 		createIssue: ReturnType<typeof vi.fn>;
 		listPendingInvitations: ReturnType<typeof vi.fn>;
 		acceptInvitation: ReturnType<typeof vi.fn>;
+		updateIssueAssignees: ReturnType<typeof vi.fn>;
 	};
 
 	beforeEach(() => {
@@ -129,6 +130,7 @@ describe("handleAdminRoute", () => {
 			createIssue: vi.fn(async () => ({ number: 99, html_url: "https://github.com/mbrooks/tars/issues/99" })),
 			listPendingInvitations: vi.fn(async () => []),
 			acceptInvitation: vi.fn(async () => undefined),
+			updateIssueAssignees: vi.fn(async () => undefined),
 		};
 		deps = {
 			adminUsername: "admin",
@@ -2602,6 +2604,99 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(500);
 		const body = JSON.parse(String(res.body));
 		expect(body.error).toContain("Network error");
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to TARS username", async () => {
+		store.set("github_username", "tars-bot");
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.assigned).toBe(true);
+		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when githubService missing", async () => {
+		const noGhDeps = { ...deps, githubService: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noGhDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("GitHub service not configured");
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when settingsStore missing", async () => {
+		const noStoreDeps = { ...deps, settingsStore: undefined };
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, noStoreDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("Settings store not configured");
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when github_username not set", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toBe("TARS GitHub username not configured");
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign handles service error", async () => {
+		store.set("github_username", "tars-bot");
+		githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(500);
+		const body = JSON.parse(String(res.body));
+		expect(body.error).toContain("API error");
+	});
+
+	it("POST /api/repos/:owner/:repo/issues/:number/assign returns false for invalid issue number", async () => {
+		const req = mockRequest({
+			url: "/api/repos/mbrooks/tars/issues/abc/assign",
+			method: "POST",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(false);
 	});
 
 	it("PATCH /api/skills/:id handles update error", async () => {
