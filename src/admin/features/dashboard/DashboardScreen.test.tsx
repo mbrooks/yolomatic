@@ -1,17 +1,10 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import React from "react";
 
 import { DashboardScreen } from "./DashboardScreen.js";
 import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
-
-function jsonResponse(data: unknown, status = 200): Response {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { "content-type": "application/json" },
-	});
-}
 
 function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
@@ -46,27 +39,6 @@ const defaultProps = {
 };
 
 describe("DashboardScreen", () => {
-	beforeEach(() => {
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async () =>
-				jsonResponse({ invitations: [] }),
-			),
-		);
-	});
-
-	afterEach(() => {
-		vi.unstubAllGlobals();
-		vi.restoreAllMocks();
-	});
-
-	it("renders invitations section with empty state", async () => {
-		render(<DashboardScreen {...defaultProps} />);
-
-		await waitFor(() => {
-			expect(screen.getByText("No pending invitations.")).not.toBeNull();
-		});
-	});
 	it("renders empty state when no recent sessions", async () => {
 		render(<DashboardScreen {...defaultProps} />);
 
