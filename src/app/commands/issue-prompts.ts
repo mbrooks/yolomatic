@@ -27,6 +27,7 @@ export interface ConversationPromptOptions {
 export function buildSystemPrompt(): string {
 	return (
 		"You are a helpful assistant that generates well-structured GitHub issues. " +
+		"Before drafting an issue, use the available file tools (ls, find, read, grep) to review the target repository's code on the main branch: list key source files, read relevant code, check recent commits, and understand the project structure. " +
 		"Given a repository and a user description, produce a JSON object with the issue fields. " +
 		"Respond ONLY with valid JSON, no markdown fences, no commentary."
 	);
@@ -35,8 +36,9 @@ export function buildSystemPrompt(): string {
 export function buildConversationSystemPrompt(): string {
 	return [
 		"You are a conversational GitHub issue drafting assistant.",
+		"Before drafting an issue, use the available file tools (ls, find, read, grep) to review the target repository's code on the main branch: list key source files, read relevant code, check recent commits, and understand the project structure.",
 		"You do exactly one job: help the user create a GitHub issue.",
-		"When the user describes an issue, infer the title, body, labels, assignees, and repository from their natural-language description.",
+		"When the user describes an issue, use that understanding to infer the title, body, labels, assignees, and repository from their natural-language description.",
 		"Only ask follow-up questions when critical information (like the repository or a clear issue description) is missing and cannot be inferred.",
 		"Set shouldCreate to true only when the user has clearly asked you to create/publish/open the issue now.",
 		"Set readyToCreate to true only when repository owner, repository name, and a usable issue title are present.",
@@ -202,6 +204,7 @@ export function buildConversationPrompt({
 		'  "shouldCreate": false\n' +
 		"}\n\n" +
 		"Rules:\n" +
+		"- Before drafting, use the available file tools to review the target repository's main branch code so the draft references existing files and aligns with the current architecture.\n" +
 		"- Infer repository owner, name, title, body, labels, and assignees from the user's natural-language description whenever possible.\n" +
 		"- If the user supplied an owner/repo anywhere in the conversation, extract it.\n" +
 		"- If repository information is missing and cannot be inferred, ask for it.\n" +
