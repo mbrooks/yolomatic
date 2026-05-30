@@ -13,6 +13,14 @@ describe("buildSystemPrompt", () => {
 		expect(prompt).toContain("Respond ONLY with valid JSON");
 		expect(prompt).toContain("no markdown fences");
 	});
+
+	it("instructs reviewing repository code before drafting", () => {
+		const prompt = buildSystemPrompt();
+		expect(prompt).toContain("use the available file tools (ls, find, read, grep)");
+		expect(prompt).toContain("review the target repository's code on the main branch");
+		expect(prompt).toContain("list key source files");
+		expect(prompt).toContain("check recent commits");
+	});
 });
 
 describe("buildUserPrompt", () => {
@@ -148,6 +156,14 @@ describe("buildConversationSystemPrompt", () => {
 		expect(prompt).toContain("GitHub issue");
 		expect(prompt).toContain("Set shouldCreate to true only when the user has clearly asked");
 	});
+
+	it("instructs reviewing repository code before drafting", () => {
+		const prompt = buildConversationSystemPrompt();
+		expect(prompt).toContain("use the available file tools (ls, find, read, grep)");
+		expect(prompt).toContain("review the target repository's code on the main branch");
+		expect(prompt).toContain("list key source files");
+		expect(prompt).toContain("check recent commits");
+	});
 });
 
 describe("buildConversationPrompt", () => {
@@ -191,6 +207,14 @@ describe("buildConversationPrompt", () => {
 		expect(prompt).not.toContain("- c6");
 		expect(prompt).toContain("Potentially related issues:");
 		expect(prompt).toContain("- #2 (closed): two");
+	});
+
+	it("includes rule to review repository code before drafting", () => {
+		const prompt = buildConversationPrompt({
+			messages: [{ role: "user", text: "help" }],
+		});
+		expect(prompt).toContain("review the target repository's main branch code");
+		expect(prompt).toContain("draft references existing files");
 	});
 
 	it("mentions template auto-detection when templates exist but none is selected", () => {
