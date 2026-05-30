@@ -1,56 +1,3 @@
-:root {
-	--bg: #0d1117;
-	--surface: #161b22;
-	--border: #30363d;
-	--text: #c9d1d9;
-	--muted: #8b949e;
-	--green: #3fb950;
-	--yellow: #d29922;
-	--red: #f85149;
-	--blue: #58a6ff;
-}
-
-* {
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
-}
-
-html, body, #root {
-	height: 100%;
-	overflow: hidden;
-}
-
-body {
-	background: var(--bg);
-	color: var(--text);
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-	line-height: 1.5;
-	padding: 1rem;
-}
-
-.restart-banner {
-	align-items: center;
-	background: rgba(210, 153, 34, 0.15);
-	border: 1px solid var(--yellow);
-	border-radius: 6px;
-	color: var(--yellow);
-	display: flex;
-	font-size: 0.875rem;
-	font-weight: 500;
-	gap: 0.5rem;
-	padding: 0.6rem 0.75rem;
-	flex-shrink: 0;
-}
-
-.restart-banner-icon {
-	font-size: 1rem;
-}
-
-.restart-banner-text {
-	line-height: 1.4;
-}
-
 header {
 	align-items: center;
 	display: flex;
@@ -69,47 +16,6 @@ header {
 
 h1 {
 	font-size: 1.25rem;
-}
-
-.badge {
-	align-items: center;
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	display: inline-flex;
-	font-size: 0.75rem;
-	font-weight: 600;
-	gap: 0.4rem;
-	letter-spacing: 0.04em;
-	padding: 0.25rem 0.6rem;
-	text-transform: uppercase;
-}
-
-.badge.online {
-	color: var(--green);
-}
-
-.badge.busy {
-	animation: pulse 2s infinite;
-	color: var(--yellow);
-}
-
-.badge.feedback {
-	color: var(--blue);
-}
-
-.badge.offline {
-	color: var(--red);
-}
-
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.6;
-	}
 }
 
 .app {
@@ -2306,4 +2212,3 @@ a:hover {
 .assignee-tag {
 	background: var(--bg);
 }
-
