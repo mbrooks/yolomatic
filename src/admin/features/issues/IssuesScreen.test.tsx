@@ -7,16 +7,17 @@ import { IssuesScreen } from "./IssuesScreen.js";
 vi.mock("./useRepoIssues.js", () => ({
 	useRepoIssues: vi.fn((owner: string, repo: string) => {
 		if (owner === "empty" && repo === "repo") {
-			return { issues: [], loading: false };
+			return { issues: [], loading: false, reload: vi.fn() };
 		}
 		if (owner === "loading" && repo === "repo") {
-			return { issues: [], loading: true };
+			return { issues: [], loading: true, reload: vi.fn() };
 		}
 		return {
 			issues: [
 				{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["user"], html_url: "https://github.com/o/r/issues/1" },
 			],
 			loading: false,
+			reload: vi.fn(),
 		};
 	}),
 }));

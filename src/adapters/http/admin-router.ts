@@ -614,6 +614,42 @@ export async function handleAdminRoute(
 		return true;
 	}
 
+	// POST /api/repos/:owner/:repo/issues/:number/assign
+	const assignMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/assign$/u.exec(pathname);
+	if (assignMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		if (!deps.settingsStore) {
+			sendJson(response, 500, { error: "Settings store not configured" });
+			return true;
+		}
+		const [, owner, repo, issueNumberStr] = assignMatch;
+		const issueNumber = Number.parseInt(issueNumberStr, 10);
+		if (Number.isNaN(issueNumber)) {
+			sendJson(response, 400, { error: "Invalid issue number" });
+			return true;
+		}
+		const tarsUsername = deps.settingsStore.get("github_username");
+		if (!tarsUsername) {
+			sendJson(response, 500, { error: "TARS GitHub username not configured" });
+			return true;
+		}
+		try {
+			await deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [tarsUsername]);
+			sendJson(response, 200, { assigned: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[webhook] assign error: ${message}\n`);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	// POST /api/issues/generate
 	if (request.method === "POST" && pathname === "/api/issues/generate") {
 		if (!checkAdminJson(request, response, deps)) {

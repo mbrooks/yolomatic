@@ -16,6 +16,7 @@ function createMockOctokit(overrides?: Partial<{
 			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/tars/issues/1" } })),
 			listLabelsForRepo: vi.fn(async () => ({ data: [] })),
 			listForRepo: vi.fn(async () => ({ data: [] })),
+			update: vi.fn(async () => ({ data: {} })),
 			...(overrides?.issues ?? {}),
 		},
 		pulls: {
@@ -554,6 +555,15 @@ describe("GitHubServiceAdapter", () => {
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			await expect(adapter.acceptInvitation(1)).rejects.toThrow("Not found");
+		});
+	});
+
+	describe("updateIssueAssignees", () => {
+		it("calls issues.update with assignees", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.updateIssueAssignees("mbrooks", "tars", 1, ["tars-bot"]);
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars", issue_number: 1, assignees: ["tars-bot"] });
 		});
 	});
 });
