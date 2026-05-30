@@ -4,13 +4,14 @@ import { navigate } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
+import { InvitationsSection } from "./InvitationsSection.js";
 
 export function SettingsScreen({
 	onBack,
 	tab = "general",
 }: {
 	onBack: () => void;
-	tab?: "general" | "skills";
+	tab?: "general" | "skills" | "invitations";
 }): React.ReactElement {
 	const [settings, setSettings] = useState<SettingView[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -88,6 +89,8 @@ export function SettingsScreen({
 			<SettingsTabs activeTab={tab} />
 			{tab === "skills" ? (
 				<ServerSkillsScreen showBreadcrumb={false} />
+			) : tab === "invitations" ? (
+				<InvitationsSection />
 			) : (
 				<>
 					{pendingRestart && (
@@ -122,7 +125,7 @@ export function SettingsScreen({
 	);
 }
 
-function SettingsTabs({ activeTab }: { activeTab: "general" | "skills" }): React.ReactElement {
+function SettingsTabs({ activeTab }: { activeTab: "general" | "skills" | "invitations" }): React.ReactElement {
 	return (
 		<div className="repo-tabs">
 			<button
@@ -138,6 +141,13 @@ function SettingsTabs({ activeTab }: { activeTab: "general" | "skills" }): React
 				type="button"
 			>
 				Skills
+			</button>
+			<button
+				className={`repo-tab${activeTab === "invitations" ? " active" : ""}`}
+				onClick={() => navigate({ screen: "settings", tab: "invitations" })}
+				type="button"
+			>
+				Invitations
 			</button>
 		</div>
 	);

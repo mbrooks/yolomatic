@@ -6,7 +6,7 @@ export type Route =
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" | "issues" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
 	| { screen: "new-issue"; owner?: string; repo?: string }
-	| { screen: "settings"; tab?: "general" | "skills" };
+	| { screen: "settings"; tab?: "general" | "skills" | "invitations" };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
@@ -17,7 +17,8 @@ export function parseHash(hash: string): Route {
 		return { screen: "new-issue" };
 	}
 	if (path[0] === "settings") {
-		return { screen: "settings", tab: path[1] === "skills" ? "skills" : "general" };
+		const tab = path[1] === "skills" ? "skills" : path[1] === "invitations" ? "invitations" : "general";
+		return { screen: "settings", tab };
 	}
 	if (path[0] === "dashboard") {
 		return { screen: "dashboard" };
@@ -56,7 +57,11 @@ export function parseHash(hash: string): Route {
 }
 
 export function buildHash(route: Route): string {
-	if (route.screen === "settings") return route.tab === "skills" ? "#/settings/skills" : "#/settings";
+	if (route.screen === "settings") {
+		if (route.tab === "skills") return "#/settings/skills";
+		if (route.tab === "invitations") return "#/settings/invitations";
+		return "#/settings";
+	}
 	if (route.screen === "dashboard") return "#/dashboard";
 	if (route.screen === "repos") return "#/repos";
 	if (route.screen === "new-issue") {
