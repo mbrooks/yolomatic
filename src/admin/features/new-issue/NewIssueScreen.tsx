@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { chatIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type IssueChatPayload, type RepoContext } from "../../api/issues.js";
+import { chatIssue, createIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type IssueChatPayload, type RepoContext } from "../../api/issues.js";
 import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
 import { webSocketManager } from "../../api/websocket.js";
 import type { RepoSummary } from "../../app/types.js";
@@ -124,6 +124,7 @@ export function NewIssueScreen({
 	const [selectedTemplate, setSelectedTemplate] = useState<string | undefined>(undefined);
 	const [loadingContext, setLoadingContext] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
+	const [creatingIssue, setCreatingIssue] = useState(false);
 	const [createdIssue, setCreatedIssue] = useState<{ number: number; html_url: string } | null>(null);
 	const [wsStatus, setWsStatus] = useState(webSocketManager.connectionStatus);
 	const [progressMessage, setProgressMessage] = useState<string | null>(null);
@@ -272,6 +273,32 @@ export function NewIssueScreen({
 			setSubmitting(false);
 		}
 	}, [appendTextMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting, wsStatus]);
+
+	const handleCreateIssue = useCallback(async () => {
+		if (!owner.trim() || !repo.trim() || !draft.title.trim() || creatingIssue) {
+			return;
+		}
+		setCreatingIssue(true);
+		setError(null);
+		try {
+			const result = await createIssue({
+				owner: owner.trim(),
+				repo: repo.trim(),
+				title: draft.title,
+				body: draft.body || undefined,
+				labels: draft.labels.length > 0 ? draft.labels : undefined,
+				assignees: draft.assignees.length > 0 ? draft.assignees : undefined,
+			});
+			setCreatedIssue(result);
+			appendTextMessage("tars", `Issue created: [#${result.number}](${result.html_url})`);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			setError(message);
+			appendTextMessage("tars", `I couldn't create the issue: ${message}`);
+		} finally {
+			setCreatingIssue(false);
+		}
+	}, [appendTextMessage, creatingIssue, draft, owner, repo]);
 
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -437,12 +464,25 @@ export function NewIssueScreen({
 						<div className="preview-context">
 							<div className="preview-context-header">Current draft</div>
 							{hasDraftContent(draft) ? (
-								<PreviewCard
-									title={draft.title || "(title pending)"}
-									body={draft.body}
-									labels={draft.labels}
-									assignees={draft.assignees}
-								/>
+								<>
+									<PreviewCard
+										title={draft.title || "(title pending)"}
+										body={draft.body}
+										labels={draft.labels}
+										assignees={draft.assignees}
+									/>
+									{!createdIssue ? (
+										<button
+											type="button"
+											className="create-issue-btn"
+											onClick={() => void handleCreateIssue()}
+											disabled={creatingIssue || !draft.title.trim()}
+										>
+											{creatingIssue ? "Creating..." : "Create Issue"}
+										</button>
+									) : null}
+									{creatingIssue ? <div className="context-loading">Creating issue...</div> : null}
+								</>
 							) : (
 								<div className="new-issue-hint">
 									The assistant will keep this draft updated as the conversation progresses.

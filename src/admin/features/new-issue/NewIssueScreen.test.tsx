@@ -78,6 +78,13 @@ describe("NewIssueScreen", () => {
 				}
 			}
 
+			if (url.includes("/api/issues") && !url.includes("/chat") && !url.includes("/generate")) {
+				return mockJsonResponse({
+					number: 99,
+					html_url: "https://github.com/mbrooks/tars/issues/99",
+				});
+			}
+
 			return mockJsonResponse({});
 		});
 
@@ -329,5 +336,180 @@ describe("NewIssueScreen", () => {
 			expect(screen.queryByText("Issue created:")).not.toBeNull();
 		});
 		expect(screen.queryByText("I couldn't continue the issue draft: WebSocket disconnected")).toBeNull();
+	});
+
+	it("shows a Create Issue button when a draft is present", async () => {
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+
+		expect(screen.queryByRole("button", { name: "Create Issue" })).not.toBeNull();
+	});
+
+	it("creates the issue when the Create Issue button is clicked", async () => {
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+
+		const createBtn = screen.getByRole("button", { name: "Create Issue" });
+		fireEvent.click(createBtn);
+
+		await waitFor(() => {
+			expect(screen.queryByText("Issue created: [#99](https://github.com/mbrooks/tars/issues/99)")).not.toBeNull();
+		});
+
+		await waitFor(() => {
+			expect(fetchSpy).toHaveBeenCalledWith(
+				expect.stringContaining("/api/issues"),
+				expect.objectContaining({ method: "POST" }),
+			);
+		});
+	});
+
+	it("disables the Create Issue button while creating", async () => {
+		let resolveCreate: (value: unknown) => void = () => {};
+		fetchSpy.mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
+			const url = typeof input === "string" ? input : input.toString();
+			if (url.includes("/api/repos/")) {
+				return mockJsonResponse({
+					labels: ["bug", "enhancement"],
+					templates: [{ name: "Bug Report", body: "## Steps\n" }],
+					recentCommits: ["abc123: fix"],
+					relatedIssues: [{ number: 1, title: "Old", state: "closed" }],
+				});
+			}
+			if (url.includes("/api/issues/chat")) {
+				return mockJsonResponse({
+					message: "I drafted the issue.",
+					owner: "mbrooks",
+					repo: "tars",
+					draft: {
+						title: "Generated Title",
+						body: "Generated body",
+						labels: ["bug"],
+						assignees: [],
+					},
+					readyToCreate: true,
+					shouldCreate: false,
+				});
+			}
+			if (url.includes("/api/issues") && !url.includes("/chat") && !url.includes("/generate")) {
+				return new Promise((resolve) => {
+					resolveCreate = resolve;
+				});
+			}
+			return mockJsonResponse({});
+		});
+
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+
+		const createBtn = screen.getByRole("button", { name: "Create Issue" });
+		fireEvent.click(createBtn);
+
+		await waitFor(() => {
+			expect(screen.queryByRole("button", { name: "Creating..." })).not.toBeNull();
+		});
+
+		resolveCreate(mockJsonResponse({ number: 99, html_url: "https://github.com/mbrooks/tars/issues/99" }));
+
+		await waitFor(() => {
+			expect(screen.queryByRole("button", { name: "Creating..." })).toBeNull();
+		});
+	});
+
+	it("handles an error when the Create Issue button fails", async () => {
+		fetchSpy.mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
+			const url = typeof input === "string" ? input : input.toString();
+			if (url.includes("/api/repos/")) {
+				return mockJsonResponse({
+					labels: ["bug", "enhancement"],
+					templates: [{ name: "Bug Report", body: "## Steps\n" }],
+					recentCommits: ["abc123: fix"],
+					relatedIssues: [{ number: 1, title: "Old", state: "closed" }],
+				});
+			}
+			if (url.includes("/api/issues/chat")) {
+				return mockJsonResponse({
+					message: "I drafted the issue.",
+					owner: "mbrooks",
+					repo: "tars",
+					draft: {
+						title: "Generated Title",
+						body: "Generated body",
+						labels: ["bug"],
+						assignees: [],
+					},
+					readyToCreate: true,
+					shouldCreate: false,
+				});
+			}
+			if (url.includes("/api/issues") && !url.includes("/chat") && !url.includes("/generate")) {
+				return new Response(JSON.stringify({ error: "GitHub error" }), {
+					status: 500,
+					headers: { "content-type": "application/json" },
+				});
+			}
+			return mockJsonResponse({});
+		});
+
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+
+		const createBtn = screen.getByRole("button", { name: "Create Issue" });
+		fireEvent.click(createBtn);
+
+		await waitFor(() => {
+			expect(screen.queryByText(/I couldn't create the issue:/)).not.toBeNull();
+		});
+	});
+
+	it("hides the Create Issue button after an issue is created via the button", async () => {
+		render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "In mbrooks/tars, something is broken" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Generated Title")).not.toBeNull();
+		});
+
+		expect(screen.queryByRole("button", { name: "Create Issue" })).not.toBeNull();
+
+		const createBtn = screen.getByRole("button", { name: "Create Issue" });
+		fireEvent.click(createBtn);
+
+		await waitFor(() => {
+			expect(screen.queryByText("Issue created: [#99](https://github.com/mbrooks/tars/issues/99)")).not.toBeNull();
+		});
+
+		expect(screen.queryByRole("button", { name: "Create Issue" })).toBeNull();
 	});
 });
