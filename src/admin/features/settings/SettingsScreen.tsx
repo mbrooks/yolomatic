@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
 import { navigate } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
+import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 
 export function SettingsScreen({
@@ -90,9 +91,7 @@ export function SettingsScreen({
 			) : (
 				<>
 					{pendingRestart && (
-						<div className="restart-banner">
-							⚠️ A restart is required for some changes to take full effect.
-						</div>
+						<RestartBanner>A restart is required for some changes to take full effect.</RestartBanner>
 					)}
 					{error && <div className="error-banner">{error}</div>}
 
