@@ -101,6 +101,10 @@ describe("parseHash", () => {
 	it("parses server-skills view", () => {
 		expect(parseHash("#/settings/skills")).toEqual({ screen: "settings", tab: "skills" });
 	});
+
+	it("parses invitations view", () => {
+		expect(parseHash("#/settings/invitations")).toEqual({ screen: "settings", tab: "invitations" });
+	});
 });
 
 describe("buildHash", () => {
@@ -162,5 +166,14 @@ describe("buildHash", () => {
 	it("round-trips skills tab", () => {
 		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "skills" }));
+	});
+
+	it("builds invitations view", () => {
+		expect(buildHash({ screen: "settings", tab: "invitations" })).toBe("#/settings/invitations");
+	});
+
+	it("round-trips invitations tab", () => {
+		const hash = buildHash({ screen: "settings" as const, tab: "invitations" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "invitations" }));
 	});
 });
