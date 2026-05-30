@@ -106,3 +106,7 @@ export async function fetchOpenIssues(owner: string, repo: string): Promise<Open
 		(r) => r.issues,
 	);
 }
+
+export async function assignIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
+	return apiPost<void>(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/assign`);
+}

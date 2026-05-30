@@ -20,7 +20,7 @@ export function IssuesScreen({
 	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onNewIssue?: () => void;
 }): React.ReactElement {
-	const { issues, loading } = useRepoIssues(owner, repo);
+	const { issues, loading, reload } = useRepoIssues(owner, repo);
 	const [selected, setSelected] = useState<OpenIssue | null>(null);
 
 	return (
@@ -34,7 +34,7 @@ export function IssuesScreen({
 			) : (
 				<div className="workspace">
 					<IssueListPane issues={issues} selected={selected} onSelect={setSelected} />
-					<IssueDetail selected={selected} />
+					<IssueDetail selected={selected} owner={owner} repo={repo} onAssignSuccess={reload} />
 				</div>
 			)}
 		</>
