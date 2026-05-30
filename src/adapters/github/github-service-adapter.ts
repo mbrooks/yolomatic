@@ -193,4 +193,28 @@ export class GitHubServiceAdapter implements GitHubService {
 			return [];
 		}
 	}
+
+	async listPendingInvitations(): Promise<import("../../ports/github-service.js").PendingInvitation[]> {
+		try {
+			const { data } = await this.octokit.repos.listInvitationsForAuthenticatedUser();
+			return data.map((inv) => ({
+				id: inv.id,
+				repository: {
+					full_name: inv.repository?.full_name ?? "",
+					name: inv.repository?.name ?? "",
+					owner: { login: inv.repository?.owner?.login ?? "" },
+				},
+				inviter: inv.inviter ? { login: inv.inviter.login } : null,
+				permissions: inv.permissions ?? "read",
+				created_at: inv.created_at,
+				html_url: inv.html_url ?? "",
+			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async acceptInvitation(invitationId: number): Promise<void> {
+		await this.octokit.repos.acceptInvitationForAuthenticatedUser({ invitation_id: invitationId });
+	}
 }

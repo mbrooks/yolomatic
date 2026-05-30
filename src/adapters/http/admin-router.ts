@@ -750,6 +750,49 @@ export async function handleAdminRoute(
 		}
 	}
 
+	// GitHub invitations routes
+	if (pathname === "/api/github/invitations" && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		try {
+			const invitations = await deps.githubService.listPendingInvitations();
+			sendJson(response, 200, { invitations });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	const acceptInvitationMatch = /^\/api\/github\/invitations\/([^/]+)\/accept$/u.exec(pathname);
+	if (acceptInvitationMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		const invitationId = Number.parseInt(acceptInvitationMatch[1], 10);
+		if (Number.isNaN(invitationId)) {
+			sendJson(response, 400, { error: "Invalid invitation ID" });
+			return true;
+		}
+		try {
+			await deps.githubService.acceptInvitation(invitationId);
+			sendJson(response, 200, { accepted: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	// Server-level Skills routes
 	if (pathname === "/api/skills") {
 		if (!checkAdminJson(request, response, deps)) {
