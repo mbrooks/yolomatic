@@ -27,6 +27,16 @@ export interface IssueTemplate {
 	body: string;
 }
 
+export interface OpenIssue {
+	number: number;
+	title: string;
+	body: string;
+	state: string;
+	labels: string[];
+	assignees: string[];
+	html_url: string;
+}
+
 export interface GitHubService {
 	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
 	postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<void>;
@@ -54,4 +64,5 @@ export interface GitHubService {
 	getIssueTemplates(owner: string, repo: string): Promise<IssueTemplate[]>;
 	listRecentCommits(owner: string, repo: string, limit?: number): Promise<string[]>;
 	listRelatedIssues(owner: string, repo: string, query: string, limit?: number): Promise<Array<{ number: number; title: string; state: string }>>;
+	listOpenIssues(owner: string, repo: string): Promise<OpenIssue[]>;
 }

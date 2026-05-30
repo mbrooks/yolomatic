@@ -69,6 +69,7 @@ function makeDeps(overrides?: {
 		getIssueTemplates: vi.fn(async () => []),
 		listRecentCommits: vi.fn(async () => []),
 		listRelatedIssues: vi.fn(async () => []),
+		listOpenIssues: vi.fn(async () => []),
 	};
 
 	const tasks: TaskControlService = {

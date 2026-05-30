@@ -176,4 +176,21 @@ export class GitHubServiceAdapter implements GitHubService {
 			return [];
 		}
 	}
+
+	async listOpenIssues(owner: string, repo: string): Promise<import("../../ports/github-service.js").OpenIssue[]> {
+		try {
+			const { data } = await this.octokit.issues.listForRepo({ owner, repo, state: "open" });
+			return data.map((i) => ({
+				number: i.number,
+				title: i.title,
+				body: i.body ?? "",
+				state: i.state,
+				labels: i.labels.map((l) => (typeof l === "string" ? l : l.name ?? "")).filter(Boolean),
+				assignees: i.assignees?.map((a) => a.login).filter(Boolean) ?? [],
+				html_url: i.html_url,
+			}));
+		} catch {
+			return [];
+		}
+	}
 }
