@@ -2241,6 +2241,68 @@ a:hover {
 	color: var(--blue);
 }
 
+/* Invitations */
+.invitations-header {
+	align-items: center;
+	display: flex;
+	gap: 0.75rem;
+	justify-content: space-between;
+	margin-bottom: 0.75rem;
+}
+
+.invitations-header h2 {
+	margin-bottom: 0;
+}
+
+.invitation-list {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.invitation-row {
+	align-items: center;
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	gap: 0.75rem;
+	justify-content: space-between;
+	padding: 0.6rem 0.75rem;
+}
+
+.invitation-row:last-child {
+	border-bottom: none;
+}
+
+.invitation-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+}
+
+.invitation-repo {
+	font-size: 0.875rem;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.invitation-repo a {
+	color: var(--blue);
+	text-decoration: none;
+}
+
+.invitation-repo a:hover {
+	text-decoration: underline;
+}
+
+.invitation-meta {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
 .assignee-tag {
 	background: var(--bg);
 }
