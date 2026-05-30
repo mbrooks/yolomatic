@@ -32,6 +32,27 @@ export type SessionLogResponse = {
 
 export type SessionType = "github_issue" | "cron";
 
+export type SkillSource = "server" | "repo" | "inherited";
+
+export type ServerSkill = {
+	id: string;
+	name: string;
+	description: string;
+	content: string;
+	enabled: boolean;
+	updatedAt: string;
+	createdAt: string;
+};
+
+export type RepoSkill = {
+	name: string;
+	description: string;
+	content: string;
+	enabled: boolean;
+	updatedAt: string;
+	source: SkillSource;
+};
+
 export type Session = {
 	owner: string;
 	repo: string;

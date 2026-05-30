@@ -13,6 +13,8 @@ import { generateIssueViaLLM } from "../../app/commands/generate-issue.js";
 import { chatIssueViaLLM } from "../../app/commands/issue-chat.js";
 import { adminHtml, serveAdminAsset } from "./asset-server.js";
 import type { SettingsStore } from "../../settings/store.js";
+import type { SkillStore } from "../../skills/store.js";
+import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import { getSettingDefinition } from "../../settings/model.js";
 import type { IssueChatResponse } from "../../admin/api/issues.js";
 
@@ -28,6 +30,8 @@ export interface AdminRouterDeps {
 	adminPassword?: string;
 	adminAssetsDir: string;
 	settingsStore?: SettingsStore;
+	skillStore?: SkillStore;
+	repoSkillService?: RepoSkillService;
 }
 
 export interface IssueChatRequestBody {
@@ -725,5 +729,307 @@ export async function handleAdminRoute(
 		}
 	}
 
+	// Server-level Skills routes
+	if (pathname === "/api/skills") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.skillStore) {
+			sendJson(response, 500, { error: "Skill store not configured" });
+			return true;
+		}
+
+		if (request.method === "GET") {
+			try {
+				const skills = await deps.skillStore.listAll();
+				sendJson(response, 200, { skills });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 500, { error: message });
+			}
+			return true;
+		}
+
+		if (request.method === "POST") {
+			try {
+				const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+					name?: string;
+					description?: string;
+					content?: string;
+					enabled?: boolean;
+				};
+				if (!body.name || !body.content) {
+					sendJson(response, 400, { error: "Missing required fields: name, content" });
+					return true;
+				}
+				const skill = await deps.skillStore.create({
+					name: body.name,
+					description: body.description || "",
+					content: body.content,
+					enabled: body.enabled ?? true,
+				});
+				sendJson(response, 201, skill);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				sendJson(response, 400, { error: message });
+			}
+			return true;
+		}
+	}
+
+	const serverSkillDetailMatch = /^\/api\/skills\/([^/]+)$/u.exec(pathname);
+	if (serverSkillDetailMatch && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.skillStore) {
+			sendJson(response, 500, { error: "Skill store not configured" });
+			return true;
+		}
+		const [, id] = serverSkillDetailMatch;
+		try {
+			const skill = await deps.skillStore.get(id);
+			if (!skill) {
+				sendJson(response, 404, { error: "Skill not found" });
+				return true;
+			}
+			sendJson(response, 200, skill);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	if (serverSkillDetailMatch && request.method === "PATCH") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.skillStore) {
+			sendJson(response, 500, { error: "Skill store not configured" });
+			return true;
+		}
+		const [, id] = serverSkillDetailMatch;
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as Partial<{
+				name: string;
+				description: string;
+				content: string;
+				enabled: boolean;
+			}>;
+			const updated = await deps.skillStore.update(id, body);
+			if (!updated) {
+				sendJson(response, 404, { error: "Skill not found" });
+				return true;
+			}
+			sendJson(response, 200, updated);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 400, { error: message });
+		}
+		return true;
+	}
+
+	if (serverSkillDetailMatch && request.method === "DELETE") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.skillStore) {
+			sendJson(response, 500, { error: "Skill store not configured" });
+			return true;
+		}
+		const [, id] = serverSkillDetailMatch;
+		try {
+			await deps.skillStore.delete(id);
+			sendJson(response, 200, { deleted: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	// Repo-level Skills routes
+	const repoSkillsMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/skills$/u.exec(pathname);
+	if (repoSkillsMatch && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.repoSkillService) {
+			sendJson(response, 500, { error: "Repo skill service not configured" });
+			return true;
+		}
+		const [, owner, repo] = repoSkillsMatch;
+		try {
+			const repoSkills = await deps.repoSkillService.listRepoSkills(owner, repo);
+			const serverSkills = deps.skillStore ? await deps.skillStore.listAll() : [];
+			const merged = mergeRepoAndServerSkills(repoSkills, serverSkills);
+			sendJson(response, 200, { skills: merged });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	if (repoSkillsMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.repoSkillService) {
+			sendJson(response, 500, { error: "Repo skill service not configured" });
+			return true;
+		}
+		const [, owner, repo] = repoSkillsMatch;
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+				name?: string;
+				description?: string;
+				content?: string;
+				enabled?: boolean;
+			};
+			if (!body.name || !body.content) {
+				sendJson(response, 400, { error: "Missing required fields: name, content" });
+				return true;
+			}
+			const result = await deps.repoSkillService.saveRepoSkill(owner, repo, {
+				name: body.name,
+				description: body.description || "",
+				content: body.content,
+				enabled: body.enabled ?? true,
+			});
+			if (!result.success) {
+				sendJson(response, 500, { error: result.error || "Failed to save skill" });
+				return true;
+			}
+			const updated = await deps.repoSkillService.listRepoSkills(owner, repo);
+			const found = updated.find((s) => s.name === body.name);
+			sendJson(response, 201, found ?? { name: body.name });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 400, { error: message });
+		}
+		return true;
+	}
+
+	const repoSkillDetailMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/skills\/([^/]+)$/u.exec(pathname);
+	if (repoSkillDetailMatch && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.repoSkillService) {
+			sendJson(response, 500, { error: "Repo skill service not configured" });
+			return true;
+		}
+		const [, owner, repo, name] = repoSkillDetailMatch;
+		try {
+			const skill = await deps.repoSkillService.getRepoSkill(owner, repo, name);
+			if (!skill) {
+				sendJson(response, 404, { error: "Skill not found" });
+				return true;
+			}
+			sendJson(response, 200, skill);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	if (repoSkillDetailMatch && request.method === "PATCH") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.repoSkillService) {
+			sendJson(response, 500, { error: "Repo skill service not configured" });
+			return true;
+		}
+		const [, owner, repo, name] = repoSkillDetailMatch;
+		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as Partial<{
+				name: string;
+				description: string;
+				content: string;
+				enabled: boolean;
+			}>;
+			const existing = await deps.repoSkillService.getRepoSkill(owner, repo, name);
+			if (!existing) {
+				sendJson(response, 404, { error: "Skill not found" });
+				return true;
+			}
+			if (body.name !== undefined && body.name !== name) {
+				// Rename: delete old, create new
+				await deps.repoSkillService.deleteRepoSkill(owner, repo, name);
+			}
+			const result = await deps.repoSkillService.saveRepoSkill(owner, repo, {
+				name: body.name ?? name,
+				description: body.description ?? existing.description,
+				content: body.content ?? existing.content,
+				enabled: body.enabled ?? existing.enabled,
+			});
+			if (!result.success) {
+				sendJson(response, 500, { error: result.error || "Failed to save skill" });
+				return true;
+			}
+			sendJson(response, 200, { name: body.name ?? name });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 400, { error: message });
+		}
+		return true;
+	}
+
+	if (repoSkillDetailMatch && request.method === "DELETE") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.repoSkillService) {
+			sendJson(response, 500, { error: "Repo skill service not configured" });
+			return true;
+		}
+		const [, owner, repo, name] = repoSkillDetailMatch;
+		try {
+			const result = await deps.repoSkillService.deleteRepoSkill(owner, repo, name);
+			if (!result.success) {
+				sendJson(response, 500, { error: result.error || "Failed to delete skill" });
+				return true;
+			}
+			sendJson(response, 200, { deleted: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	return false;
+}
+
+function mergeRepoAndServerSkills(
+	repoSkills: import("../../skills/model.js").RepoSkill[],
+	serverSkills: import("../../skills/model.js").ServerSkill[],
+): import("../../skills/model.js").RepoSkill[] {
+	const repoMap = new Map(repoSkills.map((s) => [s.name, s]));
+	const merged: import("../../skills/model.js").RepoSkill[] = [];
+	for (const serverSkill of serverSkills) {
+		if (repoMap.has(serverSkill.name)) {
+			const repoSkill = repoMap.get(serverSkill.name)!;
+			merged.push({ ...repoSkill, source: "repo" });
+		} else {
+			merged.push({
+				name: serverSkill.name,
+				description: serverSkill.description,
+				content: serverSkill.content,
+				enabled: serverSkill.enabled,
+				updatedAt: serverSkill.updatedAt,
+				source: "inherited",
+			});
+		}
+	}
+	for (const repoSkill of repoSkills) {
+		if (!serverSkills.some((s) => s.name === repoSkill.name)) {
+			merged.push({ ...repoSkill, source: "repo" });
+		}
+	}
+	return merged.sort((a, b) => a.name.localeCompare(b.name));
 }
