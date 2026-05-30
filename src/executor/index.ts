@@ -16,7 +16,7 @@ import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
-	status: "working" | "waiting-feedback" | "complete" | "cancelled";
+	status: "working" | "waiting-feedback" | "complete" | "cancelled" | "failed";
 	summary: string;
 	rawResponse: string;
 }
@@ -29,6 +29,14 @@ interface ModelReference {
 interface ModelLookup<TModel extends ModelReference> {
 	find(provider: string, modelId: string): TModel | undefined;
 	getAll(): TModel[];
+}
+
+export function isRateLimitError(message: string): boolean {
+	const lower = message.toLowerCase();
+	return (
+		lower.includes("429") &&
+		(lower.includes("usage limit") || lower.includes("rate limit") || lower.includes("rate-limit") || lower.includes("too many requests"))
+	);
 }
 
 export function extractText(content: unknown): string {
@@ -404,6 +412,19 @@ export class PiAgentExecutor {
 		if (lastMessage && typeof lastMessage === "object" && "role" in lastMessage && lastMessage.role === "assistant") {
 			const assistantMsg = lastMessage as { errorMessage?: string; stopReason?: string };
 			if (assistantMsg.errorMessage) {
+				if (isRateLimitError(assistantMsg.errorMessage)) {
+					logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
+					recordSessionLog(key, {
+						level: "error",
+						message: `Assistant error: ${assistantMsg.errorMessage}`,
+						details: { type: "assistant_error", errorMessage: assistantMsg.errorMessage, stopReason: assistantMsg.stopReason },
+					});
+					return {
+						status: "failed",
+						summary: assistantMsg.errorMessage,
+						rawResponse: "",
+					};
+				}
 				logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
 				recordSessionLog(key, {
 					level: "error",

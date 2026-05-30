@@ -7,6 +7,7 @@ import { classifyComments } from "../../pr-review/classifier.js";
 import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { extractIssueNumberFromBranch, validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import type { ExecutionResult } from "../../executor/index.js";
+import { isRateLimitError } from "../../executor/index.js";
 import { issueSessionKey, queueResumeOnBoot } from "./workflow-helpers.js";
 
 export interface PRReviewPayload {
@@ -248,6 +249,22 @@ export class HandlePRReview {
 				return;
 			}
 			const message = error instanceof Error ? error.message : String(error);
+			if (isRateLimitError(message)) {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**Build failed**",
+						"",
+						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"",
+						`Error: ${message}`,
+					].join("\n"),
+				);
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
+				throw error;
+			}
 			await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
@@ -322,6 +339,25 @@ export class HandlePRReview {
 					result.summary || "TARS needs more information before continuing.",
 				].join("\n\n"),
 			);
+		} else if (result.status === "failed") {
+			const message = result.summary;
+			if (isRateLimitError(message)) {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**Build failed**",
+						"",
+						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"",
+						`Error: ${message}`,
+					].join("\n"),
+				);
+			} else {
+				await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
+			}
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 		} else {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
 			await this.deps.github.postPRComment(
