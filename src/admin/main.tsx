@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/App.js";
 import { OnboardingWizard } from "./features/onboarding/OnboardingWizard.js";
 import { fetchOnboardingStatus } from "./api/onboarding.js";
-import "./styles.css";
+import "./index.css";
 
 function Root(): React.ReactElement {
 	const [onboarding, setOnboarding] = useState<{ complete: boolean; missing: string[] } | null>(null);

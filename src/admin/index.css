@@ -1,0 +1,38 @@
+@config "./tailwind.config.js";
+@import "tailwindcss";
+@import "./styles.css";
+
+:root {
+	--bg: #0d1117;
+	--surface: #161b22;
+	--border: #30363d;
+	--text: #c9d1d9;
+	--muted: #8b949e;
+	--green: #3fb950;
+	--yellow: #d29922;
+	--red: #f85149;
+	--blue: #58a6ff;
+}
+
+@layer base {
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	html,
+	body,
+	#root {
+		height: 100%;
+		overflow: hidden;
+	}
+
+	body {
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font-sans);
+		line-height: 1.5;
+		padding: 1rem;
+	}
+}
