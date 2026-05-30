@@ -70,6 +70,23 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`ALTER TABLE cron_jobs ADD COLUMN prNumber INTEGER`);
 		},
 	},
+	{
+		id: 4,
+		name: "create_skills_table",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS skills (
+					id TEXT PRIMARY KEY,
+					name TEXT NOT NULL UNIQUE,
+					description TEXT NOT NULL,
+					content TEXT NOT NULL,
+					enabled INTEGER NOT NULL DEFAULT 1,
+					updated_at TEXT NOT NULL,
+					created_at TEXT NOT NULL
+				)
+			`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {
