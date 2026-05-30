@@ -37,6 +37,7 @@ import {
 	buildPRReviewPrompt,
 	extractText,
 	getLastAssistantText,
+	isRateLimitError,
 	parseExecutionResult,
 	PiAgentExecutor,
 	resolveConfiguredModel,
@@ -179,6 +180,22 @@ describe("parseExecutionResult", () => {
 		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Fixed.");
+	});
+});
+
+describe("isRateLimitError", () => {
+	it("returns true for Ollama 429 usage limit messages", () => {
+		expect(isRateLimitError('429 "you (aubiematt) have reached your weekly usage limit..."')).toBe(true);
+	});
+
+	it("returns true for generic rate limit messages", () => {
+		expect(isRateLimitError("429 rate limit exceeded")).toBe(true);
+		expect(isRateLimitError("Too many requests 429")).toBe(true);
+	});
+
+	it("returns false for unrelated errors", () => {
+		expect(isRateLimitError("something went wrong")).toBe(false);
+		expect(isRateLimitError("500 internal server error")).toBe(false);
 	});
 });
 
@@ -536,6 +553,48 @@ describe("PiAgentExecutor", () => {
 		const result = await executor.execute(state, undefined, undefined, controller.signal);
 		expect(result.status).toBe("cancelled");
 		expect(result.summary).toBe("Task cancelled before execution started.");
+	});
+
+	it("returns failed when assistant message contains a 429 rate-limit error", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
+			],
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 6,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const result = await executor.execute(state);
+		expect(result.status).toBe("failed");
+		expect(result.summary).toContain("429");
+		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
 
 	it("returns cancelled when abort signal fires during execution", async () => {

@@ -7,6 +7,7 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { SessionState } from "../../session/store.js";
 import type { FatalErrorCategory } from "../../self-monitor/types.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
+import { isRateLimitError } from "../../executor/index.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +29,17 @@ export class ExecuteSessionReporter {
 		context: string,
 	): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
+		if (isRateLimitError(message)) {
+			const body = [
+				"**Build failed**",
+				"",
+				"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+				"",
+				`Error: ${message}`,
+			].join("\n");
+			await this.deps.github.postComment(owner, repo, issueNumber, body);
+			return;
+		}
 		const stack = error instanceof Error ? error.stack ?? "" : "";
 		const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
 		const body = [

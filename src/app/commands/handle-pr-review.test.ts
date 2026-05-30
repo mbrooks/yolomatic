@@ -389,6 +389,82 @@ describe("HandlePRReview", () => {
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
 
+	it("posts 'Build failed' comment when execution throws a 429 rate-limit error", async () => {
+		const { handler, sessions, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		executor.executePRReview.mockRejectedValue(new Error('429 "you (aubiematt) have reached your weekly usage limit..."'));
+
+		await expect(
+			handler.execute({
+				action: "created",
+				pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+				repository: { name: "tars", owner: { login: "mbrooks" } },
+				sender: { login: "user" },
+				comment: { id: 1, body: "Fix this", user: { login: "user" } },
+			}),
+		).rejects.toThrow('429 "you (aubiematt) have reached your weekly usage limit..."');
+
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("**Build failed**"),
+		);
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
+	});
+
+	it("posts 'Build failed' comment when executor returns failed status for rate-limit error", async () => {
+		const { handler, sessions, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
+			status: "failed",
+			summary: '429 "you (aubiematt) have reached your weekly usage limit..."',
+			rawResponse: "",
+		});
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("**Build failed**"),
+		);
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
+	});
+
+	it("posts generic failure comment when executor returns failed status for non-rate-limit error", async () => {
+		const { handler, sessions, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
+			status: "failed",
+			summary: "Some random error",
+			rawResponse: "",
+		});
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("TARS failed."),
+		);
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
+	});
+
 	it("posts failure comment when execution throws", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(makeSession());
