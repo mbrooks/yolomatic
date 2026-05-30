@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export type Route =
 	| { screen: "dashboard" }
 	| { screen: "repos" }
-	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" }
+	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" | "issues" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
 	| { screen: "new-issue"; owner?: string; repo?: string }
 	| { screen: "settings"; tab?: "general" | "skills" };
@@ -27,12 +27,14 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			let issueNumber: number | undefined;
-			let tab: "sessions" | "crons" | "skills" = "sessions";
+			let tab: "sessions" | "crons" | "skills" | "issues" = "sessions";
 			if (path[3]) {
 				if (path[3] === "crons") {
 					tab = "crons";
 				} else if (path[3] === "skills") {
 					tab = "skills";
+				} else if (path[3] === "issues") {
+					tab = "issues";
 				} else {
 					issueNumber = Number.parseInt(path[3], 10);
 					if (Number.isNaN(issueNumber)) {
@@ -68,7 +70,7 @@ export function buildHash(route: Route): string {
 		if (route.issueNumber !== undefined) {
 			return `${base}/${route.issueNumber}`;
 		}
-		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : "";
+		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : route.tab === "issues" ? "/issues" : "";
 		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {

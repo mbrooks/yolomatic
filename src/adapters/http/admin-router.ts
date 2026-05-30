@@ -593,6 +593,27 @@ export async function handleAdminRoute(
 		return true;
 	}
 
+	// GET /api/repos/:owner/:repo/issues
+	const repoIssuesMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/issues$/u.exec(pathname);
+	if (repoIssuesMatch && request.method === "GET") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		const [, owner, repo] = repoIssuesMatch;
+		try {
+			const issues = await deps.githubService.listOpenIssues(owner, repo);
+			sendJson(response, 200, { issues });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	// POST /api/issues/generate
 	if (request.method === "POST" && pathname === "/api/issues/generate") {
 		if (!checkAdminJson(request, response, deps)) {

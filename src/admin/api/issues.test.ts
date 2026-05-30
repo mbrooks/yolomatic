@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chatIssue, createIssue, fetchRepoContext, generateIssue } from "./issues.js";
+import { chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues } from "./issues.js";
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -116,5 +116,21 @@ describe("issues api", () => {
 		});
 
 		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/context");
+	});
+
+	it("fetches open issues via GET", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			jsonResponse({
+				issues: [
+					{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+				],
+			}),
+		);
+
+		await expect(fetchOpenIssues("mbrooks", "tars")).resolves.toEqual([
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+		]);
+
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues");
 	});
 });

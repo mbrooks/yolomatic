@@ -10,6 +10,7 @@ import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
+import { IssuesScreen } from "../features/issues/IssuesScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
@@ -80,7 +81,7 @@ export function App(): React.ReactElement {
 	);
 
 	const handleSelectTab = useCallback(
-		(tab: "sessions" | "crons" | "skills") => {
+		(tab: "sessions" | "crons" | "skills" | "issues") => {
 			if (route.screen === "repo") {
 				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
 			}
@@ -213,7 +214,7 @@ function AppContent({
 	onMutate: () => void;
 	onBack: () => void;
 	onSelectRepos: () => void;
-	onSelectTab: (tab: "sessions" | "crons" | "skills") => void;
+	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onNewIssueForRepo: () => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
@@ -276,6 +277,17 @@ function AppContent({
 					owner={route.owner}
 					repo={route.repo}
 					activeTab={route.tab ?? "sessions"}
+					onSelectTab={onSelectTab}
+					onBack={onBack}
+					onNewIssue={onNewIssueForRepo}
+				/>
+			);
+		}
+		if (route.tab === "issues") {
+			return (
+				<IssuesScreen
+					owner={route.owner}
+					repo={route.repo}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
 					onNewIssue={onNewIssueForRepo}

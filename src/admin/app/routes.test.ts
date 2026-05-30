@@ -88,13 +88,13 @@ describe("parseHash", () => {
 		expect(parseHash("")).toEqual({ screen: "dashboard" });
 	});
 
-	it("parses repo detail (skills tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars/skills")).toEqual({
+	it("parses repo detail (issues tab)", () => {
+		expect(parseHash("#/repos/mbrooks/tars/issues")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: undefined,
-			tab: "skills",
+			tab: "issues",
 		});
 	});
 
@@ -136,6 +136,17 @@ describe("buildHash", () => {
 
 	it("builds new-issue view with owner and repo", () => {
 		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
+	});
+
+	it("builds repo detail with issues tab", () => {
+		expect(
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
+		).toBe("#/repos/mbrooks/tars/issues");
+	});
+
+	it("round-trips issues tab", () => {
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "issues" }));
 	});
 
 	it("builds repo detail with skills tab", () => {
