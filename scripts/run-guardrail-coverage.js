@@ -5,9 +5,22 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
-const vitestEntrypoint = resolve(repoRoot, "node_modules/vitest/vitest.mjs");
 const vitestConfig = resolve(repoRoot, "vitest.guardrail.config.ts");
 const sourceFilePattern = /^src\/.*\.ts$/;
+
+function findVitestEntrypoint(startDir) {
+	let dir = startDir;
+	while (dir !== dirname(dir)) {
+		const candidate = resolve(dir, "node_modules/vitest/vitest.mjs");
+		if (existsSync(candidate)) {
+			return candidate;
+		}
+		dir = dirname(dir);
+	}
+	return null;
+}
+
+const vitestEntrypoint = findVitestEntrypoint(repoRoot) ?? resolve(repoRoot, "node_modules/vitest/vitest.mjs");
 
 function parseChangedFiles(value) {
 	const lines = value.split("\n").map((line) => line.trim()).filter(Boolean);

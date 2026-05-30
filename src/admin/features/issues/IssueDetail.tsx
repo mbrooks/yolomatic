@@ -1,11 +1,36 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import type { OpenIssue } from "../../api/issues.js";
+import { assignIssue } from "../../api/issues.js";
 
 export function IssueDetail({
 	selected,
+	owner,
+	repo,
+	onAssignSuccess,
 }: {
 	selected: OpenIssue | null;
+	owner: string;
+	repo: string;
+	onAssignSuccess?: () => void;
 }): React.ReactElement {
+	const [assigning, setAssigning] = useState(false);
+	const [assignError, setAssignError] = useState<string | null>(null);
+
+	const handleAssign = useCallback(async () => {
+		if (!selected) return;
+		setAssigning(true);
+		setAssignError(null);
+		try {
+			await assignIssue(owner, repo, selected.number);
+			onAssignSuccess?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setAssignError(message);
+		} finally {
+			setAssigning(false);
+		}
+	}, [selected, owner, repo, onAssignSuccess]);
+
 	if (!selected) {
 		return (
 			<div className="detail-pane empty">
@@ -40,6 +65,19 @@ export function IssueDetail({
 						))
 					) : (
 						<span className="issue-body-empty">Unassigned</span>
+					)}
+					{selected.assignees.length === 0 && (
+						<button
+							className="action-btn"
+							onClick={handleAssign}
+							disabled={assigning}
+							style={{ marginLeft: "0.5rem" }}
+						>
+							{assigning ? "Assigning..." : "Assign to TARS"}
+						</button>
+					)}
+					{assignError && (
+						<div className="form-error" style={{ marginTop: "0.25rem" }}>{assignError}</div>
 					)}
 				</div>
 			</div>

@@ -217,4 +217,8 @@ export class GitHubServiceAdapter implements GitHubService {
 	async acceptInvitation(invitationId: number): Promise<void> {
 		await this.octokit.repos.acceptInvitationForAuthenticatedUser({ invitation_id: invitationId });
 	}
+
+	async updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void> {
+		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, assignees });
+	}
 }
