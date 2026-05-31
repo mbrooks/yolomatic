@@ -1227,6 +1227,13 @@ a:hover {
 	border: 1px solid rgba(88, 166, 255, 0.2);
 }
 
+.chat-bubble.thinking {
+	background: rgba(210, 153, 34, 0.08);
+	border-color: rgba(210, 153, 34, 0.22);
+	color: var(--muted);
+	font-style: italic;
+}
+
 .chat-bubble.user {
 	align-self: flex-end;
 	background: rgba(63, 185, 80, 0.08);
@@ -1245,6 +1252,10 @@ a:hover {
 	color: var(--blue);
 }
 
+.chat-bubble.thinking .chat-sender {
+	color: var(--yellow);
+}
+
 .chat-bubble.user .chat-sender {
 	color: var(--green);
 }
@@ -1252,6 +1263,24 @@ a:hover {
 .chat-text {
 	font-size: 0.875rem;
 	line-height: 1.5;
+}
+
+.chat-thinking-text {
+	font-size: 0.825rem;
+	line-height: 1.5;
+}
+
+.chat-thinking-cursor {
+	animation: chat-thinking-cursor-blink 1s steps(2, start) infinite;
+	color: var(--yellow);
+	font-style: normal;
+	margin-left: 0.1rem;
+}
+
+@keyframes chat-thinking-cursor-blink {
+	50% {
+		opacity: 0;
+	}
 }
 
 .chat-error {

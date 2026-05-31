@@ -3,6 +3,7 @@ import React from "react";
 export type ChatMessage =
 	| { id: string; role: "tars"; type: "text"; text: string }
 	| { id: string; role: "user"; type: "text"; text: string }
+	| { id: string; role: "tars"; type: "thinking"; text: string; done: boolean }
 	| { id: string; role: "tars"; type: "done"; url: string; number: number };
 
 export function uid(): string {
@@ -88,6 +89,17 @@ export function ChatTranscript({
 						<div key={msg.id} className={`chat-bubble ${msg.role}`}>
 							<div className="chat-sender">{msg.role === "tars" ? "TARS" : "You"}</div>
 							<div className="chat-text">{msg.text}</div>
+						</div>
+					);
+				}
+				if (msg.type === "thinking") {
+					return (
+						<div key={msg.id} className="chat-bubble tars thinking">
+							<div className="chat-sender">TARS thinking</div>
+							<div className="chat-thinking-text">
+								{msg.text}
+								{msg.done ? null : <span className="chat-thinking-cursor">▊</span>}
+							</div>
 						</div>
 					);
 				}

@@ -102,6 +102,52 @@ describe("executeIssueChatRequest", () => {
 		);
 	});
 
+	it("forwards LLM thinking chunks as progress events", async () => {
+		const { chatIssueViaLLM } = await import("./issue-chat.js");
+		vi.mocked(chatIssueViaLLM).mockImplementationOnce(async (input) => {
+			input.onThinking?.({ text: "reading context", done: false });
+			input.onThinking?.({ text: "reading context and labels", done: true });
+			return {
+				shouldCreate: false,
+				owner: "mbrooks",
+				repo: "tars",
+				draft: { title: "Chat Title", body: "Chat Body", labels: [], assignees: [] },
+				message: "Draft ready",
+				readyToCreate: true,
+			};
+		});
+		const onProgress = vi.fn();
+
+		await executeIssueChatRequest(
+			{ githubService },
+			{ messages: [{ role: "user", text: "draft it" }] },
+			onProgress,
+		);
+
+		expect(onProgress).toHaveBeenNthCalledWith(
+			2,
+			{
+				type: "thinking",
+				message: "reading context",
+				text: "reading context",
+				done: false,
+			},
+		);
+		expect(onProgress).toHaveBeenNthCalledWith(
+			3,
+			{
+				type: "thinking",
+				message: "reading context and labels",
+				text: "reading context and labels",
+				done: true,
+			},
+		);
+		expect(onProgress).toHaveBeenNthCalledWith(
+			4,
+			expect.objectContaining({ type: "completed", message: "Draft ready" }),
+		);
+	});
+
 	it("emits progress updates when creation is incomplete", async () => {
 		const { chatIssueViaLLM } = await import("./issue-chat.js");
 		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({

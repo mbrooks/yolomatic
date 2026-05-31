@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: {
@@ -41,23 +41,54 @@ vi.mock("../../executor/index.js", () => ({
 	}),
 }));
 
+vi.mock("../../logging/llm-logger.js", () => ({
+	LlmLogger: vi.fn(() => ({
+		logPrompt: vi.fn(),
+		logThought: vi.fn(),
+		logToolCall: vi.fn(),
+		logToolResult: vi.fn(),
+		logError: vi.fn(),
+	})),
+}));
+
+vi.mock("../../logging/session-log-store.js", () => ({
+	recordSessionLog: vi.fn(),
+}));
+
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
 import { resolveConfiguredModel } from "../../executor/index.js";
+import { LlmLogger } from "../../logging/llm-logger.js";
+import { recordSessionLog } from "../../logging/session-log-store.js";
 import { chatIssueViaLLM } from "./issue-chat.js";
 
-function createMockSession(responses: Array<{ text: string; errorMessage?: string }>) {
+function createMockSession(
+	responses: Array<{ text: string; errorMessage?: string }>,
+	eventsByTurn: Array<unknown[]> = [],
+) {
 	let turn = 0;
 	const messages: Array<{ role: string; content: unknown; errorMessage?: string }> = [];
+	const listeners = new Set<(event: unknown) => void>();
 	const session = {
 		agent: { state: { systemPrompt: "" } },
 		messages,
 		prompt: vi.fn(async (text: string) => {
 			messages.push({ role: "user", content: text });
+			for (const event of eventsByTurn[turn] ?? []) {
+				for (const listener of listeners) {
+					listener(event);
+				}
+			}
 			const response = responses[turn++] ?? { text: "" };
 			messages.push({
 				role: "assistant",
 				content: [{ type: "text", text: response.text }],
 				errorMessage: response.errorMessage,
+			});
+		}),
+		subscribe: vi.fn((listener: (event: unknown) => void) => {
+			listeners.add(listener);
+			return vi.fn(() => {
+				listeners.delete(listener);
 			});
 		}),
 		dispose: vi.fn(),
@@ -66,6 +97,10 @@ function createMockSession(responses: Array<{ text: string; errorMessage?: strin
 }
 
 describe("chatIssueViaLLM", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
 	it("returns a structured conversational draft update", async () => {
 		const mockModel = { provider: "test", id: "model" };
 		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
@@ -106,6 +141,96 @@ describe("chatIssueViaLLM", () => {
 			shouldCreate: false,
 		});
 		expect(session.dispose).toHaveBeenCalled();
+		expect(session.subscribe).toHaveBeenCalled();
+	});
+
+	it("streams thinking events and logs prompt, thinking, and tool activity", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession(
+			[
+				{
+					text: JSON.stringify({
+						message: "Draft ready.",
+						owner: "mbrooks",
+						repo: "tars",
+						draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+						readyToCreate: true,
+						shouldCreate: false,
+					}),
+				},
+			],
+			[[
+				{ type: "message_update", assistantMessageEvent: { type: "thinking_delta", delta: "checking " } },
+				{ type: "message_update", assistantMessageEvent: { type: "thinking_end", content: "checking context" } },
+				{ type: "tool_execution_start", toolName: "grep", args: { pattern: "bug" } },
+				{ type: "tool_execution_end", toolName: "grep", result: "match", isError: false },
+			]],
+		);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+		const onThinking = vi.fn();
+
+		const result = await chatIssueViaLLM({
+			owner: "mbrooks",
+			repo: "tars",
+			messages: [{ role: "user", text: "draft this" }],
+			onThinking,
+		});
+
+		expect(result.message).toBe("Draft ready.");
+		expect(onThinking).toHaveBeenNthCalledWith(1, { text: "checking ", done: false });
+		expect(onThinking).toHaveBeenNthCalledWith(2, { text: "checking context", done: true });
+		const logger = vi.mocked(LlmLogger).mock.results[0].value;
+		expect(logger.logPrompt).toHaveBeenCalled();
+		expect(logger.logThought).toHaveBeenCalledWith("checking context");
+		expect(logger.logToolCall).toHaveBeenCalledWith("grep", { pattern: "bug" });
+		expect(logger.logToolResult).toHaveBeenCalledWith("grep", "match");
+		expect(recordSessionLog).toHaveBeenCalledWith(
+			"mbrooks/tars#-1",
+			expect.objectContaining({ details: expect.objectContaining({ type: "prompt" }) }),
+		);
+		expect(recordSessionLog).toHaveBeenCalledWith(
+			"mbrooks/tars#-1",
+			expect.objectContaining({ details: expect.objectContaining({ type: "thinking" }) }),
+		);
+	});
+
+	it("logs tool execution failures", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession(
+			[
+				{
+					text: JSON.stringify({
+						message: "Draft ready.",
+						owner: "mbrooks",
+						repo: "tars",
+						draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+						readyToCreate: true,
+						shouldCreate: false,
+					}),
+				},
+			],
+			[[
+				{ type: "tool_execution_end", toolName: "grep", result: "boom", isError: true },
+			]],
+		);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		await chatIssueViaLLM({
+			owner: "mbrooks",
+			repo: "tars",
+			messages: [{ role: "user", text: "draft this" }],
+		});
+
+		expect(recordSessionLog).toHaveBeenCalledWith(
+			"mbrooks/tars#-1",
+			expect.objectContaining({
+				level: "error",
+				message: "grep failed",
+				details: expect.objectContaining({ type: "tool_execution_end", isError: true }),
+			}),
+		);
 	});
 
 	it("retries if the first response is not valid JSON", async () => {
@@ -198,6 +323,27 @@ describe("chatIssueViaLLM", () => {
 				messages: [{ role: "user", text: "draft this" }],
 			}),
 		).rejects.toThrow("LLM request failed: Rate limit exceeded");
+		expect(session.dispose).toHaveBeenCalled();
+		const logger = vi.mocked(LlmLogger).mock.results[0].value;
+		expect(logger.logError).toHaveBeenCalledWith(expect.any(Error), "Issue chat failed");
+	});
+
+	it("throws after the retry limit when responses are not valid JSON", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([
+			{ text: "not json 1" },
+			{ text: "not json 2" },
+			{ text: "not json 3" },
+		]);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		await expect(
+			chatIssueViaLLM({
+				messages: [{ role: "user", text: "draft this" }],
+			}),
+		).rejects.toThrow("Could not extract valid JSON from LLM response after 3 attempts");
+		expect(session.prompt).toHaveBeenCalledTimes(3);
 		expect(session.dispose).toHaveBeenCalled();
 	});
 
