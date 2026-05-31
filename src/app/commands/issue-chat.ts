@@ -1,8 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { AuthStorage, createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { sessionKey as buildSessionKey } from "../../domain/session/model.js";
 import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
+import { LlmLogger } from "../../logging/llm-logger.js";
+import { recordSessionLog } from "../../logging/session-log-store.js";
 import { extractJson } from "./generate-issue.js";
 import { buildConversationPrompt, buildConversationSystemPrompt, type GenerateOptions, type RepoContext } from "./issue-prompts.js";
 
@@ -44,6 +47,22 @@ export interface IssueChatResponse {
 	shouldCreate: boolean;
 }
 
+export type ThinkingCallback = (chunk: { text: string; done: boolean }) => void;
+
+type AgentEvent = {
+	type: string;
+	assistantMessageEvent?: {
+		type: string;
+		content?: string;
+		delta?: string;
+		thinking?: string;
+	};
+	toolName?: string;
+	args?: unknown;
+	result?: unknown;
+	isError?: boolean;
+};
+
 function normalizeString(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
@@ -71,6 +90,7 @@ export async function chatIssueViaLLM({
 	draft,
 	context,
 	options,
+	onThinking,
 }: {
 	owner?: string;
 	repo?: string;
@@ -78,6 +98,7 @@ export async function chatIssueViaLLM({
 	draft?: Partial<IssueDraft>;
 	context?: RepoContext;
 	options?: GenerateOptions;
+	onThinking?: ThinkingCallback;
 }): Promise<IssueChatResponse> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = createTarsModelRegistry(authStorage);
@@ -109,6 +130,59 @@ export async function chatIssueViaLLM({
 	});
 
 	session.agent.state.systemPrompt = systemPrompt;
+	const logOwner = owner || "unknown";
+	const logRepo = repo || "unknown";
+	const key = buildSessionKey(logOwner, logRepo, -1);
+	const logger = new LlmLogger(logRepo, -1, "issue-chat");
+
+	logger.logPrompt(fullPrompt);
+	recordSessionLog(key, {
+		level: "info",
+		message: "Issue chat prompt sent",
+		details: { type: "prompt", length: fullPrompt.length },
+	});
+
+	const unsubscribe = session.subscribe((event: AgentEvent) => {
+		if (event.type === "message_update" && event.assistantMessageEvent) {
+			const assistantEvent = event.assistantMessageEvent;
+			if (assistantEvent.type === "thinking_delta" || assistantEvent.type === "thinking") {
+				const text = assistantEvent.delta ?? assistantEvent.content ?? assistantEvent.thinking ?? "";
+				if (text) {
+					onThinking?.({ text, done: false });
+				}
+			}
+			if (assistantEvent.type === "thinking_end") {
+				const content = assistantEvent.content ?? "";
+				if (content) {
+					onThinking?.({ text: content, done: true });
+					logger.logThought(content);
+					recordSessionLog(key, {
+						level: "info",
+						message: content,
+						details: { type: "thinking" },
+					});
+				}
+			}
+		}
+
+		if (event.type === "tool_execution_start" && event.toolName) {
+			logger.logToolCall(event.toolName, event.args as Record<string, unknown>);
+			recordSessionLog(key, {
+				level: "tool",
+				message: `${event.toolName} ${JSON.stringify(event.args).slice(0, 200)}`,
+				details: { type: "tool_execution_start", toolName: event.toolName, args: event.args },
+			});
+		}
+
+		if (event.type === "tool_execution_end" && event.toolName) {
+			logger.logToolResult(event.toolName, event.result);
+			recordSessionLog(key, {
+				level: event.isError ? "error" : "info",
+				message: `${event.toolName} ${event.isError ? "failed" : "done"}`,
+				details: { type: "tool_execution_end", toolName: event.toolName, result: event.result, isError: event.isError },
+			});
+		}
+	});
 
 	let parsed: Record<string, unknown> | undefined;
 	let lastError: string | undefined;
@@ -143,7 +217,16 @@ export async function chatIssueViaLLM({
 				}
 			}
 		}
+	} catch (error) {
+		logger.logError(error instanceof Error ? error : new Error(String(error)), "Issue chat failed");
+		recordSessionLog(key, {
+			level: "error",
+			message: `Issue chat failed: ${error instanceof Error ? error.message : String(error)}`,
+			details: { type: "prompt_error", error: error instanceof Error ? error.message : String(error) },
+		});
+		throw error;
 	} finally {
+		unsubscribe();
 		session.dispose();
 	}
 

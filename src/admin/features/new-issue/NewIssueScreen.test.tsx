@@ -320,6 +320,42 @@ describe("NewIssueScreen", () => {
 		});
 	});
 
+	it("renders websocket thinking chunks as a merged transcript block", async () => {
+		connectionStatusSpy.mockReturnValue("open");
+		requestIssueChatSpy.mockImplementation(async (_payload, onProgress) => {
+			onProgress?.({ type: "started", message: "Thinking through the issue draft..." });
+			onProgress?.({ type: "thinking", message: "Scanning repo ", text: "Scanning repo ", done: false });
+			onProgress?.({ type: "thinking", message: "Scanning repo context", text: "Scanning repo context", done: true });
+			return {
+				message: "I drafted the issue.",
+				owner: "mbrooks",
+				repo: "tars",
+				draft: {
+					title: "Generated Title",
+					body: "Generated body",
+					labels: ["bug"],
+					assignees: [],
+				},
+				readyToCreate: true,
+				shouldCreate: false,
+			};
+		});
+
+		const { container } = render(<NewIssueScreen onBack={() => {}} prefillOwner="mbrooks" prefillRepo="tars" repos={mockRepos} />);
+
+		const input = screen.getByPlaceholderText("Tell TARS what issue to create. Use Shift+Enter for a newline.");
+		fireEvent.change(input, { target: { value: "Draft this issue" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		await waitFor(() => {
+			expect(screen.queryByText("Scanning repo context")).not.toBeNull();
+		});
+		expect(container.querySelectorAll(".chat-bubble.thinking").length).toBe(1);
+		await waitFor(() => {
+			expect(screen.queryByText("I drafted the issue.")).not.toBeNull();
+		});
+	});
+
 	it("falls back to http issue chat when websocket chat fails before progress starts", async () => {
 		connectionStatusSpy.mockReturnValue("open");
 		requestIssueChatSpy.mockRejectedValue(new Error("WebSocket disconnected"));
