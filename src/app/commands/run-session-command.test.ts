@@ -58,6 +58,7 @@ function makeCommand(
 		createOrGetWorktree: vi.fn(),
 		removeWorktree: vi.fn(),
 		commitAndPush: vi.fn(),
+		commitAndPushPath: vi.fn(),
 		hasChanges: vi.fn(async () => false),
 		getWorktreePath: vi.fn(() => "/tmp/ws"),
 		getGitStatus: vi.fn(async () => ""),

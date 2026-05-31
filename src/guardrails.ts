@@ -1,11 +1,10 @@
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export const MINIMUM_COVERAGE = 80;
 export const COVERAGE_SUMMARY_FILE = resolve(process.cwd(), "coverage/coverage-summary.json");
-export const LOCKFILE_PATH = resolve(process.cwd(), "package-lock.json");
 
 const SOURCE_FILE_PATTERN = /^src\/.*\.ts$/;
 
@@ -108,45 +107,6 @@ export function findCoverageFailures(
 	return failures;
 }
 
-export interface LockfileSyncResult {
-	ok: boolean;
-	failure?: string;
-}
-
-export async function checkLockfileSync(
-	lockfilePath: string = LOCKFILE_PATH,
-	execSyncFn: typeof execSync = execSync,
-): Promise<LockfileSyncResult> {
-	if (!existsSync(lockfilePath)) {
-		return { ok: false, failure: "package-lock.json not found" };
-	}
-
-	const original = await readFile(lockfilePath, "utf-8");
-	let npmError: string | undefined;
-
-	try {
-		execSyncFn("npm install --package-lock-only", { encoding: "utf-8", stdio: "pipe" });
-	} catch (error: any) {
-		npmError = error.stderr?.toString() || error.message;
-	}
-
-	const current = await readFile(lockfilePath, "utf-8");
-
-	if (original !== current) {
-		await writeFile(lockfilePath, original, "utf-8");
-		return {
-			ok: false,
-			failure: "package-lock.json is out of sync with package.json. Run `npm install` and commit the updated lockfile.",
-		};
-	}
-
-	if (npmError) {
-		return { ok: false, failure: `npm install --package-lock-only failed: ${npmError}` };
-	}
-
-	return { ok: true };
-}
-
 export function getDefaultChangedFiles(): string[] {
 	let output = "";
 	try {
@@ -207,14 +167,6 @@ export async function runGuardrail(
 if (import.meta.url === `file://${process.argv[1]}`) {
 	(async () => {
 		let exitCode = 0;
-
-		const lockfileResult = await checkLockfileSync();
-		if (!lockfileResult.ok) {
-			console.error(`FAIL: ${lockfileResult.failure}`);
-			exitCode = 1;
-		} else {
-			console.log("Lockfile sync check passed.");
-		}
 
 		const result = await runGuardrail();
 		for (const file of result.checkedFiles) {

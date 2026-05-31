@@ -34,6 +34,7 @@ const fallbackWorkspaceService = {
 	createOrGetWorktree: async () => ({ path: "", branch: "" }),
 	removeWorktree: async () => undefined,
 	commitAndPush: async () => false,
+	commitAndPushPath: async () => false,
 	hasChanges: async () => false,
 	getWorktreePath: () => "",
 	getGitStatus: async () => "",
