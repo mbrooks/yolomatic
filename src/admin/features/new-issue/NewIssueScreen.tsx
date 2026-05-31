@@ -83,11 +83,13 @@ function hasDraftContent(draft: IssueDraft): boolean {
 	);
 }
 
-function toApiMessages(messages: Array<{ role: "tars" | "user"; type: "text"; text: string }>): IssueChatMessage[] {
-	return messages.map((message) => ({
-		role: message.role === "tars" ? "assistant" : "user",
-		text: message.text,
-	}));
+function toApiMessages(messages: ChatMessage[]): IssueChatMessage[] {
+	return messages
+		.filter((message): message is Extract<ChatMessage, { type: "text" }> => message.type === "text")
+		.map((message) => ({
+			role: message.role === "tars" ? "assistant" : "user",
+			text: message.text,
+		}));
 }
 
 export function NewIssueScreen({
@@ -105,7 +107,7 @@ export function NewIssueScreen({
 	const initialRepo = prefillRepo ?? "";
 	const initialPrompt = "What issue do you want to create?";
 
-	const [messages, setMessages] = useState<Array<{ id: string; role: "tars" | "user"; type: "text"; text: string }>>([
+	const [messages, setMessages] = useState<ChatMessage[]>([
 		{ id: uid(), role: "tars", type: "text", text: initialPrompt },
 	]);
 	const [draft, setDraft] = useState<IssueDraft>({
@@ -188,6 +190,23 @@ export function NewIssueScreen({
 		setMessages((prev) => [...prev, { id: uid(), role, type: "text", text }]);
 	}, []);
 
+	const appendThinkingMessage = useCallback((text: string, done: boolean) => {
+		if (!text) {
+			return;
+		}
+		setMessages((prev) => {
+			const last = prev.at(-1);
+			if (last?.type !== "thinking") {
+				return [...prev, { id: uid(), role: "tars", type: "thinking", text, done }];
+			}
+			const nextText = done && text.startsWith(last.text) ? text : last.text + text;
+			return [
+				...prev.slice(0, -1),
+				{ ...last, text: nextText, done },
+			];
+		});
+	}, []);
+
 	const applyChatResult = useCallback((result: Awaited<ReturnType<typeof chatIssue>>) => {
 		setOwner(result.owner);
 		setRepo(result.repo);
@@ -251,6 +270,11 @@ export function NewIssueScreen({
 				try {
 					result = await webSocketManager.requestIssueChat(payload, (event) => {
 						sawWebSocketProgress = true;
+						if (event.type === "thinking") {
+							appendThinkingMessage(event.text ?? event.message, event.done ?? false);
+							setProgressMessage(null);
+							return;
+						}
 						setProgressMessage(event.message);
 					});
 				} catch (error) {
@@ -272,7 +296,7 @@ export function NewIssueScreen({
 			setProgressMessage(null);
 			setSubmitting(false);
 		}
-	}, [appendTextMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting, wsStatus]);
+	}, [appendTextMessage, appendThinkingMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting, wsStatus]);
 
 	const handleCreateIssue = useCallback(async () => {
 		if (!owner.trim() || !repo.trim() || !draft.title.trim() || creatingIssue) {
@@ -313,6 +337,8 @@ export function NewIssueScreen({
 	const transcriptMessages: ChatMessage[] = createdIssue
 		? [...messages, { id: `done-${createdIssue.number}`, role: "tars", type: "done", url: createdIssue.html_url, number: createdIssue.number }]
 		: messages;
+	const lastTranscriptMessage = transcriptMessages.at(-1);
+	const showTyping = submitting && lastTranscriptMessage?.type !== "thinking";
 
 	if (!repoSelected) {
 		return (
@@ -438,7 +464,7 @@ export function NewIssueScreen({
 
 				<div className="chat-pane">
 					<div className="chat-messages">
-						<ChatTranscript messages={transcriptMessages} showTyping={submitting} />
+						<ChatTranscript messages={transcriptMessages} showTyping={showTyping} />
 						<div ref={messagesEndRef} />
 					</div>
 
