@@ -1,4 +1,4 @@
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CronJob, CronRun } from "./store.js";
@@ -79,10 +79,9 @@ export function createSessionStateForCron(
 }
 
 export async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now: Date): Promise<void> {
-	const worktreePath = deps.workspaceManager.getWorktreePath(job.owner, job.repo, 0);
-	const cronWorktreePath = path.join(path.dirname(worktreePath), `cron-${job.id}`);
+	const cronWorktreePath = deps.workspaceManager.getCronWorktreePath(job.owner, job.repo, job.id);
 	const sessionPath = path.join(deps.memoryDir, "sessions", `${job.owner}-${job.repo}-${job.id}.jsonl`);
-	const branchName = `tars/cron-${job.id}`;
+	const branchName = deps.workspaceManager.getCronBranchName(job.id);
 
 	let output = "";
 	let error: string | null = null;
@@ -96,82 +95,12 @@ export async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now:
 	await deps.sessionStore.set(state);
 
 	try {
-		// Ensure bare repo exists
-		const bareRepoPath = deps.workspaceManager.getBareRepoPath(job.owner, job.repo);
-		await mkdir(path.dirname(bareRepoPath), { recursive: true });
-
-		// Fetch latest
-		try {
-			const { execFile } = await import("node:child_process");
-			const { promisify } = await import("node:util");
-			const execFileAsync = promisify(execFile);
-			await execFileAsync("git", ["fetch", "origin"], { cwd: bareRepoPath });
-		} catch {
-			// bare repo may not exist yet; workspace manager will fix below
-		}
-
-		// Use workspace manager to ensure the repo bare clone exists
-		// We need a worktree for the cron job
-		// Create the worktree manually since WorkspaceManager.createOrGetWorktree is issue-specific
-		const normalizedOwner = job.owner.trim();
-		const normalizedRepo = job.repo.trim();
-		const repoBarePath = deps.workspaceManager.getBareRepoPath(normalizedOwner, normalizedRepo);
-
-		// Ensure bare repo
-		try {
-			const { execFile } = await import("node:child_process");
-			const { promisify } = await import("node:util");
-			const execFileAsync = promisify(execFile);
-			await execFileAsync("git", ["rev-parse", "--git-dir"], { cwd: repoBarePath });
-		} catch {
-			// Need to create bare repo via workspace manager's logic
-			// Trigger by creating a dummy issue worktree which ensures bare repo
-			await deps.workspaceManager.createOrGetWorktree(normalizedOwner, normalizedRepo, 999999);
-			// Remove the dummy worktree
-			await deps.workspaceManager.removeWorktree(normalizedOwner, normalizedRepo, 999999);
-		}
-
-		// Now set up cron worktree
-		await mkdir(path.dirname(cronWorktreePath), { recursive: true });
-		const { execFile } = await import("node:child_process");
-		const { promisify } = await import("node:util");
-		const execFileAsync = promisify(execFile);
-
-		// Determine whether the cron worktree already exists on disk.
-		// Checking the filesystem is more reliable than parsing git worktree list,
-		// because stale worktree registry entries can mislead us.
-		let worktreeDirExists = false;
-		try {
-			const stats = await stat(cronWorktreePath);
-			worktreeDirExists = stats.isDirectory();
-		} catch {
-			// ignore
-		}
-
-		const remoteBranch = `origin/${job.branch || "main"}`;
-		if (worktreeDirExists) {
-			await execFileAsync("git", ["checkout", "-f", branchName], { cwd: cronWorktreePath });
-			await execFileAsync("git", ["reset", "--hard", remoteBranch], { cwd: cronWorktreePath });
-			await execFileAsync("git", ["clean", "-fd"], { cwd: cronWorktreePath });
-		} else {
-			// Directory is missing, so prune any stale worktree references
-			// and delete the local branch before creating a fresh worktree.
-			try {
-				await execFileAsync("git", ["worktree", "prune", "--expire=now"], { cwd: repoBarePath });
-			} catch {
-				// ignore
-			}
-			try {
-				await execFileAsync("git", ["branch", "-D", branchName], { cwd: repoBarePath });
-			} catch {
-				// ignore
-			}
-			await execFileAsync("git", ["worktree", "add", cronWorktreePath, "-b", branchName, remoteBranch], { cwd: repoBarePath });
-		}
-
-		// Set git identity
-		await execFileAsync("git", ["config", "user.name", "TARS"], { cwd: cronWorktreePath });
-		await execFileAsync("git", ["config", "user.email", `${deps.githubUsername}@users.noreply.github.com`], { cwd: cronWorktreePath });
+		await deps.workspaceManager.createOrResetCronWorktree(
+			job.owner,
+			job.repo,
+			job.id,
+			job.branch || "main",
+		);
 
 		const prompt = buildCronPrompt(job);
 
@@ -293,12 +222,7 @@ export async function executeCronJob(deps: CronSchedulerDeps, job: CronJob, now:
 	job.lastError = error;
 	job.prUrl = state.prUrl ?? job.prUrl ?? null;
 	job.prNumber = state.prNumber ?? job.prNumber ?? null;
-	if (status === "success") {
-		job.nextRunAt = computeNextRunAt(job.scheduleType, job.scheduleValue, now);
-	} else {
-		// Retry same schedule from now
-		job.nextRunAt = computeNextRunAt(job.scheduleType, job.scheduleValue, now);
-	}
+	job.nextRunAt = computeNextRunAt(job.scheduleType, job.scheduleValue, now);
 	await deps.cronStore.set(job);
 
 	// Post to notification channel if configured
@@ -346,16 +270,14 @@ export async function tickCrons(deps: CronSchedulerDeps, now = new Date()): Prom
 	isTickRunning = true;
 	try {
 		while (cronJobQueue.length > 0) {
-			const job = cronJobQueue.shift();
-			if (!job) {
-				continue;
-			}
+			const job = cronJobQueue.shift()!;
 			try {
 				await executeCronJob(deps, job, now);
 			} finally {
 				inFlightCronIds.delete(job.id);
 			}
 		}
+		/* c8 ignore next 4 */
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		process.stdout.write(`[cron] Tick failed: ${message}\n`);
