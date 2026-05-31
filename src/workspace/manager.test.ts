@@ -66,6 +66,95 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("fetches existing bare repo instead of cloning when directory is valid", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-valid-bare-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		await mkdir(bareRepoPath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: ".\n", stderr: "" };
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		expect(worktree.branch).toBe("tars/issue-42");
+
+		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "--all",
+		);
+		expect(fetchCalls).toHaveLength(1);
+		expect(fetchCalls[0][1]).toContain("--prune");
+
+		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "clone",
+		);
+		expect(cloneCalls).toHaveLength(0);
+	});
+
+	it("re-clones when bare repo directory exists but is not a valid git repository", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-corrupted-bare-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		await mkdir(bareRepoPath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				throw new Error("fatal: not a git repository");
+			}
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+
+		expect(worktree.branch).toBe("tars/issue-42");
+
+		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "clone",
+		);
+		expect(cloneCalls).toHaveLength(1);
+		expect(cloneCalls[0][1]).toContain("--bare");
+		expect(cloneCalls[0][1]).toContain(bareRepoPath);
+
+		// Verify the corrupted directory was removed
+		await expect(stat(bareRepoPath)).rejects.toThrow();
+	});
+
 	it("returns existing worktree if already created", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
