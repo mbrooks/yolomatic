@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, stat, utimes } from "node:fs/promises";
+import { mkdir, rm, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -203,8 +203,12 @@ export class WorkspaceManager {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
 
 		if (await this.pathExists(bareRepoPath)) {
-			await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
-			return;
+			const isValid = await this.isValidGitRepo(bareRepoPath);
+			if (isValid) {
+				await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
+				return;
+			}
+			await rm(bareRepoPath, { recursive: true, force: true });
 		}
 
 		const encodedUsername = encodeURIComponent(this.config.githubUsername);
@@ -212,6 +216,15 @@ export class WorkspaceManager {
 		const url = `https://${encodedUsername}:${encodedToken}@github.com/${owner}/${repo}.git`;
 
 		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
+	}
+
+	private async isValidGitRepo(bareRepoPath: string): Promise<boolean> {
+		try {
+			await this.runCommand("git", ["rev-parse", "--git-dir"], { cwd: bareRepoPath });
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
