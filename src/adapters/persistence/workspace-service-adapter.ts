@@ -16,6 +16,10 @@ export class WorkspaceServiceAdapter implements WorkspaceService {
 		return this.manager.commitAndPush(owner, repo, issueNumber, message);
 	}
 
+	commitAndPushPath(worktreePath: string, branchName: string, message?: string, baseBranch?: string): Promise<boolean> {
+		return this.manager.commitAndPushPath(worktreePath, branchName, message, baseBranch);
+	}
+
 	hasChanges(workspacePath: string, cached?: boolean): Promise<boolean> {
 		return this.manager.hasChanges(workspacePath, cached);
 	}

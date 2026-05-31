@@ -51,6 +51,7 @@ describe("HandlePRReview", () => {
 			})),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
 			hasChanges: vi.fn(),
 			getWorktreePath: vi.fn(),
 			getGitStatus: vi.fn(),
@@ -128,6 +129,8 @@ describe("HandlePRReview", () => {
 	it("processes cron PR feedback using the stored PR mapping", async () => {
 		const { handler, sessions, workspaces, executor, github, tasks } = createHandler();
 		const session = makeSession({
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/cron-job-123",
+			branch: "tars/cron-job-123",
 			prNumber: 99,
 			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		});
@@ -144,7 +147,12 @@ describe("HandlePRReview", () => {
 
 		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
 		expect(executor.executePRReview).toHaveBeenCalledTimes(1);
-		expect(workspaces.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fix the typo");
+		expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
+		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
+			"/tmp/workspaces/mbrooks-tars/.worktrees/cron-job-123",
+			"tars/cron-job-123",
+			"TARS: Fix the typo",
+		);
 		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
 		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56");
 		expect(github.postPRComment).toHaveBeenCalledWith(
@@ -251,7 +259,11 @@ describe("HandlePRReview", () => {
 			},
 			expect.any(AbortSignal),
 		);
-		expect(workspaces.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fix the typo");
+		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
+			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			"tars/issue-56",
+			"TARS: Fix the typo",
+		);
 		expect(sessions.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
 		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56");
@@ -263,9 +275,34 @@ describe("HandlePRReview", () => {
 		);
 	});
 
-	it("posts no-changes message when commitAndPush returns false", async () => {
+	it("falls back to the issue branch when the session has no stored branch", async () => {
+		const { handler, sessions, workspaces } = createHandler();
+		sessions.get.mockResolvedValue(
+			makeSession({
+				branch: undefined,
+				prNumber: 99,
+				prUrl: "https://github.com/mbrooks/tars/pull/99",
+			}),
+		);
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
+		});
+
+		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
+			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			"tars/issue-56",
+			"TARS: Fix the typo",
+		);
+	});
+
+	it("posts no-changes message when commitAndPushPath returns false", async () => {
 		const { handler, sessions, workspaces, github } = createHandler();
-		workspaces.commitAndPush.mockResolvedValue(false);
+		workspaces.commitAndPushPath.mockResolvedValue(false);
 		sessions.get.mockResolvedValue(
 			makeSession({
 				prNumber: 99,

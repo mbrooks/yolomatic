@@ -91,6 +91,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				issueNumber: 56,
 			})),
 			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
@@ -434,8 +435,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			pull_number: 99,
 		});
 		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
-		expect(workspaceManager.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith(
+			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			"tars/issue-56",
+			"TARS: Fixed",
+			undefined,
+		);
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
 

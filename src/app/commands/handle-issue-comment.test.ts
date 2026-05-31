@@ -28,6 +28,7 @@ describe("HandleIssueComment", () => {
 			createOrGetWorktree: vi.fn(),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(),
+			commitAndPushPath: vi.fn(),
 			hasChanges: vi.fn(),
 			getWorktreePath: vi.fn(),
 			getGitStatus: vi.fn(),

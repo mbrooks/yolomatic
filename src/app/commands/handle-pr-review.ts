@@ -235,7 +235,8 @@ export class HandlePRReview {
 		reviewBody?: string,
 	): Promise<void> {
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
-		await this.deps.workspaces.createOrGetWorktree(owner, repo, issueNumber);
+		const worktreePath = state.workspacePath;
+		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
 		await this.deps.github.postPRComment(
 			owner,
 			repo,
@@ -313,10 +314,9 @@ export class HandlePRReview {
 		}
 
 		if (result.status === "complete") {
-			const pushed = await this.deps.workspaces.commitAndPush(
-				owner,
-				repo,
-				issueNumber,
+			const pushed = await this.deps.workspaces.commitAndPushPath(
+				worktreePath,
+				branchName,
 				generateCommitMessage(state.labels, issueNumber, result.summary),
 			);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
