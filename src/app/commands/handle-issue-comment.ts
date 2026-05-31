@@ -72,17 +72,12 @@ export class HandleIssueComment {
 				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: could not fetch PR\n`);
 				return;
 			}
-			const mappedIssueNumber = extractIssueNumberFromBranch(pr.head.ref);
+			const branchIssueNumber = extractIssueNumberFromBranch(pr.head.ref);
+			const mappedSession = branchIssueNumber ? null : await this.deps.sessions.findSessionByPR(owner, repo, issueNumber);
+			const mappedIssueNumber = branchIssueNumber ?? mappedSession?.issueNumber;
 			if (!mappedIssueNumber) {
-				await this.deps.github.postComment(
-					owner,
-					repo,
-					issueNumber,
-					[
-						"**TARS stopped.**",
-						"",
-						`PR #${issueNumber} head branch \`${pr.head.ref}\` is not a TARS issue branch.`,
-					].join("\n"),
+				process.stdout.write(
+					`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: PR branch ${pr.head.ref} is not associated with a TARS session\n`,
 				);
 				return;
 			}

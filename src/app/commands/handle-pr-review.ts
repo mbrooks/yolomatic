@@ -69,24 +69,25 @@ export class HandlePRReview {
 			return;
 		}
 
-		const issueNumber = extractIssueNumberFromBranch(branch);
-		if (!issueNumber) {
-			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not a TARS branch\n`);
+		const resolvedSession = await this.resolveSessionForPullRequest(owner, repo, prNumber, branch);
+		if (!resolvedSession) {
+			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not associated with a TARS session\n`);
 			return;
 		}
 
+		const { issueNumber, session, branchIssueNumber } = resolvedSession;
 		const inFlightKey = issueSessionKey(owner, repo, issueNumber);
 		if (this.inFlight.has(inFlightKey)) {
 			process.stdout.write(`[webhook] ${eventType} ignored: ${inFlightKey} is already being processed\n`);
 			return;
 		}
 
-		const session = await this.deps.sessions.get(owner, repo, issueNumber);
 		if (!session) {
 			process.stdout.write(`[webhook] ${eventType} ignored: no session for ${inFlightKey}\n`);
-			const sessionForPR = await this.deps.sessions.findSessionByPR(owner, repo, prNumber);
-			const canonicalNote = sessionForPR
-				? ` Stored PR mapping points to ${owner}/${repo}#${sessionForPR.issueNumber}; refusing to guess.`
+			const canonicalNote = branchIssueNumber
+				? (await this.deps.sessions.findSessionByPR(owner, repo, prNumber))
+					? ` Stored PR mapping points to ${owner}/${repo}#${issueNumber}; refusing to guess.`
+					: ""
 				: "";
 			await this.deps.github.postPRComment(
 				owner,
@@ -160,6 +161,26 @@ export class HandlePRReview {
 		} finally {
 			this.inFlight.delete(inFlightKey);
 		}
+	}
+
+	private async resolveSessionForPullRequest(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		branch: string,
+	): Promise<{ issueNumber: number; session: import("../../session/store.js").SessionState | null; branchIssueNumber: number | null } | null> {
+		const branchIssueNumber = extractIssueNumberFromBranch(branch);
+		if (branchIssueNumber) {
+			const session = await this.deps.sessions.get(owner, repo, branchIssueNumber);
+			return { issueNumber: branchIssueNumber, session, branchIssueNumber };
+		}
+
+		const session = await this.deps.sessions.findSessionByPR(owner, repo, prNumber);
+		if (!session) {
+			return null;
+		}
+
+		return { issueNumber: session.issueNumber, session, branchIssueNumber: null };
 	}
 
 	private async fetchReviewComments(
