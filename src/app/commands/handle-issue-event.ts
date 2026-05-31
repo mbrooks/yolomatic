@@ -4,6 +4,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
 import { hasTarsVisibleLabel, isAssignedToTars, shouldIgnoreIssueEvent } from "../../domain/workflow/policy.js";
+import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 import { issueSessionKey, markIssueWorking, removeWorkflowLabels } from "./workflow-helpers.js";
 
@@ -122,7 +123,19 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		const worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issue.number);
+		let worktree: { path: string; branch: string };
+		try {
+			worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issue.number);
+		} catch (error) {
+			if (error instanceof EmptyRepositoryError) {
+				process.stdout.write(`[webhook] repo=${owner}/${repo} appears empty. Initializing via GitHub API...\n`);
+				await this.deps.github.initializeEmptyRepo(owner, repo, this.deps.defaultBranch);
+				process.stdout.write(`[webhook] repo=${owner}/${repo} initialized. Retrying worktree creation...\n`);
+				worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issue.number);
+			} else {
+				throw error;
+			}
+		}
 		const session = await this.deps.sessions.createSession(
 			owner,
 			repo,
