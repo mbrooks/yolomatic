@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { unlinkSync } from "node:fs";
 import http from "node:http";
-import { executeIssueChatRequest, handleAdminRoute } from "./admin-router.js";
+import { handleAdminRoute } from "./admin-router.js";
 import { SettingsStore } from "../../settings/store.js";
 import type { CronJob } from "../../cron/store.js";
 
@@ -1129,105 +1129,6 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(200);
 		const body = JSON.parse(String(res.body));
 		expect(body.createdIssue.number).toBe(99);
-	});
-
-	it("executeIssueChatRequest rejects missing messages", async () => {
-		await expect(executeIssueChatRequest(deps, {})).rejects.toThrow("Missing required field: messages");
-	});
-
-	it("executeIssueChatRequest rejects create requests when GitHub service is missing", async () => {
-		const { chatIssueViaLLM } = await import("../../app/commands/issue-chat.js");
-		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({
-			shouldCreate: true,
-			owner: "mbrooks",
-			repo: "tars",
-			draft: { title: "Chat Title", body: "Chat Body", labels: [], assignees: [] },
-			message: "Create it",
-			readyToCreate: true,
-		});
-
-		await expect(
-			executeIssueChatRequest(
-				{ ...deps, githubService: undefined },
-				{ messages: [{ role: "user", text: "create it" }] },
-			),
-		).rejects.toThrow("GitHub service not configured");
-	});
-
-	it("executeIssueChatRequest emits progress updates when creation is incomplete", async () => {
-		const { chatIssueViaLLM } = await import("../../app/commands/issue-chat.js");
-		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({
-			shouldCreate: true,
-			owner: "mbrooks",
-			repo: "",
-			draft: { title: "", body: "Body", labels: [], assignees: [] },
-			message: "Need more info",
-			readyToCreate: false,
-		});
-		const onProgress = vi.fn();
-
-		const response = await executeIssueChatRequest(
-			deps,
-			{ messages: [{ role: "user", text: "create it" }] },
-			onProgress,
-		);
-
-		expect(response.shouldCreate).toBe(false);
-		expect(response.readyToCreate).toBe(false);
-		expect(onProgress).toHaveBeenNthCalledWith(
-			1,
-			expect.objectContaining({ type: "started" }),
-		);
-		expect(onProgress).toHaveBeenNthCalledWith(
-			2,
-			expect.objectContaining({
-				type: "completed",
-				response: expect.objectContaining({ readyToCreate: false, shouldCreate: false }),
-			}),
-		);
-	});
-
-	it("executeIssueChatRequest emits creating and completed progress when issue creation succeeds", async () => {
-		const { chatIssueViaLLM } = await import("../../app/commands/issue-chat.js");
-		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({
-			shouldCreate: true,
-			owner: "mbrooks",
-			repo: "tars",
-			draft: { title: "Chat Title", body: "Chat Body", labels: ["bug"], assignees: ["mbrooks"] },
-			message: "Created",
-			readyToCreate: true,
-		});
-		const onProgress = vi.fn();
-
-		const response = await executeIssueChatRequest(
-			deps,
-			{ messages: [{ role: "user", text: "create it" }] },
-			onProgress,
-		);
-
-		expect(response.createdIssue).toEqual({
-			number: 99,
-			html_url: "https://github.com/mbrooks/tars/issues/99",
-		});
-		expect(onProgress).toHaveBeenNthCalledWith(
-			2,
-			expect.objectContaining({
-				type: "creating",
-				message: "Creating issue in mbrooks/tars...",
-			}),
-		);
-		expect(onProgress).toHaveBeenNthCalledWith(
-			3,
-			expect.objectContaining({
-				type: "completed",
-				response: expect.objectContaining({
-					createdIssue: {
-						number: 99,
-						html_url: "https://github.com/mbrooks/tars/issues/99",
-					},
-				}),
-			}),
-		);
 	});
 
 	it("GET /api/onboarding/status returns 500 when settingsStore missing", async () => {

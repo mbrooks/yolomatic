@@ -5,10 +5,12 @@ import type { RepoContext } from "../../../app/commands/issue-prompts.js";
 import { sendJson } from "../response-helpers.js";
 import {
 	checkAdminJson,
-	executeIssueChatRequest,
 	type AdminRouterDeps,
-	type IssueChatRequestBody,
 } from "../admin-router-shared.js";
+import {
+	executeIssueChatRequest,
+	type IssueChatRequestBody,
+} from "../../../app/commands/issue-chat-request.js";
 
 export async function handleIssueRoutes(
 	request: IncomingMessage,

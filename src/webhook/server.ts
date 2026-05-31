@@ -12,7 +12,7 @@ import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
-import { executeIssueChatRequest } from "../adapters/http/admin-router.js";
+import { executeIssueChatRequest } from "../app/commands/issue-chat-request.js";
 import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";

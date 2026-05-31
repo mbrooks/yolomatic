@@ -2,9 +2,8 @@ import type { Server } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
-import type { IssueChatProgressEvent, IssueChatRequestBody } from "../adapters/http/admin-router.js";
+import type { IssueChatProgressEvent, IssueChatRequestBody, IssueChatResponse } from "../app/commands/issue-chat-request.js";
 import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
-import type { IssueChatResponse } from "../admin/api/issues.js";
 
 export type ClientMessage =
 	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
