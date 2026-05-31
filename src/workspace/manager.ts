@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { WorkspaceConfig } from "./config.js";
+import { EmptyRepositoryError } from "./errors.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -331,11 +332,7 @@ export class WorkspaceManager {
 			// Fall through to diagnostic error below.
 		}
 
-		throw new Error(
-			`[workspace] ERROR: Cannot resolve base branch in ${bareRepoPath}\n\n` +
-				`Tried origin/HEAD, origin/${this.config.defaultBranch}, ${this.config.defaultBranch}, and HEAD.\n` +
-				`Check that the remote has at least one branch and that git fetch can read it.`,
-		);
+		throw new EmptyRepositoryError(bareRepoPath);
 	}
 
 	private async refExists(bareRepoPath: string, ref: string): Promise<boolean> {

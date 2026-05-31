@@ -88,6 +88,20 @@ export class GitHubServiceAdapter implements GitHubService {
 		return { number: data.number, html_url: data.html_url };
 	}
 
+	async initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void> {
+		const { data } = await this.octokit.repos.get({ owner, repo });
+		const branch = data.default_branch ?? defaultBranch;
+
+		await this.octokit.repos.createOrUpdateFileContents({
+			owner,
+			repo,
+			path: "README.md",
+			message: "Initial commit",
+			content: Buffer.from(`# ${repo}\n\nAuto-initialized by TARS.\n`).toString("base64"),
+			branch,
+		});
+	}
+
 	async fileSelfReport(title: string, body: string, labels: string[]): Promise<string> {
 		const { SelfMonitor } = await import("../../self-monitor/index.js");
 		const { owner, repo } = SelfMonitor.getTargetRepo();
