@@ -42,6 +42,7 @@ function makeDeps(overrides?: {
 		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
+		commitAndPushPath: vi.fn(async () => true),
 		hasChanges: vi.fn(async () => false),
 		getWorktreePath: vi.fn(() => "/tmp/ws"),
 		getGitStatus: vi.fn(async () => " M src/main.ts"),
