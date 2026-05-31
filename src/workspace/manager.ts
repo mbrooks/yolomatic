@@ -16,6 +16,15 @@ export interface WorktreeInfo {
 	branch: string;
 }
 
+export interface CronWorktreeInfo {
+	owner: string;
+	repo: string;
+	cronId: string;
+	path: string;
+	branch: string;
+	baseBranch: string;
+}
+
 export interface CommandRunner {
 	(
 		command: string,
@@ -62,6 +71,14 @@ export class WorkspaceManager {
 
 	getBranchName(issueNumber: number): string {
 		return `tars/issue-${issueNumber}`;
+	}
+
+	getCronWorktreePath(owner: string, repo: string, cronId: string): string {
+		return path.join(this.getBareRepoPath(owner, repo), ".worktrees", `cron-${normalizeSegment(cronId, "cronId")}`);
+	}
+
+	getCronBranchName(cronId: string): string {
+		return `tars/cron-${normalizeSegment(cronId, "cronId")}`;
 	}
 
 	async createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<WorktreeInfo> {
@@ -130,6 +147,56 @@ export class WorkspaceManager {
 			issueNumber,
 			path: worktreePath,
 			branch: branchName,
+		};
+	}
+
+	async createOrResetCronWorktree(
+		owner: string,
+		repo: string,
+		cronId: string,
+		baseBranch: string,
+	): Promise<CronWorktreeInfo> {
+		const normalizedOwner = normalizeSegment(owner, "owner");
+		const normalizedRepo = normalizeSegment(repo, "repo");
+		const normalizedCronId = normalizeSegment(cronId, "cronId");
+		const normalizedBaseBranch = normalizeSegment(baseBranch, "baseBranch");
+		const bareRepoPath = this.getBareRepoPath(normalizedOwner, normalizedRepo);
+		const worktreePath = this.getCronWorktreePath(normalizedOwner, normalizedRepo, normalizedCronId);
+		const branchName = this.getCronBranchName(normalizedCronId);
+		const baseRef = `origin/${normalizedBaseBranch}`;
+
+		await mkdir(this.config.workspacesDir, { recursive: true });
+		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
+		await this.updateDefaultBranch(bareRepoPath);
+
+		const worktreeDirExists = await this.pathExists(worktreePath);
+		if (worktreeDirExists) {
+			await this.runCommand("git", ["checkout", "-f", branchName], { cwd: worktreePath });
+			await this.runCommand("git", ["reset", "--hard", baseRef], { cwd: worktreePath });
+			await this.runCommand("git", ["clean", "-fd"], { cwd: worktreePath });
+		} else {
+			await this.runCommand("git", ["worktree", "prune", "--expire=now"], {
+				cwd: bareRepoPath,
+			});
+			try {
+				await this.runCommand("git", ["branch", "-D", branchName], { cwd: bareRepoPath });
+			} catch {
+				// ignore when the cron branch does not exist yet
+			}
+			await this.runCommand("git", ["worktree", "add", worktreePath, "-b", branchName, baseRef], {
+				cwd: bareRepoPath,
+			});
+		}
+
+		await this.ensureGitIdentity(worktreePath);
+
+		return {
+			owner: normalizedOwner,
+			repo: normalizedRepo,
+			cronId: normalizedCronId,
+			path: worktreePath,
+			branch: branchName,
+			baseBranch: normalizedBaseBranch,
 		};
 	}
 
