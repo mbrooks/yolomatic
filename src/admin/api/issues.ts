@@ -80,8 +80,10 @@ export interface IssueChatResponse {
 }
 
 export interface IssueChatProgressEvent {
-	type: "started" | "creating" | "completed" | "error";
+	type: "started" | "thinking" | "creating" | "completed" | "error";
 	message: string;
+	text?: string;
+	done?: boolean;
 	response?: IssueChatResponse;
 }
 

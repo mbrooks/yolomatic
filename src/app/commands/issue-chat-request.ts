@@ -26,8 +26,10 @@ export interface IssueChatResponse extends DraftIssueChatResponse {
 }
 
 export interface IssueChatProgressEvent {
-	type: "started" | "creating" | "completed" | "error";
+	type: "started" | "thinking" | "creating" | "completed" | "error";
 	message: string;
+	text?: string;
+	done?: boolean;
 	response?: IssueChatResponse;
 }
 
@@ -65,6 +67,14 @@ export async function executeIssueChatRequest(
 		context: body.context,
 		options: { privacyMode: body.privacyMode ?? false, selectedTemplate: body.selectedTemplate },
 		messages,
+		onThinking: (chunk) => {
+			onProgress?.({
+				type: "thinking",
+				message: chunk.text,
+				text: chunk.text,
+				done: chunk.done,
+			});
+		},
 	});
 
 	if (!chatResult.shouldCreate) {
