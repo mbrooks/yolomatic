@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@emnapi/core": "^1.10.0",
+    "@emnapi/runtime": "^1.10.0",
     "@octokit/rest": "^21.1.1",
     "dotenv": "^17.4.2",
     "react": "^19.2.6",
