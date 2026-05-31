@@ -8,6 +8,7 @@ import type { WorkspaceConfig } from "./config.js";
 import { generateCommitMessage } from "./commit-message.js";
 import type { CommandRunner } from "./manager.js";
 import { WorkspaceManager } from "./manager.js";
+import { EmptyRepositoryError } from "./errors.js";
 
 function createConfig(workspacesDir: string): WorkspaceConfig {
 	return {
@@ -624,6 +625,39 @@ describe("WorkspaceManager", () => {
 			"git",
 			["worktree", "add", worktreePath, "-b", "tars/issue-42", "HEAD"],
 			{ cwd: bareRepoPath },
+		);
+	});
+
+	it("throws EmptyRepositoryError when no refs exist at all", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-empty-repo-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				const error = new Error(`fatal: Needed a single revision: ${args[2]}`) as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "branch" && args[1] === "-r") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(EmptyRepositoryError);
+		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+			"The repository appears to be empty",
 		);
 	});
 
