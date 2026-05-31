@@ -1,10 +1,11 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
 import {
+	checkLockfileSync,
 	COVERAGE_SUMMARY_FILE,
 	findCoverageFailures,
 	findMissingTests,
@@ -13,6 +14,7 @@ import {
 	getExpectedTestFile,
 	getFileCoverage,
 	isGuardrailSourceFile,
+	LOCKFILE_PATH,
 	MINIMUM_COVERAGE,
 	parseChangedFiles,
 	parseCoverageSummary,
@@ -46,6 +48,11 @@ describe("isGuardrailSourceFile", () => {
 		expect(isGuardrailSourceFile("tests/foo.test.ts")).toBe(false);
 	});
 
+	it("returns true for transport-layer files in src/", () => {
+		expect(isGuardrailSourceFile("src/admin/api/issues.ts")).toBe(true);
+		expect(isGuardrailSourceFile("src/adapters/http/admin-router.ts")).toBe(true);
+	});
+
 	it("returns false for test files", () => {
 		expect(isGuardrailSourceFile("src/foo.test.ts")).toBe(false);
 	});
@@ -64,8 +71,15 @@ describe("getChangedSourceFiles", () => {
 			"src/index.test.ts",
 			"src/types.ts",
 			"src/foo/bar.ts",
+			"src/admin/api/issues.ts",
+			"src/adapters/http/admin-router.ts",
 		]);
-		expect(result).toEqual(["src/index.ts", "src/foo/bar.ts"]);
+		expect(result).toEqual([
+			"src/index.ts",
+			"src/foo/bar.ts",
+			"src/admin/api/issues.ts",
+			"src/adapters/http/admin-router.ts",
+		]);
 	});
 });
 
@@ -232,5 +246,50 @@ describe("constants", () => {
 	it("has expected values", () => {
 		expect(MINIMUM_COVERAGE).toBe(80);
 		expect(COVERAGE_SUMMARY_FILE).toContain("coverage/coverage-summary.json");
+		expect(LOCKFILE_PATH).toContain("package-lock.json");
+	});
+});
+
+describe("checkLockfileSync", () => {
+	it("returns ok when lockfile does not change after npm install", async () => {
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "tars-lock-"));
+		const lockfilePath = path.join(tmpDir, "package-lock.json");
+		await writeFile(lockfilePath, '{"lockfileVersion":3}', "utf-8");
+		const execSyncFn = vi.fn().mockImplementation(() => "");
+		const result = await checkLockfileSync(lockfilePath, execSyncFn);
+		expect(result.ok).toBe(true);
+		expect(execSyncFn).toHaveBeenCalledWith("npm install --package-lock-only", { encoding: "utf-8", stdio: "pipe" });
+	});
+
+	it("returns failure when lockfile changes after npm install", async () => {
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "tars-lock-"));
+		const lockfilePath = path.join(tmpDir, "package-lock.json");
+		await writeFile(lockfilePath, '{"lockfileVersion":3}', "utf-8");
+		const execWithSideEffect = vi.fn().mockImplementation(() => {
+			require("node:fs").writeFileSync(lockfilePath, '{"lockfileVersion":3,"updated":true}', "utf-8");
+		});
+		const result = await checkLockfileSync(lockfilePath, execWithSideEffect);
+		expect(result.ok).toBe(false);
+		expect(result.failure).toContain("out of sync");
+		const restored = await readFile(lockfilePath, "utf-8");
+		expect(restored).toBe('{"lockfileVersion":3}');
+	});
+
+	it("returns failure when lockfile is not found", async () => {
+		const result = await checkLockfileSync("/nonexistent/package-lock.json", vi.fn());
+		expect(result.ok).toBe(false);
+		expect(result.failure).toBe("package-lock.json not found");
+	});
+
+	it("returns failure when npm errors and lockfile does not change", async () => {
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "tars-lock-"));
+		const lockfilePath = path.join(tmpDir, "package-lock.json");
+		await writeFile(lockfilePath, '{"lockfileVersion":3}', "utf-8");
+		const execSyncFn = vi.fn().mockImplementation(() => {
+			throw Object.assign(new Error("npm error"), { stderr: "some npm error" });
+		});
+		const result = await checkLockfileSync(lockfilePath, execSyncFn);
+		expect(result.ok).toBe(false);
+		expect(result.failure).toContain("npm install --package-lock-only failed");
 	});
 });

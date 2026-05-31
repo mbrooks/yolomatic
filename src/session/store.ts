@@ -1,13 +1,15 @@
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type SessionStatus = "pending" | "working" | "waiting-feedback" | "complete" | "failed" | "cancelled";
+export type SessionStatus = "pending" | "working" | "waiting-feedback" | "paused" | "complete" | "failed" | "cancelled";
 
 export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
 
 export function isTerminalStatus(status: SessionStatus): boolean {
 	return TERMINAL_STATUSES.includes(status);
 }
+
+export type SessionType = "github_issue" | "cron";
 
 export interface SessionState {
 	issueNumber: number;
@@ -28,6 +30,22 @@ export interface SessionState {
 	labels?: string[];
 	restartCount?: number;
 	restartedFrom?: SessionStatus;
+	staleDetectedAt?: string;
+	staleReason?: string;
+	archivedAt?: string;
+	resumeOnBoot?: boolean;
+	queuedComments?: string[];
+	/** Overrides the default `${repo}-issue-${issueNumber}` log tag */
+	sessionTag?: string;
+	/** Session type discriminator. Defaults to 'github_issue' for backward compatibility. */
+	sessionType?: SessionType;
+	/** Branch associated with this session. Defaults to `tars/issue-${issueNumber}` for issues. */
+	branch?: string;
+	/** Cron-specific metadata */
+	cronJobId?: string;
+	cronJobName?: string;
+	cronScheduleExpression?: string;
+	cronTriggerTime?: string;
 }
 
 export class SessionStore {
@@ -45,6 +63,14 @@ export class SessionStore {
 
 	getStatePath(owner: string, repo: string, issueNumber: number): string {
 		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
+	}
+
+	getArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number): string {
+		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
+	}
+
+	getSessionArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number): string {
+		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}.jsonl`);
 	}
 
 	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
@@ -114,7 +140,9 @@ export class SessionStore {
 					try {
 						const raw = await readFile(filePath, "utf8");
 						const parsed = JSON.parse(raw) as SessionState;
-						sessions.push(parsed);
+						if (!parsed.archivedAt) {
+							sessions.push(parsed);
+						}
 					} catch (error) {
 						const message = error instanceof Error ? error.message : String(error);
 						process.stdout.write(`[session-store] warning: invalid state file ${filePath}: ${message}\n`);
@@ -125,5 +153,30 @@ export class SessionStore {
 			// sessions dir doesn't exist or isn't readable
 		}
 		return sessions;
+	}
+
+	async archive(state: SessionState, archiveDir: string): Promise<void> {
+		const archiveStatePath = this.getArchivePath(archiveDir, state.owner, state.repo, state.issueNumber);
+		const archiveSessionPath = this.getSessionArchivePath(archiveDir, state.owner, state.repo, state.issueNumber);
+		const currentStatePath = this.getStatePath(state.owner, state.repo, state.issueNumber);
+		const currentSessionPath = this.getSessionPath(state.owner, state.repo, state.issueNumber);
+
+		await mkdir(path.dirname(archiveStatePath), { recursive: true });
+		await mkdir(path.dirname(archiveSessionPath), { recursive: true });
+
+		try {
+			await rename(currentStatePath, archiveStatePath);
+		} catch {
+			// state file may not exist; ignore
+		}
+
+		try {
+			await rename(currentSessionPath, archiveSessionPath);
+		} catch {
+			// session file may not exist; ignore
+		}
+
+		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
+		this.sessions.delete(key);
 	}
 }

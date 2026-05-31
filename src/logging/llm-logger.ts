@@ -14,8 +14,8 @@ export class LlmLogger {
 	private readonly logResponses: boolean;
 	private readonly logLevel: string;
 
-	constructor(repo: string, issueNumber: number) {
-		this.sessionTag = `${repo}-issue-${issueNumber}`;
+	constructor(repo: string, issueNumber: number, sessionTag?: string) {
+		this.sessionTag = sessionTag ?? `${repo}-issue-${issueNumber}`;
 		this.logLevel = process.env.LOG_LEVEL?.trim().toLowerCase() ?? "info";
 		this.logPrompts = process.env.LOG_PROMPTS !== "false";
 		this.logThoughts = process.env.LOG_THOUGHTS !== "false";

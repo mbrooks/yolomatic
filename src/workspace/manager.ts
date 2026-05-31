@@ -1,348 +1,10 @@
 import { execFile } from "node:child_process";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, rm, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
 import type { WorkspaceConfig } from "./config.js";
-
-const PREFIX_MAP: Record<string, string> = {
-	bug: "fix",
-	enhancement: "feat",
-	feature: "feat",
-	documentation: "docs",
-	docs: "docs",
-	test: "test",
-	testing: "test",
-	refactor: "refactor",
-	chore: "chore",
-	style: "style",
-	perf: "perf",
-	performance: "perf",
-	ci: "ci",
-	build: "build",
-};
-
-const PAST_TO_IMP: Record<string, string> = {
-	added: "add",
-	adjusted: "adjust",
-	aggregated: "aggregate",
-	aligned: "align",
-	allowed: "allow",
-	analyzed: "analyze",
-	archived: "archive",
-	arranged: "arrange",
-	assembled: "assemble",
-	assigned: "assign",
-	attached: "attach",
-	authenticated: "authenticate",
-	bound: "bind",
-	built: "build",
-	bundled: "bundle",
-	calculated: "calculate",
-	calibrated: "calibrate",
-	captured: "capture",
-	carved: "carve",
-	centered: "center",
-	changed: "change",
-	checked: "check",
-	chopped: "chop",
-	cleaned: "clean",
-	cloned: "clone",
-	collapsed: "collapse",
-	collected: "collect",
-	commissioned: "commission",
-	compiled: "compile",
-	completed: "complete",
-	compressed: "compress",
-	computed: "compute",
-	condensed: "condense",
-	configured: "configure",
-	consolidated: "consolidate",
-	converted: "convert",
-	copied: "copy",
-	counted: "count",
-	created: "create",
-	decreased: "decrease",
-	deleted: "delete",
-	delayed: "delay",
-	delegated: "delegate",
-	demonstrated: "demonstrate",
-	deployed: "deploy",
-	derived: "derive",
-	described: "describe",
-	designed: "design",
-	determined: "determine",
-	developed: "develop",
-	differentiated: "differentiate",
-	directed: "direct",
-	disabled: "disable",
-	displayed: "display",
-	documented: "document",
-	drafted: "draft",
-	dragged: "drag",
-	dropped: "drop",
-	eliminated: "eliminate",
-	enabled: "enable",
-	encoded: "encode",
-	enhanced: "enhance",
-	ensured: "ensure",
-	estimated: "estimate",
-	evaluated: "evaluate",
-	executed: "execute",
-	expanded: "expand",
-	extracted: "extract",
-	fixed: "fix",
-	flattened: "flatten",
-	formatted: "format",
-	formed: "form",
-	gathered: "gather",
-	generated: "generate",
-	governed: "govern",
-	grouped: "group",
-	guided: "guide",
-	handled: "handle",
-	highlighted: "highlight",
-	identified: "identify",
-	implemented: "implement",
-	improved: "improve",
-	increased: "increase",
-	indented: "indent",
-	installed: "install",
-	integrated: "integrate",
-	inverted: "invert",
-	invoked: "invoke",
-	joined: "join",
-	justified: "justify",
-	led: "lead",
-	limited: "limit",
-	linked: "link",
-	loaded: "load",
-	localized: "localize",
-	locked: "lock",
-	logged: "log",
-	managed: "manage",
-	mapped: "map",
-	marked: "mark",
-	measured: "measure",
-	merged: "merge",
-	migrated: "migrate",
-	modified: "modify",
-	monitored: "monitor",
-	moved: "move",
-	normalized: "normalize",
-	opened: "open",
-	optimized: "optimize",
-	orchestrated: "orchestrate",
-	organized: "organize",
-	outlined: "outline",
-	packed: "pack",
-	parsed: "parse",
-	patched: "patch",
-	planned: "plan",
-	prepared: "prepare",
-	pressed: "press",
-	prevented: "prevent",
-	prioritized: "prioritize",
-	produced: "produce",
-	protected: "protect",
-	published: "publish",
-	raised: "raise",
-	realigned: "realign",
-	rebuilt: "rebuild",
-	received: "receive",
-	reduced: "reduce",
-	refactored: "refactor",
-	refreshed: "refresh",
-	registered: "register",
-	regulated: "regulate",
-	removed: "remove",
-	rendered: "render",
-	renewed: "renew",
-	repaired: "repair",
-	replaced: "replace",
-	replicated: "replicate",
-	reported: "report",
-	represented: "represent",
-	restored: "restore",
-	restricted: "restrict",
-	resumed: "resume",
-	reverted: "revert",
-	rotated: "rotate",
-	rounded: "round",
-	scaled: "scale",
-	scheduled: "schedule",
-	scrolled: "scroll",
-	secured: "secure",
-	selected: "select",
-	separated: "separate",
-	serialized: "serialize",
-	shifted: "shift",
-	shown: "show",
-	sketched: "sketch",
-	sorted: "sort",
-	split: "split",
-	standardized: "standardize",
-	started: "start",
-	stopped: "stop",
-	structured: "structure",
-	styled: "style",
-	summarized: "summarize",
-	switched: "switch",
-	tagged: "tag",
-	tailored: "tailor",
-	tested: "test",
-	toggled: "toggle",
-	traced: "trace",
-	tracked: "track",
-	transferred: "transfer",
-	transformed: "transform",
-	translated: "translate",
-	typed: "type",
-	unchecked: "uncheck",
-	unified: "unify",
-	updated: "update",
-	verified: "verify",
-	wrapped: "wrap",
-	zoomed: "zoom",
-};
-
-function preserveCase(original: string, replacement: string): string {
-	if (original === original.toUpperCase()) {
-		return replacement.toUpperCase();
-	}
-	if (original[0] === original[0].toUpperCase()) {
-		return replacement.charAt(0).toUpperCase() + replacement.slice(1);
-	}
-	return replacement;
-}
-
-function toImperative(subject: string): string {
-	const words = subject.trim().split(/\s+/);
-	if (words.length === 0) return subject;
-	const firstLower = words[0].toLowerCase();
-	const replacement = PAST_TO_IMP[firstLower];
-	if (!replacement) return subject;
-	words[0] = preserveCase(words[0], replacement);
-	return words.join(" ");
-}
-
-function wrapText(text: string, maxWidth = 72): string {
-	const lines = text.split(/\r?\n/);
-	const result: string[] = [];
-	let paragraph: string[] = [];
-
-	function flushParagraph() {
-		if (paragraph.length === 0) return;
-		const words = paragraph.join(" ").trim().split(/\s+/);
-		let current = "";
-		for (const word of words) {
-			if (current === "") {
-				current = word;
-			} else if (current.length + 1 + word.length > maxWidth) {
-				result.push(current);
-				current = word;
-			} else {
-				current += " " + word;
-			}
-		}
-		if (current) result.push(current);
-		paragraph = [];
-	}
-
-	for (const line of lines) {
-		if (line.trim() === "") {
-			flushParagraph();
-			result.push("");
-		} else if (/^[-*+]\s/.test(line) || /^\d+\.\s/.test(line)) {
-			flushParagraph();
-			const trimmed = line.trim();
-			if (trimmed.length <= maxWidth) {
-				result.push(trimmed);
-			} else {
-				const markerMatch = trimmed.match(/^([-*+]\s|\d+\.\s)/);
-				const marker = markerMatch ? markerMatch[0] : "";
-				const rest = trimmed.slice(marker.length);
-				const words = rest.split(/\s+/);
-				const indent = " ".repeat(marker.length);
-				let current = marker;
-				for (const word of words) {
-					if (current === marker) {
-						current += word;
-					} else if (current.length + 1 + word.length > maxWidth) {
-						result.push(current);
-						current = indent + word;
-					} else {
-						current += " " + word;
-					}
-				}
-				if (current) result.push(current);
-			}
-		} else {
-			paragraph.push(line.trim());
-		}
-	}
-	flushParagraph();
-	return result.join("\n");
-}
-
-export function generateCommitMessage(
-	labels: string[] | undefined,
-	issueNumber: number,
-	summary?: string,
-): string {
-	const labelSet = new Set((labels ?? []).map((l) => l.toLowerCase()));
-	let prefix: string | undefined;
-	for (const [label, p] of Object.entries(PREFIX_MAP)) {
-		if (labelSet.has(label)) {
-			prefix = p;
-			break;
-		}
-	}
-
-	const prefixStr = prefix ? `${prefix}:` : "TARS:";
-	const prefixLen = prefixStr.length + 1; // +1 for space
-
-	const trimmedSummary = (summary ?? "").trim();
-	const summaryLines = trimmedSummary.split(/\r?\n/);
-	const firstLine = summaryLines[0] ?? "";
-	let subject = firstLine.trim() || `Changes for issue #${issueNumber}`;
-
-	subject = toImperative(subject);
-
-	// Remove trailing period(s)
-	subject = subject.replace(/\.+$/u, "");
-
-	const softMax = 50;
-	const hardMax = 72;
-
-	if (prefixLen + subject.length > softMax) {
-		const targetLen = softMax - prefixLen;
-		let truncated = subject.slice(0, targetLen);
-		const lastSpace = truncated.lastIndexOf(" ");
-		if (lastSpace > targetLen * 0.5) {
-			truncated = truncated.slice(0, lastSpace);
-		}
-		subject = truncated.trimEnd();
-	}
-
-	if (prefixLen + subject.length > hardMax) {
-		subject = subject.slice(0, hardMax - prefixLen).trimEnd();
-	}
-
-	const bodyLines = summaryLines.slice(1);
-	while (bodyLines.length > 0 && bodyLines[0].trim() === "") {
-		bodyLines.shift();
-	}
-	const body = bodyLines.join("\n").trim();
-
-	const fullSubject = `${prefixStr} ${subject}`;
-	if (!body) {
-		return fullSubject;
-	}
-
-	const wrappedBody = wrapText(body, 72);
-	return `${fullSubject}\n\n${wrappedBody}`;
-}
+import { EmptyRepositoryError } from "./errors.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -413,6 +75,7 @@ export class WorkspaceManager {
 		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
 
 		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
+			await this.touchWorktree(worktreePath);
 			return {
 				owner: normalizedOwner,
 				repo: normalizedRepo,
@@ -423,6 +86,7 @@ export class WorkspaceManager {
 		}
 
 		await this.pruneWorktrees(bareRepoPath);
+		await this.enforceWorktreeLimit(bareRepoPath, normalizedOwner, normalizedRepo);
 
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 		await this.updateDefaultBranch(bareRepoPath);
@@ -480,10 +144,12 @@ export class WorkspaceManager {
 		}
 	}
 
-	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
-		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
-		const branchName = this.getBranchName(issueNumber);
-
+	async commitAndPushPath(
+		worktreePath: string,
+		branchName: string,
+		message?: string,
+		baseBranch?: string,
+	): Promise<boolean> {
 		await this.ensureGitIdentity(worktreePath);
 		await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
 
@@ -491,7 +157,7 @@ export class WorkspaceManager {
 		if (hasStagedChanges) {
 			await this.runCommand(
 				"git",
-				["commit", "-m", message ?? `TARS: Changes for issue #${issueNumber}`],
+				["commit", "-m", message ?? `TARS: Changes for branch ${branchName}`],
 				{ cwd: worktreePath },
 			);
 		}
@@ -499,7 +165,7 @@ export class WorkspaceManager {
 		// If there are no staged changes and the branch has no commits ahead of the
 		// base branch, there's nothing to deliver. Pushing would create an empty branch
 		// that causes GitHub to reject PR creation with "No commits between ...".
-		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath))) {
+		if (!hasStagedChanges && !(await this.branchHasCommitsAhead(worktreePath, baseBranch))) {
 			return false;
 		}
 
@@ -507,11 +173,17 @@ export class WorkspaceManager {
 		return true;
 	}
 
-	private async branchHasCommitsAhead(worktreePath: string): Promise<boolean> {
+	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		const branchName = this.getBranchName(issueNumber);
+		return this.commitAndPushPath(worktreePath, branchName, message ?? `TARS: Changes for issue #${issueNumber}`);
+	}
+
+	private async branchHasCommitsAhead(worktreePath: string, baseBranch?: string): Promise<boolean> {
 		try {
 			const { stdout } = await this.runCommand(
 				"git",
-				["rev-list", "--count", `origin/${this.config.defaultBranch}..HEAD`],
+				["rev-list", "--count", `origin/${baseBranch ?? this.config.defaultBranch}..HEAD`],
 				{ cwd: worktreePath },
 			);
 			return parseInt(stdout.trim(), 10) > 0;
@@ -532,8 +204,12 @@ export class WorkspaceManager {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
 
 		if (await this.pathExists(bareRepoPath)) {
-			await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
-			return;
+			const isValid = await this.isValidGitRepo(bareRepoPath);
+			if (isValid) {
+				await this.runCommand("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
+				return;
+			}
+			await rm(bareRepoPath, { recursive: true, force: true });
 		}
 
 		const encodedUsername = encodeURIComponent(this.config.githubUsername);
@@ -541,6 +217,15 @@ export class WorkspaceManager {
 		const url = `https://${encodedUsername}:${encodedToken}@github.com/${owner}/${repo}.git`;
 
 		await this.runCommand("git", ["clone", "--bare", url, bareRepoPath]);
+	}
+
+	private async isValidGitRepo(bareRepoPath: string): Promise<boolean> {
+		try {
+			await this.runCommand("git", ["rev-parse", "--git-dir"], { cwd: bareRepoPath });
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
@@ -647,11 +332,7 @@ export class WorkspaceManager {
 			// Fall through to diagnostic error below.
 		}
 
-		throw new Error(
-			`[workspace] ERROR: Cannot resolve base branch in ${bareRepoPath}\n\n` +
-				`Tried origin/HEAD, origin/${this.config.defaultBranch}, ${this.config.defaultBranch}, and HEAD.\n` +
-				`Check that the remote has at least one branch and that git fetch can read it.`,
-		);
+		throw new EmptyRepositoryError(bareRepoPath);
 	}
 
 	private async refExists(bareRepoPath: string, ref: string): Promise<boolean> {
@@ -669,6 +350,133 @@ export class WorkspaceManager {
 			return true;
 		} catch {
 			return false;
+		}
+	}
+
+	private async touchWorktree(worktreePath: string): Promise<void> {
+		try {
+			// Bias forward slightly so coarse filesystem timestamp resolution still records access.
+			const now = new Date(Date.now() + 1000);
+			await utimes(worktreePath, now, now);
+		} catch {
+			// ignore
+		}
+	}
+
+	private async enforceWorktreeLimit(bareRepoPath: string, owner: string, repo: string): Promise<void> {
+		const maxWorktrees = this.config.maxWorktrees ?? 10;
+		const allWorktrees = await this.getWorktreeList(bareRepoPath);
+		const worktreeCount = allWorktrees.filter((w) => w.path !== bareRepoPath).length;
+		if (worktreeCount < maxWorktrees) {
+			return;
+		}
+
+		const sorted = await this.sortWorktreesForEviction(allWorktrees, bareRepoPath);
+		const victim = sorted[0];
+		if (!victim) {
+			return;
+		}
+
+		const victimInfo = allWorktrees.find((w) => w.path === victim.path);
+		await this.safeEvictWorktree(victim.path, victimInfo?.branch, bareRepoPath, owner, repo);
+	}
+
+	private async sortWorktreesForEviction(
+		candidates: Array<{ path: string; branch?: string }>,
+		bareRepoPath: string,
+	): Promise<Array<{ path: string; branch?: string }>> {
+		const filtered = candidates.filter((w) => w.path !== bareRepoPath);
+		const withTimestamps = await Promise.all(
+			filtered.map(async (w) => {
+				try {
+					const stats = await stat(w.path);
+					return {
+						path: w.path,
+						branch: w.branch,
+						birthtimeMs: stats.birthtimeMs || stats.ctimeMs,
+						mtimeMs: stats.mtimeMs,
+					};
+				} catch {
+					return {
+						path: w.path,
+						branch: w.branch,
+						birthtimeMs: Number.POSITIVE_INFINITY,
+						mtimeMs: Number.POSITIVE_INFINITY,
+					};
+				}
+			}),
+		);
+
+		const strategy = this.config.evictionStrategy ?? "lru";
+		if (strategy === "fifo") {
+			return withTimestamps.sort((a, b) => a.birthtimeMs - b.birthtimeMs);
+		}
+		return withTimestamps.sort((a, b) => a.mtimeMs - b.mtimeMs);
+	}
+
+	private async safeEvictWorktree(
+		worktreePath: string,
+		branch: string | undefined,
+		bareRepoPath: string,
+		owner: string,
+		repo: string,
+	): Promise<void> {
+		const hasUncommitted = await this.hasAnyChanges(worktreePath);
+		if (hasUncommitted) {
+			await this.ensureGitIdentity(worktreePath);
+			const stashMessage = `TARS auto-stash before eviction of ${path.basename(worktreePath)}`;
+			await this.runCommand("git", ["stash", "push", "-m", stashMessage, "-u"], {
+				cwd: worktreePath,
+			});
+		}
+
+		try {
+			await this.runCommand("git", ["worktree", "remove", worktreePath], {
+				cwd: bareRepoPath,
+			});
+		} catch {
+			await this.runCommand("git", ["worktree", "remove", "--force", worktreePath], {
+				cwd: bareRepoPath,
+			});
+		}
+
+		const strategy = this.config.evictionStrategy ?? "lru";
+		const maxWorktrees = this.config.maxWorktrees ?? 10;
+		process.stdout.write(
+			`[workspace] Evicted worktree ${worktreePath}${branch ? ` (${branch})` : ""} for ${owner}/${repo}. ` +
+				`Strategy: ${strategy}, limit: ${maxWorktrees}. ` +
+				`Uncommitted changes: ${hasUncommitted ? "stashed" : "none"}\n`,
+		);
+	}
+
+	private async hasAnyChanges(workspacePath: string): Promise<boolean> {
+		try {
+			const { stdout } = await this.runCommand("git", ["status", "--porcelain"], {
+				cwd: workspacePath,
+			});
+			return stdout.trim().length > 0;
+		} catch {
+			return true;
+		}
+	}
+
+	async getGitStatus(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["status", "--porcelain"], { cwd: worktreePath });
+			return stdout;
+		} catch {
+			return "(failed to get git status)";
+		}
+	}
+
+	async getGitDiff(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
+		try {
+			const { stdout } = await this.runCommand("git", ["diff"], { cwd: worktreePath });
+			return stdout;
+		} catch {
+			return "(failed to get git diff)";
 		}
 	}
 }

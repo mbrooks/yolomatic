@@ -92,6 +92,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			})),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(async () => ({
@@ -103,7 +105,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		return { octokit, sessionManager, workspaceManager, executor };
 	}
 
-	it("delegates handlePullRequestReviewCommentEvent to PRReviewHandler", async () => {
+	it("delegates review comment events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
@@ -129,7 +131,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
 	});
 
-	it("delegates handlePullRequestReviewEvent to PRReviewHandler", async () => {
+	it("delegates review submission events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
@@ -393,6 +395,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			"Please resume work",
 			undefined,
 			expect.any(AbortSignal),
+			expect.any(Function),
 		);
 	});
 
@@ -796,6 +799,59 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 	});
 
+	it("treats 'No commits between' as no changes needed", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		executor.execute.mockResolvedValue({
+			status: "complete" as never,
+			summary: "Fixed.",
+			rawResponse: "TARS_STATUS: complete\nFixed.",
+		});
+		octokit.pulls.create.mockRejectedValue(
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and tars/issue-56."}'),
+		);
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "complete");
+		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
+			expect.objectContaining({ labels: ["tars-pr-created"] }),
+		);
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: expect.stringContaining("No code changes were necessary.") }),
+		);
+	});
+
 	it("ignores /tars stop from non-admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
@@ -918,5 +974,236 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Task cancelled by admin. TARS is idle." }),
 		);
+	});
+
+	it("steers comments when TARS is actively executing", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const taskController = {
+			cancel: vi.fn(() => false),
+			isActive: vi.fn(() => true),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			steer: vi.fn(() => Promise.resolve(true)),
+		};
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Do this instead", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/tars#56", "Do this instead");
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Steering comment received." }),
+		);
+	});
+
+	it("steers description updates when TARS is actively executing", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const taskController = {
+			cancel: vi.fn(() => false),
+			isActive: vi.fn(() => true),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			steer: vi.fn(() => Promise.resolve(true)),
+		};
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Old body",
+			status: "working" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "edited",
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/tars#56", "New body");
+		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({ body: "Issue description updated. Steering to TARS." }),
+		);
+	});
+
+	it("updates session body on edited issue when not active", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const taskController = {
+			cancel: vi.fn(() => false),
+			isActive: vi.fn(() => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			steer: vi.fn(() => Promise.resolve(false)),
+		};
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Old body",
+			status: "waiting-feedback" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			taskController: taskController as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "edited",
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(taskController.steer).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			56,
+			"waiting-feedback",
+			expect.objectContaining({ body: "New body", title: "New title" }),
+		);
+	});
+
+	it("ignores comment on paused session", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue({
+			issueNumber: 57,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "paused" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-57.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-57",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		} as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleCommentEvent({
+			action: "created",
+			issue: { number: 57, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			comment: { body: "Can you also add tests?", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: "TARS is paused on this issue. It will resume when unpaused.",
+			}),
+		);
+	});
+
+	it("ignores edited issue when no session exists", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		sessionManager.getSession.mockResolvedValue(null as never);
+
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "edited",
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
+		expect(octokit.issues.createComment).not.toHaveBeenCalled();
 	});
 });
