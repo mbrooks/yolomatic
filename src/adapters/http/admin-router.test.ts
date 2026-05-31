@@ -196,6 +196,18 @@ describe("handleAdminRoute", () => {
 		}
 	});
 
+	it("returns false for unknown routes", async () => {
+		const req = mockRequest({
+			url: "/api/does-not-exist",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, deps);
+		expect(handled).toBe(false);
+	});
+
 	it("GET /api/onboarding/status returns missing fields", async () => {
 		const req = mockRequest({
 			url: "/api/onboarding/status",
