@@ -122,6 +122,37 @@ describe("HandlePRReview", () => {
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+	});
+
+	it("processes cron PR feedback using the stored PR mapping", async () => {
+		const { handler, sessions, workspaces, executor, github, tasks } = createHandler();
+		const session = makeSession({
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
+		});
+		sessions.findSessionByPR.mockResolvedValue(session as never);
+		sessions.get.mockResolvedValue(session as never);
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/cron-job-123" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please update the generated file", user: { login: "user" }, path: "src/foo.ts", line: 42 },
+		});
+
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(executor.executePRReview).toHaveBeenCalledTimes(1);
+		expect(workspaces.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fix the typo");
+		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("iteration complete"),
+		);
 	});
 
 	it("ignores closed and merged PRs", async () => {
