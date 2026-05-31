@@ -29,6 +29,10 @@ describe("WorkspaceManager", () => {
 			path.join("/tmp/workspaces", "mbrooks-casebot", ".worktrees", "issue-42"),
 		);
 		expect(manager.getBranchName(42)).toBe("tars/issue-42");
+		expect(manager.getCronWorktreePath("MBrooks", "CaseBot", "nightly")).toBe(
+			path.join("/tmp/workspaces", "mbrooks-casebot", ".worktrees", "cron-nightly"),
+		);
+		expect(manager.getCronBranchName("nightly")).toBe("tars/cron-nightly");
 	});
 
 	it("creates worktree by cloning bare repo and adding worktree", async () => {
@@ -517,6 +521,109 @@ describe("WorkspaceManager", () => {
 		expect(addIndex).toBeGreaterThanOrEqual(0);
 		expect(pruneIndex).toBeLessThan(addIndex);
 		expect(fetchIndex).toBeLessThan(addIndex);
+	});
+
+	it("creates a cron worktree and configures git identity", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-cron-worktree-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const cronWorktreePath = path.join(bareRepoPath, ".worktrees", "cron-nightly");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const worktree = await manager.createOrResetCronWorktree("mbrooks", "tars", "nightly", "main");
+
+		expect(worktree.path).toBe(cronWorktreePath);
+		expect(worktree.branch).toBe("tars/cron-nightly");
+		expect(worktree.baseBranch).toBe("main");
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "prune", "--expire=now"],
+			{ cwd: bareRepoPath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", cronWorktreePath, "-b", "tars/cron-nightly", "origin/main"],
+			{ cwd: bareRepoPath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["config", "user.name", "TARS"],
+			{ cwd: cronWorktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["config", "user.email", "mbrooks@users.noreply.github.com"],
+			{ cwd: cronWorktreePath },
+		);
+	});
+
+	it("resets an existing cron worktree to its base branch", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-cron-reset-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const cronWorktreePath = path.join(bareRepoPath, ".worktrees", "cron-nightly");
+		await mkdir(cronWorktreePath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.createOrResetCronWorktree("mbrooks", "tars", "nightly", "main");
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["checkout", "-f", "tars/cron-nightly"],
+			{ cwd: cronWorktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["reset", "--hard", "origin/main"],
+			{ cwd: cronWorktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["clean", "-fd"],
+			{ cwd: cronWorktreePath },
+		);
+	});
+
+	it("prunes stale cron worktree refs and resets the branch before recreating", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-cron-stale-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const cronWorktreePath = path.join(bareRepoPath, ".worktrees", "cron-nightly");
+		let deleteAttempts = 0;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			if (args[0] === "branch" && args[1] === "-D") {
+				deleteAttempts += 1;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.createOrResetCronWorktree("mbrooks", "tars", "nightly", "release");
+
+		expect(deleteAttempts).toBe(1);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["branch", "-D", "tars/cron-nightly"],
+			{ cwd: bareRepoPath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["worktree", "add", cronWorktreePath, "-b", "tars/cron-nightly", "origin/release"],
+			{ cwd: bareRepoPath },
+		);
 	});
 
 	it("throws diagnostic error when worktree add fails", async () => {
