@@ -31,6 +31,8 @@ function createMockOctokit(overrides?: Partial<{
 			listCommits: vi.fn(async () => ({ data: [] })),
 			listInvitationsForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			acceptInvitationForAuthenticatedUser: vi.fn(async () => ({ data: {} })),
+			get: vi.fn(async () => ({ data: { default_branch: "main" } })),
+			createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
 			...(overrides?.repos ?? {}),
 		},
 		search: {
@@ -201,6 +203,37 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.createIssue("mbrooks", "tars", "Title", "Body", ["bug"], ["mbrooks"]);
 			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/tars/issues/1" });
+		});
+	});
+
+	describe("initializeEmptyRepo", () => {
+		it("fetches repo default branch and creates README via contents API", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.initializeEmptyRepo("mbrooks", "tars", "main");
+			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars" });
+			expect(octokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith({
+				owner: "mbrooks",
+				repo: "tars",
+				path: "README.md",
+				message: "Initial commit",
+				content: Buffer.from("# tars\n\nAuto-initialized by TARS.\n").toString("base64"),
+				branch: "main",
+			});
+		});
+
+		it("falls back to provided default branch when repo has no default_branch", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					get: vi.fn(async () => ({ data: { default_branch: undefined } })),
+					createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.initializeEmptyRepo("mbrooks", "tars", "master");
+			expect(octokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+				expect.objectContaining({ branch: "master" }),
+			);
 		});
 	});
 

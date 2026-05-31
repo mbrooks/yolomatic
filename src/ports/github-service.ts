@@ -71,6 +71,7 @@ export interface GitHubService {
 	): Promise<CreatedPR[]>;
 	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string } | null>;
 	createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<CreatedIssue>;
+	initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void>;
 	fileSelfReport(title: string, body: string, labels: string[]): Promise<string>;
 	listReviewComments(owner: string, repo: string, prNumber: number, reviewId: number): Promise<ReviewComment[]>;
 	listLabels(owner: string, repo: string): Promise<string[]>;
