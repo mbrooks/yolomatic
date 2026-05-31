@@ -97,6 +97,46 @@ describe("PRReviewHandler", () => {
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 		expect(sessionManager.getSession).not.toHaveBeenCalled();
+		expect(sessionManager.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+	});
+
+	it("processes cron PR feedback using the stored PR mapping", async () => {
+		const { handler, sessionManager, workspaceManager, executor, octokit } = createHandler();
+		const session = {
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete",
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
+		};
+		sessionManager.findSessionByPR.mockResolvedValue(session as never);
+		sessionManager.getSession.mockResolvedValue(session as never);
+
+		await handler.handlePullRequestReviewCommentEvent({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/cron-job-123" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please update the generated file", user: { login: "user" }, path: "src/foo.ts", line: 42 },
+		});
+
+		expect(sessionManager.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
+		expect(executor.execute).toHaveBeenCalledTimes(1);
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 56, "TARS: Fix the typo");
+		expect(octokit.issues.createComment).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue_number: 99,
+				body: expect.stringContaining("iteration complete"),
+			}),
+		);
 	});
 
 	it("ignores closed/merged PRs", async () => {

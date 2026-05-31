@@ -38,6 +38,10 @@ describe("PR session invariants", () => {
 		expect(validatePRSessionMapping(session(), 99, "feature/other")).toContain("not a TARS issue branch");
 	});
 
+	it("accepts non-issue branches when the PR is already associated with the session", () => {
+		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "tars/cron-job-123")).toBeNull();
+	});
+
 	it("rejects a head branch for a different issue", () => {
 		expect(validatePRSessionMapping(session(), 99, "tars/issue-57")).toContain("issue #57");
 	});
@@ -46,4 +50,3 @@ describe("PR session invariants", () => {
 		expect(validatePRSessionMapping(session({ prNumber: 100 }), 99, "tars/issue-56")).toContain("PR #100");
 	});
 });
-
