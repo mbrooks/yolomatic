@@ -18,3 +18,11 @@ Code for each repository is managed in `~/workspaces/{owner}-{repo}/`.
 3. All file reads/writes occur within the workspace directory
 
 Workspace naming uses lowercase `{owner}-{repo}` directories as documented in `WORKSPACES.md`.
+
+## Changes made to this codebase in `/src`
+- For changes to guardrail-relevant files under `src`, include or update unit tests that cover the changed behavior.
+- Before treating a coding task as complete, always run `npm run guardrail:test`.
+- Do not treat a coding task as complete until the guardrail command passes.
+- The required verification command is `npm run guardrail:test`.
+- Changed guardrail-relevant source files must meet 80% coverage for statements, branches, functions, and lines.
+- If the guardrail fails, keep working until it passes or explicitly explain the blocker.

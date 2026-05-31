@@ -70,6 +70,7 @@ describe("SelfMonitor", () => {
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
 				gitStatus: "",
+				gitDiff: "",
 				gitBranch: "main",
 				nodeVersion: "v20.0.0",
 				timestamp: "2024-01-01T00:00:00Z",
@@ -80,6 +81,27 @@ describe("SelfMonitor", () => {
 		expect(body).toContain("tars");
 		expect(body).toContain("/tmp/ws");
 		expect(body).toContain("Suggested remediation");
+	});
+
+	it("includes correct remediation for github_pat_scope_missing", async () => {
+		const body = SelfMonitor.formatBugReportBody({
+			toolHistory: [{ toolName: "bash", args: undefined, result: "err", isError: true, timestamp: "2024-01-01T00:00:00Z" }],
+			fatalError: { category: "github_pat_scope_missing", message: "PAT scope missing", toolName: "bash" },
+			systemEvidence: {
+				whoami: "tars",
+				pwd: "/tmp",
+				workspacePath: "/tmp/ws",
+				lsWorkspace: "total 0",
+				gitStatus: "",
+				gitDiff: "",
+				gitBranch: "main",
+				nodeVersion: "v20.0.0",
+				timestamp: "2024-01-01T00:00:00Z",
+			},
+		});
+
+		expect(body).toContain("github_pat_scope_missing");
+		expect(body).toContain("workflow");
 	});
 
 	it("returns hardcoded target repo", () => {
@@ -107,6 +129,7 @@ describe("FatalSystemError", () => {
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "",
 				gitStatus: "",
+				gitDiff: "",
 				gitBranch: "main",
 				nodeVersion: "v20",
 				timestamp: "2024-01-01T00:00:00Z",

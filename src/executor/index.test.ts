@@ -4,13 +4,16 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn() },
 	createAgentSession: vi.fn(),
 	DefaultResourceLoader: vi.fn(() => ({ reload: vi.fn() })),
 	getAgentDir: vi.fn(() => "/agent"),
-	ModelRegistry: { create: vi.fn() },
 	SessionManager: { open: vi.fn() },
+}));
+
+vi.mock("./model-registry.js", () => ({
+	createTarsModelRegistry: vi.fn(),
 }));
 
 vi.mock("../logging/llm-logger.js", () => ({
@@ -24,18 +27,24 @@ vi.mock("../logging/llm-logger.js", () => ({
 	})),
 }));
 
+vi.mock("../logging/session-log-store.js", () => ({
+	recordSessionLog: vi.fn(),
+}));
+
 import {
 	buildFeedbackPrompt,
 	buildIssuePrompt,
 	buildPRReviewPrompt,
 	extractText,
 	getLastAssistantText,
+	isRateLimitError,
 	parseExecutionResult,
 	PiAgentExecutor,
 	resolveConfiguredModel,
 } from "./index.js";
 
-import { createAgentSession, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { createAgentSession } from "@earendil-works/pi-coding-agent";
+import { createTarsModelRegistry } from "./model-registry.js";
 
 interface TestModel {
 	provider: string;
@@ -154,6 +163,40 @@ describe("parseExecutionResult", () => {
 		const result = parseExecutionResult("TARS_STATUS: complete\n   ");
 		expect(result.summary).toBe("TARS_STATUS: complete");
 	});
+
+	it("finds status line anywhere in the response", () => {
+		const result = parseExecutionResult("Some preamble.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("uses the last status line when multiple are present", () => {
+		const result = parseExecutionResult("TARS_STATUS: working\nStill going.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("ignores invalid status lines and finds a later valid one", () => {
+		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Fixed.");
+	});
+});
+
+describe("isRateLimitError", () => {
+	it("returns true for Ollama 429 usage limit messages", () => {
+		expect(isRateLimitError('429 "you (aubiematt) have reached your weekly usage limit..."')).toBe(true);
+	});
+
+	it("returns true for generic rate limit messages", () => {
+		expect(isRateLimitError("429 rate limit exceeded")).toBe(true);
+		expect(isRateLimitError("Too many requests 429")).toBe(true);
+	});
+
+	it("returns false for unrelated errors", () => {
+		expect(isRateLimitError("something went wrong")).toBe(false);
+		expect(isRateLimitError("500 internal server error")).toBe(false);
+	});
 });
 
 describe("extractText", () => {
@@ -203,6 +246,20 @@ describe("getLastAssistantText", () => {
 			messages: [{ role: "assistant", content: [{ type: "text", text: "  hello  " }] }],
 		};
 		expect(getLastAssistantText(session)).toBe("hello");
+	});
+
+	it("ignores thinking blocks when visible text is present", () => {
+		const session = {
+			messages: [{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "I need to explain this clearly." },
+					{ type: "text", text: "TARS_STATUS: complete\nDone." },
+				],
+			}],
+		};
+		expect(getLastAssistantText(session)).toBe("TARS_STATUS: complete\nDone.");
+		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
 	});
 });
 
@@ -344,7 +401,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -399,7 +456,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -450,7 +507,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -498,6 +555,48 @@ describe("PiAgentExecutor", () => {
 		expect(result.summary).toBe("Task cancelled before execution started.");
 	});
 
+	it("returns failed when assistant message contains a 429 rate-limit error", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
+			],
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 6,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const result = await executor.execute(state);
+		expect(result.status).toBe("failed");
+		expect(result.summary).toContain("429");
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
 	it("returns cancelled when abort signal fires during execution", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
@@ -520,7 +619,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(ModelRegistry.create as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });

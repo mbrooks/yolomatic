@@ -1,0 +1,154 @@
+import type { CronStore } from "../../cron/store.js";
+import type { Clock } from "../../ports/clock.js";
+import type { SessionRepository } from "../../ports/session-repository.js";
+import type { StaleSessionService } from "../../ports/stale-session-service.js";
+import type { TaskControlService } from "../../ports/task-control-service.js";
+import {
+	buildRepoSummaries,
+	computeAgentStatus,
+	detectSessionRisk,
+	sessionKey,
+	sortSessionsByRecency,
+} from "../../domain/session/model.js";
+import { formatUptime } from "../../domain/workflow/policy.js";
+import type { StaleSessionInfo } from "../../session/stale-detector.js";
+import { ok, type AppResult } from "../result.js";
+
+export interface AdminStatusSessionView {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	status: string;
+	workspacePath: string;
+	branch: string;
+	lastActivity: string;
+	createdAt: string | null;
+	prUrl: string | null;
+	prNumber: number | null;
+	risk: ReturnType<typeof detectSessionRisk>;
+	staleDetectedAt: string | null;
+	staleReason: string | null;
+	stale: {
+		isStale: boolean;
+		ageMinutes: number;
+		classification: string;
+		worktreeDirty: boolean | null;
+		issueState: string | null;
+		prState: string | null;
+	} | null;
+	sessionType: "github_issue" | "cron";
+	cronJobId?: string;
+	cronJobName?: string;
+	cronScheduleExpression?: string;
+	cronTriggerTime?: string;
+}
+
+export interface AdminStatusView {
+	agent: "online" | "busy" | "feedback";
+	uptime: string;
+	draining: boolean;
+	repos: ReturnType<typeof buildRepoSummaries>;
+	sessions: AdminStatusSessionView[];
+}
+
+export class GetAdminStatus {
+	constructor(
+		private readonly sessions: SessionRepository,
+		private readonly stale: StaleSessionService,
+		private readonly clock: Clock,
+		private readonly taskControl: TaskControlService,
+		private readonly cronStore?: CronStore,
+	) {}
+
+	async execute(): Promise<AppResult<AdminStatusView>> {
+		const all = await this.sessions.getAll();
+		const sorted = sortSessionsByRecency(all);
+		const staleMap = new Map<string, StaleSessionInfo>();
+
+		try {
+			const staleInfos = await this.stale.detectStaleSessions();
+			for (const info of staleInfos) {
+				staleMap.set(sessionKey(info.session.owner, info.session.repo, info.session.issueNumber), info);
+			}
+		} catch {
+			// ignore stale detection errors
+		}
+
+		let repos = buildRepoSummaries(sorted);
+
+		if (this.cronStore) {
+			try {
+				const crons = await this.cronStore.getAll();
+				const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`, r]));
+				for (const cron of crons) {
+					const key = `${cron.owner}/${cron.repo}`;
+					const existing = repoMap.get(key);
+					if (existing) {
+						existing.cronCount++;
+						const cronActivity = cron.lastRunAt ?? cron.createdAt;
+						if (cronActivity > (existing.lastActivity ?? "")) {
+							existing.lastActivity = cronActivity;
+						}
+					} else {
+						repoMap.set(key, {
+							owner: cron.owner,
+							repo: cron.repo,
+							sessionCount: 0,
+							activeCount: 0,
+							cronCount: 1,
+							lastActivity: cron.lastRunAt ?? cron.createdAt,
+						});
+					}
+				}
+				repos = Array.from(repoMap.values()).sort((a, b) => {
+					if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+					return a.repo.localeCompare(b.repo);
+				});
+			} catch {
+				// ignore cron store errors
+			}
+		}
+
+		const view: AdminStatusView = {
+			agent: computeAgentStatus(sorted),
+			uptime: formatUptime(this.clock.uptime()),
+			draining: this.taskControl.isDraining(),
+			repos,
+			sessions: sorted.map((s) => {
+				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
+				return {
+					owner: s.owner,
+					repo: s.repo,
+					issueNumber: s.issueNumber,
+					status: s.status,
+					workspacePath: s.workspacePath,
+					branch: s.branch ?? `tars/issue-${s.issueNumber}`,
+					lastActivity: s.lastActivity,
+					createdAt: s.createdAt ?? null,
+					prUrl: s.prUrl ?? null,
+					prNumber: s.prNumber ?? null,
+					risk: detectSessionRisk(s),
+					staleDetectedAt: s.staleDetectedAt ?? null,
+					staleReason: s.staleReason ?? null,
+					stale: stale
+						? {
+								isStale: stale.isStale,
+								ageMinutes: Math.floor(stale.ageMs / 60000),
+								classification: stale.classification,
+								worktreeDirty: stale.worktreeDirty,
+								issueState: stale.issueState ?? null,
+								prState: stale.prState ?? null,
+							}
+						: null,
+					sessionType: s.sessionType ?? "github_issue",
+					cronJobId: s.cronJobId,
+					cronJobName: s.cronJobName,
+					cronScheduleExpression: s.cronScheduleExpression,
+					cronTriggerTime: s.cronTriggerTime,
+				};
+			}),
+		};
+
+		return ok(view);
+	}
+}

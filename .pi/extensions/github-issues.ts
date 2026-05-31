@@ -15,10 +15,11 @@
  * Requires GITHUB_TOKEN environment variable.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { Octokit } from "@octokit/rest";
 import { readFile } from "node:fs/promises";
+import { createOctokit } from "../../src/adapters/github/octokit.js";
 
 // GitHub API types for return values
 interface GitHubIssue {
@@ -110,7 +111,7 @@ async function getOctokit(cwd: string): Promise<Octokit> {
 	if (!token) {
 		throw new Error("GITHUB_TOKEN environment variable is not set");
 	}
-	return new Octokit({ auth: token });
+	return createOctokit(token);
 }
 
 // Validate owner/repo format

@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 coverage
-sessions
-workspaces
+/memory
+/sessions
+/workspaces
 .worktrees

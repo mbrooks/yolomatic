@@ -4,7 +4,7 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 
 ## Features
 
-- Receives `issues` and `issue_comment` GitHub webhooks in real time
+- Receives `issues`, `issue_comment`, `pull_request_review_comment`, and `pull_request_review` GitHub webhooks in real time
 - Maintains one persistent pi session per issue at `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`
 - Keeps repository work isolated under `WORKSPACES_DIR/{owner}-{repo}`
 - Applies workflow labels: `tars-working`, `tars-feedback-required`, `tars-pr-created`, `tars-complete`
@@ -21,7 +21,7 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 2. Copy `.env.example` to `.env`
 3. Fill in GitHub credentials, `WEBHOOK_SECRET`, and PI agent auth
 4. Run the receiver with `npm run dev`
-5. Expose the local server if needed, for example `ngrok http 3000`
+5. Expose the local server if needed, for example `ngrok http 6767`
 6. Point the GitHub webhook to `POST /webhook`
 
 ### Docker Deployment
@@ -36,7 +36,7 @@ TARS can be deployed with Docker Compose, including an Ollama sidecar.
 
 2. Build and run:
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
 
 3. View logs (console only):
@@ -59,10 +59,14 @@ WEBHOOK_SECRET=your_actual_secret
 SESSIONS_DIR=/app/sessions
 WORKSPACES_DIR=/app/workspaces
 DEFAULT_BRANCH=main
+MAX_WORKTREES=10
+WORKTREE_EVICTION_STRATEGY=lru
 AUTO_START=true
 PORT=6767
 NODE_ENV=production
 ```
+
+Compose also injects `OLLAMA_HOST=http://127.0.0.1:11434` so TARS talks to the Ollama sidecar over localhost inside the shared container network namespace.
 
 #### Docker Services
 
@@ -78,7 +82,8 @@ NODE_ENV=production
 | `tars_sessions` | `/app/sessions` | Session files (pi jsonl + state) |
 | `tars_workspaces` | `/app/workspaces` | Repo checkouts + git worktrees |
 | `tars_pi` | `/home/tars/.pi/agent` | Pi config, settings, extensions |
-| `tars_ollama` | `/root/.ollama` | Ollama model data |
+
+Ollama model data is mounted from the host at `${HOME}/.ollama` so the sidecar reuses the same local model cache as `../case`.
 
 #### Webhook URL with Docker
 
@@ -141,7 +146,7 @@ curl -X POST http://localhost:6767/webhook \
   -d '{"zen":"Ping!"}'
 
 # Test Ollama (from container)
-docker exec tars curl http://ollama:11434/api/tags
+docker exec tars curl http://127.0.0.1:11434/api/tags
 ```
 
 #### Log Strategy: Console Only
@@ -158,7 +163,8 @@ For production deployments, wire `scripts/update-tars-if-needed.sh` into cron to
 2. If `AUTO_START=true`, TARS labels the issue `tars-working`, comments, and executes in the repo workspace.
 3. If the agent responds with `TARS_STATUS: waiting-feedback`, TARS switches the issue to `tars-feedback-required`.
 4. When `issue_comment.created` arrives on any TARS-labeled issue, TARS resumes the same session (ignores bot comments).
-5. If the agent responds with `TARS_STATUS: complete`, TARS commits changes, pushes the branch, adds `tars-pr-created`, and posts a completion summary.
+5. When `pull_request_review_comment.created` or `pull_request_review.submitted` arrives on a TARS PR, TARS iterates on the code and pushes updates to the PR branch.
+6. If the agent responds with `TARS_STATUS: complete`, TARS commits changes, pushes the branch, adds `tars-pr-created`, and posts a completion summary.
 
 ## Notes
 

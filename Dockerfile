@@ -21,18 +21,25 @@ ENV HOME=/home/tars
 ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
 ENV SESSIONS_DIR=/app/sessions
 ENV WORKSPACES_DIR=/app/workspaces
+ENV MEMORY_DIR=/app/memory
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Install git (required for worktrees)
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Install git (required for worktrees) and GitHub CLI
+RUN apt-get update && apt-get install -y git curl gnupg \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy production dependencies
+# Copy dependencies (including devDependencies)
+COPY --from=build /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
-  && mkdir -p /app/sessions /app/workspaces \
+  && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
 
 # Copy build artifacts
@@ -45,9 +52,6 @@ COPY --chown=tars:tars --from=build /app/.pi ./.pi
 COPY --from=build /app/AGENTS.md ./AGENTS.md
 COPY --from=build /app/SOUL.md ./SOUL.md
 COPY --from=build /app/WORKSPACES.md ./WORKSPACES.md
-
-# Copy models.json to agent directory
-COPY --from=build /app/models.json /home/tars/.pi/agent/models.json
 
 # Install pi packages (like CASE does)
 RUN cd /app/.pi/npm \

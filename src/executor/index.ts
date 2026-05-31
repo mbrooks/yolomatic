@@ -1,19 +1,22 @@
 import {
+	AgentSession,
 	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
 	getAgentDir,
-	ModelRegistry,
 	SessionManager as PiSessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
+import { createTarsModelRegistry } from "./model-registry.js";
 import { readFile } from "node:fs/promises";
 
 import { LlmLogger } from "../logging/llm-logger.js";
+import { recordSessionLog } from "../logging/session-log-store.js";
 import { FatalSystemError, SelfMonitor } from "../self-monitor/index.js";
+import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
 
 export interface ExecutionResult {
-	status: "working" | "waiting-feedback" | "complete" | "cancelled";
+	status: "working" | "waiting-feedback" | "complete" | "cancelled" | "failed";
 	summary: string;
 	rawResponse: string;
 }
@@ -28,6 +31,14 @@ interface ModelLookup<TModel extends ModelReference> {
 	getAll(): TModel[];
 }
 
+export function isRateLimitError(message: string): boolean {
+	const lower = message.toLowerCase();
+	return (
+		lower.includes("429") &&
+		(lower.includes("usage limit") || lower.includes("rate limit") || lower.includes("rate-limit") || lower.includes("too many requests"))
+	);
+}
+
 export function extractText(content: unknown): string {
 	if (typeof content === "string") {
 		return content;
@@ -35,8 +46,13 @@ export function extractText(content: unknown): string {
 	if (Array.isArray(content)) {
 		return content
 			.map((item) => {
-				if (item && typeof item === "object" && "type" in item && item.type === "text" && "text" in item) {
-					return typeof item.text === "string" ? item.text : "";
+				if (item && typeof item === "object" && "type" in item) {
+					if (item.type === "text" && "text" in item) {
+						return typeof item.text === "string" ? item.text : "";
+					}
+					if (item.type === "thinking" && "thinking" in item) {
+						return typeof item.thinking === "string" ? item.thinking : "";
+					}
 				}
 				return "";
 			})
@@ -50,6 +66,21 @@ export function getLastAssistantText(session: { messages: Array<{ role?: string;
 	for (let index = session.messages.length - 1; index >= 0; index -= 1) {
 		const message = session.messages[index];
 		if (message.role === "assistant") {
+			if (Array.isArray(message.content)) {
+				const visibleText = message.content
+					.map((item) => {
+						if (item && typeof item === "object" && "type" in item && item.type === "text" && "text" in item) {
+							return typeof item.text === "string" ? item.text : "";
+						}
+						return "";
+					})
+					.filter(Boolean)
+					.join("\n")
+					.trim();
+				if (visibleText) {
+					return visibleText;
+				}
+			}
 			return extractText(message.content).trim();
 		}
 	}
@@ -78,13 +109,23 @@ async function loadSoulContent(soulPath: string): Promise<string> {
 export function parseExecutionResult(rawResponse: string): ExecutionResult {
 	const trimmed = rawResponse.trim();
 	const lines = trimmed.split(/\r?\n/u);
-	const firstLine = lines[0]?.trim() || "";
-	const match = /^TARS_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(firstLine);
-	const status = match?.[1] as ExecutionResult["status"] | undefined;
+
+	let statusLineIndex = -1;
+	let status: ExecutionResult["status"] | undefined;
+
+	for (let i = lines.length - 1; i >= 0; i -= 1) {
+		const line = lines[i]?.trim() || "";
+		const match = /^TARS_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(line);
+		if (match) {
+			statusLineIndex = i;
+			status = match[1] as ExecutionResult["status"];
+			break;
+		}
+	}
 
 	return {
 		status: status ?? "working",
-		summary: lines.slice(match ? 1 : 0).join("\n").trim() || trimmed,
+		summary: lines.slice(statusLineIndex >= 0 ? statusLineIndex + 1 : 0).join("\n").trim() || trimmed,
 		rawResponse: trimmed,
 	};
 }
@@ -217,11 +258,16 @@ export class PiAgentExecutor {
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: AgentSession) => void,
+		overridePrompt?: string,
 	): Promise<ExecutionResult> {
-		const logger = new LlmLogger(state.repo, state.issueNumber);
+		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
+		const key = buildSessionKey(state.owner, state.repo, state.issueNumber);
 
 		let prompt: string;
-		if (prReview) {
+		if (overridePrompt) {
+			prompt = overridePrompt;
+		} else if (prReview) {
 			prompt = buildPRReviewPrompt(state, prReview.comments, prReview.reviewBody);
 		} else if (newComment) {
 			prompt = buildFeedbackPrompt(newComment);
@@ -229,6 +275,7 @@ export class PiAgentExecutor {
 			prompt = buildIssuePrompt(state);
 		}
 		logger.logPrompt(prompt);
+		recordSessionLog(key, { level: "info", message: `Prompt sent`, details: { type: "prompt", length: prompt.length } });
 
 		const piSessionManager = PiSessionManager.open(state.sessionPath, undefined, state.workspacePath);
 
@@ -246,7 +293,7 @@ export class PiAgentExecutor {
 		await loader.reload();
 
 		const authStorage = AuthStorage.create();
-		const modelRegistry = ModelRegistry.create(authStorage);
+		const modelRegistry = createTarsModelRegistry(authStorage);
 		const configuredModel = resolveConfiguredModel(modelRegistry);
 		if (process.env.PI_AGENT_MODEL?.trim() && !configuredModel) {
 			process.stderr.write(
@@ -262,6 +309,7 @@ export class PiAgentExecutor {
 			modelRegistry,
 			model: configuredModel,
 		});
+		onSessionCreated?.(session);
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 
@@ -277,15 +325,26 @@ export class PiAgentExecutor {
 			if (event.type === "message_update") {
 				if (event.assistantMessageEvent.type === "thinking_end") {
 					logger.logThought(event.assistantMessageEvent.content);
+					recordSessionLog(key, { level: "info", message: event.assistantMessageEvent.content, details: { type: "thinking" } });
 				}
 			}
 
 			if (event.type === "tool_execution_start") {
 				logger.logToolCall(event.toolName, event.args as Record<string, unknown>);
+				recordSessionLog(key, {
+					level: "tool",
+					message: `${event.toolName} ${JSON.stringify(event.args).slice(0, 200)}`,
+					details: { type: "tool_execution_start", toolName: event.toolName, args: event.args },
+				});
 			}
 
 			if (event.type === "tool_execution_end") {
 				logger.logToolResult(event.toolName, event.result);
+				recordSessionLog(key, {
+					level: event.isError ? "error" : "info",
+					message: `${event.toolName} ${event.isError ? "failed" : "done"}`,
+					details: { type: "tool_execution_end", toolName: event.toolName, result: event.result, isError: event.isError },
+				});
 				selfMonitor.recordToolEnd(event.toolName, event.result, event.isError);
 				if (selfMonitor.hasFatalError()) {
 					void session.abort();
@@ -297,10 +356,20 @@ export class PiAgentExecutor {
 					new Error(event.errorMessage),
 					`Auto-retry attempt ${event.attempt}/${event.maxAttempts}`,
 				);
+				recordSessionLog(key, {
+					level: "warn",
+					message: `Auto-retry ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`,
+					details: { type: "auto_retry_start", attempt: event.attempt, maxAttempts: event.maxAttempts, errorMessage: event.errorMessage },
+				});
 			}
 
 			if (event.type === "auto_retry_end" && !event.success && event.finalError) {
 				logger.logError(new Error(event.finalError), "Auto-retry failed");
+				recordSessionLog(key, {
+					level: "error",
+					message: `Auto-retry failed: ${event.finalError}`,
+					details: { type: "auto_retry_end", success: false, finalError: event.finalError },
+				});
 			}
 		});
 
@@ -313,6 +382,11 @@ export class PiAgentExecutor {
 			await session.prompt(prompt);
 		} catch (error) {
 			logger.logError(error instanceof Error ? error : new Error(String(error)), "Prompt execution failed");
+			recordSessionLog(key, {
+				level: "error",
+				message: `Prompt execution failed: ${error instanceof Error ? error.message : String(error)}`,
+				details: { type: "prompt_error", error: error instanceof Error ? error.message : String(error) },
+			});
 			if (abortSignal?.aborted) {
 				return {
 					status: "cancelled",
@@ -338,14 +412,42 @@ export class PiAgentExecutor {
 		if (lastMessage && typeof lastMessage === "object" && "role" in lastMessage && lastMessage.role === "assistant") {
 			const assistantMsg = lastMessage as { errorMessage?: string; stopReason?: string };
 			if (assistantMsg.errorMessage) {
+				if (isRateLimitError(assistantMsg.errorMessage)) {
+					logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
+					recordSessionLog(key, {
+						level: "error",
+						message: `Assistant error: ${assistantMsg.errorMessage}`,
+						details: { type: "assistant_error", errorMessage: assistantMsg.errorMessage, stopReason: assistantMsg.stopReason },
+					});
+					return {
+						status: "failed",
+						summary: assistantMsg.errorMessage,
+						rawResponse: "",
+					};
+				}
 				logger.logError(new Error(assistantMsg.errorMessage), "Assistant error");
+				recordSessionLog(key, {
+					level: "error",
+					message: `Assistant error: ${assistantMsg.errorMessage}`,
+					details: { type: "assistant_error", errorMessage: assistantMsg.errorMessage, stopReason: assistantMsg.stopReason },
+				});
 			} else if (assistantMsg.stopReason === "error") {
 				logger.logError(new Error("Assistant stopped with error reason"), "Assistant error");
+				recordSessionLog(key, {
+					level: "error",
+					message: "Assistant stopped with error reason",
+					details: { type: "assistant_error", stopReason: assistantMsg.stopReason },
+				});
 			}
 		}
 
 		const rawResponse = getLastAssistantText(session);
 		logger.logResponse(rawResponse);
+		recordSessionLog(key, {
+			level: "assistant",
+			message: rawResponse || "(no response)",
+			details: { type: "response", status: parseExecutionResult(rawResponse).status },
+		});
 
 		return parseExecutionResult(rawResponse);
 	}

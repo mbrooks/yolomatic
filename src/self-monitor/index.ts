@@ -94,11 +94,12 @@ export class SelfMonitor {
 
 	private async gatherSystemEvidence(): Promise<Evidence["systemEvidence"]> {
 		const timestamp = new Date().toISOString();
-		const [whoami, pwd, lsWorkspace, gitStatus, gitBranch, nodeVersion] = await Promise.all([
+		const [whoami, pwd, lsWorkspace, gitStatus, gitDiff, gitBranch, nodeVersion] = await Promise.all([
 			this.runCommand("whoami", []),
 			this.runCommand("pwd", []),
 			this.runCommand("ls", ["-la", this.workspacePath]),
 			this.runCommand("git", ["status", "--short"]),
+			this.runCommand("git", ["diff"]),
 			this.runCommand("git", ["branch", "--show-current"]),
 			this.runCommand("node", ["--version"]),
 		]);
@@ -109,6 +110,7 @@ export class SelfMonitor {
 			workspacePath: this.workspacePath,
 			lsWorkspace,
 			gitStatus,
+			gitDiff,
 			gitBranch,
 			nodeVersion,
 			timestamp,
@@ -134,6 +136,11 @@ export class SelfMonitor {
 			``,
 			"```",
 			systemEvidence.gitStatus || "(clean)",
+			"```",
+			`- **Git diff:**`,
+			``,
+			"```",
+			systemEvidence.gitDiff || "(none)",
 			"```",
 			`- **Workspace listing:**`,
 			`<details>`,
@@ -165,7 +172,9 @@ export class SelfMonitor {
 				return "Check directory ownership (`ls -la node_modules`) and ensure the runtime user matches the install user. Remove `node_modules` and reinstall if necessary.";
 			case "disk_full":
 				return "Free up disk space on the host. Check `df -h` and clean up old worktrees, logs, or temporary files.";
-			case "git_worktree_failure":
+			case "github_pat_scope_missing":
+			return "The GitHub Personal Access Token needs the `workflow` scope to create or update GitHub Actions files. Update the token settings in GitHub and restart TARS.";
+		case "git_worktree_failure":
 				return "Run `git worktree list` and `git worktree prune` to clean up stale entries. Check for untracked files that block checkout.";
 			case "missing_toolchain_binary":
 				return "Verify the toolchain installation and PATH. Re-install missing packages or binaries.";
