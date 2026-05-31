@@ -18,7 +18,10 @@ export function validatePRSessionMapping(
 ): string | null {
 	const headIssueNumber = extractIssueNumberFromBranch(headRef);
 	if (!headIssueNumber) {
-		return `PR #${prNumber} head branch '${headRef}' is not a TARS issue branch.`;
+		if (session.prNumber === prNumber) {
+			return null;
+		}
+		return `PR #${prNumber} head branch '${headRef}' is not a TARS issue branch and is not associated with this session.`;
 	}
 
 	if (headIssueNumber !== session.issueNumber) {
@@ -37,4 +40,3 @@ export function validatePRSessionMapping(
 
 	return null;
 }
-
