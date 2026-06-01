@@ -517,19 +517,21 @@ describe("GitHubIssueHandlers", () => {
 		});
 
 		// Simulate an opened event immediately followed by an assigned event
-		await handlers.handleIssueEvent({
+		const openedPromise = handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
-		await handlers.handleIssueEvent({
+		const assignedPromise = handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "tars-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
+
+		await Promise.all([openedPromise, assignedPromise]);
 
 		// Should only execute once
 		expect(executor.execute).toHaveBeenCalledTimes(1);

@@ -122,37 +122,41 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		const session = await ensureSessionExists(
-			this.deps.sessions,
-			this.deps.workspaces,
-			this.deps.github,
-			owner,
-			repo,
-			issue.number,
-			issue.title,
-			issue.body ?? "",
-			issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-			this.deps.defaultBranch,
-		);
-
-		if (session.status !== "pending") {
-			process.stdout.write(`[webhook] ${payload.action} ignored: ${key} session status is ${session.status}\n`);
-			return;
+		const claimedInFlight = this.deps.autoStart;
+		if (claimedInFlight) {
+			this.inFlight.add(key);
 		}
 
-		if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session)) {
-			process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
-			return;
-		}
-
-		if (!this.deps.autoStart) {
-			process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
-			return;
-		}
-
-		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
-		this.inFlight.add(key);
 		try {
+			const session = await ensureSessionExists(
+				this.deps.sessions,
+				this.deps.workspaces,
+				this.deps.github,
+				owner,
+				repo,
+				issue.number,
+				issue.title,
+				issue.body ?? "",
+				issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
+				this.deps.defaultBranch,
+			);
+
+			if (session.status !== "pending") {
+				process.stdout.write(`[webhook] ${payload.action} ignored: ${key} session status is ${session.status}\n`);
+				return;
+			}
+
+			if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session)) {
+				process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
+				return;
+			}
+
+			if (!this.deps.autoStart) {
+				process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
+				return;
+			}
+
+			process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
 			await startIssueExecution(
 				this.executor,
 				this.deps.github,
@@ -163,7 +167,9 @@ export class HandleIssueEvent {
 				"Picked up by TARS. Working on it...",
 			);
 		} finally {
-			this.inFlight.delete(key);
+			if (claimedInFlight) {
+				this.inFlight.delete(key);
+			}
 		}
 	}
 }
