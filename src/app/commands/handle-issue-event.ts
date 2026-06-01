@@ -4,9 +4,8 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
 import { hasTarsVisibleLabel, isAssignedToTars, shouldIgnoreIssueEvent } from "../../domain/workflow/policy.js";
-import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
-import { issueSessionKey, markIssueWorking, removeWorkflowLabels } from "./workflow-helpers.js";
+import { issueSessionKey, removeWorkflowLabels, ensureSessionExists, handleDrainingMode, startIssueExecution } from "./workflow-helpers.js";
 
 export interface IssueEventPayload {
 	action: string;
@@ -123,27 +122,17 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		let worktree: { path: string; branch: string };
-		try {
-			worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issue.number);
-		} catch (error) {
-			if (error instanceof EmptyRepositoryError) {
-				process.stdout.write(`[webhook] repo=${owner}/${repo} appears empty. Initializing via GitHub API...\n`);
-				await this.deps.github.initializeEmptyRepo(owner, repo, this.deps.defaultBranch);
-				process.stdout.write(`[webhook] repo=${owner}/${repo} initialized. Retrying worktree creation...\n`);
-				worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issue.number);
-			} else {
-				throw error;
-			}
-		}
-		const session = await this.deps.sessions.createSession(
+		const session = await ensureSessionExists(
+			this.deps.sessions,
+			this.deps.workspaces,
+			this.deps.github,
 			owner,
 			repo,
 			issue.number,
 			issue.title,
 			issue.body ?? "",
-			worktree.path,
 			issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
+			this.deps.defaultBranch,
 		);
 
 		if (session.status !== "pending") {
@@ -151,12 +140,8 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		if (this.deps.tasks.isDraining()) {
+		if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session)) {
 			process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
-			await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending", {
-				resumeOnBoot: true,
-			});
-			await this.deps.github.postComment(owner, repo, issue.number, "Deploy in progress. Task will resume after restart.");
 			return;
 		}
 
@@ -168,8 +153,15 @@ export class HandleIssueEvent {
 		process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
 		this.inFlight.add(key);
 		try {
-			await markIssueWorking(this.deps.github, owner, repo, issue.number, "Picked up by TARS. Working on it...");
-			await this.executor.run(session);
+			await startIssueExecution(
+				this.executor,
+				this.deps.github,
+				owner,
+				repo,
+				issue.number,
+				session,
+				"Picked up by TARS. Working on it...",
+			);
 		} finally {
 			this.inFlight.delete(key);
 		}
