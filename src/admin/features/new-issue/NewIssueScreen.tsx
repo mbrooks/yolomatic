@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { chatIssue, createIssue, fetchRepoContext, type IssueDraft, type IssueChatMessage, type IssueChatPayload, type RepoContext } from "../../api/issues.js";
+import { type IssueChatMessage, type IssueChatPayload } from "../../api/issues.js";
 import { ChatTranscript, PreviewCard, uid, type ChatMessage } from "./chat.js";
-import { webSocketManager } from "../../api/websocket.js";
+import { hasDraftContent, useNewIssueDraft } from "./useNewIssueDraft.js";
+import { useIssueChatTransport } from "./useIssueChatTransport.js";
+import { useRepoContext } from "./useRepoContext.js";
 import type { RepoSummary } from "../../app/types.js";
 
 function RepoSelectorStep({
@@ -74,15 +76,6 @@ function RepoSelectorStep({
 	);
 }
 
-function hasDraftContent(draft: IssueDraft): boolean {
-	return Boolean(
-		draft.title.trim() ||
-		draft.body.trim() ||
-		draft.labels.length > 0 ||
-		draft.assignees.length > 0,
-	);
-}
-
 function toApiMessages(messages: ChatMessage[]): IssueChatMessage[] {
 	return messages
 		.filter((message): message is Extract<ChatMessage, { type: "text" }> => message.type === "text")
@@ -110,44 +103,17 @@ export function NewIssueScreen({
 	const [messages, setMessages] = useState<ChatMessage[]>([
 		{ id: uid(), role: "tars", type: "text", text: initialPrompt },
 	]);
-	const [draft, setDraft] = useState<IssueDraft>({
-		title: "",
-		body: "",
-		labels: [],
-		assignees: [],
-	});
-	const [owner, setOwner] = useState(initialOwner);
-	const [repo, setRepo] = useState(initialRepo);
 	const [repoSelected, setRepoSelected] = useState(() => Boolean(initialOwner && initialRepo));
 	const [input, setInput] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [privacyMode, setPrivacyMode] = useState(false);
-	const [repoContext, setRepoContext] = useState<RepoContext | null>(null);
-	const [selectedTemplate, setSelectedTemplate] = useState<string | undefined>(undefined);
-	const [loadingContext, setLoadingContext] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-	const [creatingIssue, setCreatingIssue] = useState(false);
-	const [createdIssue, setCreatedIssue] = useState<{ number: number; html_url: string } | null>(null);
-	const [wsStatus, setWsStatus] = useState(webSocketManager.connectionStatus);
-	const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
 	const messagesEndRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const scrollToBottom = useCallback(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
-
-	useEffect(() => {
-		const unsubscribe = webSocketManager.onStatusChange(setWsStatus);
-		// Ensure websocket is connected for real-time status
-		const unsubStatus = webSocketManager.subscribeStatus(() => {
-			// No-op: subscription keeps the connection alive
-		});
-		return () => {
-			unsubscribe();
-			unsubStatus();
-		};
 	}, []);
 
 	useEffect(() => {
@@ -160,35 +126,51 @@ export function NewIssueScreen({
 		}
 	}, [repoSelected]);
 
+	const appendTextMessage = useCallback((role: "tars" | "user", text: string) => {
+		setMessages((prev) => [...prev, { id: uid(), role, type: "text", text }]);
+	}, []);
+	const handleAssistantMessage = useCallback((message: string) => {
+		appendTextMessage("tars", message);
+	}, [appendTextMessage]);
+
+	const {
+		owner,
+		setOwner,
+		repo,
+		setRepo,
+		draft,
+		setDraft,
+		creatingIssue,
+		createdIssue,
+		setCreatedIssue,
+		resetDraft,
+		createCurrentIssue,
+	} = useNewIssueDraft({
+		initialOwner,
+		initialRepo,
+		onAssistantMessage: handleAssistantMessage,
+	});
+	const {
+		repoContext,
+		loadingContext,
+		selectedTemplate,
+		setSelectedTemplate,
+		clearRepoContext,
+	} = useRepoContext(owner, repo);
+	const {
+		wsStatus,
+		progressMessage,
+		setProgressMessage,
+		submitIssueChat,
+	} = useIssueChatTransport();
+
 	useEffect(() => {
 		if (!repoSelected && !owner && !repo && repos && repos.length === 1) {
 			setOwner(repos[0].owner);
 			setRepo(repos[0].repo);
 			setRepoSelected(true);
 		}
-	}, [repoSelected, owner, repo, repos]);
-
-	useEffect(() => {
-		if (!owner || !repo) {
-			setRepoContext(null);
-			return;
-		}
-		setLoadingContext(true);
-		fetchRepoContext(owner, repo)
-			.then((context) => {
-				setRepoContext(context);
-			})
-			.catch(() => {
-				setRepoContext(null);
-			})
-			.finally(() => {
-				setLoadingContext(false);
-			});
-	}, [owner, repo]);
-
-	const appendTextMessage = useCallback((role: "tars" | "user", text: string) => {
-		setMessages((prev) => [...prev, { id: uid(), role, type: "text", text }]);
-	}, []);
+	}, [repoSelected, owner, repo, repos, setOwner, setRepo]);
 
 	const appendThinkingMessage = useCallback((text: string, done: boolean) => {
 		if (!text) {
@@ -207,7 +189,7 @@ export function NewIssueScreen({
 		});
 	}, []);
 
-	const applyChatResult = useCallback((result: Awaited<ReturnType<typeof chatIssue>>) => {
+	const applyChatResult = useCallback((result: Awaited<ReturnType<typeof submitIssueChat>>) => {
 		setOwner(result.owner);
 		setRepo(result.repo);
 		setDraft(result.draft);
@@ -220,17 +202,15 @@ export function NewIssueScreen({
 
 	const handleReset = useCallback(() => {
 		setMessages([{ id: uid(), role: "tars", type: "text", text: initialPrompt }]);
-		setDraft({ title: "", body: "", labels: [], assignees: [] });
+		resetDraft();
 		// Preserve the selected repository across resets
 		setInput("");
 		setError(null);
 		setPrivacyMode(false);
-		setRepoContext(null);
-		setSelectedTemplate(undefined);
+		clearRepoContext();
 		setSubmitting(false);
-		setCreatedIssue(null);
 		setProgressMessage(null);
-	}, [initialPrompt]);
+	}, [clearRepoContext, initialPrompt, resetDraft, setProgressMessage]);
 
 	const handleSelectRepo = useCallback((selectedOwner: string, selectedRepoName: string) => {
 		setOwner(selectedOwner);
@@ -264,29 +244,9 @@ export function NewIssueScreen({
 		};
 
 		try {
-			let sawWebSocketProgress = false;
-			let result;
-			if (wsStatus === "open") {
-				try {
-					result = await webSocketManager.requestIssueChat(payload, (event) => {
-						sawWebSocketProgress = true;
-						if (event.type === "thinking") {
-							appendThinkingMessage(event.text ?? event.message, event.done ?? false);
-							setProgressMessage(null);
-							return;
-						}
-						setProgressMessage(event.message);
-					});
-				} catch (error) {
-					if (sawWebSocketProgress) {
-						throw error;
-					}
-					setProgressMessage("Live connection failed. Retrying over HTTP...");
-					result = await chatIssue(payload);
-				}
-			} else {
-				result = await chatIssue(payload);
-			}
+			const result = await submitIssueChat(payload, (chunk) => {
+				appendThinkingMessage(chunk.text, chunk.done);
+			});
 			applyChatResult(result);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -296,33 +256,15 @@ export function NewIssueScreen({
 			setProgressMessage(null);
 			setSubmitting(false);
 		}
-	}, [appendTextMessage, appendThinkingMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, submitting, wsStatus]);
+	}, [appendTextMessage, appendThinkingMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, setProgressMessage, submitIssueChat, submitting]);
 
 	const handleCreateIssue = useCallback(async () => {
-		if (!owner.trim() || !repo.trim() || !draft.title.trim() || creatingIssue) {
-			return;
-		}
-		setCreatingIssue(true);
 		setError(null);
-		try {
-			const result = await createIssue({
-				owner: owner.trim(),
-				repo: repo.trim(),
-				title: draft.title,
-				body: draft.body || undefined,
-				labels: draft.labels.length > 0 ? draft.labels : undefined,
-				assignees: draft.assignees.length > 0 ? draft.assignees : undefined,
-			});
-			setCreatedIssue(result);
-			appendTextMessage("tars", `Issue created: [#${result.number}](${result.html_url})`);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			setError(message);
-			appendTextMessage("tars", `I couldn't create the issue: ${message}`);
-		} finally {
-			setCreatingIssue(false);
+		const errorMessage = await createCurrentIssue();
+		if (errorMessage) {
+			setError(errorMessage);
 		}
-	}, [appendTextMessage, creatingIssue, draft, owner, repo]);
+	}, [createCurrentIssue]);
 
 	const handleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
