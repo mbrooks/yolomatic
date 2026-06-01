@@ -1212,4 +1212,24 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).not.toHaveBeenCalled();
 	});
+
+	it("clears in-flight after resumeInterruptedSession completes", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			autoStart: true,
+			defaultBranch: "main",
+			maxIterations: 3,
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		expect(handlers.isInFlight("mbrooks", "tars", 56)).toBe(false);
+		await handlers.resumeInterruptedSession("mbrooks", "tars", 56);
+		expect(handlers.isInFlight("mbrooks", "tars", 56)).toBe(false);
+	});
 });

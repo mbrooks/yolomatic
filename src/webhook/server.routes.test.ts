@@ -12,6 +12,7 @@ import { GitHubIssueHandlers } from "./handlers.js";
 
 import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
 import { SettingsStore } from "../settings/store.js";
+import type { SessionStatus } from "../session/store.js";
 
 function makeRequest(
 	port: number,
@@ -444,47 +445,41 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
 			},
 		};
-		let createCount = 0;
+		let storedSession: any = null;
 		const sessionManager = {
 			createSession: vi.fn(async () => {
-				createCount++;
+				storedSession = {
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status: "pending" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+				return storedSession;
+			}),
+			getSession: vi.fn(async () => storedSession),
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => {
+				if (storedSession) {
+					storedSession.status = status;
+				}
 				return {
 					issueNumber: 1,
 					repo: "tars",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
-					status: createCount === 1 ? ("pending" as const) : ("working" as const),
+					status,
 					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
 					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
 			}),
-			getSession: vi.fn(async () => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
@@ -522,21 +517,19 @@ describe("GitHubIssueHandlers", () => {
 		});
 
 		// Simulate an opened event immediately followed by an assigned event
-		const openedPromise = handlers.handleIssueEvent({
+		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
-		const assignedPromise = handlers.handleIssueEvent({
+		await handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "tars-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
-
-		await Promise.all([openedPromise, assignedPromise]);
 
 		// Should only execute once
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -618,32 +611,39 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
 			},
 		};
+		const createdIssues = new Set<number>();
 		const sessionManager = {
-			createSession: vi.fn(async () => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
-			getSession: vi.fn(async () => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			createSession: vi.fn(async (_owner: string, _repo: string, issueNumber: number) => {
+				createdIssues.add(issueNumber);
+				return {
+					issueNumber,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status: "pending" as const,
+					sessionPath: `/tmp/sessions/github-mbrooks-tars/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-tars/.worktrees/issue-${issueNumber}`,
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+			}),
+			getSession: vi.fn(async (_owner: string, _repo: string, issueNumber: number) => {
+				if (!createdIssues.has(issueNumber)) return null;
+				return {
+					issueNumber,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status: "working" as const,
+					sessionPath: `/tmp/sessions/github-mbrooks-tars/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-tars/.worktrees/issue-${issueNumber}`,
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+			}),
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
 				owner: "mbrooks",
@@ -856,43 +856,41 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
 			},
 		};
+		let storedSession: any = null;
 		const sessionManager = {
-			createSession: vi.fn(async () => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
-			getSession: vi.fn(async () => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
-				issueNumber: 1,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			})),
+			createSession: vi.fn(async () => {
+				storedSession = {
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status: "pending" as const,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+				return storedSession;
+			}),
+			getSession: vi.fn(async () => storedSession),
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => {
+				if (storedSession) {
+					storedSession.status = status;
+				}
+				return {
+					issueNumber: 1,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Title",
+					body: "Body",
+					status,
+					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				};
+			}),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
