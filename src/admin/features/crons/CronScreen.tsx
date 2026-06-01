@@ -1,7 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { EmptyState } from "../../components/EmptyState.js";
-import { RepoTabs } from "../../components/RepoTabs.js";
+import { RepoScopedScreenShell } from "../../components/RepoScopedScreenShell.js";
 import type { CronJob } from "../../app/types.js";
 import { useRepoCrons } from "./useRepoCrons.js";
 import { CronListPane } from "./CronListPane.js";
@@ -33,13 +31,18 @@ export function CronScreen({
 	}, [reload]);
 
 	return (
-		<>
-			<RepoTabs activeTab={activeTab} onSelectTab={onSelectTab} onNewIssue={onNewIssue} />
-			<Breadcrumb label={`${owner}/${repo}`} onBack={onBack} />
-			{loading ? (
-				<div className="empty">Loading crons...</div>
-			) : crons.length === 0 && !showForm ? (
-				<EmptyState message="No cron jobs for this repository.">
+		<RepoScopedScreenShell
+			owner={owner}
+			repo={repo}
+			activeTab={activeTab}
+			onSelectTab={onSelectTab}
+			onNewIssue={onNewIssue}
+			onBack={onBack}
+			loading={loading}
+			loadingMessage="Loading crons..."
+			empty={crons.length === 0 && !showForm}
+			emptyMessage="No cron jobs for this repository."
+			emptyAction={
 					<button
 						className="action-btn restart"
 						onClick={() => setShowForm(true)}
@@ -47,43 +50,40 @@ export function CronScreen({
 					>
 						+ New Cron Job
 					</button>
-				</EmptyState>
-			) : (
-				<div className="workspace">
-					<CronListPane
-						crons={crons}
-						selectedCron={selectedCron}
-						onSelect={(cron) => {
-							setSelectedCron(cron);
-							setShowForm(false);
-						}}
-						onCreate={() => {
-							setShowForm(true);
-							setSelectedCron(null);
-						}}
-					/>
+			}
+		>
+			<CronListPane
+				crons={crons}
+				selectedCron={selectedCron}
+				onSelect={(cron) => {
+					setSelectedCron(cron);
+					setShowForm(false);
+				}}
+				onCreate={() => {
+					setShowForm(true);
+					setSelectedCron(null);
+				}}
+			/>
 
-					{showForm ? (
-						<CronForm
-							owner={owner}
-							repo={repo}
-							existing={selectedCron}
-							onComplete={handleMutate}
-							onCancel={() => {
-								setShowForm(false);
-							}}
-						/>
-					) : (
-						<CronDetail
-							cron={selectedCron}
-							owner={owner}
-							repo={repo}
-							onMutate={handleMutate}
-							onEdit={() => setShowForm(true)}
-						/>
-					)}
-				</div>
+			{showForm ? (
+				<CronForm
+					owner={owner}
+					repo={repo}
+					existing={selectedCron}
+					onComplete={handleMutate}
+					onCancel={() => {
+						setShowForm(false);
+					}}
+				/>
+			) : (
+				<CronDetail
+					cron={selectedCron}
+					owner={owner}
+					repo={repo}
+					onMutate={handleMutate}
+					onEdit={() => setShowForm(true)}
+				/>
 			)}
-		</>
+		</RepoScopedScreenShell>
 	);
 }

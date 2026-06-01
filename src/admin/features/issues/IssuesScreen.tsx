@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import { Breadcrumb } from "../../components/Breadcrumb.js";
-import { EmptyState } from "../../components/EmptyState.js";
-import { RepoTabs } from "../../components/RepoTabs.js";
+import { RepoScopedScreenShell } from "../../components/RepoScopedScreenShell.js";
 import type { OpenIssue } from "../../api/issues.js";
 import { useRepoIssues } from "./useRepoIssues.js";
 import { IssueListPane } from "./IssueListPane.js";
@@ -24,19 +22,20 @@ export function IssuesScreen({
 	const [selected, setSelected] = useState<OpenIssue | null>(null);
 
 	return (
-		<>
-			<RepoTabs activeTab="issues" onSelectTab={onSelectTab} onNewIssue={onNewIssue} />
-			<Breadcrumb label={`${owner}/${repo}`} onBack={onBack} />
-			{loading ? (
-				<div className="empty">Loading issues...</div>
-			) : issues.length === 0 ? (
-				<EmptyState message="No open issues for this repository." />
-			) : (
-				<div className="workspace">
-					<IssueListPane issues={issues} selected={selected} onSelect={setSelected} />
-					<IssueDetail selected={selected} owner={owner} repo={repo} onAssignSuccess={reload} />
-				</div>
-			)}
-		</>
+		<RepoScopedScreenShell
+			owner={owner}
+			repo={repo}
+			activeTab="issues"
+			onSelectTab={onSelectTab}
+			onNewIssue={onNewIssue}
+			onBack={onBack}
+			loading={loading}
+			loadingMessage="Loading issues..."
+			empty={issues.length === 0}
+			emptyMessage="No open issues for this repository."
+		>
+			<IssueListPane issues={issues} selected={selected} onSelect={setSelected} />
+			<IssueDetail selected={selected} owner={owner} repo={repo} onAssignSuccess={reload} />
+		</RepoScopedScreenShell>
 	);
 }
