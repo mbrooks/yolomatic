@@ -1,0 +1,161 @@
+import { describe, expect, it } from "vitest";
+
+import { extractText, getLastAssistantText, isRateLimitError, parseExecutionResult } from "./results.js";
+
+describe("parseExecutionResult", () => {
+	it("parses working status", () => {
+		const result = parseExecutionResult("TARS_STATUS: working\nStill working.");
+		expect(result.status).toBe("working");
+		expect(result.summary).toBe("Still working.");
+	});
+
+	it("parses waiting-feedback status", () => {
+		const result = parseExecutionResult("TARS_STATUS: waiting-feedback\nNeed info.");
+		expect(result.status).toBe("waiting-feedback");
+		expect(result.summary).toBe("Need info.");
+	});
+
+	it("parses complete status", () => {
+		const result = parseExecutionResult("TARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("defaults to working for unknown status", () => {
+		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.");
+		expect(result.status).toBe("working");
+		expect(result.summary).toBe("TARS_STATUS: unknown\nOops.");
+	});
+
+	it("defaults to working when no status line is present", () => {
+		const result = parseExecutionResult("Just some text.");
+		expect(result.status).toBe("working");
+		expect(result.summary).toBe("Just some text.");
+	});
+
+	it("trims whitespace", () => {
+		const result = parseExecutionResult("\n  TARS_STATUS: complete  \n  Summary  \n");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Summary");
+	});
+
+	it("returns raw response as trimmed", () => {
+		const result = parseExecutionResult("  raw  ");
+		expect(result.rawResponse).toBe("raw");
+	});
+
+	it("falls back to trimmed response when summary is empty", () => {
+		const result = parseExecutionResult("TARS_STATUS: complete\n   ");
+		expect(result.summary).toBe("TARS_STATUS: complete");
+	});
+
+	it("finds status line anywhere in the response", () => {
+		const result = parseExecutionResult("Some preamble.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("uses the last status line when multiple are present", () => {
+		const result = parseExecutionResult("TARS_STATUS: working\nStill going.\nTARS_STATUS: complete\nDone.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Done.");
+	});
+
+	it("ignores invalid status lines and finds a later valid one", () => {
+		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Fixed.");
+	});
+});
+
+describe("isRateLimitError", () => {
+	it("returns true for Ollama 429 usage limit messages", () => {
+		expect(isRateLimitError('429 "you (aubiematt) have reached your weekly usage limit..."')).toBe(true);
+	});
+
+	it("returns true for generic rate limit messages", () => {
+		expect(isRateLimitError("429 rate limit exceeded")).toBe(true);
+		expect(isRateLimitError("429 rate-limit exceeded")).toBe(true);
+		expect(isRateLimitError("Too many requests 429")).toBe(true);
+	});
+
+	it("returns false for unrelated errors", () => {
+		expect(isRateLimitError("something went wrong")).toBe(false);
+		expect(isRateLimitError("500 internal server error")).toBe(false);
+	});
+});
+
+describe("extractText", () => {
+	it("returns strings as-is", () => {
+		expect(extractText("hello")).toBe("hello");
+	});
+
+	it("extracts text and thinking items from array", () => {
+		expect(extractText([
+			{ type: "text", text: "hello" },
+			{ type: "thinking", thinking: "thought" },
+			{ type: "text", text: "world" },
+		])).toBe("hello\nthought\nworld");
+	});
+
+	it("skips non-text array items", () => {
+		expect(extractText([{ type: "image" }, { type: "text", text: "only" }])).toBe("only");
+	});
+
+	it("returns empty for unknown types", () => {
+		expect(extractText(123)).toBe("");
+		expect(extractText(null)).toBe("");
+		expect(extractText(undefined)).toBe("");
+	});
+});
+
+describe("getLastAssistantText", () => {
+	it("returns text from the last assistant message", () => {
+		const session = {
+			messages: [
+				{ role: "user", content: "hi" },
+				{ role: "assistant", content: "hello" },
+				{ role: "user", content: "bye" },
+				{ role: "assistant", content: "goodbye" },
+			],
+		};
+		expect(getLastAssistantText(session)).toBe("goodbye");
+	});
+
+	it("returns empty when no assistant messages", () => {
+		const session = { messages: [{ role: "user", content: "hi" }] };
+		expect(getLastAssistantText(session)).toBe("");
+	});
+
+	it("returns empty for empty messages", () => {
+		expect(getLastAssistantText({ messages: [] })).toBe("");
+	});
+
+	it("handles array content in assistant message", () => {
+		const session = {
+			messages: [{ role: "assistant", content: [{ type: "text", text: "  hello  " }] }],
+		};
+		expect(getLastAssistantText(session)).toBe("hello");
+	});
+
+	it("ignores thinking blocks when visible text is present", () => {
+		const session = {
+			messages: [{
+				role: "assistant",
+				content: [
+					{ type: "thinking", thinking: "I need to explain this clearly." },
+					{ type: "text", text: "TARS_STATUS: complete\nDone." },
+				],
+			}],
+		};
+		expect(getLastAssistantText(session)).toBe("TARS_STATUS: complete\nDone.");
+		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
+	});
+
+	it("falls back to thinking text when no visible text is present", () => {
+		const session = {
+			messages: [{ role: "assistant", content: [{ type: "thinking", thinking: "still thinking" }] }],
+		};
+		expect(getLastAssistantText(session)).toBe("still thinking");
+	});
+});
