@@ -50,11 +50,11 @@ export function SkillForm({ existing, onSubmit, onCancel, submitLabel = "Save" }
 				</div>
 				<div className="form-group">
 					<label>Description</label>
-					<input
-						type="text"
+					<textarea
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 						maxLength={255}
+						rows={3}
 					/>
 				</div>
 				<div className="form-group">
