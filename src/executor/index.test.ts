@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn() },
@@ -31,348 +31,60 @@ vi.mock("../logging/session-log-store.js", () => ({
 	recordSessionLog: vi.fn(),
 }));
 
-import {
-	buildFeedbackPrompt,
-	buildIssuePrompt,
-	buildPRReviewPrompt,
-	extractText,
-	getLastAssistantText,
-	isRateLimitError,
-	parseExecutionResult,
-	PiAgentExecutor,
-	resolveConfiguredModel,
-} from "./index.js";
+import { PiAgentExecutor } from "./index.js";
 
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "./model-registry.js";
 
-interface TestModel {
-	provider: string;
-	id: string;
-}
-
-function createRegistry(models: TestModel[]) {
-	return {
-		find(provider: string, modelId: string): TestModel | undefined {
-			return models.find((model) => model.provider === provider && model.id === modelId);
-		},
-		getAll(): TestModel[] {
-			return models;
-		},
-	};
-}
-
-describe("resolveConfiguredModel", () => {
-	it("prefers an explicit provider when configured", () => {
-		const registry = createRegistry([
-			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
-		]);
-
-		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_PROVIDER: "ollama",
-			PI_AGENT_MODEL: "kimi-k2.6:cloud",
-		});
-
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
+describe("PiAgentExecutor", () => {
+	afterEach(() => {
+		delete process.env.PI_AGENT_MODEL;
+		delete process.env.PI_AGENT_PROVIDER;
+		vi.restoreAllMocks();
 	});
 
-	it("resolves a unique model id without an explicit provider", () => {
-		const registry = createRegistry([
-			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
-		]);
+	function makeState(issueNumber = 1) {
+		return {
+			issueNumber,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+	}
 
-		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_MODEL: "kimi-k2.6:cloud",
-		});
+	async function makeSoulPath() {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+		return soulPath;
+	}
 
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
-	});
+	function mockRegistry(models: Array<{ provider: string; id: string }> = []) {
+		return {
+			find: vi.fn((provider: string, modelId: string) => models.find((model) => model.provider === provider && model.id === modelId)),
+			getAll: vi.fn(() => models),
+		};
+	}
 
-	it("supports provider/model syntax in PI_AGENT_MODEL", () => {
-		const registry = createRegistry([
-			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
-		]);
-
-		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_MODEL: "ollama/kimi-k2.6:cloud",
-		});
-
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
-	});
-
-	it("returns undefined for ambiguous model ids", () => {
-		const registry = createRegistry([
-			{ provider: "provider-a", id: "shared-model" },
-			{ provider: "provider-b", id: "shared-model" },
-		]);
-
-		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_MODEL: "shared-model",
-		});
-
-		expect(model).toBeUndefined();
-	});
-});
-
-describe("parseExecutionResult", () => {
-	it("parses working status", () => {
-		const result = parseExecutionResult("TARS_STATUS: working\nStill working.");
-		expect(result.status).toBe("working");
-		expect(result.summary).toBe("Still working.");
-	});
-
-	it("parses waiting-feedback status", () => {
-		const result = parseExecutionResult("TARS_STATUS: waiting-feedback\nNeed info.");
-		expect(result.status).toBe("waiting-feedback");
-		expect(result.summary).toBe("Need info.");
-	});
-
-	it("parses complete status", () => {
-		const result = parseExecutionResult("TARS_STATUS: complete\nDone.");
-		expect(result.status).toBe("complete");
-		expect(result.summary).toBe("Done.");
-	});
-
-	it("defaults to working for unknown status", () => {
-		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.");
-		expect(result.status).toBe("working");
-		expect(result.summary).toBe("TARS_STATUS: unknown\nOops.");
-	});
-
-	it("defaults to working when no status line is present", () => {
-		const result = parseExecutionResult("Just some text.");
-		expect(result.status).toBe("working");
-		expect(result.summary).toBe("Just some text.");
-	});
-
-	it("trims whitespace", () => {
-		const result = parseExecutionResult("\n  TARS_STATUS: complete  \n  Summary  \n");
-		expect(result.status).toBe("complete");
-		expect(result.summary).toBe("Summary");
-	});
-
-	it("returns raw response as trimmed", () => {
-		const result = parseExecutionResult("  raw  ");
-		expect(result.rawResponse).toBe("raw");
-	});
-
-	it("falls back to trimmed response when summary is empty", () => {
-		const result = parseExecutionResult("TARS_STATUS: complete\n   ");
-		expect(result.summary).toBe("TARS_STATUS: complete");
-	});
-
-	it("finds status line anywhere in the response", () => {
-		const result = parseExecutionResult("Some preamble.\nTARS_STATUS: complete\nDone.");
-		expect(result.status).toBe("complete");
-		expect(result.summary).toBe("Done.");
-	});
-
-	it("uses the last status line when multiple are present", () => {
-		const result = parseExecutionResult("TARS_STATUS: working\nStill going.\nTARS_STATUS: complete\nDone.");
-		expect(result.status).toBe("complete");
-		expect(result.summary).toBe("Done.");
-	});
-
-	it("ignores invalid status lines and finds a later valid one", () => {
-		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
-		expect(result.status).toBe("complete");
-		expect(result.summary).toBe("Fixed.");
-	});
-});
-
-describe("isRateLimitError", () => {
-	it("returns true for Ollama 429 usage limit messages", () => {
-		expect(isRateLimitError('429 "you (aubiematt) have reached your weekly usage limit..."')).toBe(true);
-	});
-
-	it("returns true for generic rate limit messages", () => {
-		expect(isRateLimitError("429 rate limit exceeded")).toBe(true);
-		expect(isRateLimitError("Too many requests 429")).toBe(true);
-	});
-
-	it("returns false for unrelated errors", () => {
-		expect(isRateLimitError("something went wrong")).toBe(false);
-		expect(isRateLimitError("500 internal server error")).toBe(false);
-	});
-});
-
-describe("extractText", () => {
-	it("returns strings as-is", () => {
-		expect(extractText("hello")).toBe("hello");
-	});
-
-	it("extracts text items from array", () => {
-		expect(extractText([{ type: "text", text: "hello" }, { type: "text", text: "world" }])).toBe("hello\nworld");
-	});
-
-	it("skips non-text array items", () => {
-		expect(extractText([{ type: "image" }, { type: "text", text: "only" }])).toBe("only");
-	});
-
-	it("returns empty for unknown types", () => {
-		expect(extractText(123)).toBe("");
-		expect(extractText(null)).toBe("");
-		expect(extractText(undefined)).toBe("");
-	});
-});
-
-describe("getLastAssistantText", () => {
-	it("returns text from the last assistant message", () => {
-		const session = {
+	function mockSuccessfulSession(content = "TARS_STATUS: complete\nDone.") {
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
 			messages: [
-				{ role: "user", content: "hi" },
-				{ role: "assistant", content: "hello" },
-				{ role: "user", content: "bye" },
-				{ role: "assistant", content: "goodbye" },
+				{ role: "assistant", content },
 			],
 		};
-		expect(getLastAssistantText(session)).toBe("goodbye");
-	});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+		return { mockSession, unsubscribe };
+	}
 
-	it("returns empty when no assistant messages", () => {
-		const session = { messages: [{ role: "user", content: "hi" }] };
-		expect(getLastAssistantText(session)).toBe("");
-	});
-
-	it("returns empty for empty messages", () => {
-		expect(getLastAssistantText({ messages: [] })).toBe("");
-	});
-
-	it("handles array content in assistant message", () => {
-		const session = {
-			messages: [{ role: "assistant", content: [{ type: "text", text: "  hello  " }] }],
-		};
-		expect(getLastAssistantText(session)).toBe("hello");
-	});
-
-	it("ignores thinking blocks when visible text is present", () => {
-		const session = {
-			messages: [{
-				role: "assistant",
-				content: [
-					{ type: "thinking", thinking: "I need to explain this clearly." },
-					{ type: "text", text: "TARS_STATUS: complete\nDone." },
-				],
-			}],
-		};
-		expect(getLastAssistantText(session)).toBe("TARS_STATUS: complete\nDone.");
-		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
-	});
-});
-
-describe("buildIssuePrompt", () => {
-	it("includes issue metadata", () => {
-		const state = {
-			issueNumber: 42,
-			owner: "mbrooks",
-			repo: "tars",
-			workspacePath: "/tmp/ws",
-			title: "Fix bug",
-			body: "Description here",
-		} as never;
-		const prompt = buildIssuePrompt(state);
-		expect(prompt).toContain("#42");
-		expect(prompt).toContain("mbrooks/tars");
-		expect(prompt).toContain("/tmp/ws");
-		expect(prompt).toContain("Fix bug");
-		expect(prompt).toContain("Description here");
-	});
-
-	it("handles empty body", () => {
-		const state = {
-			issueNumber: 1,
-			owner: "x",
-			repo: "y",
-			workspacePath: "/tmp",
-			title: "T",
-			body: "",
-		} as never;
-		const prompt = buildIssuePrompt(state);
-		expect(prompt).toContain("(no description provided)");
-	});
-});
-
-describe("buildFeedbackPrompt", () => {
-	it("includes feedback text", () => {
-		const prompt = buildFeedbackPrompt("Please retry.");
-		expect(prompt).toContain("Please retry.");
-		expect(prompt).toContain("Human feedback received");
-	});
-
-	it("trims feedback text", () => {
-		const prompt = buildFeedbackPrompt("  trim me  ");
-		expect(prompt).toContain("trim me");
-		expect(prompt).not.toContain("  trim me  ");
-	});
-});
-
-describe("buildPRReviewPrompt", () => {
-	it("includes PR and issue metadata", () => {
-		const state = {
-			issueNumber: 56,
-			owner: "mbrooks",
-			repo: "tars",
-			workspacePath: "/tmp/ws",
-			title: "Fix bug",
-			body: "Description here",
-		} as never;
-		const prompt = buildPRReviewPrompt(state, [{ body: "Fix typo", user: "reviewer", path: "src/foo.ts", line: 42 }]);
-		expect(prompt).toContain("PR review feedback received");
-		expect(prompt).toContain("issue #56");
-		expect(prompt).toContain("mbrooks/tars");
-		expect(prompt).toContain("tars/issue-56");
-		expect(prompt).toContain("Fix typo");
-		expect(prompt).toContain("src/foo.ts:42");
-	});
-
-	it("includes review body when provided", () => {
-		const state = {
-			issueNumber: 1,
-			owner: "x",
-			repo: "y",
-			workspacePath: "/tmp",
-			title: "T",
-			body: "B",
-		} as never;
-		const prompt = buildPRReviewPrompt(state, [], "Please add tests");
-		expect(prompt).toContain("Overall review comment:");
-		expect(prompt).toContain("Please add tests");
-	});
-
-	it("handles comments without line info", () => {
-		const state = {
-			issueNumber: 2,
-			owner: "a",
-			repo: "b",
-			workspacePath: "/tmp",
-			title: "T",
-			body: "B",
-		} as never;
-		const prompt = buildPRReviewPrompt(state, [{ body: "LGTM", user: "user" }]);
-		expect(prompt).toContain("@user: LGTM");
-		expect(prompt).not.toContain("undefined");
-	});
-
-	it("handles empty comments and no review body", () => {
-		const state = {
-			issueNumber: 3,
-			owner: "a",
-			repo: "b",
-			workspacePath: "/tmp",
-			title: "T",
-			body: "B",
-		} as never;
-		const prompt = buildPRReviewPrompt(state, []);
-		expect(prompt).toContain("Address the review feedback");
-		expect(prompt).not.toContain("Overall review comment:");
-		expect(prompt).not.toContain("Review comments:");
-	});
-});
-
-describe("PiAgentExecutor", () => {
 	it("constructor stores soulPath", () => {
 		const executor = new PiAgentExecutor({ soulPath: "/tmp/SOUL.md" });
 		expect(executor).toBeInstanceOf(PiAgentExecutor);
@@ -533,6 +245,8 @@ describe("PiAgentExecutor", () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		mockSuccessfulSession();
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
@@ -641,5 +355,89 @@ describe("PiAgentExecutor", () => {
 		expect(result.status).toBe("cancelled");
 		expect(result.summary).toBe("Task cancelled by admin.");
 		expect(abort).toHaveBeenCalled();
+	});
+
+	it("uses an override prompt and passes the configured model into Pi", async () => {
+		const soulPath = await makeSoulPath();
+		const configuredModel = { provider: "ollama", id: "kimi-k2.6:cloud" };
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
+		const { mockSession } = mockSuccessfulSession();
+		process.env.PI_AGENT_MODEL = "kimi-k2.6:cloud";
+		const onSessionCreated = vi.fn();
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(7), undefined, undefined, undefined, onSessionCreated, "custom prompt");
+
+		expect(result.status).toBe("complete");
+		expect(mockSession.prompt).toHaveBeenCalledWith("custom prompt");
+		expect(onSessionCreated).toHaveBeenCalledWith(mockSession);
+		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
+	});
+
+	it("builds feedback and PR review prompts for continued sessions", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const feedbackSession = mockSuccessfulSession().mockSession;
+		const executor = new PiAgentExecutor({ soulPath });
+
+		await executor.execute(makeState(8), "Please retry.");
+		expect(feedbackSession.prompt).toHaveBeenCalledWith(expect.stringContaining("Human feedback received"));
+
+		const reviewSession = mockSuccessfulSession().mockSession;
+		await executor.execute(makeState(9), undefined, { comments: [], reviewBody: "Please add tests" });
+		expect(reviewSession.prompt).toHaveBeenCalledWith(expect.stringContaining("PR review feedback received"));
+	});
+
+	it("warns when PI_AGENT_MODEL is configured but cannot be resolved", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		mockSuccessfulSession();
+		process.env.PI_AGENT_MODEL = "missing-model";
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		await executor.execute(makeState(10));
+
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("PI_AGENT_MODEL=missing-model did not resolve"));
+	});
+
+	it("logs non-rate assistant errors without overriding the parsed result", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: complete\nDone.", errorMessage: "tool failed", stopReason: "error" },
+			],
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(11));
+
+		expect(result.status).toBe("complete");
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
+	it("logs assistant error stop reasons without a message", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: working\nRetrying.", stopReason: "error" },
+			],
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(12));
+
+		expect(result.status).toBe("working");
+		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
 });
