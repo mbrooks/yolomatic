@@ -30,6 +30,52 @@ function normalizeSegment(value: string, label: string): string {
 	return trimmed;
 }
 
+function getCommonIndent(lines: string[]): number {
+	let min = Infinity;
+	for (const line of lines) {
+		if (line === "") continue;
+		const match = line.match(/^(\s*)/);
+		const len = match ? match[1].length : 0;
+		if (len < min) min = len;
+	}
+	return min === Infinity ? 0 : min;
+}
+
+function stripIndent(lines: string[]): string {
+	const indent = getCommonIndent(lines);
+	return lines.map((l) => l.slice(indent)).join("\n");
+}
+
+function parseBlockScalar(raw: string, indicator: string): string {
+	const lines = raw.split("\n");
+	const isFolded = indicator.startsWith(">");
+	if (isFolded) {
+		const paragraphs: string[] = [];
+		let current: string[] = [];
+		for (const line of lines) {
+			if (line === "") {
+				if (current.length > 0) {
+					paragraphs.push(current.join(" "));
+					current = [];
+				}
+			} else {
+				current.push(line);
+			}
+		}
+		if (current.length > 0) {
+			paragraphs.push(current.join(" "));
+		}
+		const text = paragraphs.join("\n\n");
+		if (indicator.endsWith("+")) return text + "\n";
+		if (indicator.endsWith("-")) return text.trimEnd();
+		return text;
+	}
+	const text = lines.join("\n");
+	if (indicator.endsWith("+")) return text + "\n";
+	if (indicator.endsWith("-")) return text.trimEnd();
+	return text;
+}
+
 export function parseSkillFile(content: string): { name: string; description: string; body: string } {
 	const trimmed = content.trimStart();
 	if (!trimmed.startsWith("---")) {
@@ -39,25 +85,72 @@ export function parseSkillFile(content: string): { name: string; description: st
 	if (endIndex === -1) {
 		return { name: "", description: "", body: content };
 	}
-	const frontmatter = trimmed.slice(3, endIndex).trim();
+	const frontmatter = trimmed.slice(3, endIndex).trimEnd();
 	const body = trimmed.slice(endIndex + 3).trimStart();
 
 	let name = "";
 	let description = "";
-	for (const line of frontmatter.split("\n")) {
+	const lines = frontmatter.split("\n");
+	const blockScalarPattern = /^[>|]([+-])?$/u;
+
+	function collectBlockLines(startIndex: number): { lines: string[]; nextIndex: number } {
+		const blockLines: string[] = [];
+		let i = startIndex;
+		while (i < lines.length) {
+			const line = lines[i];
+			if (/^([a-zA-Z0-9_-]+):\s*/.test(line)) {
+				break;
+			}
+			if (line === "") {
+				blockLines.push("");
+				i++;
+				continue;
+			}
+			if (/^\s/.test(line)) {
+				blockLines.push(line);
+				i++;
+			} else {
+				break;
+			}
+		}
+		return { lines: blockLines, nextIndex: i };
+	}
+
+	let i = 0;
+	while (i < lines.length) {
+		const line = lines[i];
 		const match = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/u);
 		if (match) {
 			const key = match[1];
 			const value = match[2].trim();
-			if (key === "name") name = value;
-			if (key === "description") description = value;
+			if (blockScalarPattern.test(value)) {
+				const { lines: blockLines, nextIndex } = collectBlockLines(i + 1);
+				const raw = stripIndent(blockLines);
+				const parsedValue = parseBlockScalar(raw, value);
+				if (key === "name") name = parsedValue;
+				if (key === "description") description = parsedValue;
+				i = nextIndex;
+			} else {
+				if (key === "name") name = value;
+				if (key === "description") description = value;
+				i++;
+			}
+		} else {
+			i++;
 		}
 	}
 	return { name, description, body };
 }
 
 export function buildSkillFile(name: string, description: string, body: string): string {
-	return `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}`;
+	let descYaml: string;
+	if (description.includes("\n")) {
+		const lines = description.split("\n");
+		descYaml = "|\n" + lines.map((l) => "  " + l).join("\n");
+	} else {
+		descYaml = description;
+	}
+	return `---\nname: ${name}\ndescription: ${descYaml}\n---\n\n${body}`;
 }
 
 export class RepoSkillService {
