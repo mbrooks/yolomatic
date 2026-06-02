@@ -79,6 +79,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			github: github as never,
 			autoStart: true,
+			defaultBranch: "main",
 			githubUsername: "tars-bot",
 			executor: {
 				sessions: sessions as never,

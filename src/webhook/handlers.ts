@@ -160,6 +160,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			tasks,
 			github,
 			autoStart: deps.autoStart,
+			defaultBranch: deps.defaultBranch,
 			githubUsername: deps.githubUsername,
 			adminGithubUsername: deps.adminGithubUsername,
 			executor: execDeps,

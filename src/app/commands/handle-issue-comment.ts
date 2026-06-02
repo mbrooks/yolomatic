@@ -2,8 +2,8 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { hasTarsVisibleLabel, isAdmin, isStopCommand, shouldIgnoreCommentEvent } from "../../domain/workflow/policy.js";
-import { issueSessionKey, markIssueWorking, queueResumeOnBoot, stopSessionByAdmin } from "./workflow-helpers.js";
+import { hasTarsVisibleLabel, isStopCommand, shouldIgnoreCommentEvent } from "../../domain/workflow/policy.js";
+import { issueSessionKey, ensureSessionExists, handleDrainingMode, startIssueExecution, handleAdminStop } from "./workflow-helpers.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
 import type { HandlePRReview, PRReviewPayload } from "./handle-pr-review.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
@@ -35,6 +35,7 @@ export class HandleIssueComment {
 			tasks: TaskControlService;
 			github: GitHubService;
 			autoStart: boolean;
+			defaultBranch: string;
 			githubUsername: string;
 			adminGithubUsername?: string;
 			executor: ExecuteSessionDeps;
@@ -83,14 +84,12 @@ export class HandleIssueComment {
 			}
 
 			if (isStopCommand(payload.comment.body)) {
-				if (!isAdmin(payload.sender.login, this.deps.adminGithubUsername)) {
-					await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
-					return;
-				}
-				await stopSessionByAdmin(
-					this.deps.sessions,
+				await handleAdminStop(
 					this.deps.github,
 					this.deps.tasks,
+					this.deps.sessions,
+					payload.sender.login,
+					this.deps.adminGithubUsername,
 					owner,
 					repo,
 					mappedIssueNumber,
@@ -122,25 +121,27 @@ export class HandleIssueComment {
 
 		// Handle admin stop command
 		if (isStopCommand(payload.comment.body)) {
-			if (!isAdmin(payload.sender.login, this.deps.adminGithubUsername)) {
-			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can stop TARS.");
+			const result = await handleAdminStop(
+				this.deps.github,
+				this.deps.tasks,
+				this.deps.sessions,
+				payload.sender.login,
+				this.deps.adminGithubUsername,
+				owner,
+				repo,
+				issueNumber,
+				issueNumber,
+			);
+			if (result === "not-admin") {
+				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
+			} else {
+				process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
+			}
+			if (result === "cancelled") {
+				process.stdout.write(`[webhook] stopped ${key} (not in-flight)\n`);
+			}
 			return;
 		}
-		process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
-		const stopResult = await stopSessionByAdmin(
-			this.deps.sessions,
-			this.deps.github,
-			this.deps.tasks,
-			owner,
-			repo,
-			issueNumber,
-		);
-		if (stopResult === "cancelled") {
-			process.stdout.write(`[webhook] stopped ${key} (not in-flight)\n`);
-		}
-		return;
-	}
 
 		const check = shouldIgnoreCommentEvent(payload, this.deps.githubUsername);
 		if (check.ignore) {
@@ -176,37 +177,39 @@ export class HandleIssueComment {
 			return;
 		}
 
-		if (this.deps.tasks.isDraining()) {
+		let session = await ensureSessionExists(
+			this.deps.sessions,
+			this.deps.workspaces,
+			this.deps.github,
+			owner,
+			repo,
+			issueNumber,
+			payload.issue.title ?? "",
+			payload.issue.body ?? "",
+			payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
+			this.deps.defaultBranch,
+		);
+
+		if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session, [payload.comment.body])) {
 			process.stdout.write(`[webhook] comment ignored: draining mode for ${key}\n`);
-			const session = await this.deps.sessions.get(owner, repo, issueNumber);
-			if (session) {
-				await queueResumeOnBoot(this.deps.sessions, session, [payload.comment.body]);
-			}
-			await this.deps.github.postComment(owner, repo, issueNumber, "Deploy in progress. Feedback will be processed after restart.");
 			return;
 		}
 
-		let session = await this.deps.sessions.get(owner, repo, issueNumber);
-		if (session && session.status === "paused") {
+		if (session.status === "paused") {
 			process.stdout.write(`[webhook] comment ignored: ${key} is paused\n`);
 			await this.deps.github.postComment(owner, repo, issueNumber, "TARS is paused on this issue. It will resume when unpaused.");
 			return;
 		}
 
-		if (!session) {
-			const worktree = await this.deps.workspaces.createOrGetWorktree(owner, repo, issueNumber);
-			session = await this.deps.sessions.createSession(
-				owner,
-				repo,
-				issueNumber,
-				payload.issue.title ?? "",
-				payload.issue.body ?? "",
-				worktree.path,
-				payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-			);
-		}
-
-		await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Feedback received. Resuming work.");
-		await this.executor.run(session, payload.comment.body);
+		await startIssueExecution(
+			this.executor,
+			this.deps.github,
+			owner,
+			repo,
+			issueNumber,
+			session,
+			"Feedback received. Resuming work.",
+			payload.comment.body,
+		);
 	}
 }
