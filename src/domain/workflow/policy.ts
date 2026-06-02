@@ -1,4 +1,4 @@
-import { isTerminalStatus } from "../../session/store.js";
+import { isTerminalStatus } from "../session/model.js";
 import type { SessionState, SessionStatus } from "../../session/store.js";
 
 interface IssueLabel {

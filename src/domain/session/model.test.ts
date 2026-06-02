@@ -5,9 +5,10 @@ import {
 	detectSessionRisk,
 	buildRepoSummaries,
 	computeAgentStatus,
+	isTerminalStatus,
 	sortSessionsByRecency,
+	type SessionState,
 } from "./model.js";
-import type { SessionState } from "../../session/store.js";
 
 function makeSession(partial: Partial<SessionState> & { owner: string; repo: string; issueNumber: number }): SessionState {
 	return {
@@ -31,6 +32,13 @@ describe("sessionKey", () => {
 describe("branchName", () => {
 	it("formats tars/issue-N", () => {
 		expect(branchName(42)).toBe("tars/issue-42");
+	});
+});
+
+describe("compatibility re-exports", () => {
+	it("keeps isTerminalStatus available from the domain model module", () => {
+		expect(isTerminalStatus("complete")).toBe(true);
+		expect(isTerminalStatus("working")).toBe(false);
 	});
 });
 
