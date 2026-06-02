@@ -62,6 +62,51 @@ describe("parseSkillFile", () => {
 		expect(parsed.body).toBe("# Just body");
 	});
 
+	it("parses folded block scalar description", () => {
+		const content = "---\nname: my-skill\ndescription: >\n  Line one\n  Line two\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.name).toBe("my-skill");
+		expect(parsed.description).toBe("Line one Line two");
+		expect(parsed.body).toBe("Body");
+	});
+
+	it("parses literal block scalar description", () => {
+		const content = "---\nname: my-skill\ndescription: |\n  Line one\n  Line two\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("Line one\nLine two");
+	});
+
+	it("parses folded block scalar with blank line as paragraph separator", () => {
+		const content = "---\nname: my-skill\ndescription: >\n  Para one\n\n  Para two\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("Para one\n\nPara two");
+	});
+
+	it("parses block scalar with strip modifier", () => {
+		const content = "---\nname: my-skill\ndescription: |-\n  Line one\n  Line two\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("Line one\nLine two");
+	});
+
+	it("parses block scalar with keep modifier", () => {
+		const content = "---\nname: my-skill\ndescription: |+\n  Line one\n  Line two\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("Line one\nLine two\n");
+	});
+
+	it("parses empty block scalar description", () => {
+		const content = "---\nname: my-skill\ndescription: >\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("");
+	});
+
+	it("ignores unindented lines after block scalar", () => {
+		const content = "---\nname: my-skill\ndescription: >\n  Line one\nunrelated: value\n---\n\nBody";
+		const parsed = parseSkillFile(content);
+		expect(parsed.description).toBe("Line one");
+		expect(parsed.body).toBe("Body");
+	});
+
 	it("handles missing closing delimiter", () => {
 		const parsed = parseSkillFile("---\nname: x\n# body");
 		expect(parsed.name).toBe("");
@@ -75,6 +120,13 @@ describe("buildSkillFile", () => {
 		expect(result).toContain("name: my-skill");
 		expect(result).toContain("description: My desc");
 		expect(result).toContain("# Content");
+	});
+
+	it("emits multi-line descriptions as literal block scalars", () => {
+		const result = buildSkillFile("my-skill", "Line one\nLine two", "# Content");
+		expect(result).toContain("description: |");
+		expect(result).toContain("  Line one");
+		expect(result).toContain("  Line two");
 	});
 });
 
