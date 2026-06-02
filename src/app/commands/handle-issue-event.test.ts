@@ -353,17 +353,22 @@ describe("HandleIssueEvent", () => {
 
 	it("auto-starts execution when enabled", async () => {
 		const deps = createDeps();
-		(deps.sessions.get as any) = vi.fn(async () => ({
-			owner: "mbrooks",
-			repo: "tars",
-			issueNumber: 1,
-			status: "working",
-			seeded: true,
-			title: "Test issue",
-			body: "Issue body",
-			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-			labels: [],
-		}));
+		let getCallCount = 0;
+		deps.sessions.get = vi.fn(async () => {
+			getCallCount++;
+			if (getCallCount === 1) return null;
+			return {
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				status: "working",
+				seeded: true,
+				title: "Test issue",
+				body: "Issue body",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				labels: [],
+			};
+		});
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
