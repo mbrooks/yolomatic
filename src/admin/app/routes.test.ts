@@ -42,13 +42,13 @@ describe("parseHash", () => {
 		expect(parseHash("#/repos")).toEqual({ screen: "repos" });
 	});
 
-	it("parses repo detail (sessions tab)", () => {
+	it("parses repo detail (issues tab)", () => {
 		expect(parseHash("#/repos/mbrooks/tars")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: undefined,
-			tab: "sessions",
+			tab: "issues",
 		});
 	});
 
@@ -58,7 +58,7 @@ describe("parseHash", () => {
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: 140,
-			tab: "sessions",
+			tab: "issues",
 		});
 	});
 

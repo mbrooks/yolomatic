@@ -41,7 +41,7 @@ export function App(): React.ReactElement {
 	}, [sessions, route]);
 
 	const handleSelectRepo = useCallback((owner: string, repo: string) => {
-		navigate({ screen: "repo", owner, repo });
+		navigate({ screen: "repo", owner, repo, tab: "issues" });
 	}, []);
 
 	const handleSelectWorking = useCallback(() => {
@@ -60,7 +60,7 @@ export function App(): React.ReactElement {
 		(session: Session) => {
 			const next: Route =
 				route.screen === "repo"
-					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: route.tab }
+					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: "sessions" }
 					: route.screen === "working"
 						? {
 							screen: "working",
@@ -251,9 +251,9 @@ function AppContent({
 				selected={selectedSession}
 				onSelect={onSelectSession}
 				onMutate={onMutate}
-				breadcrumbLabel="Active Tasks"
+				breadcrumbLabel="Active Issues"
 				onBack={onBack}
-				emptyMessage="No active tasks."
+				emptyMessage="No active issues."
 			/>
 		);
 	}
@@ -291,6 +291,9 @@ function AppContent({
 					onSelectTab={onSelectTab}
 					onBack={onBack}
 					onNewIssue={onNewIssueForRepo}
+					sessions={repoSessions}
+					onSelectSession={onSelectSession}
+					onMutate={onMutate}
 				/>
 			);
 		}

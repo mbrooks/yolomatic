@@ -30,6 +30,7 @@ describe("IssuesScreen", () => {
 				repo="repo"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
+				sessions={[]}
 			/>,
 		);
 		expect(screen.getByText("Loading issues...")).toBeDefined();
@@ -42,6 +43,7 @@ describe("IssuesScreen", () => {
 				repo="repo"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
+				sessions={[]}
 			/>,
 		);
 		expect(screen.getByText("No open issues for this repository.")).toBeDefined();
@@ -54,6 +56,7 @@ describe("IssuesScreen", () => {
 				repo="tars"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
+				sessions={[]}
 			/>,
 		);
 		await waitFor(() => {
@@ -68,6 +71,7 @@ describe("IssuesScreen", () => {
 				repo="tars"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
+				sessions={[]}
 			/>,
 		);
 		const tabs = screen.getAllByRole("button");

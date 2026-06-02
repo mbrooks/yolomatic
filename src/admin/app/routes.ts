@@ -28,7 +28,7 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			let issueNumber: number | undefined;
-			let tab: "sessions" | "crons" | "skills" | "issues" = "sessions";
+			let tab: "sessions" | "crons" | "skills" | "issues" = "issues";
 			if (path[3]) {
 				if (path[3] === "crons") {
 					tab = "crons";

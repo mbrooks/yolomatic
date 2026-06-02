@@ -22,6 +22,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		staleDetectedAt: null,
 		staleReason: null,
 		stale: null,
+		sessionType: "github_issue",
 		...overrides,
 	};
 }
@@ -39,11 +40,11 @@ const defaultProps = {
 };
 
 describe("DashboardScreen", () => {
-	it("renders empty state when no recent sessions", async () => {
+	it("renders empty state when no recent issues", async () => {
 		render(<DashboardScreen {...defaultProps} />);
 
 		await waitFor(() => {
-			expect(screen.getByText("No recent sessions.")).not.toBeNull();
+			expect(screen.getByText("No recent issues.")).not.toBeNull();
 		});
 	});
 
@@ -54,32 +55,60 @@ describe("DashboardScreen", () => {
 		const activityList = document.querySelector(".activity-list");
 		expect(activityList).not.toBeNull();
 
-		const headers = activityList!.querySelectorAll(".activity-list-header > div");
+		const headers = activityList!.querySelectorAll(
+			".activity-list-header > div",
+		);
 		expect(headers[0].textContent).toBe("Repo");
 		expect(headers[1].textContent).toBe("Issue");
 		expect(headers[2].textContent).toBe("Status");
 		expect(headers[3].textContent).toBe("Activity");
 	});
 
-	it("renders recent session rows", () => {
+	it("renders recent issue rows", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
-			makeSession({ owner: "mbrooks", repo: "case", issueNumber: 2, status: "complete" }),
+			makeSession({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				status: "working",
+			}),
+			makeSession({
+				owner: "mbrooks",
+				repo: "case",
+				issueNumber: 2,
+				status: "complete",
+			}),
 		];
 		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
 
-		const recentActivity = document.querySelector(".dashboard-section:has(h2):has(.activity-list)");
+		const recentActivity = document.querySelector(
+			".dashboard-section:has(h2):has(.activity-list)",
+		);
 		expect(recentActivity).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("mbrooks/tars")).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("#1")).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("mbrooks/case")).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("#2")).not.toBeNull();
+		expect(
+			within(recentActivity as HTMLElement).getByText("mbrooks/tars"),
+		).not.toBeNull();
+		expect(
+			within(recentActivity as HTMLElement).getByText("#1"),
+		).not.toBeNull();
+		expect(
+			within(recentActivity as HTMLElement).getByText("mbrooks/case"),
+		).not.toBeNull();
+		expect(
+			within(recentActivity as HTMLElement).getByText("#2"),
+		).not.toBeNull();
 	});
 
 	it("calls onSelectSession when a row is clicked", () => {
 		const onSelectSession = vi.fn();
 		const sessions = [makeSession()];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} onSelectSession={onSelectSession} />);
+		render(
+			<DashboardScreen
+				{...defaultProps}
+				sessions={sessions}
+				onSelectSession={onSelectSession}
+			/>,
+		);
 
 		const row = document.querySelector(".activity-row");
 		expect(row).not.toBeNull();
@@ -92,7 +121,13 @@ describe("DashboardScreen", () => {
 	it("calls onSelectSession when Enter is pressed on a row", () => {
 		const onSelectSession = vi.fn();
 		const sessions = [makeSession()];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} onSelectSession={onSelectSession} />);
+		render(
+			<DashboardScreen
+				{...defaultProps}
+				sessions={sessions}
+				onSelectSession={onSelectSession}
+			/>,
+		);
 
 		const row = document.querySelector(".activity-row");
 		expect(row).not.toBeNull();
@@ -105,7 +140,13 @@ describe("DashboardScreen", () => {
 	it("calls onSelectSession when Space is pressed on a row", () => {
 		const onSelectSession = vi.fn();
 		const sessions = [makeSession()];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} onSelectSession={onSelectSession} />);
+		render(
+			<DashboardScreen
+				{...defaultProps}
+				sessions={sessions}
+				onSelectSession={onSelectSession}
+			/>,
+		);
 
 		const row = document.querySelector(".activity-row");
 		expect(row).not.toBeNull();
@@ -118,7 +159,13 @@ describe("DashboardScreen", () => {
 	it("does not call onSelectSession for other keys", () => {
 		const onSelectSession = vi.fn();
 		const sessions = [makeSession()];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} onSelectSession={onSelectSession} />);
+		render(
+			<DashboardScreen
+				{...defaultProps}
+				sessions={sessions}
+				onSelectSession={onSelectSession}
+			/>,
+		);
 
 		const row = document.querySelector(".activity-row");
 		expect(row).not.toBeNull();
@@ -128,15 +175,24 @@ describe("DashboardScreen", () => {
 	});
 
 	it("shows dash for cron session issue number", () => {
-		const sessions = [makeSession({ sessionType: "cron", issueNumber: null as unknown as number })];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
+		const sessions = [
+			makeSession({
+				sessionType: "cron",
+				issueNumber: null as unknown as number,
+			}),
+		];
+		render(
+			<DashboardScreen {...defaultProps} sessions={sessions} />,
+		);
 
 		const recentActivity = document.querySelector(".activity-list");
 		expect(recentActivity).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("–")).not.toBeNull();
+		expect(
+			within(recentActivity as HTMLElement).getByText("–"),
+		).not.toBeNull();
 	});
 
-	it("limits recent sessions to 10", () => {
+	it("limits recent issues to 10", () => {
 		const sessions = Array.from({ length: 15 }, (_, i) =>
 			makeSession({
 				issueNumber: i + 1,
@@ -151,20 +207,60 @@ describe("DashboardScreen", () => {
 		expect(rows.length).toBe(10);
 	});
 
-	it("sorts recent sessions by lastActivity descending", () => {
+	it("sorts recent issues by lastActivity descending", () => {
 		const sessions = [
-			makeSession({ issueNumber: 1, lastActivity: new Date(Date.now() - 5000).toISOString() }),
-			makeSession({ issueNumber: 2, lastActivity: new Date(Date.now() - 1000).toISOString() }),
-			makeSession({ issueNumber: 3, lastActivity: new Date(Date.now() - 3000).toISOString() }),
+			makeSession({
+				issueNumber: 1,
+				lastActivity: new Date(Date.now() - 5000).toISOString(),
+			}),
+			makeSession({
+				issueNumber: 2,
+				lastActivity: new Date(Date.now() - 1000).toISOString(),
+			}),
+			makeSession({
+				issueNumber: 3,
+				lastActivity: new Date(Date.now() - 3000).toISOString(),
+			}),
 		];
 		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
 
 		const recentActivityList = document.querySelector(".activity-list");
 		expect(recentActivityList).not.toBeNull();
 		const rows = recentActivityList!.querySelectorAll(".activity-row");
-		expect(rows[0].querySelector(".activity-issue")?.textContent).toBe("#2");
-		expect(rows[1].querySelector(".activity-issue")?.textContent).toBe("#3");
-		expect(rows[2].querySelector(".activity-issue")?.textContent).toBe("#1");
+		expect(
+			rows[0].querySelector(".activity-issue")?.textContent,
+		).toBe("#2");
+		expect(
+			rows[1].querySelector(".activity-issue")?.textContent,
+		).toBe("#3");
+		expect(
+			rows[2].querySelector(".activity-issue")?.textContent,
+		).toBe("#1");
+	});
+
+	it("aggregates multiple sessions for the same issue", () => {
+		const sessions = [
+			makeSession({
+				issueNumber: 1,
+				status: "complete",
+				lastActivity: new Date(Date.now() - 5000).toISOString(),
+			}),
+			makeSession({
+				issueNumber: 1,
+				status: "working",
+				lastActivity: new Date(Date.now() - 1000).toISOString(),
+			}),
+		];
+		render(<DashboardScreen {...defaultProps} sessions={sessions} />,
+		);
+
+		const recentActivityList = document.querySelector(".activity-list");
+		expect(recentActivityList).not.toBeNull();
+		const rows = recentActivityList!.querySelectorAll(".activity-row");
+		expect(rows.length).toBe(1);
+		expect(
+			rows[0].querySelector(".activity-status")?.textContent,
+		).toBe("working");
 	});
 
 	it("calls quick link handlers", () => {
@@ -181,13 +277,19 @@ describe("DashboardScreen", () => {
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(
+			screen.getByRole("button", { name: /Active Issues/ }),
+		);
 		expect(onSelectWorking).toHaveBeenCalledTimes(1);
 
-		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
+		fireEvent.click(
+			screen.getByRole("button", { name: /Repositories/ }),
+		);
 		expect(onSelectRepos).toHaveBeenCalledTimes(1);
 
-		fireEvent.click(screen.getByRole("button", { name: /New Issue/ }));
+		fireEvent.click(
+			screen.getByRole("button", { name: /New Issue/ }),
+		);
 		expect(onNewIssue).toHaveBeenCalledTimes(1);
 	});
 

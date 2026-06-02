@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent, renderHook, act, within } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, renderHook, act } from "@testing-library/react";
 import React from "react";
 
 import { App } from "./app/App.js";
@@ -178,7 +178,7 @@ describe("App", () => {
 		expect(screen.queryAllByText("Waiting Feedback").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Uptime")).not.toBeNull();
 		expect(screen.queryAllByText("Repositories").length).toBeGreaterThan(0);
-		expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+		expect(screen.queryAllByText("Active Issues").length).toBeGreaterThan(0);
 		expect(screen.queryAllByRole("button", { name: /New Issue/ }).length).toBeGreaterThan(0);
 	});
 
@@ -186,10 +186,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+			expect(screen.queryAllByText("Active Issues").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Active Issues/ }));
 
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
@@ -204,7 +204,7 @@ describe("App", () => {
 		expect(screen.queryByText("#3")).toBeNull();
 	});
 
-	it("shows empty state in working view when no active tasks", async () => {
+	it("shows empty state in working view when no active issues", async () => {
 		fetchSpy.mockImplementation(async () => {
 			return mockStatusResponse({
 				agent: "online",
@@ -235,13 +235,13 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+			expect(screen.queryAllByText("Active Issues").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Active Issues/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("No active tasks.")).not.toBeNull();
+			expect(screen.queryByText("No active issues.")).not.toBeNull();
 		});
 	});
 
@@ -263,10 +263,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+			expect(screen.queryAllByText("Active Issues").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Active Issues/ }));
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
 		});
@@ -282,10 +282,10 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
+			expect(screen.queryAllByText("Active Issues").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Active Issues/ }));
 
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: /mbrooks\/tars #1/i })).not.toBeNull();

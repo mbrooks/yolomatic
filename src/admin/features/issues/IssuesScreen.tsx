@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { RepoScopedScreenShell } from "../../components/RepoScopedScreenShell.js";
 import type { OpenIssue } from "../../api/issues.js";
+import type { Session } from "../../app/types.js";
 import { useRepoIssues } from "./useRepoIssues.js";
 import { IssueListPane } from "./IssueListPane.js";
 import { IssueDetail } from "./IssueDetail.js";
@@ -11,12 +12,18 @@ export function IssuesScreen({
 	onBack,
 	onSelectTab,
 	onNewIssue,
+	sessions,
+	onSelectSession,
+	onMutate,
 }: {
 	owner: string;
 	repo: string;
 	onBack: () => void;
 	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onNewIssue?: () => void;
+	sessions?: Session[];
+	onSelectSession?: (session: Session) => void;
+	onMutate?: () => void;
 }): React.ReactElement {
 	const { issues, loading, reload } = useRepoIssues(owner, repo);
 	const [selected, setSelected] = useState<OpenIssue | null>(null);
@@ -35,7 +42,15 @@ export function IssuesScreen({
 			emptyMessage="No open issues for this repository."
 		>
 			<IssueListPane issues={issues} selected={selected} onSelect={setSelected} />
-			<IssueDetail selected={selected} owner={owner} repo={repo} onAssignSuccess={reload} />
+			<IssueDetail
+				selected={selected}
+				owner={owner}
+				repo={repo}
+				sessions={sessions ?? []}
+				onAssignSuccess={reload}
+				onSelectSession={onSelectSession}
+				onMutate={onMutate}
+			/>
 		</RepoScopedScreenShell>
 	);
 }
