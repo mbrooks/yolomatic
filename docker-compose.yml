@@ -11,11 +11,14 @@ services:
       - .env
     environment:
       OLLAMA_HOST: http://127.0.0.1:11434
+    group_add:
+      - "${DOCKER_GID:-999}"
     volumes:
       - tars_sessions:/app/sessions
       - tars_workspaces:/app/workspaces
       - tars_pi:/home/tars/.pi/agent
       - tars_memory:/app/memory
+      - /var/run/docker.sock:/var/run/docker.sock
 
   ollama:
     image: alpine/ollama:0.20.5
