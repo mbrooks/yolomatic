@@ -24,20 +24,26 @@ ENV WORKSPACES_DIR=/app/workspaces
 ENV MEMORY_DIR=/app/memory
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Install git (required for worktrees) and GitHub CLI
-RUN apt-get update && apt-get install -y git curl gnupg \
+# Install git (required for worktrees), GitHub CLI, and Docker CLI
+RUN apt-get update && apt-get install -y ca-certificates git curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-    && apt-get update && apt-get install -y gh \
+    && apt-get update && apt-get install -y gh docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependencies (including devDependencies)
 COPY --from=build /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 
-# Create non-root user
+# Create non-root user and docker group for socket access
 RUN useradd --create-home --shell /bin/bash tars \
+  && groupadd -g 999 docker \
+  && usermod -aG docker tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
   && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
