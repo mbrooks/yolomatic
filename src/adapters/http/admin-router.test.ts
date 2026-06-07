@@ -85,6 +85,8 @@ describe("handleAdminRoute", () => {
 		listPendingInvitations: ReturnType<typeof vi.fn>;
 		acceptInvitation: ReturnType<typeof vi.fn>;
 		updateIssueAssignees: ReturnType<typeof vi.fn>;
+		getAuthenticatedUser: ReturnType<typeof vi.fn>;
+		listAccessibleRepositories: ReturnType<typeof vi.fn>;
 	};
 
 	beforeEach(() => {
@@ -131,6 +133,8 @@ describe("handleAdminRoute", () => {
 			listPendingInvitations: vi.fn(async () => []),
 			acceptInvitation: vi.fn(async () => undefined),
 			updateIssueAssignees: vi.fn(async () => undefined),
+			getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
+			listAccessibleRepositories: vi.fn(async () => []),
 		};
 		deps = {
 			adminUsername: "admin",

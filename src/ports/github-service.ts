@@ -50,6 +50,12 @@ export interface PendingInvitation {
 	html_url: string;
 }
 
+export interface AccessibleRepo {
+	owner: string;
+	repo: string;
+	fullName: string;
+}
+
 export interface GitHubService {
 	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
 	postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<void>;
@@ -82,4 +88,6 @@ export interface GitHubService {
 	listPendingInvitations(): Promise<PendingInvitation[]>;
 	acceptInvitation(invitationId: number): Promise<void>;
 	updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void>;
+	getAuthenticatedUser(): Promise<{ login: string } | null>;
+	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 }

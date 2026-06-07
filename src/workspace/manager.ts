@@ -81,6 +81,13 @@ export class WorkspaceManager {
 		return `tars/cron-${normalizeSegment(cronId, "cronId")}`;
 	}
 
+	async initializeRepo(owner: string, repo: string): Promise<void> {
+		const normalizedOwner = normalizeSegment(owner, "owner");
+		const normalizedRepo = normalizeSegment(repo, "repo");
+		await mkdir(this.config.workspacesDir, { recursive: true });
+		await this.ensureBareRepo(normalizedOwner, normalizedRepo);
+	}
+
 	async createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<WorktreeInfo> {
 		const normalizedOwner = normalizeSegment(owner, "owner");
 		const normalizedRepo = normalizeSegment(repo, "repo");
