@@ -12,50 +12,158 @@ function mockOkResponse(data: unknown): Response {
 	});
 }
 
+vi.mock("../../api/onboarding.js", async () => {
+	return {
+		fetchOnboardingStatus: vi.fn(async () => ({ complete: false, missing: ["github_token"] })),
+		verifyGitHubToken: vi.fn(async () => ({ username: "octocat" })),
+		generateWebhookSecret: vi.fn(async () => ({ secret: "a".repeat(192) })),
+		listAccessibleRepositories: vi.fn(async () => ({
+			repositories: [
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
+			],
+		})),
+		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/tars"] })),
+		submitOnboarding: vi.fn(async () => ({ success: true, requiresRestart: ["github_token"] })),
+	};
+});
+
 describe("OnboardingWizard", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
+		localStorage.clear();
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
-			return mockOkResponse({ success: true, requiresRestart: ["github_token"] });
+			return mockOkResponse({ success: true });
 		});
 	});
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
+		localStorage.clear();
 	});
 
-	it("renders form fields", () => {
+	it("renders step 1 by default", () => {
 		render(<OnboardingWizard />);
 		expect(screen.queryByText("Welcome to TARS")).not.toBeNull();
-		expect(screen.queryByLabelText("GitHub Token")).not.toBeNull();
-		expect(screen.queryByLabelText("GitHub Username")).not.toBeNull();
-		expect(screen.queryByLabelText("Webhook Secret")).not.toBeNull();
+		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
 	});
 
-	it("submits onboarding data on form submit", async () => {
+	it("suggests a password by default", () => {
 		render(<OnboardingWizard />);
+		const passwordInput = screen.getByLabelText("Admin Password") as HTMLInputElement;
+		expect(passwordInput.value.length).toBeGreaterThan(0);
+	});
 
-		fireEvent.change(screen.getByLabelText("GitHub Token"), { target: { value: "tok" } });
-		fireEvent.change(screen.getByLabelText("GitHub Username"), { target: { value: "user" } });
-		fireEvent.change(screen.getByLabelText("Webhook Secret"), { target: { value: "sec" } });
+	it("regenerates password when regenerate button clicked", () => {
+		render(<OnboardingWizard />);
+		const passwordInput = screen.getByLabelText("Admin Password") as HTMLInputElement;
+		const firstPassword = passwordInput.value;
+		fireEvent.click(screen.getByText("Regenerate"));
+		expect(passwordInput.value).not.toBe(firstPassword);
+	});
+
+	it("navigates to step 2 after filling step 1", () => {
+		render(<OnboardingWizard />);
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
-		fireEvent.change(screen.getByLabelText("Admin Password"), { target: { value: "pass" } });
+		fireEvent.click(screen.getByText("Next"));
+		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByLabelText("GitHub PAT (Personal Access Token)")).not.toBeNull();
+	});
 
-		fireEvent.click(screen.getByText("Save and Finish"));
+	it("verifies token and infers username in step 2", async () => {
+		const { verifyGitHubToken } = await import("../../api/onboarding.js");
+		render(<OnboardingWizard />);
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+		fireEvent.click(screen.getByText("Verify"));
 
 		await waitFor(() => {
-			expect(screen.queryByText("Setup Complete")).not.toBeNull();
+			expect(verifyGitHubToken).toHaveBeenCalledWith("ghp_test");
 		});
 
-		const calls = fetchSpy.mock.calls as [string, RequestInit][];
-		const lastCall = calls[calls.length - 1];
-		expect(lastCall[0]).toBe("/api/onboarding");
-		expect(lastCall[1].method).toBe("POST");
-		const body = JSON.parse(lastCall[1].body as string);
-		expect(body.github_token).toBe("tok");
-		expect(body.admin_username).toBe("admin");
+		await waitFor(() => {
+			expect(screen.queryByLabelText("GitHub Username")).not.toBeNull();
+		});
+	});
+
+	it("navigates through all steps and submits", async () => {
+		const { submitOnboarding, initializeWorkspaces } = await import("../../api/onboarding.js");
+		render(<OnboardingWizard />);
+
+		// Step 1
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		// Step 2
+		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+		fireEvent.click(screen.getByText("Verify"));
+		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByText("Next"));
+
+		// Step 3
+		fireEvent.click(screen.getByText("Generate"));
+		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+
+		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
+		fireEvent.click(screen.getByText("Next"));
+
+		// Step 4
+		fireEvent.click(screen.getByText("Fetch Repositories"));
+		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+
+		fireEvent.click(screen.getByText("Initialize & Finish"));
+		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
+
+		expect(submitOnboarding).toHaveBeenCalled();
+		expect(initializeWorkspaces).toHaveBeenCalled();
+	});
+
+	it("preserves state in localStorage", () => {
+		render(<OnboardingWizard />);
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		expect(localStorage.getItem("tars-onboarding-wizard")).toContain("admin");
+	});
+
+	it("restores state from localStorage", () => {
+		localStorage.setItem(
+			"tars-onboarding-wizard",
+			JSON.stringify({
+				step: 2,
+				adminUsername: "stored-admin",
+				adminPassword: "stored-pass",
+				githubToken: "",
+				githubUsername: "",
+				githubUsernameConfirmed: false,
+				webhookSecret: "",
+				webhookSecretConfirmed: false,
+				repositories: [],
+				error: null,
+			}),
+		);
+		render(<OnboardingWizard />);
+		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByLabelText("Admin Username")).toBeNull();
+	});
+
+	it("allows going back to previous steps", () => {
+		render(<OnboardingWizard />);
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+
+		fireEvent.click(screen.getByText("Back"));
+		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
+	});
+
+	it("disables next when step 1 fields are empty", () => {
+		render(<OnboardingWizard />);
+		const nextButton = screen.getByText("Next") as HTMLButtonElement;
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "" } });
+		expect(nextButton.disabled).toBe(true);
 	});
 });

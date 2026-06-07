@@ -35,6 +35,54 @@ describe("WorkspaceManager", () => {
 		expect(manager.getCronBranchName("nightly")).toBe("tars/cron-nightly");
 	});
 
+	it("initializes a repo by cloning the bare repository", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-init-repo-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse") {
+				return { stdout: "abcd1234\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.initializeRepo("mbrooks", "tars");
+
+		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "clone",
+		);
+		expect(cloneCalls).toHaveLength(1);
+		expect(cloneCalls[0][1]).toContain("--bare");
+		expect(cloneCalls[0][1]).toContain(bareRepoPath);
+		expect(cloneCalls[0][1].some((arg) => arg.includes("github.com"))).toBe(true);
+	});
+
+	it("fetches existing bare repo during initializeRepo instead of cloning", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-init-repo-valid-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		await mkdir(bareRepoPath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: ".\n", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.initializeRepo("mbrooks", "tars");
+
+		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "--all",
+		);
+		expect(fetchCalls).toHaveLength(1);
+
+		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([cmd, args]) => cmd === "git" && args[0] === "clone",
+		);
+		expect(cloneCalls).toHaveLength(0);
+	});
+
 	it("creates worktree by cloning bare repo and adding worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");

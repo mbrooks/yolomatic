@@ -58,6 +58,8 @@ describe("handleRepoRoutes", () => {
 				adminPassword: "secret",
 				githubService: {
 					updateIssueAssignees: vi.fn(),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
+		listAccessibleRepositories: vi.fn(async () => []),
 				},
 			} as never,
 			"/api/repos/mbrooks/tars/issues/12/assign",
