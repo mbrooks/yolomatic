@@ -340,6 +340,8 @@ function StepOneAdminCredentials({
 	updateField: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
 	onGeneratePassword: () => void;
 }): React.ReactElement {
+	const [showPassword, setShowPassword] = useState(true);
+
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -359,7 +361,7 @@ function StepOneAdminCredentials({
 				<div style={{ display: "flex", gap: "0.5rem" }}>
 					<input
 						id="admin_password"
-						type="password"
+						type={showPassword ? "text" : "password"}
 						value={state.adminPassword}
 						onChange={(e) => updateField("adminPassword", e.target.value)}
 						placeholder="••••••"
@@ -374,6 +376,16 @@ function StepOneAdminCredentials({
 					>
 						Regenerate
 					</button>
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem" }}>
+					<label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "0.875rem", color: "var(--muted)" }}>
+						<input
+							type="checkbox"
+							checked={showPassword}
+							onChange={(e) => setShowPassword(e.target.checked)}
+						/>
+						Show password
+					</label>
 				</div>
 				<span className="setting-description">A strong password has been suggested. You may override it.</span>
 			</div>

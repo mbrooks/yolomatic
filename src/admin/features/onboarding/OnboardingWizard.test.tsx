@@ -51,10 +51,11 @@ describe("OnboardingWizard", () => {
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
 	});
 
-	it("suggests a password by default", () => {
+	it("suggests a password by default in plain text", () => {
 		render(<OnboardingWizard />);
 		const passwordInput = screen.getByLabelText("Admin Password") as HTMLInputElement;
 		expect(passwordInput.value.length).toBeGreaterThan(0);
+		expect(passwordInput.type).toBe("text");
 	});
 
 	it("regenerates password when regenerate button clicked", () => {
@@ -63,6 +64,20 @@ describe("OnboardingWizard", () => {
 		const firstPassword = passwordInput.value;
 		fireEvent.click(screen.getByText("Regenerate"));
 		expect(passwordInput.value).not.toBe(firstPassword);
+	});
+
+	it("toggles password visibility via checkbox", () => {
+		render(<OnboardingWizard />);
+		const passwordInput = screen.getByLabelText("Admin Password") as HTMLInputElement;
+		expect(passwordInput.type).toBe("text");
+		const checkbox = screen.getByLabelText("Show password") as HTMLInputElement;
+		expect(checkbox.checked).toBe(true);
+		fireEvent.click(checkbox);
+		expect(passwordInput.type).toBe("password");
+		expect(checkbox.checked).toBe(false);
+		fireEvent.click(checkbox);
+		expect(passwordInput.type).toBe("text");
+		expect(checkbox.checked).toBe(true);
 	});
 
 	it("navigates to step 2 after filling step 1", () => {
