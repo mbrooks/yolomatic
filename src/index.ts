@@ -18,7 +18,7 @@ import { RepoSkillService } from "./skills/repo-skill-service.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 
-const noOpHandlers: WebhookHandlers = {
+export const noOpHandlers: WebhookHandlers = {
 	async handleIssueEvent() {},
 	async handleCommentEvent() {},
 	async handlePullRequestReviewCommentEvent() {},
@@ -107,7 +107,6 @@ export async function main(): Promise<void> {
 		autoStart: config.autoStart,
 		defaultBranch: config.defaultBranch,
 		selfReportEnabled: config.selfReportEnabled,
-		maxIterations: config.maxIterations,
 		taskController,
 		adminGithubUsername: config.adminGithubUsername,
 	});

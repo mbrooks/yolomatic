@@ -129,7 +129,6 @@ function createDeps(overrides?: {
 					rawResponse: "TARS_STATUS: complete\nDone.",
 				})),
 			} as any,
-			maxIterations: 10,
 		},
 	};
 }
