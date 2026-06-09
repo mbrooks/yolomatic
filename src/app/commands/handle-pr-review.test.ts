@@ -21,7 +21,7 @@ describe("HandlePRReview", () => {
 		};
 	}
 
-	function createHandler(options: Partial<{ maxIterations: number }> = {}) {
+	function createHandler() {
 		const sessions = {
 			get: vi.fn(),
 			getAll: vi.fn(),
@@ -95,7 +95,6 @@ describe("HandlePRReview", () => {
 			github: github as never,
 			tasks: tasks as never,
 			githubUsername: "tars-bot",
-			maxIterations: options.maxIterations ?? 3,
 		});
 
 		return { handler, sessions, workspaces, executor, github, tasks };
@@ -344,27 +343,6 @@ describe("HandlePRReview", () => {
 			"tars",
 			99,
 			expect.stringContaining("No code changes required"),
-		);
-	});
-
-	it("enforces max iteration limit", async () => {
-		const { handler, sessions, executor, github } = createHandler({ maxIterations: 2 });
-		sessions.get.mockResolvedValue(makeSession({ iterationCount: 2 }));
-
-		await handler.execute({
-			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "user" },
-			comment: { id: 1, body: "Please fix this", user: { login: "user" } },
-		});
-
-		expect(executor.executePRReview).not.toHaveBeenCalled();
-		expect(github.postPRComment).toHaveBeenCalledWith(
-			"mbrooks",
-			"tars",
-			99,
-			expect.stringContaining("Maximum iteration limit"),
 		);
 	});
 

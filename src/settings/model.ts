@@ -157,15 +157,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		envVar: "TARS_SELF_REPORT_ENABLED",
 	},
 	{
-		key: "max_iterations",
-		type: "number",
-		description: "Max iterations before forcing completion",
-		default: "3",
-		requiresRestart: false,
-		sensitive: false,
-		envVar: "MAX_ITERATIONS",
-	},
-	{
 		key: "cleanup_retention_days",
 		type: "number",
 		description: "Days to retain sessions before cleanup (0 or empty to disable)",

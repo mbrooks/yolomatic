@@ -106,7 +106,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			autoStart: boolean;
 			defaultBranch: string;
 			selfReportEnabled: boolean;
-			maxIterations?: number;
 			octokit?: Octokit;
 			taskController?: TaskController;
 			adminGithubUsername?: string;
@@ -151,7 +150,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			github,
 			tasks,
 			githubUsername: deps.githubUsername,
-			maxIterations: deps.maxIterations ?? 3,
 		});
 
 		this.handleIssueCommentCmd = new HandleIssueComment({

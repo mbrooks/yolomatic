@@ -13,7 +13,6 @@ export interface AppConfig {
 	workspacesDir: string;
 	soulPath: string;
 	selfReportEnabled: boolean;
-	maxIterations: number;
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
 	adminGithubUsername: string | undefined;
@@ -50,7 +49,6 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workspacesDir: path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		soulPath: path.resolve(store.getString("soul_path", "./SOUL.md")),
 		selfReportEnabled: store.getBoolean("self_report_enabled", true),
-		maxIterations: store.getNumber("max_iterations", 3),
 		adminUsername: store.get("admin_username"),
 		adminPassword: store.get("admin_password"),
 		adminGithubUsername: store.get("admin_github_username") ?? store.get("admin_username") ?? undefined,
