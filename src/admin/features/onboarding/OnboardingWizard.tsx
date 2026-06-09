@@ -117,6 +117,12 @@ export function OnboardingWizard(): React.ReactElement {
 		}
 	}, [setError]);
 
+	useEffect(() => {
+		if (state.step === 3 && !state.webhookSecret && !loading) {
+			handleGenerateSecret();
+		}
+	}, [state.step, state.webhookSecret, loading, handleGenerateSecret]);
+
 	const handleFetchRepos = useCallback(async () => {
 		setLoading(true);
 		setError(null);
@@ -464,6 +470,8 @@ function StepThreeWebhookSecurity({
 	onGenerateSecret: () => Promise<void>;
 	loading: boolean;
 }): React.ReactElement {
+	const [showSecret, setShowSecret] = useState(true);
+
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -471,13 +479,12 @@ function StepThreeWebhookSecurity({
 				<div style={{ display: "flex", gap: "0.5rem" }}>
 					<input
 						id="webhook_secret"
-						type={state.webhookSecretConfirmed ? "text" : "password"}
+						type={showSecret ? "text" : "password"}
 						value={state.webhookSecret}
 						onChange={(e) => updateField("webhookSecret", e.target.value)}
 						placeholder="Generate a secret..."
 						required
 						style={{ flex: 1 }}
-						readOnly={state.webhookSecretConfirmed}
 					/>
 					<button
 						type="button"
@@ -486,8 +493,18 @@ function StepThreeWebhookSecurity({
 						onClick={onGenerateSecret}
 						disabled={loading}
 					>
-						{loading ? "Generating..." : "Generate"}
+						{loading ? "Generating..." : "Regenerate"}
 					</button>
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem" }}>
+					<label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "0.875rem", color: "var(--muted)" }}>
+						<input
+							type="checkbox"
+							checked={showSecret}
+							onChange={(e) => setShowSecret(e.target.checked)}
+						/>
+						Show secret
+					</label>
 				</div>
 				<span className="setting-description">Minimum 128 characters. Used to verify GitHub webhook signatures.</span>
 			</div>
