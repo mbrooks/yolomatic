@@ -116,7 +116,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -142,7 +141,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -181,7 +179,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -223,7 +220,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -264,7 +260,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -301,7 +296,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: false,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -338,7 +332,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -377,7 +370,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -410,7 +402,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -456,7 +447,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -518,7 +508,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -559,7 +548,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -610,7 +598,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -641,7 +628,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -680,7 +666,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -724,7 +709,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -779,7 +763,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -836,7 +819,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -868,7 +850,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			adminGithubUsername: "admin",
@@ -904,7 +885,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			adminGithubUsername: "admin",
@@ -955,7 +935,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			adminGithubUsername: "admin",
@@ -1012,7 +991,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			taskController: taskController as never,
@@ -1064,7 +1042,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			taskController: taskController as never,
@@ -1115,7 +1092,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 			taskController: taskController as never,
@@ -1162,7 +1138,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -1196,7 +1171,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
@@ -1223,7 +1197,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			githubUsername: "tars-bot",
 			autoStart: true,
 			defaultBranch: "main",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});

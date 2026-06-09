@@ -33,7 +33,9 @@ describe("getConfig", () => {
 		delete process.env.WORKSPACES_DIR;
 		delete process.env.SOUL_PATH;
 		delete process.env.TARS_SELF_REPORT_ENABLED;
-		delete process.env.MAX_ITERATIONS;
+		delete process.env.ARCHIVE_DIR;
+		delete process.env.MEMORY_DIR;
+		delete process.env.CLEANUP_RETENTION_DAYS;
 		delete process.env.ADMIN_USERNAME;
 		delete process.env.ADMIN_PASSWORD;
 	});
@@ -60,9 +62,22 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBeTruthy();
 		expect(config.soulPath).toBeTruthy();
 		expect(config.selfReportEnabled).toBe(true);
-		expect(config.maxIterations).toBe(3);
 		expect(config.adminUsername).toBeUndefined();
 		expect(config.adminPassword).toBeUndefined();
+	});
+
+	it("reads optional environment variables", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.ARCHIVE_DIR = "/tmp/archive";
+		process.env.MEMORY_DIR = "/tmp/memory";
+		process.env.CLEANUP_RETENTION_DAYS = "0";
+
+		const config = getConfig(createStore());
+		expect(config.archiveDir).toBe("/tmp/archive");
+		expect(config.memoryDir).toBe("/tmp/memory");
+		expect(config.cleanupRetentionDays).toBeUndefined();
 	});
 
 	it("reads environment variables", () => {
@@ -75,7 +90,6 @@ describe("getConfig", () => {
 		process.env.GITHUB_USERNAME = "user";
 		process.env.WORKSPACES_DIR = "/tmp/workspaces";
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
-		process.env.MAX_ITERATIONS = "5";
 		process.env.ADMIN_USERNAME = "admin";
 		process.env.ADMIN_PASSWORD = "secret";
 
@@ -90,7 +104,6 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
 		expect(config.selfReportEnabled).toBe(true);
-		expect(config.maxIterations).toBe(5);
 		expect(config.adminUsername).toBe("admin");
 		expect(config.adminPassword).toBe("secret");
 	});
@@ -110,6 +123,16 @@ describe("getConfig", () => {
 
 		const config = getConfig(createStore());
 		expect(config.selfReportEnabled).toBe(false);
+	});
+
+	it("returns undefined for invalid cleanup retention", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		process.env.CLEANUP_RETENTION_DAYS = "abc";
+
+		const config = getConfig(createStore());
+		expect(config.cleanupRetentionDays).toBeUndefined();
 	});
 });
 
@@ -149,5 +172,16 @@ describe("getBootstrapMissingFields", () => {
 		expect(missing).toContain("admin_username");
 		expect(missing).not.toContain("github_token");
 		expect(missing).not.toContain("admin_password");
+	});
+
+	it("returns empty when all fields are present", () => {
+		const missing = getBootstrapMissingFields({
+			webhookSecret: "secret",
+			githubToken: "token",
+			githubUsername: "user",
+			adminUsername: "admin",
+			adminPassword: "pass",
+		} as unknown as import("./config.js").AppConfig);
+		expect(missing).toHaveLength(0);
 	});
 });

@@ -35,7 +35,6 @@ export class HandlePRReview {
 			github: GitHubService;
 			tasks: TaskControlService;
 			githubUsername: string;
-			maxIterations: number;
 		},
 	) {}
 
@@ -148,13 +147,6 @@ export class HandlePRReview {
 			return;
 		}
 
-		const iterationCount = session.iterationCount ?? 0;
-		if (iterationCount >= this.deps.maxIterations) {
-			process.stdout.write(`[webhook] ${eventType} PR #${prNumber} ignored: max iterations (${this.deps.maxIterations}) reached\n`);
-			await this.deps.github.postPRComment(owner, repo, prNumber, `Maximum iteration limit (${this.deps.maxIterations}) reached. Human intervention required.`);
-			return;
-		}
-
 		this.inFlight.add(inFlightKey);
 		try {
 			await this.processActionableReview(owner, repo, issueNumber, prNumber, session, comments, reviewBody);
@@ -241,7 +233,7 @@ export class HandlePRReview {
 			owner,
 			repo,
 			prNumber,
-			`Picked up review feedback. Iteration ${(state.iterationCount ?? 0) + 1}/${this.deps.maxIterations}.`,
+			`Picked up review feedback. Iteration ${(state.iterationCount ?? 0) + 1}.`,
 		);
 
 		const inFlightKey = issueSessionKey(owner, repo, issueNumber);
