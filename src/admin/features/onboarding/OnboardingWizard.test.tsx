@@ -121,8 +121,10 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		// Step 3
-		fireEvent.click(screen.getByText("Generate"));
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
+		expect(secretInput.value.length).toBeGreaterThan(0);
+		expect(screen.getByText("Regenerate")).not.toBeNull();
 
 		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
 		fireEvent.click(screen.getByText("Next"));
@@ -180,5 +182,30 @@ describe("OnboardingWizard", () => {
 		const nextButton = screen.getByText("Next") as HTMLButtonElement;
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "" } });
 		expect(nextButton.disabled).toBe(true);
+	});
+
+	it("auto-generates webhook secret and toggles visibility in step 3", async () => {
+		render(<OnboardingWizard />);
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+		fireEvent.click(screen.getByText("Verify"));
+		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByText("Next"));
+
+		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
+		expect(secretInput.value.length).toBeGreaterThan(0);
+		expect(secretInput.type).toBe("text");
+
+		const showCheckbox = screen.getByLabelText("Show secret") as HTMLInputElement;
+		expect(showCheckbox.checked).toBe(true);
+		fireEvent.click(showCheckbox);
+		expect(secretInput.type).toBe("password");
+		expect(showCheckbox.checked).toBe(false);
+		fireEvent.click(showCheckbox);
+		expect(secretInput.type).toBe("text");
+		expect(showCheckbox.checked).toBe(true);
 	});
 });
