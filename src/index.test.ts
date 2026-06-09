@@ -16,7 +16,6 @@ vi.mock("./config.js", () => ({
 		githubUsername: "tars-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
-		maxIterations: 3,
 		selfReportEnabled: true,
 		adminUsername: "admin",
 		adminPassword: "secret",
@@ -116,7 +115,7 @@ vi.mock("./skills/repo-skill-service.js", () => ({
 }));
 
 import { createWebhookServer } from "./webhook/server.js";
-import { main } from "./index.js";
+import { main, noOpHandlers } from "./index.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { SessionStore } from "./session/store.js";
 import { isBootstrapComplete } from "./config.js";
@@ -301,7 +300,6 @@ describe("main", () => {
 			githubUsername: "tars-bot",
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
-			maxIterations: 3,
 			selfReportEnabled: true,
 			adminUsername: "admin",
 			adminPassword: "secret",
@@ -330,5 +328,27 @@ describe("main", () => {
 		}));
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
+	});
+});
+
+describe("noOpHandlers", () => {
+	it("handleIssueEvent does nothing", async () => {
+		await expect(noOpHandlers.handleIssueEvent({})).resolves.toBeUndefined();
+	});
+
+	it("handleCommentEvent does nothing", async () => {
+		await expect(noOpHandlers.handleCommentEvent({})).resolves.toBeUndefined();
+	});
+
+	it("handlePullRequestReviewCommentEvent does nothing", async () => {
+		await expect(noOpHandlers.handlePullRequestReviewCommentEvent({})).resolves.toBeUndefined();
+	});
+
+	it("handlePullRequestReviewEvent does nothing", async () => {
+		await expect(noOpHandlers.handlePullRequestReviewEvent({})).resolves.toBeUndefined();
+	});
+
+	it("isInFlight returns false", () => {
+		expect(noOpHandlers.isInFlight("mbrooks", "tars", 1)).toBe(false);
 	});
 });
