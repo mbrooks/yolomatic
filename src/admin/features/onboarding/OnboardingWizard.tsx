@@ -58,7 +58,7 @@ function saveState(state: WizardState): void {
 function getDefaultState(): WizardState {
 	return {
 		step: 1,
-		adminUsername: "",
+		adminUsername: "admin",
 		adminPassword: generatePassword(),
 		githubToken: "",
 		githubUsername: "",
