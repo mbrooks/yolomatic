@@ -208,4 +208,33 @@ describe("OnboardingWizard", () => {
 		expect(secretInput.type).toBe("text");
 		expect(showCheckbox.checked).toBe(true);
 	});
+
+	it("allows manually configuring a webhook secret and proceeding to step 4", async () => {
+		render(<OnboardingWizard />);
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+		fireEvent.click(screen.getByText("Verify"));
+		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByText("Next"));
+
+		// Wait for auto-generation
+		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
+		expect(secretInput.value.length).toBeGreaterThan(0);
+
+		// Manually clear and type a custom secret
+		fireEvent.change(secretInput, { target: { value: "" } });
+		const manualSecret = "a".repeat(192);
+		fireEvent.change(secretInput, { target: { value: manualSecret } });
+
+		// The custom secret should still be there (not overwritten by auto-gen)
+		expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value).toBe(manualSecret);
+
+		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
+		fireEvent.click(screen.getByText("Next"));
+
+		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
+	});
 });
