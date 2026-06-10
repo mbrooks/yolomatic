@@ -68,6 +68,8 @@ describe("HandleIssueComment", () => {
 			listPendingInvitations: vi.fn(),
 			acceptInvitation: vi.fn(),
 			updateIssueAssignees: vi.fn(),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
+		listAccessibleRepositories: vi.fn(async () => []),
 		};
 		const prReview = {
 			execute: vi.fn(async () => undefined),

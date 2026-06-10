@@ -94,6 +94,8 @@ function createDeps(overrides?: {
 		listPendingInvitations: vi.fn(async () => []),
 		acceptInvitation: vi.fn(async () => {}),
 		updateIssueAssignees: vi.fn(async () => {}),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
+		listAccessibleRepositories: vi.fn(async () => []),
 	};
 
 	return {
