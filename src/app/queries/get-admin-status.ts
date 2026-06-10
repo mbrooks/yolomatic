@@ -3,6 +3,7 @@ import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
+import type { SettingsStore } from "../../settings/store.js";
 import {
 	buildRepoSummaries,
 	computeAgentStatus,
@@ -51,6 +52,44 @@ export interface AdminStatusView {
 	sessions: AdminStatusSessionView[];
 }
 
+interface ConfiguredRepository {
+	owner: string;
+	repo: string;
+}
+
+function parseConfiguredRepositories(raw: string | undefined): ConfiguredRepository[] {
+	if (!raw?.trim()) {
+		return [];
+	}
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		if (!Array.isArray(parsed)) {
+			return [];
+		}
+		const repos: ConfiguredRepository[] = [];
+		const seen = new Set<string>();
+		for (const item of parsed) {
+			if (!item || typeof item !== "object") {
+				continue;
+			}
+			const owner = "owner" in item && typeof item.owner === "string" ? item.owner.trim() : "";
+			const repo = "repo" in item && typeof item.repo === "string" ? item.repo.trim() : "";
+			if (!owner || !repo) {
+				continue;
+			}
+			const key = `${owner}/${repo}`.toLowerCase();
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			repos.push({ owner, repo });
+		}
+		return repos;
+	} catch {
+		return [];
+	}
+}
+
 export class GetAdminStatus {
 	constructor(
 		private readonly sessions: SessionRepository,
@@ -58,6 +97,7 @@ export class GetAdminStatus {
 		private readonly clock: Clock,
 		private readonly taskControl: TaskControlService,
 		private readonly cronStore?: CronStore,
+		private readonly settingsStore?: SettingsStore,
 	) {}
 
 	async execute(): Promise<AppResult<AdminStatusView>> {
@@ -107,6 +147,28 @@ export class GetAdminStatus {
 			} catch {
 				// ignore cron store errors
 			}
+		}
+
+		if (this.settingsStore) {
+			const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`.toLowerCase(), r]));
+			for (const configured of parseConfiguredRepositories(this.settingsStore.get("configured_repositories"))) {
+				const key = `${configured.owner}/${configured.repo}`.toLowerCase();
+				if (repoMap.has(key)) {
+					continue;
+				}
+				repoMap.set(key, {
+					owner: configured.owner,
+					repo: configured.repo,
+					sessionCount: 0,
+					activeCount: 0,
+					cronCount: 0,
+					lastActivity: null,
+				});
+			}
+			repos = Array.from(repoMap.values()).sort((a, b) => {
+				if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
+				return a.repo.localeCompare(b.repo);
+			});
 		}
 
 		const view: AdminStatusView = {

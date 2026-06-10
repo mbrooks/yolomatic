@@ -224,6 +224,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.initialized).toEqual([]);
+			expect(store.get("configured_repositories")).toBe("[]");
 		});
 
 		it("attempts to initialize provided repos", async () => {
@@ -245,6 +246,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(Array.isArray(body.initialized)).toBe(true);
+			expect(store.get("configured_repositories")).toBe(JSON.stringify([{ owner: "mbrooks", repo: "tars" }]));
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {

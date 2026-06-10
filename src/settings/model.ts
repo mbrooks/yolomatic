@@ -130,6 +130,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		envVar: "DEFAULT_BRANCH",
 	},
 	{
+		key: "configured_repositories",
+		type: "string",
+		description: "JSON list of repositories configured during onboarding",
+		default: "[]",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "CONFIGURED_REPOSITORIES",
+	},
+	{
 		key: "port",
 		type: "number",
 		description: "HTTP server port",
