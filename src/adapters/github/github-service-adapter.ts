@@ -235,4 +235,29 @@ export class GitHubServiceAdapter implements GitHubService {
 	async updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void> {
 		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, assignees });
 	}
+
+	async getAuthenticatedUser(): Promise<{ login: string } | null> {
+		try {
+			const { data } = await this.octokit.users.getAuthenticated();
+			if (data.login) {
+				return { login: data.login };
+			}
+			return null;
+		} catch {
+			return null;
+		}
+	}
+
+	async listAccessibleRepositories(): Promise<import("../../ports/github-service.js").AccessibleRepo[]> {
+		try {
+			const { data } = await this.octokit.repos.listForAuthenticatedUser({ per_page: 100, sort: "updated" });
+			return data.map((repo) => ({
+				owner: repo.owner?.login ?? "",
+				repo: repo.name ?? "",
+				fullName: repo.full_name ?? "",
+			}));
+		} catch {
+			return [];
+		}
+	}
 }
