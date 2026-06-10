@@ -275,6 +275,9 @@ class WebSocketManager {
 			this.reconnectTimer = null;
 			this.connect();
 		}, this.reconnectDelay);
+		if (typeof this.reconnectTimer === "object" && "unref" in this.reconnectTimer) {
+			this.reconnectTimer.unref();
+		}
 		this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
 	}
 
