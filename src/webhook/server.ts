@@ -21,6 +21,7 @@ import { onSessionLogEvent } from "../logging/log-events.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
+	onOnboardingComplete?: () => void | Promise<void>;
 };
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -58,6 +59,7 @@ export function createWebhookServer(
 
 	serverDeps.skillStore = skillStore;
 	serverDeps.repoSkillService = repoSkillService;
+	serverDeps.onOnboardingComplete = options.onOnboardingComplete;
 
 	const credentialProvider: CredentialProvider = {
 		getCredentials(): { username?: string; password?: string } {

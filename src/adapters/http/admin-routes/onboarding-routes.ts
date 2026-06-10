@@ -10,6 +10,21 @@ import {
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 
+const REQUIRED_ONBOARDING_SETTINGS = [
+	"github_token",
+	"github_username",
+	"webhook_secret",
+	"admin_username",
+	"admin_password",
+];
+
+function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
+	return REQUIRED_ONBOARDING_SETTINGS.filter((key) => {
+		const value = deps.settingsStore!.get(key);
+		return value === undefined || value === "";
+	});
+}
+
 export async function handleOnboardingRoutes(
 	request: IncomingMessage,
 	response: ServerResponse,
@@ -21,17 +36,7 @@ export async function handleOnboardingRoutes(
 			sendJson(response, 500, { error: "Settings store not configured" });
 			return true;
 		}
-		const required = [
-			"github_token",
-			"github_username",
-			"webhook_secret",
-			"admin_username",
-			"admin_password",
-		];
-		const missing = required.filter((key) => {
-			const value = deps.settingsStore!.get(key);
-			return value === undefined || value === "";
-		});
+		const missing = getMissingOnboardingSettings(deps);
 		sendJson(response, 200, { complete: missing.length === 0, missing });
 		return true;
 	}
@@ -146,24 +151,27 @@ export async function handleOnboardingRoutes(
 				string,
 				string
 			>;
-			const required = [
-				"github_token",
-				"github_username",
-				"webhook_secret",
-				"admin_username",
-				"admin_password",
-			];
-			const missing = required.filter((key) => !body[key]?.trim());
+			const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => !body[key]?.trim());
 			if (missing.length > 0) {
 				sendJson(response, 400, {
 					error: `Missing required fields: ${missing.join(", ")}`,
 				});
 				return true;
 			}
-			for (const key of required) {
+			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
 				deps.settingsStore.set(key, body[key].trim());
 			}
-			sendJson(response, 200, { success: true, requiresRestart: required });
+			const storedMissing = getMissingOnboardingSettings(deps);
+			const activated = storedMissing.length === 0;
+			sendJson(response, 200, { success: true, activated, requiresRestart: [] });
+			if (activated && deps.onOnboardingComplete) {
+				setImmediate(() => {
+					void Promise.resolve(deps.onOnboardingComplete?.()).catch((error) => {
+						const message = error instanceof Error ? error.message : String(error);
+						process.stderr.write(`[onboarding] activation failed: ${message}\n`);
+					});
+				});
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			sendJson(response, 400, { error: message });

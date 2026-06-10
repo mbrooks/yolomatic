@@ -25,6 +25,7 @@ export interface AdminRouterDeps {
 	settingsStore?: SettingsStore;
 	skillStore?: SkillStore;
 	repoSkillService?: RepoSkillService;
+	onOnboardingComplete?: () => void | Promise<void>;
 }
 
 export function mapResultToStatus(code: string): number {

@@ -24,7 +24,7 @@ vi.mock("../../api/onboarding.js", async () => {
 			],
 		})),
 		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/tars"] })),
-		submitOnboarding: vi.fn(async () => ({ success: true, requiresRestart: ["github_token"] })),
+		submitOnboarding: vi.fn(async () => ({ success: true, activated: true, requiresRestart: [] })),
 	};
 });
 
@@ -108,19 +108,17 @@ describe("OnboardingWizard", () => {
 
 	it("navigates through all steps and submits", async () => {
 		const { submitOnboarding, initializeWorkspaces } = await import("../../api/onboarding.js");
-		render(<OnboardingWizard />);
+		const onComplete = vi.fn();
+		render(<OnboardingWizard onComplete={onComplete} />);
 
-		// Step 1
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
 
-		// Step 2
 		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
 		fireEvent.click(screen.getByText("Verify"));
 		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 		fireEvent.click(screen.getByText("Next"));
 
-		// Step 3
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
 		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
 		expect(secretInput.value.length).toBeGreaterThan(0);
@@ -129,13 +127,15 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
 		fireEvent.click(screen.getByText("Next"));
 
-		// Step 4
 		fireEvent.click(screen.getByText("Fetch Repositories"));
 		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
 
+		expect(screen.queryByText("Your settings have been saved and TARS is loading them now.")).not.toBeNull();
+		expect(screen.queryByText(/Restart TARS/u)).toBeNull();
+		expect(onComplete).toHaveBeenCalledTimes(1);
 		expect(submitOnboarding).toHaveBeenCalled();
 		expect(initializeWorkspaces).toHaveBeenCalled();
 	});
@@ -219,17 +219,14 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 		fireEvent.click(screen.getByText("Next"));
 
-		// Wait for auto-generation
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
 		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
 		expect(secretInput.value.length).toBeGreaterThan(0);
 
-		// Manually clear and type a custom secret
 		fireEvent.change(secretInput, { target: { value: "" } });
 		const manualSecret = "a".repeat(192);
 		fireEvent.change(secretInput, { target: { value: manualSecret } });
 
-		// The custom secret should still be there (not overwritten by auto-gen)
 		expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value).toBe(manualSecret);
 
 		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));

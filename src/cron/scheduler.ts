@@ -127,6 +127,7 @@ export function startCronScheduler(deps: CronSchedulerDeps): void {
 	cronIntervalId = setInterval(() => {
 		void tickCrons(deps);
 	}, REMINDER_TICK_MS);
+	cronIntervalId.unref?.();
 }
 
 export function stopCronScheduler(): void {

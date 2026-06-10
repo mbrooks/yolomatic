@@ -267,6 +267,11 @@ describe("handleOnboardingRoutes", () => {
 	describe("POST /api/onboarding", () => {
 		it("returns success when all fields provided", async () => {
 			const store = await tmpStore();
+			const onOnboardingComplete = vi.fn();
+			const deps = {
+				...(makeDeps(store) as object),
+				onOnboardingComplete,
+			} as never;
 			const req = mockRequest({
 				url: "/api/onboarding",
 				method: "POST",
@@ -280,12 +285,14 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.success).toBe(true);
+			expect(body).toEqual({ success: true, activated: true, requiresRestart: [] });
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			expect(onOnboardingComplete).toHaveBeenCalledTimes(1);
 		});
 
 		it("returns error when fields are missing", async () => {
@@ -355,5 +362,5 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 		});
-	});
+		});
 });

@@ -70,7 +70,7 @@ function getDefaultState(): WizardState {
 	};
 }
 
-export function OnboardingWizard(): React.ReactElement {
+export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): React.ReactElement {
 	const [state, setState] = useState<WizardState>(() => loadState());
 	const [loading, setLoading] = useState(false);
 	const [done, setDone] = useState(false);
@@ -171,11 +171,12 @@ export function OnboardingWizard(): React.ReactElement {
 
 			localStorage.removeItem(STORAGE_KEY);
 			setDone(true);
+			onComplete?.();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : String(err));
 			setLoading(false);
 		}
-	}, [state]);
+	}, [state, onComplete]);
 
 	const handleCancel = useCallback(() => {
 		if (confirm("Are you sure you want to cancel the onboarding? Your progress will be lost.")) {
@@ -205,7 +206,7 @@ export function OnboardingWizard(): React.ReactElement {
 				<div className="onboarding-card">
 					<h2>Setup Complete</h2>
 					<p className="onboarding-subtitle">
-						Your settings have been saved. Restart TARS to finish and start working.
+						Your settings have been saved and TARS is loading them now.
 					</p>
 				</div>
 			</div>
@@ -373,7 +374,7 @@ function StepOneAdminCredentials({
 						type={showPassword ? "text" : "password"}
 						value={state.adminPassword}
 						onChange={(e) => updateField("adminPassword", e.target.value)}
-						placeholder="••••••"
+						placeholder="password"
 						required
 						style={{ flex: 1 }}
 					/>
@@ -526,7 +527,7 @@ function StepThreeWebhookSecurity({
 					<strong>How to configure this secret in GitHub:</strong>
 					<ol style={{ marginLeft: "1.25rem", marginTop: "0.5rem" }}>
 						<li>Go to your repository on GitHub.</li>
-						<li>Click <strong>Settings</strong> → <strong>Webhooks</strong>.</li>
+						<li>Click <strong>Settings</strong> then <strong>Webhooks</strong>.</li>
 						<li>Click <strong>Add webhook</strong>.</li>
 						<li>Set <strong>Payload URL</strong> to your TARS webhook endpoint.</li>
 						<li>Paste the secret above into <strong>Secret</strong>.</li>
@@ -601,7 +602,7 @@ function StepFourWorkspaceInit({
 								onChange={() => {
 									const allSelected = state.repositories.every((r) => r.selected);
 									state.repositories.forEach((_, i) => {
-										// We'll handle this via a helper in parent, but here we just toggle each
+										// Handled by the button below.
 									});
 								}}
 								style={{ display: "none" }}

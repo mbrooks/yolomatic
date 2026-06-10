@@ -53,6 +53,8 @@ export function initializeWorkspaces(payload: InitWorkspacesRequest): Promise<In
 	return apiPost<InitWorkspacesResponse>("/api/onboarding/init-workspaces", payload);
 }
 
-export function submitOnboarding(body: Record<string, string>): Promise<{ success: boolean; requiresRestart: string[] }> {
-	return apiPost<{ success: boolean; requiresRestart: string[] }>("/api/onboarding", body);
+export function submitOnboarding(
+	body: Record<string, string>,
+): Promise<{ success: boolean; activated: boolean; requiresRestart: string[] }> {
+	return apiPost<{ success: boolean; activated: boolean; requiresRestart: string[] }>("/api/onboarding", body);
 }

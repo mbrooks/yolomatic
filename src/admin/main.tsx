@@ -19,7 +19,7 @@ function Root(): React.ReactElement {
 	}
 
 	if (!onboarding.complete) {
-		return <OnboardingWizard />;
+		return <OnboardingWizard onComplete={() => setOnboarding({ complete: true, missing: [] })} />;
 	}
 
 	return <App />;

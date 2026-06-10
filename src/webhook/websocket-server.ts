@@ -85,6 +85,7 @@ export function createAdminWebSocketServer(
 				}
 			})();
 		}, 5000);
+		statusInterval.unref?.();
 	}
 
 	function stopStatusPolling(): void {
