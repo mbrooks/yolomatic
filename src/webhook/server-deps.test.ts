@@ -73,7 +73,10 @@ describe("createWebhookServerDeps", () => {
 		};
 		const cronStore = { getAll: vi.fn(async () => []) };
 		const githubService = { postComment: vi.fn() };
-		const settingsStore = { getAll: vi.fn(async () => []) };
+		const settingsStore = {
+			get: vi.fn(() => undefined),
+			getAll: vi.fn(async () => []),
+		};
 
 		const deps = createWebhookServerDeps(
 			sessionStore,

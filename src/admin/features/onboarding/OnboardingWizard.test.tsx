@@ -209,7 +209,7 @@ describe("OnboardingWizard", () => {
 		expect(showCheckbox.checked).toBe(true);
 	});
 
-	it("allows manually configuring a webhook secret and proceeding to step 4", async () => {
+	it("allows manually configuring a shorter webhook secret and proceeding to step 4", async () => {
 		render(<OnboardingWizard />);
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
@@ -224,7 +224,7 @@ describe("OnboardingWizard", () => {
 		expect(secretInput.value.length).toBeGreaterThan(0);
 
 		fireEvent.change(secretInput, { target: { value: "" } });
-		const manualSecret = "a".repeat(192);
+		const manualSecret = "changed-webhook-api-key";
 		fireEvent.change(secretInput, { target: { value: manualSecret } });
 
 		expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value).toBe(manualSecret);

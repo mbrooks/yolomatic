@@ -18,6 +18,28 @@ const REQUIRED_ONBOARDING_SETTINGS = [
 	"admin_password",
 ];
 
+function storeConfiguredRepositories(
+	deps: AdminRouterDeps,
+	repos: Array<{ owner: string; repo: string }>,
+): void {
+	const configured = repos
+		.map((repo) => ({
+			owner: repo.owner.trim(),
+			repo: repo.repo.trim(),
+		}))
+		.filter((repo) => repo.owner && repo.repo);
+	const seen = new Set<string>();
+	const unique = configured.filter((repo) => {
+		const key = `${repo.owner}/${repo.repo}`.toLowerCase();
+		if (seen.has(key)) {
+			return false;
+		}
+		seen.add(key);
+		return true;
+	});
+	deps.settingsStore!.set("configured_repositories", JSON.stringify(unique));
+}
+
 function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	return REQUIRED_ONBOARDING_SETTINGS.filter((key) => {
 		const value = deps.settingsStore!.get(key);
@@ -109,6 +131,7 @@ export async function handleOnboardingRoutes(
 				sendJson(response, 400, { error: "Token and username are required" });
 				return true;
 			}
+			storeConfiguredRepositories(deps, repos);
 			if (repos.length === 0) {
 				sendJson(response, 200, { initialized: [] });
 				return true;

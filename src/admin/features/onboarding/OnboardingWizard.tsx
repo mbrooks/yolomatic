@@ -192,7 +192,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			case 2:
 				return state.githubToken.trim().length > 0 && state.githubUsernameConfirmed;
 			case 3:
-				return state.webhookSecret.trim().length >= 128 && state.webhookSecretConfirmed;
+				return state.webhookSecret.trim().length > 0 && state.webhookSecretConfirmed;
 			case 4:
 				return true;
 			default:
@@ -510,7 +510,7 @@ function StepThreeWebhookSecurity({
 						Show secret
 					</label>
 				</div>
-				<span className="setting-description">Minimum 128 characters. Used to verify GitHub webhook signatures.</span>
+				<span className="setting-description">Used to verify GitHub webhook signatures.</span>
 			</div>
 
 			{state.webhookSecret.length > 0 && (
