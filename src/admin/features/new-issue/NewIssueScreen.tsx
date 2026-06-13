@@ -156,6 +156,8 @@ export function NewIssueScreen({
 		selectedTemplate,
 		setSelectedTemplate,
 		clearRepoContext,
+		skills,
+		loadingSkills,
 	} = useRepoContext(owner, repo);
 	const {
 		wsStatus,
@@ -426,6 +428,18 @@ export function NewIssueScreen({
 							</select>
 						</div>
 					) : null}
+
+					{skills.length > 0 ? (
+						<div className="template-selector">
+							<span className="template-selector-label">Skills:</span>
+							{skills.map((skill) => (
+								<span key={skill.name} className="preview-context-tag">
+									{skill.name}
+								</span>
+							))}
+						</div>
+					) : null}
+					{loadingSkills ? <div className="context-loading">Loading skills…</div> : null}
 
 					{createdIssue ? (
 						<div className="chat-actions">

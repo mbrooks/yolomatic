@@ -1,6 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { AuthStorage, createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
+import { readdirSync, statSync, readFileSync } from "node:fs";
+import path from "node:path";
+import type { SkillStore } from "../../skills/store.js";
+import type { RepoSkillService } from "../../skills/repo-skill-service.js";
+import { parseSkillFile, buildSkillFile } from "../../skills/repo-skill-service.js";
 import { sessionKey as buildSessionKey } from "../../domain/session/model.js";
 import { createTarsModelRegistry } from "../../executor/model-registry.js";
 import { resolveConfiguredModel, getLastAssistantText } from "../../executor/index.js";
@@ -83,6 +88,100 @@ function normalizeDraft(value: unknown): IssueDraft {
 	};
 }
 
+interface SkillInfo {
+	name: string;
+	description: string;
+	content: string;
+}
+
+function scanLocalSkills(cwd: string): SkillInfo[] {
+	const skills: SkillInfo[] = [];
+	const skillsDir = path.join(cwd, ".pi/skills");
+	const dirStat = statSync(skillsDir, { throwIfNoEntry: false });
+	if (!dirStat || !dirStat.isDirectory()) return skills;
+
+	for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+		if (entry.isDirectory()) {
+			const skillFile = path.join(skillsDir, entry.name, "SKILL.md");
+			const fileStat = statSync(skillFile, { throwIfNoEntry: false });
+			if (!fileStat || !fileStat.isFile()) continue;
+			try {
+				const raw = readFileSync(skillFile, "utf-8");
+				const parsed = parseSkillFile(raw);
+				skills.push({
+					name: parsed.name || entry.name,
+					description: parsed.description,
+					content: parsed.body,
+				});
+			} catch {
+				// ignore unreadable files
+			}
+		} else if (entry.isFile() && entry.name.endsWith(".md")) {
+			const skillFile = path.join(skillsDir, entry.name);
+			try {
+				const raw = readFileSync(skillFile, "utf-8");
+				const parsed = parseSkillFile(raw);
+				const name = parsed.name || path.basename(entry.name, ".md");
+				skills.push({ name, description: parsed.description, content: parsed.body });
+			} catch {
+				// ignore unreadable files
+			}
+		}
+	}
+	return skills;
+}
+
+async function buildSkillAgentsFiles(
+	cwd: string,
+	skillStore?: SkillStore,
+	repoSkillService?: RepoSkillService,
+	owner?: string,
+	repo?: string,
+): Promise<Array<{ path: string; content: string }>> {
+	const skills = new Map<string, SkillInfo>();
+
+	for (const skill of scanLocalSkills(cwd)) {
+		skills.set(skill.name, skill);
+	}
+
+	if (skillStore) {
+		try {
+			const serverSkills = await skillStore.listAll();
+			for (const skill of serverSkills) {
+				if (!skills.has(skill.name)) {
+					skills.set(skill.name, {
+						name: skill.name,
+						description: skill.description,
+						content: skill.content,
+					});
+				}
+			}
+		} catch {
+			// ignore server skill fetch errors
+		}
+	}
+
+	if (repoSkillService && owner && repo) {
+		try {
+			const repoSkills = await repoSkillService.listRepoSkills(owner, repo);
+			for (const skill of repoSkills) {
+				skills.set(skill.name, {
+					name: skill.name,
+					description: skill.description,
+					content: skill.content,
+				});
+			}
+		} catch {
+			// ignore repo skill fetch errors
+		}
+	}
+
+	return Array.from(skills.values()).map((skill) => ({
+		path: path.join(cwd, ".pi/skills", skill.name, "SKILL.md"),
+		content: buildSkillFile(skill.name, skill.description, skill.content),
+	}));
+}
+
 export async function chatIssueViaLLM({
 	owner,
 	repo,
@@ -91,6 +190,8 @@ export async function chatIssueViaLLM({
 	context,
 	options,
 	onThinking,
+	skillStore,
+	repoSkillService,
 }: {
 	owner?: string;
 	repo?: string;
@@ -99,6 +200,8 @@ export async function chatIssueViaLLM({
 	context?: RepoContext;
 	options?: GenerateOptions;
 	onThinking?: ThinkingCallback;
+	skillStore?: SkillStore;
+	repoSkillService?: RepoSkillService;
 }): Promise<IssueChatResponse> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = createTarsModelRegistry(authStorage);
@@ -120,9 +223,20 @@ export async function chatIssueViaLLM({
 		options,
 	});
 
+	const skillFiles = await buildSkillAgentsFiles(AGENT_CWD, skillStore, repoSkillService, owner, repo);
+	const loader = new DefaultResourceLoader({
+		cwd: AGENT_CWD,
+		agentDir: getAgentDir(),
+		agentsFilesOverride: (current) => ({
+			agentsFiles: [...current.agentsFiles, ...skillFiles],
+		}),
+	});
+	await loader.reload();
+
 	const { session } = await createAgentSession({
 		cwd: AGENT_CWD,
 		sessionManager: SessionManager.inMemory(),
+		resourceLoader: loader,
 		authStorage,
 		modelRegistry,
 		model: configuredModel,
