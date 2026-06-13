@@ -5,12 +5,14 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { IssueDetail } from "./IssueDetail.js";
 
 const mockAssignIssue = vi.fn();
+const mockStartIssueSession = vi.fn();
 
 vi.mock("../../api/issues.js", async () => {
 	const actual = await vi.importActual<typeof import("../../api/issues.js")>("../../api/issues.js");
 	return {
 		...actual,
 		assignIssue: (...args: unknown[]) => mockAssignIssue(...args),
+		startIssueSession: (...args: unknown[]) => mockStartIssueSession(...args),
 	};
 });
 
@@ -27,6 +29,7 @@ const mockIssue = {
 describe("IssueDetail", () => {
 	beforeEach(() => {
 		mockAssignIssue.mockReset();
+		mockStartIssueSession.mockReset();
 	});
 
 	afterEach(() => {
@@ -65,14 +68,16 @@ describe("IssueDetail", () => {
 		expect(screen.getByText("Unassigned")).toBeDefined();
 	});
 
-	it("does not show Assign to TARS button when issue has assignees", () => {
+	it("does not show action buttons when issue has assignees", () => {
 		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
 		expect(screen.queryByText("Assign to TARS")).toBeNull();
+		expect(screen.queryByText("Start Session")).toBeNull();
 	});
 
-	it("shows Assign to TARS button when issue is unassigned", () => {
+	it("shows Assign to TARS and Start Session buttons when issue is unassigned", () => {
 		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="tars" />);
 		expect(screen.getByText("Assign to TARS")).toBeDefined();
+		expect(screen.getByText("Start Session")).toBeDefined();
 	});
 
 	it("calls assignIssue and onAssignSuccess when Assign to TARS is clicked", async () => {
@@ -90,6 +95,32 @@ describe("IssueDetail", () => {
 		fireEvent.click(button);
 		await waitFor(() => expect(mockAssignIssue).toHaveBeenCalledWith("mbrooks", "tars", 1));
 		await waitFor(() => expect(onAssignSuccess).toHaveBeenCalled());
+	});
+
+	it("calls startIssueSession and onStartSessionSuccess when Start Session is clicked", async () => {
+		mockStartIssueSession.mockResolvedValue({ started: true, status: "working", message: "ok" });
+		const onStartSessionSuccess = vi.fn();
+		render(
+			<IssueDetail
+				selected={{ ...mockIssue, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+				onStartSessionSuccess={onStartSessionSuccess}
+			/>,
+		);
+		const button = screen.getByText("Start Session");
+		fireEvent.click(button);
+		await waitFor(() =>
+			expect(mockStartIssueSession).toHaveBeenCalledWith(
+				"mbrooks",
+				"tars",
+				1,
+				"Bug report",
+				"Something is broken",
+				["bug", "ui"],
+			),
+		);
+		await waitFor(() => expect(onStartSessionSuccess).toHaveBeenCalled());
 	});
 
 	it("shows error message when assignment fails", async () => {
@@ -118,6 +149,34 @@ describe("IssueDetail", () => {
 		const button = screen.getByText("Assign to TARS");
 		fireEvent.click(button);
 		await waitFor(() => expect(screen.getByText("Assigning...")).toBeDefined());
+	});
+
+	it("shows error message when start session fails", async () => {
+		mockStartIssueSession.mockRejectedValue(new Error("Start failed"));
+		render(
+			<IssueDetail
+				selected={{ ...mockIssue, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		const button = screen.getByText("Start Session");
+		fireEvent.click(button);
+		await waitFor(() => expect(screen.getByText("Start failed")).toBeDefined());
+	});
+
+	it("shows Starting... while start session is in progress", async () => {
+		mockStartIssueSession.mockImplementation(() => new Promise(() => {}));
+		render(
+			<IssueDetail
+				selected={{ ...mockIssue, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		const button = screen.getByText("Start Session");
+		fireEvent.click(button);
+		await waitFor(() => expect(screen.getByText("Starting...")).toBeDefined());
 	});
 
 	it("renders labels as tags", () => {

@@ -77,6 +77,7 @@ describe("createWebhookServer", () => {
 				_adminAssetsDir?: unknown,
 				_githubService?: unknown,
 				settingsStore?: unknown,
+				_executor?: unknown,
 			) => ({
 				adminUsername,
 				adminPassword,
