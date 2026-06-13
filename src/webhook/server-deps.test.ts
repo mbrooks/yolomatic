@@ -74,9 +74,24 @@ describe("createWebhookServerDeps", () => {
 		const cronStore = { getAll: vi.fn(async () => []) };
 		const githubService = { postComment: vi.fn() };
 		const settingsStore = {
-			get: vi.fn(() => undefined),
+			get: vi.fn((key: string) => {
+				if (key === "github_username") return "tars-bot";
+				if (key === "default_branch") return "main";
+				if (key === "self_report_enabled") return "true";
+				return undefined;
+			}),
+			getString: vi.fn((key: string, defaultValue?: string) => {
+				if (key === "github_username") return "tars-bot";
+				if (key === "default_branch") return "main";
+				return defaultValue ?? "";
+			}),
+			getBoolean: vi.fn((key: string, defaultValue?: boolean) => {
+				if (key === "self_report_enabled") return true;
+				return defaultValue ?? false;
+			}),
 			getAll: vi.fn(async () => []),
 		};
+		const executor = { execute: vi.fn() };
 
 		const deps = createWebhookServerDeps(
 			sessionStore,
@@ -90,6 +105,7 @@ describe("createWebhookServerDeps", () => {
 			"/tmp/admin-assets",
 			githubService as never,
 			settingsStore as never,
+			executor as never,
 		);
 
 		const wrappedWorkspaceService = (deps.cleanupCommand as any).workspaces;
@@ -121,5 +137,6 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.adminPassword).toBe("secret");
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
 		expect(deps.settingsStore).toBe(settingsStore);
+		expect(deps.startIssueSession).toBeDefined();
 	});
 });

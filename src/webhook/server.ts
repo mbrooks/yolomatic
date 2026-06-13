@@ -10,6 +10,7 @@ import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
+import type { PiAgentExecutor } from "../executor/index.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { executeIssueChatRequest } from "../app/commands/issue-chat-request.js";
@@ -43,6 +44,7 @@ export function createWebhookServer(
 	settingsStore?: SettingsStore,
 	skillStore?: SkillStore,
 	repoSkillService?: RepoSkillService,
+	executor?: PiAgentExecutor,
 ) {
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -56,6 +58,7 @@ export function createWebhookServer(
 		options.adminAssetsDir,
 		githubService,
 		settingsStore,
+		executor,
 	);
 
 	serverDeps.skillStore = skillStore;

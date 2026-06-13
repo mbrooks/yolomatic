@@ -1,20 +1,24 @@
 import React, { useState, useCallback } from "react";
 import type { OpenIssue } from "../../api/issues.js";
-import { assignIssue } from "../../api/issues.js";
+import { assignIssue, startIssueSession } from "../../api/issues.js";
 
 export function IssueDetail({
 	selected,
 	owner,
 	repo,
 	onAssignSuccess,
+	onStartSessionSuccess,
 }: {
 	selected: OpenIssue | null;
 	owner: string;
 	repo: string;
 	onAssignSuccess?: () => void;
+	onStartSessionSuccess?: () => void;
 }): React.ReactElement {
 	const [assigning, setAssigning] = useState(false);
 	const [assignError, setAssignError] = useState<string | null>(null);
+	const [startingSession, setStartingSession] = useState(false);
+	const [startSessionError, setStartSessionError] = useState<string | null>(null);
 
 	const handleAssign = useCallback(async () => {
 		if (!selected) return;
@@ -30,6 +34,21 @@ export function IssueDetail({
 			setAssigning(false);
 		}
 	}, [selected, owner, repo, onAssignSuccess]);
+
+	const handleStartSession = useCallback(async () => {
+		if (!selected) return;
+		setStartingSession(true);
+		setStartSessionError(null);
+		try {
+			await startIssueSession(owner, repo, selected.number, selected.title, selected.body, selected.labels);
+			onStartSessionSuccess?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setStartSessionError(message);
+		} finally {
+			setStartingSession(false);
+		}
+	}, [selected, owner, repo, onStartSessionSuccess]);
 
 	if (!selected) {
 		return (
@@ -67,17 +86,30 @@ export function IssueDetail({
 						<span className="issue-body-empty">Unassigned</span>
 					)}
 					{selected.assignees.length === 0 && (
-						<button
-							className="action-btn"
-							onClick={handleAssign}
-							disabled={assigning}
-							style={{ marginLeft: "0.5rem" }}
-						>
-							{assigning ? "Assigning..." : "Assign to TARS"}
-						</button>
+						<>
+							<button
+								className="action-btn"
+								onClick={handleAssign}
+								disabled={assigning}
+								style={{ marginLeft: "0.5rem" }}
+							>
+								{assigning ? "Assigning..." : "Assign to TARS"}
+							</button>
+							<button
+								className="action-btn"
+								onClick={handleStartSession}
+								disabled={startingSession}
+								style={{ marginLeft: "0.5rem" }}
+							>
+								{startingSession ? "Starting..." : "Start Session"}
+							</button>
+						</>
 					)}
 					{assignError && (
 						<div className="form-error" style={{ marginTop: "0.25rem" }}>{assignError}</div>
+					)}
+					{startSessionError && (
+						<div className="form-error" style={{ marginTop: "0.25rem" }}>{startSessionError}</div>
 					)}
 				</div>
 			</div>
