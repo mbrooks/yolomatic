@@ -15,14 +15,43 @@ Webhook-driven GitHub issue worker for `mbrooks/*` repositories.
 
 ## Setup
 
-### Local Development
+### Quickstart: Docker Compose
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Start TARS:
+   ```bash
+   docker compose up --build
+   ```
+3. Open the admin wizard at:
+   ```
+   http://127.0.0.1:6767/tarsadmin
+   ```
+4. Use the wizard to create admin credentials, verify a GitHub token, generate a webhook secret, and initialize repositories.
+5. Configure each GitHub repository webhook with payload URL `https://your-public-host/webhook` and the generated secret.
+
+For local testing, expose port `6767` with a tunnel such as `ngrok http 6767`, then use the tunnel `/webhook` URL in GitHub.
+
+### Quickstart: Local npm
 
 1. Install dependencies: `npm install`
-2. Copy `.env.example` to `.env`
-3. Fill in GitHub credentials, `WEBHOOK_SECRET`, and PI agent auth
-4. Run the receiver with `npm run dev`
-5. Expose the local server if needed, for example `ngrok http 6767`
-6. Point the GitHub webhook to `POST /webhook`
+2. Start the receiver with `npm run dev`
+3. Open the admin wizard at `http://127.0.0.1:6767/tarsadmin`
+4. Complete the same setup flow: admin credentials, GitHub token verification, webhook secret, and optional workspace initialization.
+5. Expose the local server if needed, for example `ngrok http 6767`, and point the GitHub webhook to `POST /webhook`.
+
+### Troubleshooting First Run
+
+| Symptom | Check |
+| --- | --- |
+| Admin UI shows onboarding every time | Ensure the `MEMORY_DIR` volume or local `./memory` directory is persisted. |
+| GitHub token verification fails | Confirm the token is active and can access the target repositories and issues. |
+| Webhook returns `401 Invalid signature` | The GitHub webhook secret must match the generated TARS secret exactly. |
+| No webhook deliveries arrive | Confirm the public payload URL ends in `/webhook` and reaches port `6767`. |
+| Repository initialization fails | Confirm the token can clone the repo and that the workspace directory is writable. |
+| Agent starts but cannot run model work | Check `PI_AGENT_PROVIDER`, `PI_AGENT_MODEL`, and the Ollama sidecar/container logs. |
 
 ### Docker Deployment
 

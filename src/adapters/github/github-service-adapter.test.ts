@@ -5,10 +5,12 @@ function createMockOctokit(overrides?: Partial<{
 	issues: Record<string, ReturnType<typeof vi.fn>>;
 	pulls: Record<string, ReturnType<typeof vi.fn>>;
 	repos: Record<string, ReturnType<typeof vi.fn>>;
+	request: ReturnType<typeof vi.fn>;
 	search: Record<string, ReturnType<typeof vi.fn>>;
 	users: Record<string, ReturnType<typeof vi.fn>>;
 }>) {
 	return {
+		request: overrides?.request ?? vi.fn(async () => ({ data: { items: [] } })),
 		issues: {
 			createComment: vi.fn(async () => ({ data: {} })),
 			addLabels: vi.fn(async () => ({ data: {} })),
@@ -366,24 +368,32 @@ describe("GitHubServiceAdapter", () => {
 
 	describe("listRelatedIssues", () => {
 		it("returns mapped search results", async () => {
-			const octokit = createMockOctokit({
-				search: {
-					issuesAndPullRequests: vi.fn(async () => ({
-						data: {
-							items: [
-								{ number: 1, title: "Bug", state: "open" },
-							],
-						},
-					})),
+			const request = vi.fn(async () => ({
+				data: {
+					items: [
+						{ number: 1, title: "Bug", state: "open" },
+					],
 				},
+			}));
+			const octokit = createMockOctokit({
+				request,
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listRelatedIssues("mbrooks", "tars", "bug", 5);
 			expect(result).toEqual([{ number: 1, title: "Bug", state: "open" }]);
+			expect(request).toHaveBeenCalledWith("GET /search/issues", {
+				q: "repo:mbrooks/tars is:issue bug in:title",
+				per_page: 5,
+			});
+			expect(octokit.search.issuesAndPullRequests).not.toHaveBeenCalled();
 		});
 
 		it("returns empty array on error", async () => {
-			const octokit = createMockOctokit();
+			const octokit = createMockOctokit({
+				request: vi.fn(async () => {
+					throw new Error("Search failed");
+				}),
+			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listRelatedIssues("mbrooks", "tars", "bug");
 			expect(result).toEqual([]);
