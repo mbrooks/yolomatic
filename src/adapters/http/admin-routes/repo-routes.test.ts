@@ -48,12 +48,17 @@ describe("handleRepoRoutes", () => {
 		get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
 	};
 
+	const startIssueSession = {
+		execute: vi.fn(async () => ok({ started: true, status: "working", message: "ok" })),
+	};
+
 	function makeDeps(overrides?: Partial<AdminRouterDeps>): AdminRouterDeps {
 		return {
 			adminUsername: "admin",
 			adminPassword: "secret",
 			githubService: githubService as unknown as AdminRouterDeps["githubService"],
 			settingsStore: settingsStore as unknown as AdminRouterDeps["settingsStore"],
+			startIssueSession: startIssueSession as unknown as AdminRouterDeps["startIssueSession"],
 			...overrides,
 		} as AdminRouterDeps;
 	}
@@ -193,7 +198,7 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST"),
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ githubService: undefined }),
 				"/api/repos/mbrooks/tars/issues/42/assign",
@@ -208,7 +213,7 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when settingsStore is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST"),
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ settingsStore: undefined }),
 				"/api/repos/mbrooks/tars/issues/42/assign",
@@ -218,6 +223,21 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBe("Settings store not configured");
+		});
+
+		it("returns 500 when startIssueSession is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				res,
+				makeDeps({ startIssueSession: undefined }),
+				"/api/repos/mbrooks/tars/issues/42/assign",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Session executor not configured");
 		});
 
 		it("returns false for invalid issue number (route does not match)", async () => {
@@ -238,7 +258,7 @@ describe("handleRepoRoutes", () => {
 				get: vi.fn(() => undefined),
 			};
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST"),
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ settingsStore: noUserStore as unknown as AdminRouterDeps["settingsStore"] }),
 				"/api/repos/mbrooks/tars/issues/42/assign",
@@ -250,10 +270,25 @@ describe("handleRepoRoutes", () => {
 			expect(body.error).toBe("TARS GitHub username not configured");
 		});
 
-		it("assigns issue and returns success", async () => {
+		it("returns 400 when title is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST"),
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ body: "desc", labels: [] })),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/issues/42/assign",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Missing required field: title");
+		});
+
+		it("assigns issue, starts session, and returns result", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps(),
 				"/api/repos/mbrooks/tars/issues/42/assign",
@@ -262,16 +297,40 @@ describe("handleRepoRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.assigned).toBe(true);
+			expect(body.started).toBe(true);
+			expect(body.status).toBe("working");
 			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
+			expect(startIssueSession.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 		});
 
-		it("handles service errors", async () => {
+		it("returns 409 when session is already executing", async () => {
+			const res = response();
+			const conflictSession = {
+				execute: vi.fn(async () => ({
+					success: false,
+					code: "conflict",
+					message: "Session is already being executed",
+				})),
+			};
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
+				res,
+				makeDeps({ startIssueSession: conflictSession as unknown as AdminRouterDeps["startIssueSession"] }),
+				"/api/repos/mbrooks/tars/issues/42/assign",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(409);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Session is already being executed");
+		});
+
+		it("handles service errors from assignment", async () => {
 			const res = response();
 			githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST"),
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
 				res,
 				makeDeps(),
 				"/api/repos/mbrooks/tars/issues/42/assign",
@@ -281,6 +340,27 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBe("API error");
+		});
+
+		it("handles service errors from startIssueSession", async () => {
+			const res = response();
+			githubService.updateIssueAssignees.mockResolvedValue(undefined);
+			const failingSession = {
+				execute: vi.fn(async () => {
+					throw new Error("Execution failed");
+				}),
+			};
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
+				res,
+				makeDeps({ startIssueSession: failingSession as unknown as AdminRouterDeps["startIssueSession"] }),
+				"/api/repos/mbrooks/tars/issues/42/assign",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Execution failed");
 		});
 	});
 

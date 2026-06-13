@@ -189,6 +189,12 @@ describe("handleAdminRoute", () => {
 			} as never,
 			cronStore: cronStore as never,
 			githubService: githubService as never,
+			startIssueSession: {
+				execute: vi.fn(async () => ({
+					success: true as const,
+					data: { started: true, status: "working", message: "ok" },
+				})),
+			} as never,
 		};
 	});
 
@@ -2529,6 +2535,7 @@ describe("handleAdminRoute", () => {
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
 
@@ -2536,8 +2543,9 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
 		const body = JSON.parse(String(res.body));
-		expect(body.assigned).toBe(true);
+		expect(body.started).toBe(true);
 		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
+		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 	});
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when githubService missing", async () => {
@@ -2546,6 +2554,7 @@ describe("handleAdminRoute", () => {
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
 
@@ -2562,6 +2571,7 @@ describe("handleAdminRoute", () => {
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
 
@@ -2577,6 +2587,7 @@ describe("handleAdminRoute", () => {
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
 
@@ -2594,6 +2605,7 @@ describe("handleAdminRoute", () => {
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
 
