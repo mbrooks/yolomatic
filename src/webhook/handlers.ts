@@ -17,6 +17,9 @@ import { HandleIssueComment } from "../app/commands/handle-issue-comment.js";
 import { HandlePRReview } from "../app/commands/handle-pr-review.js";
 import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-session.js";
 import { ExecuteSession } from "../app/commands/execute-session.js";
+import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
+import type { GitHubEvent, GitHubEventStateStore } from "../github-events/model.js";
+import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 
 interface IssueLabel {
 	name?: string;
@@ -82,6 +85,7 @@ interface CommentPayload {
 }
 
 export interface WebhookHandlers {
+	handleGitHubEvent?(event: GitHubEvent): Promise<void>;
 	handleIssueEvent(payload: unknown): Promise<void>;
 	handleCommentEvent(payload: unknown): Promise<void>;
 	handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
@@ -95,6 +99,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 	private readonly handleIssueCommentCmd: HandleIssueComment;
 	private readonly handlePRReviewCmd: HandlePRReview;
 	private readonly resumeSessionCmd: ResumeInterruptedSession;
+	private readonly dispatcher: GitHubEventDispatcher;
 
 	public constructor(
 		private readonly deps: {
@@ -103,12 +108,12 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: PiAgentExecutor;
 			githubToken: string;
 			githubUsername: string;
-			autoStart: boolean;
 			defaultBranch: string;
 			selfReportEnabled: boolean;
 			octokit?: Octokit;
 			taskController?: TaskController;
 			adminGithubUsername?: string;
+			eventStore?: GitHubEventStateStore;
 		},
 	) {
 		const sessions = new SessionRepositoryAdapter(deps.sessionManager);
@@ -135,7 +140,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			tasks,
 			github,
 			clock: systemClock,
-			autoStart: deps.autoStart,
 			defaultBranch: deps.defaultBranch,
 			githubUsername: deps.githubUsername,
 			selfReportEnabled: deps.selfReportEnabled,
@@ -157,7 +161,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			workspaces,
 			tasks,
 			github,
-			autoStart: deps.autoStart,
 			defaultBranch: deps.defaultBranch,
 			githubUsername: deps.githubUsername,
 			adminGithubUsername: deps.adminGithubUsername,
@@ -170,24 +173,42 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			github,
 			executor: execDeps,
 		});
+
+		this.dispatcher = new GitHubEventDispatcher({
+			handleIssueEvent: this.handleIssueEventCmd,
+			handleIssueComment: this.handleIssueCommentCmd,
+			handlePRReview: this.handlePRReviewCmd,
+			eventStore: deps.eventStore,
+			githubUsername: deps.githubUsername,
+		});
+	}
+
+	async handleGitHubEvent(event: GitHubEvent): Promise<void> {
+		await this.dispatcher.dispatch(event);
 	}
 
 	async handleIssueEvent(rawPayload: unknown): Promise<void> {
-		const payload = rawPayload as IssuePayload;
-		await this.handleIssueEventCmd.execute(payload);
+		for (const event of normalizeWebhookEvent("issues", rawPayload)) {
+			await this.handleGitHubEvent(event);
+		}
 	}
 
 	async handleCommentEvent(rawPayload: unknown): Promise<void> {
-		const payload = rawPayload as CommentPayload;
-		await this.handleIssueCommentCmd.execute(payload);
+		for (const event of normalizeWebhookEvent("issue_comment", rawPayload)) {
+			await this.handleGitHubEvent(event);
+		}
 	}
 
 	async handlePullRequestReviewCommentEvent(payload: unknown): Promise<void> {
-		await this.handlePRReviewCmd.execute(payload as import("../app/commands/handle-pr-review.js").PRReviewPayload);
+		for (const event of normalizeWebhookEvent("pull_request_review_comment", payload)) {
+			await this.handleGitHubEvent(event);
+		}
 	}
 
 	async handlePullRequestReviewEvent(payload: unknown): Promise<void> {
-		await this.handlePRReviewCmd.execute(payload as import("../app/commands/handle-pr-review.js").PRReviewPayload);
+		for (const event of normalizeWebhookEvent("pull_request_review", payload)) {
+			await this.handleGitHubEvent(event);
+		}
 	}
 
 	async resumeInterruptedSession(owner: string, repo: string, issueNumber: number): Promise<void> {

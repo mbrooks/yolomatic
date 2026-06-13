@@ -35,7 +35,7 @@ describe("cron migrations", () => {
 		db.close();
 	});
 
-	it("creates cron_jobs and cron_runs tables", () => {
+	it("creates cron, settings, skills, and GitHub event tables", () => {
 		const db = new DatabaseSync(dbPath);
 		runMigrations(db);
 
@@ -43,6 +43,9 @@ describe("cron migrations", () => {
 		const tableNames = tables.map((t) => t.name);
 		expect(tableNames).toContain("cron_jobs");
 		expect(tableNames).toContain("cron_runs");
+		expect(tableNames).toContain("github_event_state");
+		expect(tableNames).toContain("github_event_dedupe");
+		expect(tableNames).toContain("github_poll_subjects");
 		expect(tableNames).toContain("_migrations");
 		db.close();
 	});

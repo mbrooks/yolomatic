@@ -24,7 +24,6 @@ describe("getConfig", () => {
 	beforeEach(() => {
 		process.env = { ...originalEnv };
 		delete process.env.PORT;
-		delete process.env.AUTO_START;
 		delete process.env.WEBHOOK_SECRET;
 		delete process.env.SESSIONS_DIR;
 		delete process.env.DEFAULT_BRANCH;
@@ -38,6 +37,8 @@ describe("getConfig", () => {
 		delete process.env.CLEANUP_RETENTION_DAYS;
 		delete process.env.ADMIN_USERNAME;
 		delete process.env.ADMIN_PASSWORD;
+		delete process.env.GITHUB_EVENT_MODE;
+		delete process.env.GITHUB_POLL_INTERVAL_MS;
 	});
 
 	afterEach(() => {
@@ -56,7 +57,6 @@ describe("getConfig", () => {
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(6767);
-		expect(config.autoStart).toBe(false);
 		expect(config.defaultBranch).toBe("main");
 		expect(config.sessionsDir).toBeTruthy();
 		expect(config.workspacesDir).toBeTruthy();
@@ -64,6 +64,8 @@ describe("getConfig", () => {
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.adminUsername).toBeUndefined();
 		expect(config.adminPassword).toBeUndefined();
+		expect(config.githubEventMode).toBe("webhook");
+		expect(config.githubPollIntervalMs).toBe(60000);
 	});
 
 	it("reads optional environment variables", () => {
@@ -82,7 +84,6 @@ describe("getConfig", () => {
 
 	it("reads environment variables", () => {
 		process.env.PORT = "8080";
-		process.env.AUTO_START = "true";
 		process.env.WEBHOOK_SECRET = "secret";
 		process.env.SESSIONS_DIR = "/tmp/sessions";
 		process.env.DEFAULT_BRANCH = "develop";
@@ -92,10 +93,11 @@ describe("getConfig", () => {
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
 		process.env.ADMIN_USERNAME = "admin";
 		process.env.ADMIN_PASSWORD = "secret";
+		process.env.GITHUB_EVENT_MODE = "both";
+		process.env.GITHUB_POLL_INTERVAL_MS = "30000";
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
-		expect(config.autoStart).toBe(true);
 		expect(config.webhookSecret).toBe("secret");
 		expect(config.sessionsDir).toBe("/tmp/sessions");
 		expect(config.defaultBranch).toBe("develop");
@@ -106,6 +108,15 @@ describe("getConfig", () => {
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.adminUsername).toBe("admin");
 		expect(config.adminPassword).toBe("secret");
+		expect(config.githubEventMode).toBe("both");
+		expect(config.githubPollIntervalMs).toBe(30000);
+	});
+
+	it("falls back to webhook mode for unknown GitHub event modes", () => {
+		process.env.GITHUB_EVENT_MODE = "invalid";
+
+		const config = getConfig(createStore());
+		expect(config.githubEventMode).toBe("webhook");
 	});
 
 	it("returns empty strings for missing required settings without throwing", () => {

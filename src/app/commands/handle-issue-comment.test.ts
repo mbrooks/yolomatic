@@ -80,7 +80,6 @@ describe("HandleIssueComment", () => {
 			workspaces: workspaces as never,
 			tasks: tasks as never,
 			github: github as never,
-			autoStart: true,
 			defaultBranch: "main",
 			githubUsername: "tars-bot",
 			executor: {

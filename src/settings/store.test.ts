@@ -43,10 +43,10 @@ describe("SettingsStore", () => {
 	});
 
 	it("getBoolean parses true/false", () => {
-		store.set("auto_start", "true");
-		expect(store.getBoolean("auto_start")).toBe(true);
-		store.set("auto_start", "false");
-		expect(store.getBoolean("auto_start")).toBe(false);
+		store.set("self_report_enabled", "true");
+		expect(store.getBoolean("self_report_enabled")).toBe(true);
+		store.set("self_report_enabled", "false");
+		expect(store.getBoolean("self_report_enabled")).toBe(false);
 	});
 
 	it("getAllViews returns all definitions", () => {
@@ -60,8 +60,8 @@ describe("SettingsStore", () => {
 	});
 
 	it("setTyped coerces values correctly", () => {
-		store.setTyped("auto_start", true);
-		expect(store.get("auto_start")).toBe("true");
+		store.setTyped("self_report_enabled", true);
+		expect(store.get("self_report_enabled")).toBe("true");
 		store.setTyped("port", 42);
 		expect(store.get("port")).toBe("42");
 		store.setTyped("default_branch", "develop");
@@ -89,8 +89,7 @@ describe("SettingsStore", () => {
 	});
 
 	it("getBoolean falls back to definition default", () => {
-		// auto_start has default "false" in definitions
-		expect(store.getBoolean("auto_start")).toBe(false);
+		expect(store.getBoolean("self_report_enabled")).toBe(true);
 	});
 
 	it("getBoolean returns false for unknown keys", () => {
