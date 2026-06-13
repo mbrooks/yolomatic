@@ -136,13 +136,15 @@ describe("issues api", () => {
 
 	it("assigns issue via POST", async () => {
 		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			jsonResponse({ assigned: true }),
+			jsonResponse({ started: true, status: "working", message: "ok" }),
 		);
 
-		await expect(assignIssue("mbrooks", "tars", 42)).resolves.toEqual({ assigned: true });
+		await expect(assignIssue("mbrooks", "tars", 42, "Bug", "desc", ["bug"])).resolves.toEqual({ started: true, status: "working", message: "ok" });
 
 		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/assign", {
 			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 	});
 

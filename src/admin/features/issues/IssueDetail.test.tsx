@@ -81,7 +81,7 @@ describe("IssueDetail", () => {
 	});
 
 	it("calls assignIssue and onAssignSuccess when Assign to TARS is clicked", async () => {
-		mockAssignIssue.mockResolvedValue(undefined);
+		mockAssignIssue.mockResolvedValue({ started: true, status: "working", message: "ok" });
 		const onAssignSuccess = vi.fn();
 		render(
 			<IssueDetail
@@ -93,7 +93,16 @@ describe("IssueDetail", () => {
 		);
 		const button = screen.getByText("Assign to TARS");
 		fireEvent.click(button);
-		await waitFor(() => expect(mockAssignIssue).toHaveBeenCalledWith("mbrooks", "tars", 1));
+		await waitFor(() =>
+			expect(mockAssignIssue).toHaveBeenCalledWith(
+				"mbrooks",
+				"tars",
+				1,
+				"Bug report",
+				"Something is broken",
+				["bug", "ui"],
+			),
+		);
 		await waitFor(() => expect(onAssignSuccess).toHaveBeenCalled());
 	});
 
