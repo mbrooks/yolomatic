@@ -77,7 +77,7 @@ export function buildHash(route: Route): string {
 		if (route.issueNumber !== undefined) {
 			return `${base}/${route.issueNumber}`;
 		}
-		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : route.tab === "issues" ? "/issues" : route.tab === "sessions" ? "/sessions" : "";
+		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : route.tab === "sessions" ? "/sessions" : "";
 		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {
