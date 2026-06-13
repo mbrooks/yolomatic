@@ -13,7 +13,7 @@ export function SessionDetail({
 }: {
 	selected: Session | null;
 	onMutate: () => void;
-	activeTab?: "sessions" | "crons" | "skills";
+	activeTab?: "sessions" | "crons" | "skills" | "issues";
 }): React.ReactElement {
 	const [paused, setPaused] = useState(false);
 	const logState = useSessionLog(selected, paused);

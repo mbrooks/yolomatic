@@ -42,8 +42,18 @@ describe("parseHash", () => {
 		expect(parseHash("#/repos")).toEqual({ screen: "repos" });
 	});
 
-	it("parses repo detail (sessions tab)", () => {
+	it("parses repo detail (default tab)", () => {
 		expect(parseHash("#/repos/mbrooks/tars")).toEqual({
+			screen: "repo",
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: undefined,
+			tab: "issues",
+		});
+	});
+
+	it("parses repo detail (sessions tab)", () => {
+		expect(parseHash("#/repos/mbrooks/tars/sessions")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
 			repo: "tars",
@@ -58,7 +68,7 @@ describe("parseHash", () => {
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: 140,
-			tab: "sessions",
+			tab: "issues",
 		});
 	});
 
@@ -122,8 +132,14 @@ describe("buildHash", () => {
 
 	it("builds repo detail", () => {
 		expect(
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
+		).toBe("#/repos/mbrooks/tars/issues");
+	});
+
+	it("builds repo detail with sessions tab", () => {
+		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars");
+		).toBe("#/repos/mbrooks/tars/sessions");
 	});
 
 	it("builds repo detail with crons tab", () => {
@@ -134,18 +150,12 @@ describe("buildHash", () => {
 
 	it("builds repo detail with issue number", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "issues" }),
 		).toBe("#/repos/mbrooks/tars/140");
 	});
 
 	it("builds new-issue view with owner and repo", () => {
 		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
-	});
-
-	it("builds repo detail with issues tab", () => {
-		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
-		).toBe("#/repos/mbrooks/tars/issues");
 	});
 
 	it("round-trips issues tab", () => {
