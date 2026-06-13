@@ -45,6 +45,7 @@ export function buildConversationSystemPrompt(): string {
 		"Set shouldCreate to true only when the user has clearly asked you to create/publish/open the issue now.",
 		"Set readyToCreate to true only when repository owner, repository name, and a usable issue title are present.",
 		"Respond ONLY with valid JSON and no markdown fences or commentary.",
+		"Additional skills are available in the read-only context under .pi/skills/. Use `ls` and `read` to discover and consult them when they would improve the issue draft.",
 	].join(" ");
 }
 

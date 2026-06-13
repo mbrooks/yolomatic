@@ -30,6 +30,9 @@ describe("NewIssueScreen", () => {
 			const url = typeof input === "string" ? input : input.toString();
 
 			if (url.includes("/api/repos/")) {
+				if (url.endsWith("/skills")) {
+					return mockJsonResponse({ skills: [] });
+				}
 				return mockJsonResponse({
 					labels: ["bug", "enhancement"],
 					templates: [{ name: "Bug Report", body: "## Steps\n" }],
@@ -428,6 +431,9 @@ describe("NewIssueScreen", () => {
 		fetchSpy.mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
 			const url = typeof input === "string" ? input : input.toString();
 			if (url.includes("/api/repos/")) {
+				if (url.endsWith("/skills")) {
+					return mockJsonResponse({ skills: [] });
+				}
 				return mockJsonResponse({
 					labels: ["bug", "enhancement"],
 					templates: [{ name: "Bug Report", body: "## Steps\n" }],
@@ -486,6 +492,9 @@ describe("NewIssueScreen", () => {
 		fetchSpy.mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
 			const url = typeof input === "string" ? input : input.toString();
 			if (url.includes("/api/repos/")) {
+				if (url.endsWith("/skills")) {
+					return mockJsonResponse({ skills: [] });
+				}
 				return mockJsonResponse({
 					labels: ["bug", "enhancement"],
 					templates: [{ name: "Bug Report", body: "## Steps\n" }],
