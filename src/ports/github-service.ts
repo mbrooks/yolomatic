@@ -152,6 +152,7 @@ export interface GitHubService {
 	listPendingInvitations(): Promise<PendingInvitation[]>;
 	acceptInvitation(invitationId: number): Promise<void>;
 	updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void>;
+	closeIssue(owner: string, repo: string, issueNumber: number): Promise<void>;
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 }

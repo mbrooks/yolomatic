@@ -40,6 +40,8 @@ describe("handleRepoRoutes", () => {
 		listRelatedIssues: vi.fn() as ReturnType<typeof vi.fn>,
 		listOpenIssues: vi.fn() as ReturnType<typeof vi.fn>,
 		updateIssueAssignees: vi.fn() as ReturnType<typeof vi.fn>,
+		closeIssue: vi.fn() as ReturnType<typeof vi.fn>,
+		addLabels: vi.fn() as ReturnType<typeof vi.fn>,
 		getAuthenticatedUser: vi.fn() as ReturnType<typeof vi.fn>,
 		listAccessibleRepositories: vi.fn() as ReturnType<typeof vi.fn>,
 	};
@@ -791,6 +793,113 @@ describe("handleRepoRoutes", () => {
 				"configured_repositories",
 				JSON.stringify([{ owner: "valid", repo: "repo" }]),
 			);
+		});
+	});
+
+	describe("POST /api/repos/:owner/:repo/issues/:number/close", () => {
+		it("closes the issue", async () => {
+			const res = response();
+			githubService.closeIssue.mockResolvedValue(undefined);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/issues/42/close",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.closed).toBe(true);
+			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		});
+
+		it("returns 500 when githubService is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				res,
+				makeDeps({ githubService: undefined }),
+				"/api/repos/mbrooks/tars/issues/42/close",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub service not configured");
+		});
+
+		it("handles service errors", async () => {
+			const res = response();
+			githubService.closeIssue.mockRejectedValue(new Error("API error"));
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/issues/42/close",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("API error");
+		});
+	});
+
+	describe("POST /api/repos/:owner/:repo/issues/:number/mark-do-not-work", () => {
+		it("adds wontfix label and closes the issue", async () => {
+			const res = response();
+			githubService.addLabels.mockResolvedValue(undefined);
+			githubService.closeIssue.mockResolvedValue(undefined);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.closed).toBe(true);
+			expect(body.labeled).toBe(true);
+			expect(githubService.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 42, ["wontfix"]);
+			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		});
+
+		it("returns 500 when githubService is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				res,
+				makeDeps({ githubService: undefined }),
+				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub service not configured");
+		});
+
+		it("handles service errors", async () => {
+			const res = response();
+			githubService.addLabels.mockRejectedValue(new Error("Label API error"));
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Label API error");
 		});
 	});
 });
