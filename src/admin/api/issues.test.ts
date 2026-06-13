@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assignIssue, chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues } from "./issues.js";
+import { assignIssue, chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues, startIssueSession } from "./issues.js";
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -143,6 +143,24 @@ describe("issues api", () => {
 
 		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/assign", {
 			method: "POST",
+		});
+	});
+
+	it("starts issue session via POST", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			jsonResponse({ started: true, status: "working", message: "ok" }),
+		);
+
+		await expect(startIssueSession("mbrooks", "tars", 42, "Bug", "desc", ["bug"])).resolves.toEqual({
+			started: true,
+			status: "working",
+			message: "ok",
+		});
+
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/start-session", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 	});
 });

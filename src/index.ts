@@ -127,6 +127,7 @@ export async function main(): Promise<void> {
 			settingsStore,
 			skillStore,
 			repoSkillService,
+			executor,
 		);
 		server.listen(nextConfig.port, () => {
 			process.stdout.write(`Webhook receiver listening on port ${nextConfig.port}\n`);

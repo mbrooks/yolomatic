@@ -182,6 +182,7 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
+			expect.any(Object),
 		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
@@ -247,6 +248,7 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
+			expect.any(Object),
 		);
 	});
 
@@ -297,6 +299,7 @@ describe("main", () => {
 			expect.any(String),
 			expect.anything(),
 			undefined,
+			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
