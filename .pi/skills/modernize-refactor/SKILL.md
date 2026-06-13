@@ -3,11 +3,6 @@ name: modernize-refactor
 description: Plan behavior-preserving modernization and refactor work for an existing codebase. Use when the agent needs to inspect a repo, identify dead code, duplicated paths, oversized modules, stale abstractions, legacy patterns, and other structural debt, then pr
 ---
 
----
-name: modernize-refactor
-description: Plan behavior-preserving modernization and refactor work for an existing codebase. Use when the agent needs to inspect a repo, identify dead code, duplicated paths, oversized modules, stale abstractions, legacy patterns, and other structural debt, then propose a staged refactor plan with small reviewable passes, stable public APIs, and validation checks that prove behavior stays the same.
----
-
 # Modernize Refactor
 
 ## Overview
