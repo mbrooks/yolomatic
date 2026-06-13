@@ -181,7 +181,7 @@ export class GitHubServiceAdapter implements GitHubService {
 
 	async listRelatedIssues(owner: string, repo: string, query: string, limit = 10): Promise<Array<{ number: number; title: string; state: string }>> {
 		try {
-			const { data } = await this.octokit.search.issuesAndPullRequests({
+			const { data } = await this.octokit.request("GET /search/issues", {
 				q: `repo:${owner}/${repo} is:issue ${query} in:title`,
 				per_page: limit,
 			});
