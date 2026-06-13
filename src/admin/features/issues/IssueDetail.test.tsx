@@ -198,4 +198,76 @@ describe("IssueDetail", () => {
 		render(<IssueDetail selected={{ ...mockIssue, labels: [] }} owner="mbrooks" repo="tars" />);
 		expect(screen.getByText("No labels")).toBeDefined();
 	});
+
+	it("resets assigning state when selected issue changes", async () => {
+		mockAssignIssue.mockImplementation(() => new Promise(() => {}));
+		const { rerender } = render(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 1, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		fireEvent.click(screen.getByText("Assign to TARS"));
+		await waitFor(() => expect(screen.getByText("Assigning...")).toBeDefined());
+
+		rerender(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 2, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		expect(screen.queryByText("Assigning...")).toBeNull();
+		expect(screen.getByText("Assign to TARS")).toBeDefined();
+	});
+
+	it("resets start session state when selected issue changes", async () => {
+		mockStartIssueSession.mockImplementation(() => new Promise(() => {}));
+		const { rerender } = render(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 1, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		fireEvent.click(screen.getByText("Start Session"));
+		await waitFor(() => expect(screen.getByText("Starting...")).toBeDefined());
+
+		rerender(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 2, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		expect(screen.queryByText("Starting...")).toBeNull();
+		expect(screen.getByText("Start Session")).toBeDefined();
+	});
+
+	it("resets error states when selected issue changes", async () => {
+		mockAssignIssue.mockRejectedValue(new Error("Network error"));
+		mockStartIssueSession.mockRejectedValue(new Error("Start failed"));
+		const { rerender } = render(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 1, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		fireEvent.click(screen.getByText("Assign to TARS"));
+		fireEvent.click(screen.getByText("Start Session"));
+		await waitFor(() => expect(screen.getByText("Network error")).toBeDefined());
+		await waitFor(() => expect(screen.getByText("Start failed")).toBeDefined());
+
+		rerender(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 2, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		expect(screen.queryByText("Network error")).toBeNull();
+		expect(screen.queryByText("Start failed")).toBeNull();
+	});
 });
