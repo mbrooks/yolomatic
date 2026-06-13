@@ -270,5 +270,60 @@ export async function handleRepoRoutes(
 		return true;
 	}
 
+	const closeMatch =
+		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/close$/u.exec(pathname);
+	if (closeMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		const [, owner, repo, issueNumberStr] = closeMatch;
+		const issueNumber = Number.parseInt(issueNumberStr, 10);
+		if (Number.isNaN(issueNumber)) {
+			sendJson(response, 400, { error: "Invalid issue number" });
+			return true;
+		}
+		try {
+			await deps.githubService.closeIssue(owner, repo, issueNumber);
+			sendJson(response, 200, { closed: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[webhook] close error: ${message}\n`);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
+	const markDoNotWorkMatch =
+		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/mark-do-not-work$/u.exec(pathname);
+	if (markDoNotWorkMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		const [, owner, repo, issueNumberStr] = markDoNotWorkMatch;
+		const issueNumber = Number.parseInt(issueNumberStr, 10);
+		if (Number.isNaN(issueNumber)) {
+			sendJson(response, 400, { error: "Invalid issue number" });
+			return true;
+		}
+		try {
+			await deps.githubService.addLabels(owner, repo, issueNumber, ["wontfix"]);
+			await deps.githubService.closeIssue(owner, repo, issueNumber);
+			sendJson(response, 200, { closed: true, labeled: true });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[webhook] mark-do-not-work error: ${message}\n`);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	return false;
 }

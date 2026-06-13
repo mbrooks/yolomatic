@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import type { OpenIssue } from "../../api/issues.js";
-import { assignIssue, startIssueSession } from "../../api/issues.js";
+import { assignIssue, startIssueSession, closeIssue, markIssueDoNotWork } from "../../api/issues.js";
 
 export function IssueDetail({
 	selected,
@@ -8,17 +8,25 @@ export function IssueDetail({
 	repo,
 	onAssignSuccess,
 	onStartSessionSuccess,
+	onCloseSuccess,
+	onMarkDoNotWorkSuccess,
 }: {
 	selected: OpenIssue | null;
 	owner: string;
 	repo: string;
 	onAssignSuccess?: () => void;
 	onStartSessionSuccess?: () => void;
+	onCloseSuccess?: () => void;
+	onMarkDoNotWorkSuccess?: () => void;
 }): React.ReactElement {
 	const [assigning, setAssigning] = useState(false);
 	const [assignError, setAssignError] = useState<string | null>(null);
 	const [startingSession, setStartingSession] = useState(false);
 	const [startSessionError, setStartSessionError] = useState<string | null>(null);
+	const [closing, setClosing] = useState(false);
+	const [closeError, setCloseError] = useState<string | null>(null);
+	const [markingDoNotWork, setMarkingDoNotWork] = useState(false);
+	const [markDoNotWorkError, setMarkDoNotWorkError] = useState<string | null>(null);
 
 	const handleAssign = useCallback(async () => {
 		if (!selected) return;
@@ -49,6 +57,36 @@ export function IssueDetail({
 			setStartingSession(false);
 		}
 	}, [selected, owner, repo, onStartSessionSuccess]);
+
+	const handleClose = useCallback(async () => {
+		if (!selected) return;
+		setClosing(true);
+		setCloseError(null);
+		try {
+			await closeIssue(owner, repo, selected.number);
+			onCloseSuccess?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setCloseError(message);
+		} finally {
+			setClosing(false);
+		}
+	}, [selected, owner, repo, onCloseSuccess]);
+
+	const handleMarkDoNotWork = useCallback(async () => {
+		if (!selected) return;
+		setMarkingDoNotWork(true);
+		setMarkDoNotWorkError(null);
+		try {
+			await markIssueDoNotWork(owner, repo, selected.number);
+			onMarkDoNotWorkSuccess?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setMarkDoNotWorkError(message);
+		} finally {
+			setMarkingDoNotWork(false);
+		}
+	}, [selected, owner, repo, onMarkDoNotWorkSuccess]);
 
 	if (!selected) {
 		return (
@@ -123,6 +161,33 @@ export function IssueDetail({
 						))
 					) : (
 						<span className="issue-body-empty">No labels</span>
+					)}
+				</div>
+			</div>
+
+			<div className="detail-section">
+				<h3>Actions</h3>
+				<div className="detail-row">
+					<button
+						className="action-btn"
+						onClick={handleClose}
+						disabled={closing}
+					>
+						{closing ? "Closing..." : "Close Issue"}
+					</button>
+					<button
+						className="action-btn"
+						onClick={handleMarkDoNotWork}
+						disabled={markingDoNotWork}
+						style={{ marginLeft: "0.5rem" }}
+					>
+						{markingDoNotWork ? "Marking..." : "Mark as Do Not Work"}
+					</button>
+					{closeError && (
+						<div className="form-error" style={{ marginTop: "0.25rem" }}>{closeError}</div>
+					)}
+					{markDoNotWorkError && (
+						<div className="form-error" style={{ marginTop: "0.25rem" }}>{markDoNotWorkError}</div>
 					)}
 				</div>
 			</div>

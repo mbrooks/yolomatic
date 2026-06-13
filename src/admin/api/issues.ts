@@ -136,3 +136,25 @@ export async function startIssueSession(
 		{ title, body, labels },
 	);
 }
+
+export async function closeIssue(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+): Promise<{ closed: boolean }> {
+	return apiPost<{ closed: boolean }>(
+		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/close`,
+		{},
+	);
+}
+
+export async function markIssueDoNotWork(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+): Promise<{ closed: boolean; labeled: boolean }> {
+	return apiPost<{ closed: boolean; labeled: boolean }>(
+		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/mark-do-not-work`,
+		{},
+	);
+}

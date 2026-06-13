@@ -35,7 +35,20 @@ export function IssuesScreen({
 			emptyMessage="No open issues for this repository."
 		>
 			<IssueListPane issues={issues} selected={selected} onSelect={setSelected} />
-			<IssueDetail selected={selected} owner={owner} repo={repo} onAssignSuccess={reload} />
+			<IssueDetail
+				selected={selected}
+				owner={owner}
+				repo={repo}
+				onAssignSuccess={reload}
+				onCloseSuccess={() => {
+					setSelected(null);
+					reload();
+				}}
+				onMarkDoNotWorkSuccess={() => {
+					setSelected(null);
+					reload();
+				}}
+			/>
 		</RepoScopedScreenShell>
 	);
 }

@@ -248,6 +248,10 @@ export class GitHubServiceAdapter implements GitHubService {
 		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, assignees });
 	}
 
+	async closeIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
+		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, state: "closed" });
+	}
+
 	async getAuthenticatedUser(): Promise<{ login: string } | null> {
 		try {
 			const { data } = await this.octokit.users.getAuthenticated();
