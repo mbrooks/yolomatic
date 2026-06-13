@@ -73,7 +73,7 @@ export class ExecuteSessionDelivery {
 			const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
 			process.stdout.write(`[execute] post-commit status for ${repo}#${issueNumber}: ${postStatus}\n`);
 
-			const prResult = await this.createPR(owner, repo, issueNumber, current.title, result.summary);
+			const prResult = await this.createPR(owner, repo, issueNumber, current.title, result, current);
 			prUrl = prResult.url;
 			deliveryOutcome = prResult.outcome;
 		} catch (error) {
@@ -139,17 +139,22 @@ export class ExecuteSessionDelivery {
 		owner: string,
 		repo: string,
 		issueNumber: number,
-		title: string,
-		summary: string,
+		issueTitle: string,
+		result: import("../../executor/index.js").ExecutionResult,
+		current: import("../../session/store.js").SessionState,
 	): Promise<{ url?: string; outcome: "pr-created" | "pr-existed" | "no-changes" }> {
 		const base = this.deps.defaultBranch;
 		const head = `tars/issue-${issueNumber}`;
+
+		const gitDiff = await this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(() => "");
+		const prBody = this.buildPRBody(issueNumber, current, result, gitDiff);
+
 		try {
 			const pr = await this.deps.github.createPullRequest(
 				owner,
 				repo,
-				`TARS: ${title}`,
-				`Fixes #${issueNumber}\n\n${summary}`,
+				`TARS: ${issueTitle}`,
+				prBody,
 				head,
 				base,
 			);
@@ -177,5 +182,33 @@ export class ExecuteSessionDelivery {
 			throw error;
 		}
 		return { outcome: "no-changes" };
+	}
+
+	private buildPRBody(
+		issueNumber: number,
+		current: import("../../session/store.js").SessionState,
+		result: import("../../executor/index.js").ExecutionResult,
+		gitDiff: string,
+	): string {
+		const issueContext = current.body
+			? `## Issue Context\n\n**Title:** ${current.title}\n\n${current.body.slice(0, 2000)}${current.body.length > 2000 ? "\n\n..." : ""}`
+			: `## Issue Context\n\n**Title:** ${current.title}`;
+
+		const summarySection = result.summary
+			? `## Summary\n\n${result.summary}`
+			: "";
+
+		const changesSection = gitDiff
+			? `## Changes\n\n\`\`\`diff\n${gitDiff.slice(0, 5000)}${gitDiff.length > 5000 ? "\n... (truncated)" : ""}\n\`\`\``
+			: "";
+
+		const parts = [
+			`Fixes #${issueNumber}`,
+			summarySection,
+			issueContext,
+			changesSection,
+		].filter(Boolean);
+
+		return parts.join("\n\n");
 	}
 }
