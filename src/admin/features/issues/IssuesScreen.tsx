@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { RepoScopedScreenShell } from "../../components/RepoScopedScreenShell.js";
 import type { OpenIssue } from "../../api/issues.js";
 import { useRepoIssues } from "./useRepoIssues.js";
@@ -21,6 +21,15 @@ export function IssuesScreen({
 	const { issues, loading, reload } = useRepoIssues(owner, repo);
 	const [selected, setSelected] = useState<OpenIssue | null>(null);
 
+	useEffect(() => {
+		if (selected) {
+			const updated = issues.find((i) => i.number === selected.number);
+			if (updated) {
+				setSelected(updated);
+			}
+		}
+	}, [issues]);
+
 	return (
 		<RepoScopedScreenShell
 			owner={owner}
@@ -29,7 +38,7 @@ export function IssuesScreen({
 			onSelectTab={onSelectTab}
 			onNewIssue={onNewIssue}
 			onBack={onBack}
-			loading={loading}
+			loading={issues.length === 0 && loading}
 			loadingMessage="Loading issues..."
 			empty={issues.length === 0}
 			emptyMessage="No open issues for this repository."

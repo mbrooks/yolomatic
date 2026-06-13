@@ -38,11 +38,18 @@ describe("RepoScopedScreenShell", () => {
 		expect(props.onBack).toHaveBeenCalled();
 	});
 
-	it("renders the loading branch", () => {
-		renderShell({ loading: true });
+	it("renders the loading branch when empty", () => {
+		renderShell({ loading: true, empty: true });
 
 		expect(screen.getByText("Loading repo data...")).toBeTruthy();
 		expect(screen.queryByText("Repo content")).toBeNull();
+	});
+
+	it("keeps workspace visible during reload", () => {
+		renderShell({ loading: true, empty: false });
+
+		expect(screen.queryByText("Loading repo data...")).toBeNull();
+		expect(screen.getByText("Repo content")).toBeTruthy();
 	});
 
 	it("renders the empty branch with optional action", () => {
