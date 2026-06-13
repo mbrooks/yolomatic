@@ -21,6 +21,12 @@ describe("buildSystemPrompt", () => {
 		expect(prompt).toContain("list key source files");
 		expect(prompt).toContain("check recent commits");
 	});
+
+	it("instructs thoroughness and detail when drafting issues", () => {
+		const prompt = buildSystemPrompt();
+		expect(prompt).toContain("Be thorough and detailed when drafting");
+		expect(prompt).toContain("Include enough context, reproduction steps, and expected behavior");
+	});
 });
 
 describe("buildUserPrompt", () => {
@@ -29,6 +35,7 @@ describe("buildUserPrompt", () => {
 		expect(prompt).toContain("Repository: owner/repo");
 		expect(prompt).toContain("User request: fix the bug");
 		expect(prompt).toContain("Generate a GitHub issue");
+		expect(prompt).toContain("thorough, detailed description with reproduction steps");
 	});
 
 	it("adds privacy warning when privacyMode is true", () => {
@@ -164,6 +171,12 @@ describe("buildConversationSystemPrompt", () => {
 		expect(prompt).toContain("list key source files");
 		expect(prompt).toContain("check recent commits");
 	});
+
+	it("instructs thoroughness in the conversational draft", () => {
+		const prompt = buildConversationSystemPrompt();
+		expect(prompt).toContain("Be thorough and detailed when drafting");
+		expect(prompt).toContain("Include enough context, reproduction steps, and expected behavior");
+	});
 });
 
 describe("buildConversationPrompt", () => {
@@ -215,6 +228,14 @@ describe("buildConversationPrompt", () => {
 		});
 		expect(prompt).toContain("review the target repository's main branch code");
 		expect(prompt).toContain("draft references existing files");
+	});
+
+	it("includes rule to be thorough and detailed in draft body", () => {
+		const prompt = buildConversationPrompt({
+			messages: [{ role: "user", text: "help" }],
+		});
+		expect(prompt).toContain("Be thorough and detailed in the draft body");
+		expect(prompt).toContain("Include reproduction steps, expected behavior");
 	});
 
 	it("mentions template auto-detection when templates exist but none is selected", () => {
