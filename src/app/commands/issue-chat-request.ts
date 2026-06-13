@@ -1,4 +1,6 @@
 import type { CreatedIssue, GitHubService } from "../../ports/github-service.js";
+import type { SkillStore } from "../../skills/store.js";
+import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import type { RepoContext } from "./issue-prompts.js";
 import {
 	chatIssueViaLLM,
@@ -35,6 +37,8 @@ export interface IssueChatProgressEvent {
 
 export interface IssueChatRequestDeps {
 	githubService?: GitHubService;
+	skillStore?: SkillStore;
+	repoSkillService?: RepoSkillService;
 }
 
 function normalizeMessages(messages: IssueChatRequestBody["messages"]): IssueConversationMessage[] {
@@ -75,6 +79,8 @@ export async function executeIssueChatRequest(
 				done: chunk.done,
 			});
 		},
+		skillStore: deps.skillStore,
+		repoSkillService: deps.repoSkillService,
 	});
 
 	if (!chatResult.shouldCreate) {
