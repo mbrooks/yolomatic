@@ -271,8 +271,10 @@ h1 {
 }
 
 .action-btn {
-	border: none;
+	background: var(--surface);
+	border: 1px solid var(--border);
 	border-radius: 4px;
+	color: var(--text);
 	cursor: pointer;
 	font-size: 0.75rem;
 	font-weight: 600;
@@ -458,6 +460,9 @@ a:hover {
 }
 
 .repo-inventory-header {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
 	flex-shrink: 0;
 }
 
