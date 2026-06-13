@@ -7,7 +7,6 @@ describe("skill types", () => {
 			name: "test",
 			description: "desc",
 			content: "body",
-			enabled: true,
 			updatedAt: "",
 			createdAt: "",
 		};
@@ -19,7 +18,6 @@ describe("skill types", () => {
 			name: "test",
 			description: "desc",
 			content: "body",
-			enabled: true,
 			updatedAt: "",
 			source: "repo" as const,
 		};

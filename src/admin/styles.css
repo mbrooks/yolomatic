@@ -2291,26 +2291,6 @@ a:hover {
 	color: var(--green);
 }
 
-.skill-badge.disabled {
-	color: var(--red);
-}
-
-.skill-status {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	font-size: 0.75rem;
-	padding: 0.15rem 0.4rem;
-}
-
-.skill-status.enabled {
-	color: var(--green);
-}
-
-.skill-status.disabled {
-	color: var(--red);
-}
-
 .skill-description {
 	color: var(--muted);
 	font-size: 0.875rem;

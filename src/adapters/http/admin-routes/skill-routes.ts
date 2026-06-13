@@ -39,7 +39,6 @@ export async function handleSkillRoutes(
 					name?: string;
 					description?: string;
 					content?: string;
-					enabled?: boolean;
 				};
 				if (!body.name || !body.content) {
 					sendJson(response, 400, { error: "Missing required fields: name, content" });
@@ -49,7 +48,6 @@ export async function handleSkillRoutes(
 					name: body.name,
 					description: body.description || "",
 					content: body.content,
-					enabled: body.enabled ?? true,
 				});
 				sendJson(response, 201, skill);
 			} catch (error) {
@@ -98,7 +96,6 @@ export async function handleSkillRoutes(
 				name: string;
 				description: string;
 				content: string;
-				enabled: boolean;
 			}>;
 			const updated = await deps.skillStore.update(id, body);
 			if (!updated) {
@@ -169,7 +166,6 @@ export async function handleSkillRoutes(
 				name?: string;
 				description?: string;
 				content?: string;
-				enabled?: boolean;
 			};
 			if (!body.name || !body.content) {
 				sendJson(response, 400, { error: "Missing required fields: name, content" });
@@ -179,7 +175,6 @@ export async function handleSkillRoutes(
 				name: body.name,
 				description: body.description || "",
 				content: body.content,
-				enabled: body.enabled ?? true,
 			});
 			if (!result.success) {
 				sendJson(response, 500, { error: result.error || "Failed to save skill" });
@@ -234,7 +229,6 @@ export async function handleSkillRoutes(
 				name: string;
 				description: string;
 				content: string;
-				enabled: boolean;
 			}>;
 			const existing = await deps.repoSkillService.getRepoSkill(owner, repo, name);
 			if (!existing) {
@@ -248,7 +242,6 @@ export async function handleSkillRoutes(
 				name: body.name ?? name,
 				description: body.description ?? existing.description,
 				content: body.content ?? existing.content,
-				enabled: body.enabled ?? existing.enabled,
 			});
 			if (!result.success) {
 				sendJson(response, 500, { error: result.error || "Failed to save skill" });
