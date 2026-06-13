@@ -94,7 +94,7 @@ export function RepoInventoryScreen({
 					}}
 					disabled={scanning}
 				>
-					{scanning ? "Scanning..." : "Rescan"}
+					{scanning ? "🔄 Scanning..." : "🔄 Rescan"}
 				</button>
 			</div>
 			{scanError ? (
