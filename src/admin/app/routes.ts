@@ -30,14 +30,14 @@ export function parseHash(hash: string): Route {
 			let issueNumber: number | undefined;
 			let tab: "sessions" | "crons" | "skills" | "issues" = "issues";
 			if (path[3]) {
-				if (path[3] === "crons") {
-					tab = "crons";
-				} else if (path[3] === "skills") {
-					tab = "skills";
-				} else if (path[3] === "issues") {
-					tab = "issues";
-				} else if (path[3] === "sessions") {
-					tab = "sessions";
+				if (path[3] === "crons" || path[3] === "skills" || path[3] === "issues" || path[3] === "sessions") {
+					tab = path[3];
+					if (path[4]) {
+						const num = Number.parseInt(path[4], 10);
+						if (!Number.isNaN(num)) {
+							issueNumber = num;
+						}
+					}
 				} else {
 					issueNumber = Number.parseInt(path[3], 10);
 					if (Number.isNaN(issueNumber)) {
@@ -74,10 +74,10 @@ export function buildHash(route: Route): string {
 	}
 	if (route.screen === "repo") {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
-		if (route.issueNumber !== undefined) {
-			return `${base}/${route.issueNumber}`;
-		}
 		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : route.tab === "sessions" ? "/sessions" : "";
+		if (route.issueNumber !== undefined) {
+			return `${base}${tab}/${route.issueNumber}`;
+		}
 		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {
