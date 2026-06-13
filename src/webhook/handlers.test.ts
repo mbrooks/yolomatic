@@ -114,7 +114,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -139,7 +138,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -177,7 +175,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -218,7 +215,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -258,7 +254,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -274,9 +269,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("does not auto-start when autoStart is disabled", async () => {
+	it("auto-starts accepted issue events", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
-		sessionManager.createSession.mockResolvedValue({
+		const pendingSession = {
 			issueNumber: 56,
 			repo: "tars",
 			owner: "mbrooks",
@@ -287,14 +282,15 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
-		});
+		};
+		(sessionManager.getSession as any).mockResolvedValueOnce(null).mockResolvedValue(pendingSession);
+		sessionManager.createSession.mockResolvedValue(pendingSession);
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: false,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -307,7 +303,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(executor.execute).not.toHaveBeenCalled();
+		expect(executor.execute).toHaveBeenCalled();
 	});
 
 	it("processes comment on issue/PR created by TARS without assignee or mention", async () => {
@@ -330,7 +326,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -368,7 +363,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -400,7 +394,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -445,7 +438,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -506,7 +498,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -546,7 +537,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -596,7 +586,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -626,7 +615,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -664,7 +652,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -707,7 +694,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -761,7 +747,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -817,7 +802,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -848,7 +832,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -883,7 +866,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -933,7 +915,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -989,7 +970,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1040,7 +1020,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1090,7 +1069,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1136,7 +1114,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1169,7 +1146,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1195,7 +1171,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			executor: executor as never,
 			githubToken: "token",
 			githubUsername: "tars-bot",
-			autoStart: true,
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,

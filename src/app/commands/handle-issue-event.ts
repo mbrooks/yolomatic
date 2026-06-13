@@ -33,7 +33,6 @@ export class HandleIssueEvent {
 			tasks: TaskControlService;
 			github: GitHubService;
 			clock: Clock;
-			autoStart: boolean;
 			defaultBranch: string;
 			githubUsername: string;
 			selfReportEnabled: boolean;
@@ -122,10 +121,7 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		const claimedInFlight = this.deps.autoStart;
-		if (claimedInFlight) {
-			this.inFlight.add(key);
-		}
+		this.inFlight.add(key);
 
 		try {
 			const session = await ensureSessionExists(
@@ -151,11 +147,6 @@ export class HandleIssueEvent {
 				return;
 			}
 
-			if (!this.deps.autoStart) {
-				process.stdout.write(`[webhook] auto-start disabled for ${repo}#${issue.number}\n`);
-				return;
-			}
-
 			process.stdout.write(`[webhook] auto-starting ${repo}#${issue.number}\n`);
 			await startIssueExecution(
 				this.executor,
@@ -167,9 +158,7 @@ export class HandleIssueEvent {
 				"Picked up by TARS. Working on it...",
 			);
 		} finally {
-			if (claimedInFlight) {
-				this.inFlight.delete(key);
-			}
+			this.inFlight.delete(key);
 		}
 	}
 }

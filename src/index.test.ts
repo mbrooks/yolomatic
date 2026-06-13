@@ -6,7 +6,6 @@ vi.mock("dotenv/config", () => ({}));
 vi.mock("./config.js", () => ({
 	getConfig: vi.fn(() => ({
 		port: 6767,
-		autoStart: true,
 		webhookSecret: "secret",
 		sessionsDir: "/tmp/sessions",
 		archiveDir: "/tmp/sessions/archive",
@@ -24,6 +23,8 @@ vi.mock("./config.js", () => ({
 		staleThresholdMs: 14400000,
 		maxWorktrees: 10,
 		evictionStrategy: "lru",
+		githubEventMode: "webhook",
+		githubPollIntervalMs: 60000,
 	})),
 	isBootstrapComplete: vi.fn(() => true),
 }));
@@ -79,8 +80,13 @@ vi.mock("./cron/scheduler.js", () => ({
 	startCronScheduler: vi.fn(),
 }));
 
+vi.mock("./github-events/polling.js", () => ({
+	startGitHubPolling: vi.fn(),
+}));
+
 vi.mock("./webhook/handlers.js", () => ({
 	GitHubIssueHandlers: vi.fn(() => ({
+		handleGitHubEvent: vi.fn(),
 		handleIssueEvent: vi.fn(),
 		handleCommentEvent: vi.fn(),
 		handlePullRequestReviewCommentEvent: vi.fn(),
@@ -120,11 +126,21 @@ import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { SessionStore } from "./session/store.js";
 import { isBootstrapComplete } from "./config.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
+import { startGitHubPolling } from "./github-events/polling.js";
 
 describe("main", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.mocked(isBootstrapComplete).mockReturnValue(true);
+		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			handleGitHubEvent: vi.fn(),
+			handleIssueEvent: vi.fn(),
+			handleCommentEvent: vi.fn(),
+			handlePullRequestReviewCommentEvent: vi.fn(),
+			handlePullRequestReviewEvent: vi.fn(),
+			isInFlight: vi.fn(() => false),
+			resumeInterruptedSession: vi.fn(),
+		}));
 	});
 
 	it("enters onboarding mode when bootstrap incomplete", async () => {
@@ -169,6 +185,123 @@ describe("main", () => {
 		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
+	});
+
+	it("starts GitHub polling when event mode is polling", async () => {
+		const { getConfig } = await import("./config.js");
+		vi.mocked(getConfig).mockReturnValueOnce({
+			port: 6767,
+			webhookSecret: "secret",
+			sessionsDir: "/tmp/sessions",
+			archiveDir: "/tmp/sessions/archive",
+			memoryDir: "/tmp/memory",
+			defaultBranch: "main",
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			workspacesDir: "/tmp/workspaces",
+			soulPath: "/tmp/SOUL.md",
+			selfReportEnabled: true,
+			adminUsername: "admin",
+			adminPassword: "secret",
+			adminGithubUsername: "admin",
+			cleanupRetentionDays: undefined,
+			staleThresholdMs: 14400000,
+			maxWorktrees: 10,
+			evictionStrategy: "lru",
+			piAgentModel: undefined,
+			piAgentProvider: undefined,
+			logLevel: "info",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+			githubEventMode: "polling",
+			githubPollIntervalMs: 30000,
+		});
+
+		await main();
+
+		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({
+			intervalMs: 30000,
+			githubUsername: "tars-bot",
+			dispatch: expect.any(Function),
+		}));
+		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls[0][0] as { dispatch: (event: unknown) => Promise<void> };
+		await pollingDeps.dispatch({ id: "e1" });
+		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
+		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
+		expect(handlersInstance.handleGitHubEvent).toHaveBeenCalledWith({ id: "e1" });
+		expect(createWebhookServer).toHaveBeenCalledWith(
+			"secret",
+			noOpHandlers,
+			expect.any(Object),
+			expect.anything(),
+			expect.anything(),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(String),
+			expect.anything(),
+			undefined,
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+		);
+	});
+
+	it("keeps webhook handlers active and starts polling when event mode is both", async () => {
+		const { getConfig } = await import("./config.js");
+		vi.mocked(getConfig).mockReturnValueOnce({
+			port: 6767,
+			webhookSecret: "secret",
+			sessionsDir: "/tmp/sessions",
+			archiveDir: "/tmp/sessions/archive",
+			memoryDir: "/tmp/memory",
+			defaultBranch: "main",
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			workspacesDir: "/tmp/workspaces",
+			soulPath: "/tmp/SOUL.md",
+			selfReportEnabled: true,
+			adminUsername: "admin",
+			adminPassword: "secret",
+			adminGithubUsername: "admin",
+			cleanupRetentionDays: undefined,
+			staleThresholdMs: 14400000,
+			maxWorktrees: 10,
+			evictionStrategy: "lru",
+			piAgentModel: undefined,
+			piAgentProvider: undefined,
+			logLevel: "info",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+			githubEventMode: "both",
+			githubPollIntervalMs: 45000,
+		});
+
+		await main();
+
+		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({ intervalMs: 45000 }));
+		expect(createWebhookServer).toHaveBeenCalledWith(
+			"secret",
+			expect.objectContaining({ handleGitHubEvent: expect.any(Function) }),
+			expect.any(Object),
+			expect.anything(),
+			expect.anything(),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(String),
+			expect.anything(),
+			undefined,
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+			expect.any(Object),
+		);
 	});
 
 	it("resumes interrupted working sessions on startup", async () => {
@@ -290,7 +423,6 @@ describe("main", () => {
 		const { getConfig } = await import("./config.js");
 		vi.mocked(getConfig).mockReturnValueOnce({
 			port: 6767,
-			autoStart: true,
 			webhookSecret: "secret",
 			sessionsDir: "/tmp/sessions",
 			archiveDir: "/tmp/sessions/archive",
@@ -315,6 +447,8 @@ describe("main", () => {
 			logThoughts: true,
 			logTools: true,
 			logResponses: true,
+			githubEventMode: "webhook",
+			githubPollIntervalMs: 60000,
 		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
@@ -334,6 +468,10 @@ describe("main", () => {
 describe("noOpHandlers", () => {
 	it("handleIssueEvent does nothing", async () => {
 		await expect(noOpHandlers.handleIssueEvent({})).resolves.toBeUndefined();
+	});
+
+	it("handleGitHubEvent does nothing", async () => {
+		await expect(noOpHandlers.handleGitHubEvent?.({} as never)).resolves.toBeUndefined();
 	});
 
 	it("handleCommentEvent does nothing", async () => {

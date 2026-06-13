@@ -18,6 +18,7 @@ import { createWebhookServerDeps } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
 import { createAdminWebSocketServer, type CredentialProvider, type StatusProvider } from "./websocket-server.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
+import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
@@ -118,7 +119,14 @@ export function createWebhookServer(
 		);
 
 		try {
-			if (event === "issues") {
+			const normalized = normalizeWebhookEvent(event, payload, delivery);
+			if (normalized.length === 0) {
+				process.stdout.write(`[webhook] ignored unsupported event=${event ?? "unknown"}\n`);
+			} else if (handlers.handleGitHubEvent) {
+				for (const githubEvent of normalized) {
+					await handlers.handleGitHubEvent(githubEvent);
+				}
+			} else if (event === "issues") {
 				await handlers.handleIssueEvent(payload);
 			} else if (event === "issue_comment") {
 				await handlers.handleCommentEvent(payload);
@@ -126,8 +134,6 @@ export function createWebhookServer(
 				await handlers.handlePullRequestReviewCommentEvent(payload);
 			} else if (event === "pull_request_review") {
 				await handlers.handlePullRequestReviewEvent(payload);
-			} else {
-				process.stdout.write(`[webhook] ignored unsupported event=${event ?? "unknown"}\n`);
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

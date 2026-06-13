@@ -16,8 +16,11 @@ import { SkillStore } from "./skills/store.js";
 import { RepoSkillService } from "./skills/repo-skill-service.js";
 import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
+import { GitHubEventStore } from "./github-events/store.js";
+import { startGitHubPolling } from "./github-events/polling.js";
 
 export const noOpHandlers: WebhookHandlers = {
+	async handleGitHubEvent() {},
 	async handleIssueEvent() {},
 	async handleCommentEvent() {},
 	async handlePullRequestReviewCommentEvent() {},
@@ -62,17 +65,18 @@ export async function main(): Promise<void> {
 			evictionStrategy: nextConfig.evictionStrategy,
 		});
 		const executor = new PiAgentExecutor({ soulPath: nextConfig.soulPath });
+		const eventStore = new GitHubEventStore(path.join(nextConfig.memoryDir, "bot-state.sqlite"));
 		const handlers = new GitHubIssueHandlers({
 			sessionManager,
 			workspaceManager,
 			executor,
 			githubToken: nextConfig.githubToken,
 			githubUsername: nextConfig.githubUsername,
-			autoStart: nextConfig.autoStart,
 			defaultBranch: nextConfig.defaultBranch,
 			selfReportEnabled: nextConfig.selfReportEnabled,
 			taskController,
 			adminGithubUsername: nextConfig.adminGithubUsername,
+			eventStore,
 		});
 
 		const staleDetector = new StaleSessionDetector(
@@ -92,6 +96,9 @@ export async function main(): Promise<void> {
 			defaultBranch: nextConfig.defaultBranch,
 		});
 		const github = new GitHubServiceAdapter({ githubToken: nextConfig.githubToken });
+		const githubEventsEnabled = nextConfig.githubEventMode === "webhook" || nextConfig.githubEventMode === "both";
+		const pollingEnabled = nextConfig.githubEventMode === "polling" || nextConfig.githubEventMode === "both";
+		const activeHandlers = githubEventsEnabled ? handlers : noOpHandlers;
 		const cronDeps = {
 			cronStore,
 			sessionStore,
@@ -106,7 +113,7 @@ export async function main(): Promise<void> {
 
 		const server = createWebhookServer(
 			nextConfig.webhookSecret,
-			handlers,
+			activeHandlers,
 			sessionStore,
 			nextConfig.adminUsername,
 			nextConfig.adminPassword,
@@ -124,6 +131,16 @@ export async function main(): Promise<void> {
 		server.listen(nextConfig.port, () => {
 			process.stdout.write(`Webhook receiver listening on port ${nextConfig.port}\n`);
 		});
+
+		if (pollingEnabled) {
+			startGitHubPolling({
+				github,
+				eventStore,
+				githubUsername: nextConfig.githubUsername,
+				intervalMs: nextConfig.githubPollIntervalMs,
+				dispatch: (event) => handlers.handleGitHubEvent(event),
+			});
+		}
 
 		// Startup stale detection: conservatively mark very old working sessions.
 		try {
