@@ -199,6 +199,19 @@ const PAST_TO_IMP: Record<string, string> = {
 	zoomed: "zoom",
 };
 
+function stripMarkdown(text: string): string {
+	return text
+		.replace(/```(?:\w+)?\n?[\s\S]*?```/g, "")
+		.replace(/`([^`]+)`/g, "$1")
+		.replace(/\*\*([^*]+)\*\*/g, "$1")
+		.replace(/\*([^*]+)\*/g, "$1")
+		.replace(/__([^_]+)__/g, "$1")
+		.replace(/_([^_]+)_/g, "$1")
+		.replace(/#{1,6}\s+/g, "")
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+		.trim();
+}
+
 function preserveCase(original: string, replacement: string): string {
 	if (original === original.toUpperCase()) {
 		return replacement.toUpperCase();
@@ -296,7 +309,7 @@ export function generateCommitMessage(
 	const prefixStr = prefix ? `${prefix}:` : "TARS:";
 	const prefixLen = prefixStr.length + 1;
 
-	const trimmedSummary = (summary ?? "").trim();
+	const trimmedSummary = stripMarkdown(summary ?? "").trim();
 	const summaryLines = trimmedSummary.split(/\r?\n/);
 	const firstLine = summaryLines[0] ?? "";
 	let subject = firstLine.trim() || `Changes for issue #${issueNumber}`;

@@ -11,7 +11,7 @@ export function buildIssuePrompt(state: SessionState): string {
 		"  TARS_STATUS: waiting-feedback",
 		"  TARS_STATUS: complete",
 		"- If you need human clarification, ask the question immediately after the status line.",
-		"- If complete, summarize what code was generated after the status line.",
+		"- If complete, summarize what code was generated after the status line. Write a concise imperative subject line (under 50 characters, no markdown) that captures the most important change, followed by a blank line and additional details if needed.",
 		"",
 		"When you mark TARS_STATUS: complete, do not commit, push, or open a Pull Request yourself.",
 		"The host process owns delivery and will publish your completed branch after the run finishes.",
@@ -55,7 +55,7 @@ export function buildPRReviewPrompt(state: SessionState, comments: PRReviewComme
 		"  TARS_STATUS: waiting-feedback",
 		"  TARS_STATUS: complete",
 		"- If complete, commit all changes and push to the branch:",
-		`  git add -A && git commit -m "TARS: Iteration on PR for issue #${state.issueNumber}" && git push origin tars/issue-${state.issueNumber}`,
+		`- git add -A && git commit -m "TARS: Address PR review feedback" && git push origin tars/issue-${state.issueNumber}`,
 		"- Do NOT force-push. Append commits to the existing PR branch.",
 		"",
 	];
