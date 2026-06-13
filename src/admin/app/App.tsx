@@ -283,28 +283,28 @@ function AppContent({
 				/>
 			);
 		}
-		if (route.tab === "issues") {
+		if (route.tab === "sessions") {
 			return (
-				<IssuesScreen
-					owner={route.owner}
-					repo={route.repo}
-					onSelectTab={onSelectTab}
+				<SessionScreen
+					sessions={repoSessions}
+					selected={selectedSession}
+					onSelect={onSelectSession}
+					onMutate={onMutate}
+					breadcrumbLabel={`${route.owner}/${route.repo}`}
 					onBack={onBack}
+					emptyMessage="No sessions for this repository."
+					activeTab={route.tab ?? "issues"}
+					onSelectTab={onSelectTab}
 					onNewIssue={onNewIssueForRepo}
 				/>
 			);
 		}
 		return (
-			<SessionScreen
-				sessions={repoSessions}
-				selected={selectedSession}
-				onSelect={onSelectSession}
-				onMutate={onMutate}
-				breadcrumbLabel={`${route.owner}/${route.repo}`}
-				onBack={onBack}
-				emptyMessage="No sessions for this repository."
-				activeTab={route.tab ?? "issues"}
+			<IssuesScreen
+				owner={route.owner}
+				repo={route.repo}
 				onSelectTab={onSelectTab}
+				onBack={onBack}
 				onNewIssue={onNewIssueForRepo}
 			/>
 		);

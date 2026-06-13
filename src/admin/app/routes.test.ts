@@ -133,7 +133,7 @@ describe("buildHash", () => {
 	it("builds repo detail", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
-		).toBe("#/repos/mbrooks/tars/issues");
+		).toBe("#/repos/mbrooks/tars");
 	});
 
 	it("builds repo detail with sessions tab", () => {
