@@ -6,13 +6,13 @@ import { SkillListPane } from "./SkillListPane.js";
 import type { ServerSkill, RepoSkill } from "../../app/types.js";
 
 const mockServerSkills: ServerSkill[] = [
-	{ id: "1", name: "skill-a", description: "Desc A", content: "", enabled: true, updatedAt: "", createdAt: "" },
-	{ id: "2", name: "skill-b", description: "", content: "", enabled: false, updatedAt: "", createdAt: "" },
+	{ id: "1", name: "skill-a", description: "Desc A", content: "", updatedAt: "", createdAt: "" },
+	{ id: "2", name: "skill-b", description: "", content: "", updatedAt: "", createdAt: "" },
 ];
 
 const mockRepoSkills: RepoSkill[] = [
-	{ name: "repo-skill", description: "Repo desc", content: "", enabled: true, updatedAt: "", source: "repo" },
-	{ name: "inherited-skill", description: "Inherited desc", content: "", enabled: true, updatedAt: "", source: "inherited" },
+	{ name: "repo-skill", description: "Repo desc", content: "", updatedAt: "", source: "repo" },
+	{ name: "inherited-skill", description: "Inherited desc", content: "", updatedAt: "", source: "inherited" },
 ];
 
 describe("SkillListPane", () => {
@@ -42,18 +42,6 @@ describe("SkillListPane", () => {
 		);
 		expect(screen.getByText("repo")).toBeDefined();
 		expect(screen.getByText("inherited")).toBeDefined();
-	});
-
-	it("renders disabled badge for disabled skills", () => {
-		render(
-			<SkillListPane
-				skills={mockServerSkills}
-				selected={null}
-				onSelect={vi.fn()}
-				onCreate={vi.fn()}
-			/>,
-		);
-		expect(screen.getByText("disabled")).toBeDefined();
 	});
 
 	it("calls onSelect when a row is clicked", () => {

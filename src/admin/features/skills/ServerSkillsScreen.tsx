@@ -98,9 +98,6 @@ export function ServerSkillsScreen({
 						<div className="detail-pane">
 							<div className="detail-title">{selectedSkill.name}</div>
 							<div className="detail-section">
-								<span className={`skill-status ${selectedSkill.enabled ? "enabled" : "disabled"}`}>
-									{selectedSkill.enabled ? "Enabled" : "Disabled"}
-								</span>
 								<p className="skill-description">{selectedSkill.description || "No description"}</p>
 							</div>
 							<div className="detail-section">

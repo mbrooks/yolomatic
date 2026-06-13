@@ -239,7 +239,6 @@ describe("handleAdminRoute", () => {
 			name: "triage",
 			description: "Existing description",
 			content: "Existing body",
-			enabled: false,
 			updatedAt: "",
 			source: "repo" as const,
 		}));
@@ -265,7 +264,6 @@ describe("handleAdminRoute", () => {
 			name: "triage",
 			description: "Updated description",
 			content: "Existing body",
-			enabled: false,
 		});
 	});
 

@@ -9,14 +9,13 @@ export function createServerSkill(body: {
 	name: string;
 	description: string;
 	content: string;
-	enabled: boolean;
 }): Promise<ServerSkill> {
 	return apiPost<ServerSkill>("/api/skills", body);
 }
 
 export async function updateServerSkill(
 	id: string,
-	body: Partial<{ name: string; description: string; content: string; enabled: boolean }>,
+	body: Partial<{ name: string; description: string; content: string }>,
 ): Promise<ServerSkill> {
 	const response = await fetch(`/api/skills/${encodeURIComponent(id)}`, {
 		method: "PATCH",
@@ -48,7 +47,7 @@ export function fetchRepoSkills(owner: string, repo: string): Promise<{ skills: 
 export function createRepoSkill(
 	owner: string,
 	repo: string,
-	body: { name: string; description: string; content: string; enabled: boolean },
+	body: { name: string; description: string; content: string },
 ): Promise<RepoSkill> {
 	return apiPost<RepoSkill>(
 		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/skills`,
@@ -60,7 +59,7 @@ export async function updateRepoSkill(
 	owner: string,
 	repo: string,
 	name: string,
-	body: Partial<{ name: string; description: string; content: string; enabled: boolean }>,
+	body: Partial<{ name: string; description: string; content: string }>,
 ): Promise<unknown> {
 	const response = await fetch(
 		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/skills/${encodeURIComponent(name)}`,
