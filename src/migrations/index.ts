@@ -87,6 +87,52 @@ export const MIGRATIONS: Migration[] = [
 			`);
 		},
 	},
+	{
+		id: 5,
+		name: "create_github_event_tables",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS github_event_state (
+					key TEXT PRIMARY KEY,
+					value TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS github_event_dedupe (
+					event_id TEXT PRIMARY KEY,
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					occurred_at TEXT NOT NULL,
+					seen_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_github_event_dedupe_owner_repo ON github_event_dedupe(owner, repo)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_github_event_dedupe_seen_at ON github_event_dedupe(seen_at)`);
+		},
+	},
+	{
+		id: 6,
+		name: "create_github_poll_subjects",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS github_poll_subjects (
+					subject_key TEXT PRIMARY KEY,
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					subject_type TEXT NOT NULL,
+					number INTEGER NOT NULL,
+					last_activity_at TEXT NOT NULL,
+					last_checked_at TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_github_poll_subjects_owner_repo ON github_poll_subjects(owner, repo)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_github_poll_subjects_last_checked ON github_poll_subjects(last_checked_at)`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

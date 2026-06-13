@@ -3,7 +3,6 @@ import type { SettingsStore } from "./settings/store.js";
 
 export interface AppConfig {
 	port: number;
-	autoStart: boolean;
 	webhookSecret: string;
 	sessionsDir: string;
 	archiveDir: string;
@@ -28,6 +27,8 @@ export interface AppConfig {
 	logThoughts: boolean;
 	logTools: boolean;
 	logResponses: boolean;
+	githubEventMode: "webhook" | "polling" | "both";
+	githubPollIntervalMs: number;
 }
 
 export function getConfig(store: SettingsStore): AppConfig {
@@ -36,9 +37,11 @@ export function getConfig(store: SettingsStore): AppConfig {
 	const archiveDir = rawArchiveDir ? path.resolve(rawArchiveDir) : path.join(sessionsDir, "archive");
 	const rawCleanup = store.get("cleanup_retention_days");
 
+	const rawEventMode = store.getString("github_event_mode", "webhook").toLowerCase();
+	const githubEventMode = rawEventMode === "polling" || rawEventMode === "both" ? rawEventMode : "webhook";
+
 	return {
 		port: store.getNumber("port", 6767),
-		autoStart: store.getBoolean("auto_start", false),
 		webhookSecret: store.get("webhook_secret") ?? "",
 		sessionsDir,
 		archiveDir,
@@ -67,6 +70,8 @@ export function getConfig(store: SettingsStore): AppConfig {
 		logThoughts: store.getBoolean("log_thoughts", true),
 		logTools: store.getBoolean("log_tools", true),
 		logResponses: store.getBoolean("log_responses", true),
+		githubEventMode,
+		githubPollIntervalMs: Math.max(1000, store.getNumber("github_poll_interval_ms", 60000)),
 	};
 }
 

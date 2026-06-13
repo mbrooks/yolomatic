@@ -32,7 +32,7 @@ describe("settings/model", () => {
     });
 
     it("parses a boolean", () => {
-      const def = getSettingDefinition("auto_start")!;
+      const def = getSettingDefinition("self_report_enabled")!;
       expect(parseSettingValue(def, "true")).toBe(true);
       expect(parseSettingValue(def, "false")).toBe(false);
     });
@@ -45,7 +45,7 @@ describe("settings/model", () => {
 
   describe("formatSettingValue", () => {
     it("formats a boolean", () => {
-      const def = getSettingDefinition("auto_start")!;
+      const def = getSettingDefinition("self_report_enabled")!;
       expect(formatSettingValue(def, true)).toBe("true");
       expect(formatSettingValue(def, false)).toBe("false");
     });
@@ -80,12 +80,13 @@ describe("settings/model", () => {
 
     it("coerces valid numbers", () => {
       expect(coerceEnvValue("port", "8080")).toBe("8080");
+      expect(coerceEnvValue("github_poll_interval_ms", "30000")).toBe("30000");
     });
 
     it("coerces booleans", () => {
-      expect(coerceEnvValue("auto_start", "true")).toBe("true");
-      expect(coerceEnvValue("auto_start", "false")).toBe("false");
-      expect(coerceEnvValue("auto_start", "maybe")).toBe("false");
+      expect(coerceEnvValue("self_report_enabled", "true")).toBe("true");
+      expect(coerceEnvValue("self_report_enabled", "false")).toBe("false");
+      expect(coerceEnvValue("self_report_enabled", "maybe")).toBe("false");
     });
 
     it("trims string values", () => {
@@ -97,6 +98,11 @@ describe("settings/model", () => {
     it("contains no duplicate keys", () => {
       const keys = SETTING_DEFINITIONS.map((d) => d.key);
       expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it("defines GitHub event ingestion settings", () => {
+      expect(getSettingDefinition("github_event_mode")?.default).toBe("webhook");
+      expect(getSettingDefinition("github_poll_interval_ms")?.default).toBe("60000");
     });
   });
 });
