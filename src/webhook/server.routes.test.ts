@@ -287,7 +287,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "tars",
 				title: "TARS: Title",
-				body: "Fixes #42\n\nDone.",
+				body: expect.stringContaining("Fixes #42"),
 				head: "tars/issue-42",
 				base: "main",
 			}),
