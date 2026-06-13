@@ -2539,9 +2539,10 @@ describe("handleAdminRoute", () => {
 
 		const handled = await handleAdminRoute(req, res, deps);
 		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
+		expect(res.statusCode).toBe(202);
 		const body = JSON.parse(String(res.body));
 		expect(body.started).toBe(true);
+		expect(body.status).toBe("queued");
 		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
 		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 	});
