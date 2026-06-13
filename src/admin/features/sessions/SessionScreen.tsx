@@ -25,7 +25,7 @@ export function SessionScreen({
 	breadcrumbLabel: string;
 	onBack: () => void;
 	emptyMessage: string;
-	activeTab?: "sessions" | "crons" | "skills";
+	activeTab?: "sessions" | "crons" | "skills" | "issues";
 	onSelectTab?: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onNewIssue?: () => void;
 }): React.ReactElement {

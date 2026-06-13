@@ -73,7 +73,7 @@ export function App(): React.ReactElement {
 								owner: session.owner,
 								repo: session.repo,
 								issueNumber: session.issueNumber,
-								tab: "sessions",
+								tab: "issues",
 							};
 			navigate(next);
 		},
@@ -264,7 +264,7 @@ function AppContent({
 				<CronScreen
 					owner={route.owner}
 					repo={route.repo}
-					activeTab={route.tab ?? "sessions"}
+					activeTab={route.tab ?? "issues"}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
 					onNewIssue={onNewIssueForRepo}
@@ -276,7 +276,7 @@ function AppContent({
 				<RepoSkillsScreen
 					owner={route.owner}
 					repo={route.repo}
-					activeTab={route.tab ?? "sessions"}
+					activeTab={route.tab ?? "issues"}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
 					onNewIssue={onNewIssueForRepo}
@@ -303,7 +303,7 @@ function AppContent({
 				breadcrumbLabel={`${route.owner}/${route.repo}`}
 				onBack={onBack}
 				emptyMessage="No sessions for this repository."
-				activeTab={route.tab ?? "sessions"}
+				activeTab={route.tab ?? "issues"}
 				onSelectTab={onSelectTab}
 				onNewIssue={onNewIssueForRepo}
 			/>
