@@ -82,6 +82,10 @@ export async function handleRepoRoutes(
 			sendJson(response, 500, { error: "Settings store not configured" });
 			return true;
 		}
+		if (!deps.startIssueSession) {
+			sendJson(response, 500, { error: "Session executor not configured" });
+			return true;
+		}
 		const [, owner, repo, issueNumberStr] = assignMatch;
 		const issueNumber = Number.parseInt(issueNumberStr, 10);
 		if (Number.isNaN(issueNumber)) {
@@ -94,10 +98,31 @@ export async function handleRepoRoutes(
 			return true;
 		}
 		try {
+			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+				title?: string;
+				body?: string;
+				labels?: string[];
+			};
+			if (!body.title) {
+				sendJson(response, 400, { error: "Missing required field: title" });
+				return true;
+			}
 			await deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [
 				tarsUsername,
 			]);
-			sendJson(response, 200, { assigned: true });
+			const result = await deps.startIssueSession.execute(
+				owner,
+				repo,
+				issueNumber,
+				body.title,
+				body.body ?? "",
+				body.labels ?? [],
+			);
+			if (!result.success) {
+				sendJson(response, mapResultToStatus(result.code), { error: result.message });
+				return true;
+			}
+			sendJson(response, 200, result.data);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[webhook] assign error: ${message}\n`);

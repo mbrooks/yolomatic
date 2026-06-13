@@ -25,7 +25,7 @@ export function IssueDetail({
 		setAssigning(true);
 		setAssignError(null);
 		try {
-			await assignIssue(owner, repo, selected.number);
+			await assignIssue(owner, repo, selected.number, selected.title, selected.body, selected.labels);
 			onAssignSuccess?.();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
