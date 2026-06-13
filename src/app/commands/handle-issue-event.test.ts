@@ -25,7 +25,6 @@ function createDeps(overrides?: {
 	createOrGetWorktree?: ReturnType<typeof vi.fn>;
 	initializeEmptyRepo?: ReturnType<typeof vi.fn>;
 	createSession?: ReturnType<typeof vi.fn>;
-	autoStart?: boolean;
 }) {
 	const sessions = {
 		get: vi.fn(async () => null),
@@ -104,7 +103,6 @@ function createDeps(overrides?: {
 		tasks,
 		github,
 		clock: { now: () => new Date() },
-		autoStart: true,
 		defaultBranch: "main",
 		githubUsername: "tars-bot",
 		selfReportEnabled: false,
@@ -286,7 +284,19 @@ describe("HandleIssueEvent", () => {
 
 	it("creates worktree and session for new issues", async () => {
 		const deps = createDeps();
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
+		(deps.sessions.get as any)
+			.mockResolvedValueOnce(null)
+			.mockResolvedValue({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				status: "pending",
+				title: "Test issue",
+				body: "Issue body",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				labels: [],
+			});
+		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await handler.execute(payload);
@@ -315,7 +325,7 @@ describe("HandleIssueEvent", () => {
 			path: "/tmp/worktree",
 			labels: [],
 		}));
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
+		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await handler.execute(payload);
@@ -327,7 +337,7 @@ describe("HandleIssueEvent", () => {
 	it("posts draining message when in draining mode", async () => {
 		const deps = createDeps();
 		deps.tasks.isDraining = vi.fn(() => true);
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
+		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await handler.execute(payload);
@@ -341,18 +351,7 @@ describe("HandleIssueEvent", () => {
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "pending", { resumeOnBoot: true });
 	});
 
-	it("does not auto-start when disabled", async () => {
-		const deps = createDeps();
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
-		const payload = createPayload();
-
-		await handler.execute(payload);
-
-		expect(deps.sessions.createSession).toHaveBeenCalled();
-		expect(deps.github.postComment).not.toHaveBeenCalled();
-	});
-
-	it("auto-starts execution when enabled", async () => {
+	it("auto-starts execution for accepted issues", async () => {
 		const deps = createDeps();
 		let getCallCount = 0;
 		deps.sessions.get = vi.fn(async () => {
@@ -394,13 +393,25 @@ describe("HandleIssueEvent", () => {
 		});
 		const initializeEmptyRepo = vi.fn(async () => {});
 		const deps = createDeps({ createOrGetWorktree, initializeEmptyRepo });
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
+		(deps.sessions.get as any)
+			.mockResolvedValueOnce(null)
+			.mockResolvedValue({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				status: "pending",
+				title: "Test issue",
+				body: "Issue body",
+				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				labels: [],
+			});
+		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await handler.execute(payload);
 
 		expect(initializeEmptyRepo).toHaveBeenCalledWith("mbrooks", "tars", "main");
-		expect(createOrGetWorktree).toHaveBeenCalledTimes(2);
+		expect(createOrGetWorktree).toHaveBeenCalledTimes(3);
 		expect(deps.sessions.createSession).toHaveBeenCalled();
 	});
 
@@ -409,7 +420,7 @@ describe("HandleIssueEvent", () => {
 			throw new Error("some other error");
 		});
 		const deps = createDeps({ createOrGetWorktree });
-		const handler = new HandleIssueEvent({ ...(deps as any), autoStart: false });
+		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await expect(handler.execute(payload)).rejects.toThrow("some other error");

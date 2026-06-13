@@ -34,7 +34,6 @@ export class HandleIssueComment {
 			workspaces: WorkspaceService;
 			tasks: TaskControlService;
 			github: GitHubService;
-			autoStart: boolean;
 			defaultBranch: string;
 			githubUsername: string;
 			adminGithubUsername?: string;
