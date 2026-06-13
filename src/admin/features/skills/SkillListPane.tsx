@@ -49,7 +49,6 @@ export function SkillListPane({ skills, selected, onSelect, onCreate }: SkillLis
 										{"source" in skill && skill.source === "repo" && (
 											<span className="skill-badge repo">repo</span>
 										)}
-										{!skill.enabled && <span className="skill-badge disabled">disabled</span>}
 									</div>
 									<div className="skill-subtitle">{skill.description || "No description"}</div>
 								</div>

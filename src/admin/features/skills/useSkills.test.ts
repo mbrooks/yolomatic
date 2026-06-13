@@ -10,7 +10,7 @@ describe("useServerSkills", () => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => ({
 			ok: true,
 			status: 200,
-			json: async () => ({ skills: [{ id: "1", name: "a", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" }] }),
+			json: async () => ({ skills: [{ id: "1", name: "a", description: "", content: "", updatedAt: "", createdAt: "" }] }),
 		} as Response));
 	});
 
@@ -56,7 +56,7 @@ describe("useRepoSkills", () => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => ({
 			ok: true,
 			status: 200,
-			json: async () => ({ skills: [{ name: "a", description: "", content: "", enabled: true, updatedAt: "", source: "repo" }] }),
+			json: async () => ({ skills: [{ name: "a", description: "", content: "", updatedAt: "", source: "repo" }] }),
 		} as Response));
 	});
 

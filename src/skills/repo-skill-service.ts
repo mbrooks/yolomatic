@@ -244,7 +244,6 @@ export class RepoSkillService {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
 		const worktreePath = await this.createTempWorktree(bareRepoPath, this.config.defaultBranch);
 		try {
-			const settingsSkills = this.readEnabledSkills(worktreePath);
 			const skillFile = path.join(worktreePath, ".pi/skills", name, "SKILL.md");
 			if (!this.pathExists(skillFile)) return null;
 			const content = readFileSync(skillFile, "utf-8");
@@ -254,7 +253,6 @@ export class RepoSkillService {
 				name: skillName,
 				description: parsed.description,
 				content: parsed.body,
-				enabled: settingsSkills.has(skillName),
 				updatedAt: "",
 				source: "repo",
 			};
@@ -279,9 +277,6 @@ export class RepoSkillService {
 			const skillFile = path.join(skillDir, "SKILL.md");
 			const fileContent = buildSkillFile(data.name, data.description, data.content);
 			writeFileSync(skillFile, fileContent);
-
-			// Update settings.json
-			await this.updateSettingsJson(worktreePath, data.name, data.enabled);
 
 			await this.ensureGitIdentity(worktreePath);
 			await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
@@ -310,7 +305,6 @@ export class RepoSkillService {
 			if (this.pathExists(skillDir)) {
 				rmSync(skillDir, { recursive: true, force: true });
 			}
-			await this.removeSkillFromSettingsJson(worktreePath, name);
 
 			await this.ensureGitIdentity(worktreePath);
 			await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
@@ -330,62 +324,12 @@ export class RepoSkillService {
 		}
 	}
 
-	private async updateSettingsJson(worktreePath: string, skillName: string, enabled: boolean): Promise<void> {
-		const settingsPath = path.join(worktreePath, ".pi/settings.json");
-		let settings: Record<string, unknown> = {};
-		try {
-			settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-		} catch {
-			// file doesn't exist or invalid
-		}
-		let skills: string[] = [];
-		if (Array.isArray(settings.skills)) {
-			skills = settings.skills.filter((s): s is string => typeof s === "string");
-		}
-		if (enabled && !skills.includes(skillName)) {
-			skills.push(skillName);
-		} else if (!enabled) {
-			skills = skills.filter((s) => s !== skillName);
-		}
-		settings.skills = skills;
-		mkdirSync(path.dirname(settingsPath), { recursive: true });
-		writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-	}
-
-	private async removeSkillFromSettingsJson(worktreePath: string, skillName: string): Promise<void> {
-		const settingsPath = path.join(worktreePath, ".pi/settings.json");
-		let settings: Record<string, unknown> = {};
-		try {
-			settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-		} catch {
-			return;
-		}
-		if (Array.isArray(settings.skills)) {
-			settings.skills = settings.skills.filter((s: unknown) => s !== skillName);
-			writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-		}
-	}
-
-	private readEnabledSkills(worktreePath: string): Set<string> {
-		const settingsPath = path.join(worktreePath, ".pi/settings.json");
-		try {
-			const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as { skills?: unknown };
-			if (Array.isArray(settings.skills)) {
-				return new Set(settings.skills.filter((skill): skill is string => typeof skill === "string"));
-			}
-		} catch {
-			// ignore missing or invalid settings
-		}
-		return new Set();
-	}
-
 	private readSkillsFromWorktree(worktreePath: string): RepoSkill[] {
 		const skillsDir = path.join(worktreePath, ".pi/skills");
 		if (!this.pathExists(skillsDir)) {
 			return [];
 		}
 
-		const enabledSkills = this.readEnabledSkills(worktreePath);
 		const skills: RepoSkill[] = [];
 		for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue;
@@ -399,7 +343,6 @@ export class RepoSkillService {
 					name: skillName,
 					description: parsed.description,
 					content: parsed.body,
-					enabled: enabledSkills.has(skillName),
 					updatedAt: "",
 					source: "repo",
 				});

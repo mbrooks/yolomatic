@@ -99,7 +99,6 @@ export function mergeRepoAndServerSkills(
 			name: serverSkill.name,
 			description: serverSkill.description,
 			content: serverSkill.content,
-			enabled: serverSkill.enabled,
 			updatedAt: serverSkill.updatedAt,
 			source: "inherited",
 		});

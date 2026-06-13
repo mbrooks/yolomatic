@@ -13,7 +13,6 @@ export function SkillForm({ existing, onSubmit, onCancel, submitLabel = "Save" }
 	const [name, setName] = useState(existing?.name ?? "");
 	const [description, setDescription] = useState(existing?.description ?? "");
 	const [content, setContent] = useState(existing?.content ?? "");
-	const [enabled, setEnabled] = useState(existing?.enabled ?? true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -23,14 +22,14 @@ export function SkillForm({ existing, onSubmit, onCancel, submitLabel = "Save" }
 			setSaving(true);
 			setError(null);
 			try {
-				await onSubmit({ name, description, content, enabled });
+				await onSubmit({ name, description, content });
 			} catch (err) {
 				setError(err instanceof Error ? err.message : String(err));
 			} finally {
 				setSaving(false);
 			}
 		},
-		[name, description, content, enabled, onSubmit],
+		[name, description, content, onSubmit],
 	);
 
 	return (
@@ -65,16 +64,6 @@ export function SkillForm({ existing, onSubmit, onCancel, submitLabel = "Save" }
 						required
 						rows={10}
 					/>
-				</div>
-				<div className="form-group">
-					<label>
-						<input
-							type="checkbox"
-							checked={enabled}
-							onChange={(e) => setEnabled(e.target.checked)}
-						/>{" "}
-						Enabled
-					</label>
 				</div>
 				{error ? <div className="form-error">{error}</div> : null}
 				<div className="detail-actions">

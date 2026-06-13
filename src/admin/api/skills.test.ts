@@ -28,14 +28,14 @@ describe("skills API", () => {
 	}
 
 	it("fetchServerSkills returns skills", async () => {
-		mockFetch({ skills: [{ id: "s1", name: "n", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" }] });
+		mockFetch({ skills: [{ id: "s1", name: "n", description: "", content: "", updatedAt: "", createdAt: "" }] });
 		const result = await fetchServerSkills();
 		expect(result.skills.length).toBe(1);
 	});
 
 	it("createServerSkill POSTs and returns skill", async () => {
-		mockFetch({ id: "s1", name: "n", description: "", content: "", enabled: true, updatedAt: "", createdAt: "" });
-		const result = await createServerSkill({ name: "n", description: "", content: "c", enabled: true });
+		mockFetch({ id: "s1", name: "n", description: "", content: "", updatedAt: "", createdAt: "" });
+		const result = await createServerSkill({ name: "n", description: "", content: "c" });
 		expect(result.name).toBe("n");
 	});
 
@@ -62,14 +62,14 @@ describe("skills API", () => {
 	});
 
 	it("fetchRepoSkills returns skills", async () => {
-		mockFetch({ skills: [{ name: "n", description: "", content: "", enabled: true, updatedAt: "", source: "repo" }] });
+		mockFetch({ skills: [{ name: "n", description: "", content: "", updatedAt: "", source: "repo" }] });
 		const result = await fetchRepoSkills("o", "r");
 		expect(result.skills.length).toBe(1);
 	});
 
 	it("createRepoSkill POSTs and returns skill", async () => {
-		mockFetch({ name: "n", description: "", content: "", enabled: true, updatedAt: "", source: "repo" });
-		const result = await createRepoSkill("o", "r", { name: "n", description: "", content: "c", enabled: true });
+		mockFetch({ name: "n", description: "", content: "", updatedAt: "", source: "repo" });
+		const result = await createRepoSkill("o", "r", { name: "n", description: "", content: "c" });
 		expect(result.name).toBe("n");
 	});
 
