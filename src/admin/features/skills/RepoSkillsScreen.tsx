@@ -16,7 +16,7 @@ export function RepoSkillsScreen({
 }: {
 	owner: string;
 	repo: string;
-	activeTab: "sessions" | "crons" | "skills";
+	activeTab: "sessions" | "crons" | "skills" | "issues";
 	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
 	onBack: () => void;
 	onNewIssue?: () => void;
