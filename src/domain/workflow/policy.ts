@@ -7,6 +7,7 @@ interface IssueLabel {
 
 export const TARS_WORKFLOW_LABELS = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"] as const;
 export const TARS_VISIBLE_LABELS = [...TARS_WORKFLOW_LABELS, "tars"] as const;
+export const DO_NOT_WORK_LABELS = ["wontfix", "invalid"] as const;
 
 export function hasLabel(labels: IssueLabel[] | undefined, label: string): boolean {
 	return (labels ?? []).some((item) => item.name === label);
@@ -43,6 +44,10 @@ export function shouldIgnoreIssueEvent(
 	inFlight: boolean,
 ): { ignore: true; reason: string } | { ignore: false } {
 	const { action, issue, sender } = payload;
+
+	if (hasAnyLabel(issue.labels, [...DO_NOT_WORK_LABELS])) {
+		return { ignore: true, reason: "issue marked do-not-work" };
+	}
 
 	if (sender.login === githubUsername) {
 		return { ignore: true, reason: `event from ${githubUsername}` };

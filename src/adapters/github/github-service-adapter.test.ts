@@ -616,6 +616,15 @@ describe("GitHubServiceAdapter", () => {
 		});
 	});
 
+	describe("closeIssue", () => {
+		it("calls issues.update with state closed", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.closeIssue("mbrooks", "tars", 1);
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars", issue_number: 1, state: "closed" });
+		});
+	});
+
 	describe("getAuthenticatedUser", () => {
 		it("returns the authenticated user's login", async () => {
 			const octokit = createMockOctokit({

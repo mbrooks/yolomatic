@@ -12,6 +12,7 @@ import {
 	canRestart,
 	canDelete,
 	formatUptime,
+	DO_NOT_WORK_LABELS,
 } from "./policy.js";
 
 describe("hasLabel", () => {
@@ -35,6 +36,13 @@ describe("hasAnyLabel", () => {
 
 	it("returns false when no labels match", () => {
 		expect(hasAnyLabel([{ name: "bug" }], ["tars"])).toBe(false);
+	});
+});
+
+describe("DO_NOT_WORK_LABELS", () => {
+	it("contains wontfix and invalid", () => {
+		expect(DO_NOT_WORK_LABELS).toContain("wontfix");
+		expect(DO_NOT_WORK_LABELS).toContain("invalid");
 	});
 });
 
@@ -130,6 +138,33 @@ describe("shouldIgnoreIssueEvent", () => {
 			false,
 		);
 		expect(result.ignore).toBe(false);
+	});
+
+	it("ignores issues with do-not-work labels", () => {
+		const result = shouldIgnoreIssueEvent(
+			{
+				action: "opened",
+				issue: { assignees: [{ login: "tars-bot" }], labels: [{ name: "wontfix" }] },
+				sender: { login: "user" },
+			},
+			"tars-bot",
+			false,
+		);
+		expect(result.ignore).toBe(true);
+		expect(result.ignore ? result.reason : "").toBe("issue marked do-not-work");
+	});
+
+	it("ignores issues with invalid label", () => {
+		const result = shouldIgnoreIssueEvent(
+			{
+				action: "assigned",
+				issue: { assignees: [{ login: "tars-bot" }], labels: [{ name: "invalid" }] },
+				sender: { login: "user" },
+			},
+			"tars-bot",
+			false,
+		);
+		expect(result.ignore).toBe(true);
 	});
 });
 
