@@ -164,6 +164,8 @@ export function NewIssueScreen({
 		progressMessage,
 		setProgressMessage,
 		submitIssueChat,
+		abortIssueChat,
+		steerIssueChat,
 	} = useIssueChatTransport();
 
 	useEffect(() => {
@@ -251,6 +253,10 @@ export function NewIssueScreen({
 			});
 			applyChatResult(result);
 		} catch (err) {
+			if (err instanceof Error && err.message === "Aborted") {
+				appendTextMessage("tars", "Stopped.");
+				return;
+			}
 			const message = err instanceof Error ? err.message : String(err);
 			setError(message);
 			appendTextMessage("tars", `I couldn't continue the issue draft: ${message}`);
@@ -259,6 +265,23 @@ export function NewIssueScreen({
 			setSubmitting(false);
 		}
 	}, [appendTextMessage, appendThinkingMessage, applyChatResult, draft, input, messages, owner, privacyMode, repo, repoContext, selectedTemplate, setProgressMessage, submitIssueChat, submitting]);
+
+	const handleAbort = useCallback(() => {
+		abortIssueChat();
+	}, [abortIssueChat]);
+
+	const handleSteer = useCallback(() => {
+		const value = input.trim();
+		if (!value || !submitting) {
+			return;
+		}
+
+		const userMessage = { id: uid(), role: "user" as const, type: "text" as const, text: value };
+		setMessages((prev) => [...prev, userMessage]);
+		setInput("");
+		setError(null);
+		steerIssueChat(value);
+	}, [input, steerIssueChat, submitting]);
 
 	const handleCreateIssue = useCallback(async () => {
 		setError(null);
@@ -272,10 +295,14 @@ export function NewIssueScreen({
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
 			if (event.key === "Enter" && !event.shiftKey) {
 				event.preventDefault();
-				void handleSubmit();
+				if (submitting) {
+					void handleSteer();
+				} else {
+					void handleSubmit();
+				}
 			}
 		},
-		[handleSubmit],
+		[handleSubmit, handleSteer, submitting],
 	);
 
 	const transcriptMessages: ChatMessage[] = createdIssue
@@ -460,17 +487,37 @@ export function NewIssueScreen({
 							value={input}
 							onChange={(event) => setInput(event.target.value)}
 							onKeyDown={handleKeyDown}
-							disabled={submitting || createdIssue !== null}
+							disabled={createdIssue !== null}
 							rows={3}
 						/>
-						<button
-							className="chat-send-btn"
-							type="button"
-							onClick={() => void handleSubmit()}
-							disabled={submitting || createdIssue !== null || !input.trim()}
-						>
-							{submitting ? "Thinking..." : "Send"}
-						</button>
+						{submitting ? (
+							<>
+								<button
+									className="chat-send-btn secondary"
+									type="button"
+									onClick={() => void handleAbort()}
+								>
+									Stop
+								</button>
+								<button
+									className="chat-send-btn"
+									type="button"
+									onClick={() => void handleSteer()}
+									disabled={!input.trim()}
+								>
+									Steer
+								</button>
+							</>
+						) : (
+							<button
+								className="chat-send-btn"
+								type="button"
+								onClick={() => void handleSubmit()}
+								disabled={createdIssue !== null || !input.trim()}
+							>
+								Send
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

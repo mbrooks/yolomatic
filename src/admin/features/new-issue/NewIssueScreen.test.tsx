@@ -290,7 +290,7 @@ describe("NewIssueScreen", () => {
 
 	it("uses websocket issue chat when the connection is open", async () => {
 		connectionStatusSpy.mockReturnValue("open");
-		requestIssueChatSpy.mockImplementation(async (_payload, onProgress) => {
+		requestIssueChatSpy.mockImplementation(async (_requestId, _payload, onProgress) => {
 			onProgress?.({ type: "started", message: "Thinking through the issue draft..." });
 			onProgress?.({ type: "creating", message: "Creating issue in mbrooks/tars..." });
 			return {
@@ -325,7 +325,7 @@ describe("NewIssueScreen", () => {
 
 	it("renders websocket thinking chunks as a merged transcript block", async () => {
 		connectionStatusSpy.mockReturnValue("open");
-		requestIssueChatSpy.mockImplementation(async (_payload, onProgress) => {
+		requestIssueChatSpy.mockImplementation(async (_requestId, _payload, onProgress) => {
 			onProgress?.({ type: "started", message: "Thinking through the issue draft..." });
 			onProgress?.({ type: "thinking", message: "Scanning repo ", text: "Scanning repo ", done: false });
 			onProgress?.({ type: "thinking", message: "Scanning repo context", text: "Scanning repo context", done: true });
