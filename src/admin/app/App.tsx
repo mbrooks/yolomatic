@@ -173,7 +173,6 @@ function AppHeader({
 				>
 					Settings
 				</button>
-				<StatusBadge status={agentStatus} />
 			</div>
 		</header>
 	);

@@ -35,6 +35,12 @@ export function DashboardScreen({
 		<div className="dashboard">
 			<div className="dashboard-stats">
 				<div className="stat-card">
+					<div className="stat-label">Agent</div>
+					<div className="stat-value">
+						<StatusBadge status={agentStatus} />
+					</div>
+				</div>
+				<div className="stat-card">
 					<div className="stat-label">Active Work</div>
 					<div className="stat-value">{workingCount}</div>
 				</div>
