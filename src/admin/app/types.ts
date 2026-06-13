@@ -39,7 +39,6 @@ export type ServerSkill = {
 	name: string;
 	description: string;
 	content: string;
-	enabled: boolean;
 	updatedAt: string;
 	createdAt: string;
 };
@@ -48,7 +47,6 @@ export type RepoSkill = {
 	name: string;
 	description: string;
 	content: string;
-	enabled: boolean;
 	updatedAt: string;
 	source: SkillSource;
 };

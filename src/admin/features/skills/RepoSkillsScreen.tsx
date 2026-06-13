@@ -95,9 +95,6 @@ export function RepoSkillsScreen({
 				<div className="detail-pane">
 					<div className="detail-title">{selectedSkill.name}</div>
 					<div className="detail-section">
-						<span className={`skill-status ${selectedSkill.enabled ? "enabled" : "disabled"}`}>
-							{selectedSkill.enabled ? "Enabled" : "Disabled"}
-						</span>
 						{selectedSkill.source === "inherited" && (
 							<span className="skill-badge inherited">Inherited from server</span>
 						)}

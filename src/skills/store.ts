@@ -11,7 +11,6 @@ function rowToSkill(row: Record<string, unknown>): ServerSkill {
 		name: String(row.name),
 		description: String(row.description),
 		content: String(row.content),
-		enabled: Number(row.enabled) === 1,
 		updatedAt: String(row.updated_at),
 		createdAt: String(row.created_at),
 	};
@@ -29,11 +28,11 @@ export class SkillStore {
 		runMigrations(this.db);
 
 		this.insertStmt = this.db.prepare(
-			`INSERT INTO skills (id, name, description, content, enabled, updated_at, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO skills (id, name, description, content, updated_at, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(id) DO UPDATE SET
 			 name=excluded.name, description=excluded.description, content=excluded.content,
-			 enabled=excluded.enabled, updated_at=excluded.updated_at`,
+			 updated_at=excluded.updated_at`,
 		);
 
 		this.deleteStmt = this.db.prepare("DELETE FROM skills WHERE id = ?");
@@ -59,22 +58,21 @@ export class SkillStore {
 		return rows.map(rowToSkill);
 	}
 
-	async create(data: { name: string; description: string; content: string; enabled: boolean }): Promise<ServerSkill> {
+	async create(data: { name: string; description: string; content: string }): Promise<ServerSkill> {
 		const now = new Date().toISOString();
 		const skill: ServerSkill = {
 			id: randomUUID(),
 			name: data.name,
 			description: data.description,
 			content: data.content,
-			enabled: data.enabled,
 			updatedAt: now,
 			createdAt: now,
 		};
-		this.insertStmt.run(skill.id, skill.name, skill.description, skill.content, skill.enabled ? 1 : 0, skill.updatedAt, skill.createdAt);
+		this.insertStmt.run(skill.id, skill.name, skill.description, skill.content, skill.updatedAt, skill.createdAt);
 		return skill;
 	}
 
-	async update(id: string, data: Partial<{ name: string; description: string; content: string; enabled: boolean }>): Promise<ServerSkill | null> {
+	async update(id: string, data: Partial<{ name: string; description: string; content: string }>): Promise<ServerSkill | null> {
 		const existing = await this.get(id);
 		if (!existing) return null;
 
@@ -83,10 +81,9 @@ export class SkillStore {
 			name: data.name ?? existing.name,
 			description: data.description ?? existing.description,
 			content: data.content ?? existing.content,
-			enabled: data.enabled ?? existing.enabled,
 			updatedAt: new Date().toISOString(),
 		};
-		this.insertStmt.run(updated.id, updated.name, updated.description, updated.content, updated.enabled ? 1 : 0, updated.updatedAt, updated.createdAt);
+		this.insertStmt.run(updated.id, updated.name, updated.description, updated.content, updated.updatedAt, updated.createdAt);
 		return updated;
 	}
 

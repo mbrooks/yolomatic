@@ -148,18 +148,15 @@ describe("RepoSkillService", () => {
 		try { rmSync(TEST_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
 	});
 
-	it("listRepoSkills reads from a checked-out worktree and honors enabled skills", async () => {
+	it("listRepoSkills reads from a checked-out worktree", async () => {
 		const bareRepo = path.join(TEST_DIR, "owner-repo");
 		mkdirSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "skill-a"), { recursive: true });
 		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "skill-a", "SKILL.md"), buildSkillFile("skill-a", "Desc A", "Body A"));
 		mkdirSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "skill-b"), { recursive: true });
 		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "skill-b", "SKILL.md"), buildSkillFile("skill-b", "Desc B", "Body B"));
-		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "settings.json"), JSON.stringify({ skills: ["skill-a"] }));
 
 		const skills = await service.listRepoSkills("owner", "repo");
 		expect(skills.length).toBe(2);
-		expect(skills.find((s) => s.name === "skill-a")?.enabled).toBe(true);
-		expect(skills.find((s) => s.name === "skill-b")?.enabled).toBe(false);
 	});
 
 	it("getRepoSkill returns null when missing", async () => {
@@ -171,14 +168,12 @@ describe("RepoSkillService", () => {
 		const bareRepo = path.join(TEST_DIR, "owner-repo");
 		mkdirSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "found"), { recursive: true });
 		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "found", "SKILL.md"), buildSkillFile("found", "Found desc", "Found body"));
-		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "settings.json"), JSON.stringify({ skills: ["found"] }));
 
 		const skill = await service.getRepoSkill("owner", "repo", "found");
 		expect(skill).not.toBeNull();
 		expect(skill!.name).toBe("found");
 		expect(skill!.description).toBe("Found desc");
 		expect(skill!.content).toBe("Found body");
-		expect(skill!.enabled).toBe(true);
 	});
 
 	it("saveRepoSkill creates skill directory and pushes", async () => {
@@ -186,7 +181,6 @@ describe("RepoSkillService", () => {
 			name: "new-skill",
 			description: "New desc",
 			content: "New body",
-			enabled: true,
 		});
 		expect(result.success).toBe(true);
 		expect(result.error).toBeUndefined();
@@ -196,17 +190,7 @@ describe("RepoSkillService", () => {
 		expect(commitCalls[0].args[2]).toContain("update skill new-skill");
 	});
 
-	it("saveRepoSkill with enabled=false updates settings.json", async () => {
-		const result = await service.saveRepoSkill("owner", "repo", {
-			name: "disabled-skill",
-			description: "",
-			content: "body",
-			enabled: false,
-		});
-		expect(result.success).toBe(true);
-	});
-
-	it("saveRepoSkill preserves existing settings arrays and avoids duplicate skill entries", async () => {
+	it("saveRepoSkill does not modify settings.json", async () => {
 		const bareRepo = path.join(TEST_DIR, "owner-repo");
 		mkdirSync(path.join(bareRepo, ".mock-source", ".pi"), { recursive: true });
 		writeFileSync(
@@ -230,10 +214,9 @@ describe("RepoSkillService", () => {
 			name: "new-skill",
 			description: "",
 			content: "body",
-			enabled: true,
 		});
 		expect(result.success).toBe(true);
-		expect(JSON.parse(capturedSettings)).toEqual({ skills: ["existing-skill", "new-skill"] });
+		expect(JSON.parse(capturedSettings)).toEqual({ skills: ["existing-skill", 123, "new-skill"] });
 	});
 
 	it("saveRepoSkill returns error on git failure", async () => {
@@ -245,7 +228,6 @@ describe("RepoSkillService", () => {
 			name: "fail",
 			description: "",
 			content: "body",
-			enabled: true,
 		});
 		expect(result.success).toBe(false);
 		expect(result.error).toContain("git failed");
@@ -270,7 +252,6 @@ describe("RepoSkillService", () => {
 			name: "fail",
 			description: "",
 			content: "body",
-			enabled: true,
 		});
 		expect(result.success).toBe(false);
 		expect(result.error).toContain("string failure");
@@ -289,32 +270,6 @@ describe("RepoSkillService", () => {
 	it("deleteRepoSkill succeeds when skill dir does not exist", async () => {
 		const result = await service.deleteRepoSkill("owner", "repo", "nonexistent");
 		expect(result.success).toBe(true);
-	});
-
-	it("deleteRepoSkill updates settings.json when enabled skills are configured", async () => {
-		const bareRepo = path.join(TEST_DIR, "owner-repo");
-		mkdirSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "old-skill"), { recursive: true });
-		writeFileSync(path.join(bareRepo, ".mock-source", ".pi", "skills", "old-skill", "SKILL.md"), buildSkillFile("old-skill", "", "body"));
-		writeFileSync(
-			path.join(bareRepo, ".mock-source", ".pi", "settings.json"),
-			JSON.stringify({ skills: ["old-skill", "keep-me"] }),
-		);
-		let capturedSettings = "";
-		const inspectRunner: CommandRunner = async (command, args, options) => {
-			await mock.runner(command, args, options);
-			if (command === "git" && args[0] === "add" && options?.cwd) {
-				capturedSettings = readFileSync(path.join(options.cwd, ".pi", "settings.json"), "utf-8");
-			}
-			return { stdout: "", stderr: "" };
-		};
-		const inspectService = new RepoSkillService(
-			{ workspacesDir: TEST_DIR, githubUsername: "testuser", githubToken: "token", defaultBranch: "main" },
-			inspectRunner,
-		);
-
-		const result = await inspectService.deleteRepoSkill("owner", "repo", "old-skill");
-		expect(result.success).toBe(true);
-		expect(JSON.parse(capturedSettings)).toEqual({ skills: ["keep-me"] });
 	});
 
 	it("listRepoSkills returns empty when skills dir missing", async () => {
