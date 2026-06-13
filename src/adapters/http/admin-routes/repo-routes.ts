@@ -189,19 +189,18 @@ export async function handleRepoRoutes(
 			await deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [
 				tarsUsername,
 			]);
-			const result = await deps.startIssueSession.execute(
+			deps.startIssueSession.execute(
 				owner,
 				repo,
 				issueNumber,
 				body.title,
 				body.body ?? "",
 				body.labels ?? [],
-			);
-			if (!result.success) {
-				sendJson(response, mapResultToStatus(result.code), { error: result.message });
-				return true;
-			}
-			sendJson(response, 200, result.data);
+			).catch((error: unknown) => {
+				const message = error instanceof Error ? error.message : String(error);
+				process.stdout.write(`[webhook] background session error: ${message}\n`);
+			});
+			sendJson(response, 202, { started: true, status: "queued", message: "Session started in background" });
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[webhook] assign error: ${message}\n`);

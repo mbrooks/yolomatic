@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type { OpenIssue } from "../../api/issues.js";
 import { assignIssue, startIssueSession } from "../../api/issues.js";
 
@@ -19,6 +19,13 @@ export function IssueDetail({
 	const [assignError, setAssignError] = useState<string | null>(null);
 	const [startingSession, setStartingSession] = useState(false);
 	const [startSessionError, setStartSessionError] = useState<string | null>(null);
+
+	useEffect(() => {
+		setAssigning(false);
+		setAssignError(null);
+		setStartingSession(false);
+		setStartSessionError(null);
+	}, [selected?.number]);
 
 	const handleAssign = useCallback(async () => {
 		if (!selected) return;
