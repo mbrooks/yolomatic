@@ -112,3 +112,17 @@ export async function fetchOpenIssues(owner: string, repo: string): Promise<Open
 export async function assignIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
 	return apiPost<void>(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/assign`);
 }
+
+export async function startIssueSession(
+	owner: string,
+	repo: string,
+	issueNumber: number,
+	title: string,
+	body: string,
+	labels: string[],
+): Promise<{ started: boolean; status: string; message: string }> {
+	return apiPost<{ started: boolean; status: string; message: string }>(
+		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/start-session`,
+		{ title, body, labels },
+	);
+}
