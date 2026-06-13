@@ -113,6 +113,7 @@ function makeCommand(
 		listPendingInvitations: vi.fn(async () => []),
 		acceptInvitation: vi.fn(),
 		updateIssueAssignees: vi.fn(),
+		closeIssue: vi.fn(),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "tars-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 	};
