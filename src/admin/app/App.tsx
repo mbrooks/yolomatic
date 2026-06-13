@@ -73,7 +73,7 @@ export function App(): React.ReactElement {
 								owner: session.owner,
 								repo: session.repo,
 								issueNumber: session.issueNumber,
-								tab: "issues",
+								tab: "sessions",
 							};
 			navigate(next);
 		},
