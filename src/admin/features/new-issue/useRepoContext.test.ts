@@ -14,7 +14,11 @@ describe("useRepoContext", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
-		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+			const url = typeof input === "string" ? input : input.toString();
+			if (url.endsWith("/skills")) {
+				return mockJsonResponse({ skills: [] });
+			}
 			return mockJsonResponse({
 				labels: ["bug"],
 				templates: [{ name: "Bug", body: "body" }],
@@ -28,7 +32,7 @@ describe("useRepoContext", () => {
 		fetchSpy.mockRestore();
 	});
 
-	it("loads repo context for an owner and repo", async () => {
+	it("loads repo context and skills for an owner and repo", async () => {
 		const { result } = renderHook(() => useRepoContext("mbrooks", "tars"));
 
 		await act(async () => {
@@ -37,8 +41,11 @@ describe("useRepoContext", () => {
 		});
 
 		expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining("/api/repos/mbrooks/tars/context"));
+		expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining("/api/repos/mbrooks/tars/skills"));
 		expect(result.current.loadingContext).toBe(false);
+		expect(result.current.loadingSkills).toBe(false);
 		expect(result.current.repoContext?.labels).toEqual(["bug"]);
+		expect(result.current.skills).toEqual([]);
 	});
 
 	it("clears context and selected template", async () => {

@@ -5,6 +5,8 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 		create: vi.fn(() => ({})),
 	},
 	createAgentSession: vi.fn(),
+	DefaultResourceLoader: vi.fn(() => ({ reload: vi.fn() })),
+	getAgentDir: vi.fn(() => "/agent"),
 	SessionManager: {
 		inMemory: vi.fn(() => ({})),
 	},
@@ -41,6 +43,18 @@ vi.mock("../../executor/index.js", () => ({
 	}),
 }));
 
+vi.mock("node:fs", () => ({
+	readdirSync: vi.fn(() => []),
+	statSync: vi.fn(() => undefined),
+	readFileSync: vi.fn(() => ""),
+}));
+
+vi.mock("../../skills/repo-skill-service.js", () => ({
+	parseSkillFile: vi.fn(() => ({ name: "", description: "", body: "" })),
+	buildSkillFile: vi.fn((name: string, description: string, content: string) =>
+		`---\nname: ${name}\ndescription: ${description}\n---\n\n${content}`),
+}));
+
 vi.mock("../../logging/llm-logger.js", () => ({
 	LlmLogger: vi.fn(() => ({
 		logPrompt: vi.fn(),
@@ -55,7 +69,7 @@ vi.mock("../../logging/session-log-store.js", () => ({
 	recordSessionLog: vi.fn(),
 }));
 
-import { createAgentSession } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { resolveConfiguredModel } from "../../executor/index.js";
 import { LlmLogger } from "../../logging/llm-logger.js";
 import { recordSessionLog } from "../../logging/session-log-store.js";
@@ -345,6 +359,89 @@ describe("chatIssueViaLLM", () => {
 		).rejects.toThrow("Could not extract valid JSON from LLM response after 3 attempts");
 		expect(session.prompt).toHaveBeenCalledTimes(3);
 		expect(session.dispose).toHaveBeenCalled();
+	});
+
+	it("still works when repo skill service throws", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([
+			{
+				text: JSON.stringify({
+					message: "Draft ready.",
+					owner: "mbrooks",
+					repo: "tars",
+					draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+					readyToCreate: true,
+					shouldCreate: false,
+				}),
+			},
+		]);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		const repoSkillService = {
+			listRepoSkills: vi.fn(async () => {
+				throw new Error("repo skill fetch failed");
+			}),
+		};
+
+		await chatIssueViaLLM({
+			owner: "mbrooks",
+			repo: "tars",
+			messages: [{ role: "user", text: "draft this" }],
+			repoSkillService: repoSkillService as unknown as import("../../skills/repo-skill-service.js").RepoSkillService,
+		});
+
+		expect(DefaultResourceLoader).toHaveBeenCalled();
+	});
+
+	it("creates a DefaultResourceLoader with skill files when services are provided", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([
+			{
+				text: JSON.stringify({
+					message: "Draft ready.",
+					owner: "mbrooks",
+					repo: "tars",
+					draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+					readyToCreate: true,
+					shouldCreate: false,
+				}),
+			},
+		]);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		const skillStore = {
+			listAll: vi.fn(async () => [
+				{ id: "1", name: "server-skill", description: "desc", content: "body", updatedAt: "", createdAt: "" },
+			]),
+		};
+		const repoSkillService = {
+			listRepoSkills: vi.fn(async () => [
+				{ name: "repo-skill", description: "rdesc", content: "rbody", updatedAt: "", source: "repo" },
+			]),
+		};
+
+		await chatIssueViaLLM({
+			owner: "mbrooks",
+			repo: "tars",
+			messages: [{ role: "user", text: "draft this" }],
+			skillStore: skillStore as unknown as import("../../skills/store.js").SkillStore,
+			repoSkillService: repoSkillService as unknown as import("../../skills/repo-skill-service.js").RepoSkillService,
+		});
+
+		expect(DefaultResourceLoader).toHaveBeenCalled();
+		const loaderOptions = vi.mocked(DefaultResourceLoader).mock.calls[0][0];
+		expect(loaderOptions.cwd).toBeDefined();
+		expect(loaderOptions.agentDir).toBeDefined();
+		expect(loaderOptions.agentsFilesOverride).toBeDefined();
+
+		const agentsFilesOverride = loaderOptions.agentsFilesOverride!;
+		const overrideResult = agentsFilesOverride({ agentsFiles: [] });
+		expect(overrideResult.agentsFiles.length).toBeGreaterThanOrEqual(2);
+		const paths = overrideResult.agentsFiles.map((f: { path: string }) => f.path);
+		expect(paths.some((p: string) => p.includes("server-skill"))).toBe(true);
+		expect(paths.some((p: string) => p.includes("repo-skill"))).toBe(true);
 	});
 
 	it("defaults missing draft payload fields safely", async () => {
