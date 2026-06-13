@@ -371,7 +371,7 @@ describe("createAdminWebSocketServer", () => {
 	it("runs issue chat over websocket and streams progress", async () => {
 		if (socketBindingUnavailable) return;
 		const issueChatProvider = {
-			runIssueChat: vi.fn(async (_payload, onProgress) => {
+			runIssueChat: vi.fn(async (_requestId, _payload, onProgress) => {
 				onProgress({ type: "started", message: "Thinking..." });
 				onProgress({ type: "creating", message: "Creating issue..." });
 				return {

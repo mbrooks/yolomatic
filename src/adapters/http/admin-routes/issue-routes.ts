@@ -65,7 +65,7 @@ export async function handleIssueRoutes(
 				sendJson(response, 400, { error: "Missing required field: messages" });
 				return true;
 			}
-			sendJson(response, 200, await executeIssueChatRequest(deps, body));
+			sendJson(response, 200, await executeIssueChatRequest(deps, undefined, body));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			sendJson(

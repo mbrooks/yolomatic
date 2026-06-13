@@ -208,6 +208,7 @@ describe("webSocketManager", () => {
 
 	it("sends issue chat requests and resolves the response", async () => {
 		const responsePromise = webSocketManager.requestIssueChat(
+			"req-test-1",
 			{ owner: "mbrooks", repo: "tars", messages: [{ role: "user", text: "hello" }] },
 			vi.fn(),
 		);
@@ -218,6 +219,7 @@ describe("webSocketManager", () => {
 			.map((entry) => JSON.parse(entry))
 			.find((entry) => entry.type === "issue-chat");
 		expect(issueChatMessage).toBeTruthy();
+		expect(issueChatMessage.requestId).toBe("req-test-1");
 
 		socket.triggerMessage({
 			type: "issue-chat-response",
@@ -238,6 +240,7 @@ describe("webSocketManager", () => {
 	it("forwards issue chat progress events", async () => {
 		const progress = vi.fn();
 		const responsePromise = webSocketManager.requestIssueChat(
+			"req-test-2",
 			{ owner: "mbrooks", repo: "tars", messages: [{ role: "user", text: "hello" }] },
 			progress,
 		);
