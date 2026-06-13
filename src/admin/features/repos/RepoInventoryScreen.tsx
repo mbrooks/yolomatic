@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
+import { scanRepos } from "../../api/repos.js";
 
 type SortKey = "repo" | "activeCount" | "sessionCount" | "cronCount" | "lastActivity";
 type SortDir = "asc" | "desc";
@@ -39,12 +40,16 @@ export function RepoInventoryScreen({
 	repos,
 	onSelectRepo,
 	onBack,
+	onRescanComplete,
 }: {
 	repos: RepoSummary[];
 	onSelectRepo: (owner: string, repo: string) => void;
 	onBack: () => void;
+	onRescanComplete?: () => void;
 }): React.ReactElement {
 	const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "lastActivity", dir: "desc" });
+	const [scanning, setScanning] = useState(false);
+	const [scanError, setScanError] = useState<string | null>(null);
 
 	const sortedRepos = useMemo(
 		() => sortRepos(repos, sort.key, sort.dir),
@@ -63,9 +68,40 @@ export function RepoInventoryScreen({
 		return sort.dir === "asc" ? " ▲" : " ▼";
 	}
 
+	async function handleRescan() {
+		setScanning(true);
+		setScanError(null);
+		try {
+			await scanRepos();
+			onRescanComplete?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setScanError(message);
+		} finally {
+			setScanning(false);
+		}
+	}
+
 	return (
 		<div className="repo-inventory">
-			<Breadcrumb label="Repositories" onBack={onBack} />
+			<div className="repo-inventory-header">
+				<Breadcrumb label="Repositories" onBack={onBack} />
+				<button
+					type="button"
+					className="action-btn"
+					onClick={() => {
+						void handleRescan();
+					}}
+					disabled={scanning}
+				>
+					{scanning ? "Scanning..." : "Rescan"}
+				</button>
+			</div>
+			{scanError ? (
+				<div className="empty-state">
+					<p className="error-text">Rescan failed: {scanError}</p>
+				</div>
+			) : null}
 			{repos.length === 0 ? (
 				<div className="empty-state">
 					<p>No repositories have been used yet.</p>

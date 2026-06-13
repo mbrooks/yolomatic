@@ -46,6 +46,7 @@ describe("handleRepoRoutes", () => {
 
 	const settingsStore = {
 		get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+		set: vi.fn(),
 	};
 
 	const startIssueSession = {
@@ -606,6 +607,190 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBe("Execution failed");
+		});
+	});
+
+	describe("POST /api/repos/scan", () => {
+		it("returns discovered repos and merges into configured_repositories", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => {
+					if (key === "configured_repositories") {
+						return JSON.stringify([{ owner: "mbrooks", repo: "tars" }]);
+					}
+					return undefined;
+				}),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world" },
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.repos).toHaveLength(2);
+			expect(body.added).toBe(1);
+			expect(store.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([
+					{ owner: "mbrooks", repo: "tars" },
+					{ owner: "octocat", repo: "hello-world" },
+				]),
+			);
+		});
+
+		it("returns 500 when githubService is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ githubService: undefined }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub service not configured");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: undefined }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Settings store not configured");
+		});
+
+		it("returns 500 when token is invalid", async () => {
+			const res = response();
+			githubService.getAuthenticatedUser.mockResolvedValue(null);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub token is invalid or not configured");
+		});
+
+		it("handles service errors from listAccessibleRepositories", async () => {
+			const res = response();
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockRejectedValue(new Error("API rate limit exceeded"));
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps(),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("API rate limit exceeded");
+		});
+
+		it("handles empty configured_repositories", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn(() => undefined),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([
+				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world" },
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(1);
+		});
+
+		it("handles invalid JSON in configured_repositories", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn(() => "not-json"),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(0);
+		});
+
+		it("filters malformed entries from configured_repositories", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn(() =>
+					JSON.stringify([
+						{ owner: "", repo: "x" },
+						{ owner: "y", repo: "" },
+						"bad",
+						{ owner: "valid", repo: "repo" },
+						{ owner: "valid", repo: "repo" },
+					])),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(0);
+			expect(store.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([{ owner: "valid", repo: "repo" }]),
+			);
 		});
 	});
 });
