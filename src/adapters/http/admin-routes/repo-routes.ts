@@ -7,12 +7,91 @@ import {
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 
+interface ConfiguredRepository {
+	owner: string;
+	repo: string;
+}
+
+function parseConfiguredRepositories(raw: string | undefined): ConfiguredRepository[] {
+	if (!raw?.trim()) {
+		return [];
+	}
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		if (!Array.isArray(parsed)) {
+			return [];
+		}
+		const repos: ConfiguredRepository[] = [];
+		const seen = new Set<string>();
+		for (const item of parsed) {
+			if (!item || typeof item !== "object") {
+				continue;
+			}
+			const owner = "owner" in item && typeof item.owner === "string" ? item.owner.trim() : "";
+			const repo = "repo" in item && typeof item.repo === "string" ? item.repo.trim() : "";
+			if (!owner || !repo) {
+				continue;
+			}
+			const key = `${owner}/${repo}`.toLowerCase();
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			repos.push({ owner, repo });
+		}
+		return repos;
+	} catch {
+		return [];
+	}
+}
+
 export async function handleRepoRoutes(
 	request: IncomingMessage,
 	response: ServerResponse,
 	deps: AdminRouterDeps,
 	pathname: string,
 ): Promise<boolean> {
+	const scanMatch = /^\/api\/repos\/scan$/u.exec(pathname);
+	if (scanMatch && request.method === "POST") {
+		if (!checkAdminJson(request, response, deps)) {
+			return true;
+		}
+		if (!deps.githubService) {
+			sendJson(response, 500, { error: "GitHub service not configured" });
+			return true;
+		}
+		if (!deps.settingsStore) {
+			sendJson(response, 500, { error: "Settings store not configured" });
+			return true;
+		}
+		try {
+			const user = await deps.githubService.getAuthenticatedUser();
+			if (!user) {
+				sendJson(response, 500, { error: "GitHub token is invalid or not configured" });
+				return true;
+			}
+			const discovered = await deps.githubService.listAccessibleRepositories();
+			const currentRaw = deps.settingsStore.get("configured_repositories") ?? "[]";
+			const current = parseConfiguredRepositories(currentRaw);
+			const seen = new Set(current.map((r) => `${r.owner}/${r.repo}`.toLowerCase()));
+			let added = 0;
+			for (const repo of discovered) {
+				const key = `${repo.owner}/${repo.repo}`.toLowerCase();
+				if (!seen.has(key)) {
+					seen.add(key);
+					current.push({ owner: repo.owner, repo: repo.repo });
+					added++;
+				}
+			}
+			deps.settingsStore.set("configured_repositories", JSON.stringify(current));
+			sendJson(response, 200, { repos: discovered, added });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			sendJson(response, 500, { error: message });
+		}
+		return true;
+	}
+
 	const repoContextMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/context$/u.exec(pathname);
 	if (repoContextMatch && request.method === "GET") {
 		if (!checkAdminJson(request, response, deps)) {
