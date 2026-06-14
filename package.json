@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:coverage": "NODE_ENV=development node ./scripts/run-guardrail-coverage.js",
     "guardrail": "npm run guardrail:test",
-    "guardrail:test": "NODE_ENV=development npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
+    "preflight": "node ./scripts/preflight.js",
+    "guardrail:test": "npm run preflight && NODE_ENV=development npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.75.5",
