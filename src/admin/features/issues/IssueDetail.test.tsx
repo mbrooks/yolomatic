@@ -270,4 +270,44 @@ describe("IssueDetail", () => {
 		expect(screen.queryByText("Network error")).toBeNull();
 		expect(screen.queryByText("Start failed")).toBeNull();
 	});
+
+	it("shows TARS as optimistic assignee after successful assignment", async () => {
+		mockAssignIssue.mockResolvedValue({ started: true, status: "working", message: "ok" });
+		render(
+			<IssueDetail
+				selected={{ ...mockIssue, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		const button = screen.getByText("Assign to TARS");
+		fireEvent.click(button);
+		await waitFor(() => expect(screen.getByText("TARS")).toBeDefined());
+		expect(screen.queryByText("Assign to TARS")).toBeNull();
+		expect(screen.queryByText("Start Session")).toBeNull();
+	});
+
+	it("resets optimistic assignee when selected issue changes", async () => {
+		mockAssignIssue.mockResolvedValue({ started: true, status: "working", message: "ok" });
+		const { rerender } = render(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 1, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		fireEvent.click(screen.getByText("Assign to TARS"));
+		await waitFor(() => expect(screen.getByText("TARS")).toBeDefined());
+
+		rerender(
+			<IssueDetail
+				selected={{ ...mockIssue, number: 2, assignees: [] }}
+				owner="mbrooks"
+				repo="tars"
+			/>,
+		);
+		expect(screen.queryByText("TARS")).toBeNull();
+		expect(screen.getByText("Unassigned")).toBeDefined();
+		expect(screen.getByText("Assign to TARS")).toBeDefined();
+	});
 });

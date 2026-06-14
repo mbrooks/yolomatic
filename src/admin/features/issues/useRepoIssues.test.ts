@@ -39,7 +39,7 @@ describe("useRepoIssues", () => {
 			{ number: 2, title: "Feature", body: "desc", state: "open", labels: [], assignees: [], html_url: "" },
 		]);
 		await act(async () => {
-			result.current.reload();
+			await result.current.reload();
 		});
 		await waitFor(() => expect(result.current.loading).toBe(false));
 		expect(result.current.issues).toHaveLength(1);
