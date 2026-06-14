@@ -212,7 +212,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 	{
 		key: "pi_agent_model",
 		type: "string",
-		description: "LLM model identifier (e.g. kimi-k2.6:cloud)",
+		description: "LLM model identifier (e.g. kimi-k2.7-code:cloud)",
 		requiresRestart: false,
 		sensitive: false,
 		envVar: "PI_AGENT_MODEL",

@@ -359,10 +359,10 @@ describe("PiAgentExecutor", () => {
 
 	it("uses an override prompt and passes the configured model into Pi", async () => {
 		const soulPath = await makeSoulPath();
-		const configuredModel = { provider: "ollama", id: "kimi-k2.6:cloud" };
+		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
 		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
 		const { mockSession } = mockSuccessfulSession();
-		process.env.PI_AGENT_MODEL = "kimi-k2.6:cloud";
+		process.env.PI_AGENT_MODEL = "kimi-k2.7-code:cloud";
 		const onSessionCreated = vi.fn();
 
 		const executor = new PiAgentExecutor({ soulPath });
