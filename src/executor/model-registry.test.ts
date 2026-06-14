@@ -27,7 +27,7 @@ describe("createTarsModelRegistry", () => {
 			api: "openai-completions",
 			apiKey: "ollama",
 			models: expect.arrayContaining([
-				expect.objectContaining({ id: "kimi-k2.6:cloud" }),
+				expect.objectContaining({ id: "kimi-k2.7-code:cloud" }),
 			]),
 		}));
 		expect(registry).toBe(mockRegistry);

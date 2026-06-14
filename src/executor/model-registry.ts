@@ -13,8 +13,8 @@ export function createTarsModelRegistry(authStorage: AuthStorage): ModelRegistry
 		apiKey: "ollama",
 		models: [
 			{
-				id: "kimi-k2.6:cloud",
-				name: "kimi-k2.6:cloud",
+				id: "kimi-k2.7-code:cloud",
+				name: "kimi-k2.7-code:cloud",
 				api: "openai-completions",
 				reasoning: true,
 				input: ["text", "image"],
