@@ -31,7 +31,7 @@ export function useRepoIssues(owner: string, repo: string): {
 		issues,
 		loading,
 		reload: () => {
-			void load();
+			return load();
 		},
 	};
 }

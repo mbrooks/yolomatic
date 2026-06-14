@@ -1,8 +1,14 @@
 // @vitest-environment happy-dom
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { IssuesScreen } from "./IssuesScreen.js";
+
+const mockIssuesRef = {
+	current: [
+		{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: [], html_url: "https://github.com/o/r/issues/1" },
+	],
+};
 
 vi.mock("./useRepoIssues.js", () => ({
 	useRepoIssues: vi.fn((owner: string, repo: string) => {
@@ -13,9 +19,7 @@ vi.mock("./useRepoIssues.js", () => ({
 			return { issues: [], loading: true, reload: vi.fn() };
 		}
 		return {
-			issues: [
-				{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["user"], html_url: "https://github.com/o/r/issues/1" },
-			],
+			issues: mockIssuesRef.current,
 			loading: false,
 			reload: vi.fn(),
 		};
@@ -73,5 +77,37 @@ describe("IssuesScreen", () => {
 		const tabs = screen.getAllByRole("button");
 		const issuesTab = tabs.find((t) => t.textContent === "Issues");
 		expect(issuesTab?.classList.contains("active")).toBe(true);
+	});
+
+	it("keeps selected issue in sync when issues reload", async () => {
+		const { rerender } = render(
+			<IssuesScreen
+				owner="mbrooks"
+				repo="tars"
+				onBack={vi.fn()}
+				onSelectTab={vi.fn()}
+			/>,
+		);
+		await waitFor(() => {
+			expect(screen.getByText("Bug")).toBeDefined();
+		});
+		fireEvent.click(screen.getByText("Bug"));
+		expect(screen.getByText("Assign to TARS")).toBeDefined();
+
+		mockIssuesRef.current = [
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["tars"], html_url: "https://github.com/o/r/issues/1" },
+		];
+		rerender(
+			<IssuesScreen
+				owner="mbrooks"
+				repo="tars"
+				onBack={vi.fn()}
+				onSelectTab={vi.fn()}
+			/>,
+		);
+		await waitFor(() => {
+			expect(screen.queryByText("Assign to TARS")).toBeNull();
+		});
+		expect(screen.getByText("tars")).toBeDefined();
 	});
 });

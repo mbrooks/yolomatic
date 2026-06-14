@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { OpenIssue } from "../../api/issues.js";
 import { assignIssue, startIssueSession, closeIssue, markIssueDoNotWork } from "../../api/issues.js";
 
@@ -21,6 +21,7 @@ export function IssueDetail({
 }): React.ReactElement {
 	const [assigning, setAssigning] = useState(false);
 	const [assignError, setAssignError] = useState<string | null>(null);
+	const [justAssigned, setJustAssigned] = useState(false);
 	const [startingSession, setStartingSession] = useState(false);
 	const [startSessionError, setStartSessionError] = useState<string | null>(null);
 	const [closing, setClosing] = useState(false);
@@ -28,25 +29,34 @@ export function IssueDetail({
 	const [markingDoNotWork, setMarkingDoNotWork] = useState(false);
 	const [markDoNotWorkError, setMarkDoNotWorkError] = useState<string | null>(null);
 
+	const selectedRef = useRef(selected);
+	selectedRef.current = selected;
+
 	useEffect(() => {
 		setAssigning(false);
 		setAssignError(null);
+		setJustAssigned(false);
 		setStartingSession(false);
 		setStartSessionError(null);
-	}, [selected?.number]);
+	}, [selected?.number, selected?.assignees?.join(",")]);
 
 	const handleAssign = useCallback(async () => {
 		if (!selected) return;
+		const currentNumber = selected.number;
 		setAssigning(true);
 		setAssignError(null);
 		try {
-			await assignIssue(owner, repo, selected.number, selected.title, selected.body, selected.labels);
+			await assignIssue(owner, repo, currentNumber, selected.title, selected.body, selected.labels);
+			if (selectedRef.current?.number === currentNumber) {
+				setJustAssigned(true);
+			}
 			onAssignSuccess?.();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			setAssignError(message);
-		} finally {
-			setAssigning(false);
+			if (selectedRef.current?.number === currentNumber) {
+				setAssigning(false);
+			}
 		}
 	}, [selected, owner, repo, onAssignSuccess]);
 
@@ -123,14 +133,19 @@ export function IssueDetail({
 			<div className="detail-section">
 				<h3>Assignees</h3>
 				<div className="detail-row">
-					{selected.assignees.length > 0 ? (
-						selected.assignees.map((a) => (
-							<span key={a} className="issue-tag assignee-tag">{a}</span>
-						))
+					{selected.assignees.length > 0 || justAssigned ? (
+						<>
+							{selected.assignees.map((a) => (
+								<span key={a} className="issue-tag assignee-tag">{a}</span>
+							))}
+							{justAssigned && selected.assignees.length === 0 && (
+								<span className="issue-tag assignee-tag">TARS</span>
+							)}
+						</>
 					) : (
 						<span className="issue-body-empty">Unassigned</span>
 					)}
-					{selected.assignees.length === 0 && (
+					{selected.assignees.length === 0 && !justAssigned && (
 						<>
 							<button
 								className="action-btn"

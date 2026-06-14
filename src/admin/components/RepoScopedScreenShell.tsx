@@ -36,7 +36,7 @@ export function RepoScopedScreenShell({
 		<>
 			<RepoTabs activeTab={activeTab} onSelectTab={onSelectTab} onNewIssue={onNewIssue} />
 			<Breadcrumb label={`${owner}/${repo}`} onBack={onBack} />
-			{loading ? (
+			{loading && empty ? (
 				<div className="empty">{loadingMessage}</div>
 			) : empty ? (
 				<EmptyState message={emptyMessage}>{emptyAction}</EmptyState>
