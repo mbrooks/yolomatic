@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { AuthStorage, createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
 import { readdirSync, statSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SkillStore } from "../../skills/store.js";
 import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import { parseSkillFile, buildSkillFile } from "../../skills/repo-skill-service.js";
@@ -50,6 +51,7 @@ export interface IssueChatResponse {
 	draft: IssueDraft;
 	readyToCreate: boolean;
 	shouldCreate: boolean;
+	cancelled?: boolean;
 }
 
 export type ThinkingCallback = (chunk: { text: string; done: boolean }) => void;
@@ -192,6 +194,8 @@ export async function chatIssueViaLLM({
 	onThinking,
 	skillStore,
 	repoSkillService,
+	abortSignal,
+	onSessionCreated,
 }: {
 	owner?: string;
 	repo?: string;
@@ -202,6 +206,8 @@ export async function chatIssueViaLLM({
 	onThinking?: ThinkingCallback;
 	skillStore?: SkillStore;
 	repoSkillService?: RepoSkillService;
+	abortSignal?: AbortSignal;
+	onSessionCreated?: (session: AgentSession) => void;
 }): Promise<IssueChatResponse> {
 	const authStorage = AuthStorage.create();
 	const modelRegistry = createTarsModelRegistry(authStorage);
@@ -244,6 +250,7 @@ export async function chatIssueViaLLM({
 	});
 
 	session.agent.state.systemPrompt = systemPrompt;
+	onSessionCreated?.(session);
 	const logOwner = owner || "unknown";
 	const logRepo = repo || "unknown";
 	const key = buildSessionKey(logOwner, logRepo, -1);
@@ -302,7 +309,24 @@ export async function chatIssueViaLLM({
 	let lastError: string | undefined;
 	const maxTurns = 3;
 
+	const onAbort = () => {
+		void session.abort();
+	};
+	abortSignal?.addEventListener("abort", onAbort);
+
 	try {
+		if (abortSignal?.aborted) {
+			return {
+				message: "Stopped by user.",
+				owner: owner || "",
+				repo: repo || "",
+				draft: normalizeDraft(draft),
+				readyToCreate: false,
+				shouldCreate: false,
+				cancelled: true,
+			};
+		}
+
 		for (let turn = 0; turn < maxTurns; turn++) {
 			if (turn === 0) {
 				await session.prompt(fullPrompt);
@@ -332,6 +356,17 @@ export async function chatIssueViaLLM({
 			}
 		}
 	} catch (error) {
+		if (abortSignal?.aborted) {
+			return {
+				message: "Stopped by user.",
+				owner: owner || "",
+				repo: repo || "",
+				draft: normalizeDraft(draft),
+				readyToCreate: false,
+				shouldCreate: false,
+				cancelled: true,
+			};
+		}
 		logger.logError(error instanceof Error ? error : new Error(String(error)), "Issue chat failed");
 		recordSessionLog(key, {
 			level: "error",
@@ -340,6 +375,7 @@ export async function chatIssueViaLLM({
 		});
 		throw error;
 	} finally {
+		abortSignal?.removeEventListener("abort", onAbort);
 		unsubscribe();
 		session.dispose();
 	}

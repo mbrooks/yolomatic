@@ -169,7 +169,7 @@ describe("createAdminWebSocketServer", () => {
 
 	it("streams issue chat progress and responses", async () => {
 		const issueChatProvider = {
-			runIssueChat: vi.fn(async (_payload, onProgress) => {
+			runIssueChat: vi.fn(async (_requestId, _payload, onProgress) => {
 				onProgress({ type: "started", message: "Thinking..." });
 				return {
 					message: "Created",
@@ -199,6 +199,11 @@ describe("createAdminWebSocketServer", () => {
 		await Promise.resolve();
 		await Promise.resolve();
 
+		expect(issueChatProvider.runIssueChat).toHaveBeenCalledWith(
+			"req-1",
+			{ messages: [{ role: "user", text: "hello" }] },
+			expect.any(Function),
+		);
 		expect(socket.sent.map((entry) => JSON.parse(entry))).toEqual(
 			expect.arrayContaining([
 				{
@@ -260,6 +265,67 @@ describe("createAdminWebSocketServer", () => {
 			requestId: "req-error",
 			event: { type: "error", message: "boom" },
 		});
+	});
+
+	it("cancels active issue chat via task control service", async () => {
+		const taskControlService = {
+			cancel: vi.fn(),
+			steer: vi.fn(),
+			isActive: vi.fn(),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(),
+			setDraining: vi.fn(),
+		};
+		const { createAdminWebSocketServer } = await import("./websocket-server.js");
+		createAdminWebSocketServer(
+			{} as never,
+			{ getCredentials: () => ({}) },
+			undefined,
+			undefined,
+			taskControlService,
+		);
+		const socket = new FakeSocket();
+		(connectionHandler as (ws: FakeSocket) => void)(socket);
+
+		socket.emitMessage({
+			type: "issue-chat-abort",
+			requestId: "req-abort-1",
+		});
+		await Promise.resolve();
+
+		expect(taskControlService.cancel).toHaveBeenCalledWith("req-abort-1");
+	});
+
+	it("steers active issue chat via task control service", async () => {
+		const taskControlService = {
+			cancel: vi.fn(),
+			steer: vi.fn(),
+			isActive: vi.fn(),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(),
+			setDraining: vi.fn(),
+		};
+		const { createAdminWebSocketServer } = await import("./websocket-server.js");
+		createAdminWebSocketServer(
+			{} as never,
+			{ getCredentials: () => ({}) },
+			undefined,
+			undefined,
+			taskControlService,
+		);
+		const socket = new FakeSocket();
+		(connectionHandler as (ws: FakeSocket) => void)(socket);
+
+		socket.emitMessage({
+			type: "issue-chat-steer",
+			requestId: "req-steer-1",
+			message: "focus on performance",
+		});
+		await Promise.resolve();
+
+		expect(taskControlService.steer).toHaveBeenCalledWith("req-steer-1", "focus on performance");
 	});
 
 	it("stops sending log entries after unsubscribe", async () => {
@@ -329,7 +395,7 @@ describe("createAdminWebSocketServer", () => {
 
 	it("does not send issue chat updates when the socket has closed", async () => {
 		const issueChatProvider = {
-			runIssueChat: vi.fn(async (_payload, onProgress) => {
+			runIssueChat: vi.fn(async (_requestId, _payload, onProgress) => {
 				onProgress({ type: "started", message: "Thinking..." });
 				return {
 					message: "Created",

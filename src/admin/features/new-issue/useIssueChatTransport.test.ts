@@ -33,6 +33,8 @@ describe("useIssueChatTransport", () => {
 	let onStatusChangeSpy: any;
 	let subscribeStatusSpy: any;
 	let requestIssueChatSpy: any;
+	let abortIssueChatSpy: any;
+	let steerIssueChatSpy: any;
 
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -40,6 +42,8 @@ describe("useIssueChatTransport", () => {
 		onStatusChangeSpy = vi.spyOn(webSocketManager, "onStatusChange").mockReturnValue(() => undefined);
 		subscribeStatusSpy = vi.spyOn(webSocketManager, "subscribeStatus").mockReturnValue(() => undefined);
 		requestIssueChatSpy = vi.spyOn(webSocketManager, "requestIssueChat");
+		abortIssueChatSpy = vi.spyOn(webSocketManager, "abortIssueChat");
+		steerIssueChatSpy = vi.spyOn(webSocketManager, "steerIssueChat");
 	});
 
 	afterEach(() => {
@@ -48,12 +52,15 @@ describe("useIssueChatTransport", () => {
 		onStatusChangeSpy.mockRestore();
 		subscribeStatusSpy.mockRestore();
 		requestIssueChatSpy.mockRestore();
+		abortIssueChatSpy.mockRestore();
+		steerIssueChatSpy.mockRestore();
 	});
 
 	it("uses the websocket transport and streams thinking chunks while connected", async () => {
 		const onThinking = vi.fn();
 		statusSpy.mockReturnValue("open");
 		requestIssueChatSpy.mockImplementation(async (
+			_requestId: string,
 			_payload: IssueChatPayload,
 			onProgress?: (event: IssueChatProgressEvent) => void,
 		) => {
@@ -71,7 +78,7 @@ describe("useIssueChatTransport", () => {
 		});
 
 		expect(chatResponse).toEqual(response);
-		expect(requestIssueChatSpy).toHaveBeenCalledWith(payload, expect.any(Function));
+		expect(requestIssueChatSpy).toHaveBeenCalledWith(expect.stringMatching(/^issue-chat-/), payload, expect.any(Function));
 		expect(fetchSpy).not.toHaveBeenCalled();
 		expect(onThinking).toHaveBeenCalledWith({ text: "step one", done: false });
 		expect(onThinking).toHaveBeenCalledWith({ text: "message fallback", done: false });
@@ -105,6 +112,7 @@ describe("useIssueChatTransport", () => {
 		const onThinking = vi.fn();
 		statusSpy.mockReturnValue("open");
 		requestIssueChatSpy.mockImplementation(async (
+			_requestId: string,
 			_payload: IssueChatPayload,
 			onProgress?: (event: IssueChatProgressEvent) => void,
 		) => {
@@ -135,5 +143,55 @@ describe("useIssueChatTransport", () => {
 		expect(chatResponse).toEqual(response);
 		expect(requestIssueChatSpy).not.toHaveBeenCalled();
 		expect(fetchSpy).toHaveBeenCalledWith("/api/issues/chat", expect.any(Object));
+	});
+
+	it("aborts the active issue chat", async () => {
+		statusSpy.mockReturnValue("open");
+		let resolveRequest: (value: IssueChatResponse) => void = () => {};
+		requestIssueChatSpy.mockImplementation(async (_requestId: string) => {
+			return new Promise((resolve) => {
+				resolveRequest = resolve;
+			});
+		});
+		const { result } = renderHook(() => useIssueChatTransport());
+
+		// Start submit but don't await it yet
+		const submitPromise = result.current.submitIssueChat(payload, vi.fn());
+
+		// Abort while still in flight
+		act(() => {
+			result.current.abortIssueChat();
+		});
+
+		expect(abortIssueChatSpy).toHaveBeenCalled();
+
+		// Resolve the pending request so the hook doesn't stay in a bad state
+		resolveRequest(response);
+		await submitPromise.catch(() => {});
+	});
+
+	it("steers the active issue chat", async () => {
+		statusSpy.mockReturnValue("open");
+		let resolveRequest: (value: IssueChatResponse) => void = () => {};
+		requestIssueChatSpy.mockImplementation(async (_requestId: string) => {
+			return new Promise((resolve) => {
+				resolveRequest = resolve;
+			});
+		});
+		const { result } = renderHook(() => useIssueChatTransport());
+
+		// Start submit but don't await it yet
+		const submitPromise = result.current.submitIssueChat(payload, vi.fn());
+
+		// Steer while still in flight
+		act(() => {
+			result.current.steerIssueChat("focus on performance");
+		});
+
+		expect(steerIssueChatSpy).toHaveBeenCalledWith(expect.stringMatching(/^issue-chat-/), "focus on performance");
+
+		// Resolve the pending request so the hook doesn't stay in a bad state
+		resolveRequest(response);
+		await submitPromise;
 	});
 });
