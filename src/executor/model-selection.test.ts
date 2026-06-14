@@ -22,41 +22,41 @@ describe("resolveConfiguredModel", () => {
 	it("prefers an explicit provider when configured", () => {
 		const registry = createRegistry([
 			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
 		]);
 
 		const model = resolveConfiguredModel(registry, {
 			PI_AGENT_PROVIDER: "ollama",
-			PI_AGENT_MODEL: "kimi-k2.6:cloud",
+			PI_AGENT_MODEL: "kimi-k2.7-code:cloud",
 		});
 
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
+		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
 
 	it("resolves a unique model id without an explicit provider", () => {
 		const registry = createRegistry([
 			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
 		]);
 
 		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_MODEL: "kimi-k2.6:cloud",
+			PI_AGENT_MODEL: "kimi-k2.7-code:cloud",
 		});
 
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
+		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
 
 	it("supports provider/model syntax in PI_AGENT_MODEL", () => {
 		const registry = createRegistry([
 			{ provider: "github-copilot", id: "gpt-4o" },
-			{ provider: "ollama", id: "kimi-k2.6:cloud" },
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
 		]);
 
 		const model = resolveConfiguredModel(registry, {
-			PI_AGENT_MODEL: "ollama/kimi-k2.6:cloud",
+			PI_AGENT_MODEL: "ollama/kimi-k2.7-code:cloud",
 		});
 
-		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.6:cloud" });
+		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
 
 	it("returns undefined for ambiguous model ids", () => {
