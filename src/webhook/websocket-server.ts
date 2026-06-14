@@ -4,13 +4,16 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
 import type { IssueChatProgressEvent, IssueChatRequestBody, IssueChatResponse } from "../app/commands/issue-chat-request.js";
 import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
+import type { TaskControlService } from "../ports/task-control-service.js";
 
 export type ClientMessage =
 	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "unsubscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "subscribe-status" }
 	| { type: "unsubscribe-status" }
-	| { type: "issue-chat"; requestId: string; payload: IssueChatRequestBody };
+	| { type: "issue-chat"; requestId: string; payload: IssueChatRequestBody }
+	| { type: "issue-chat-abort"; requestId: string }
+	| { type: "issue-chat-steer"; requestId: string; message: string };
 
 export type ServerMessage =
 	| { type: "log-entry"; sessionKey: string; entry: SessionLogEntry }
@@ -29,6 +32,7 @@ export interface StatusProvider {
 
 export interface IssueChatProvider {
 	runIssueChat(
+		requestId: string,
 		payload: IssueChatRequestBody,
 		onProgress: (event: IssueChatProgressEvent) => void,
 	): Promise<IssueChatResponse>;
@@ -39,6 +43,7 @@ export function createAdminWebSocketServer(
 	credentialProvider: CredentialProvider,
 	statusProvider?: StatusProvider,
 	issueChatProvider?: IssueChatProvider,
+	taskControlService?: TaskControlService,
 ): {
 	broadcastLog: (sessionKey: string, entry: SessionLogEntry) => void;
 	broadcastStatus: (data: unknown) => void;
@@ -140,7 +145,7 @@ export function createAdminWebSocketServer(
 						}
 						return;
 					}
-					void issueChatProvider.runIssueChat(msg.payload, (event) => {
+					void issueChatProvider.runIssueChat(msg.requestId, msg.payload, (event) => {
 						if (ws.readyState !== WebSocket.OPEN) {
 							return;
 						}
@@ -169,6 +174,10 @@ export function createAdminWebSocketServer(
 							event: { type: "error", message },
 						} satisfies ServerMessage));
 					});
+				} else if (msg.type === "issue-chat-abort") {
+					taskControlService?.cancel(msg.requestId);
+				} else if (msg.type === "issue-chat-steer") {
+					void taskControlService?.steer(msg.requestId, msg.message);
 				}
 			} catch {
 				// ignore invalid messages

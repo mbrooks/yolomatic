@@ -154,8 +154,9 @@ export function createWebhookServer(
 		credentialProvider,
 		statusProvider,
 		{
-			runIssueChat: (payload, onProgress) => executeIssueChatRequest(serverDeps, payload, onProgress),
+			runIssueChat: (requestId, payload, onProgress) => executeIssueChatRequest(serverDeps, requestId, payload, onProgress),
 		},
+		serverDeps.taskController,
 	);
 
 	const stopLogEvents = onSessionLogEvent((sessionKey, entry) => {

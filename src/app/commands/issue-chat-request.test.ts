@@ -19,7 +19,7 @@ describe("executeIssueChatRequest", () => {
 	} as Pick<GitHubService, "createIssue"> as GitHubService;
 
 	it("rejects missing messages", async () => {
-		await expect(executeIssueChatRequest({ githubService }, {})).rejects.toThrow("Missing required field: messages");
+		await expect(executeIssueChatRequest({ githubService }, undefined, {})).rejects.toThrow("Missing required field: messages");
 	});
 
 	it("filters invalid messages before invoking the LLM", async () => {
@@ -35,6 +35,7 @@ describe("executeIssueChatRequest", () => {
 
 		const response = await executeIssueChatRequest(
 			{ githubService },
+			undefined,
 			{
 				messages: [
 					{ role: "user", text: "hello" },
@@ -64,6 +65,7 @@ describe("executeIssueChatRequest", () => {
 		await expect(
 			executeIssueChatRequest(
 				{},
+				undefined,
 				{ messages: [{ role: "user", text: "create it" }] },
 			),
 		).rejects.toThrow("GitHub service not configured");
@@ -83,6 +85,7 @@ describe("executeIssueChatRequest", () => {
 
 		const response = await executeIssueChatRequest(
 			{ githubService },
+			undefined,
 			{ messages: [{ role: "user", text: "draft it" }] },
 			onProgress,
 		);
@@ -120,6 +123,7 @@ describe("executeIssueChatRequest", () => {
 
 		await executeIssueChatRequest(
 			{ githubService },
+			undefined,
 			{ messages: [{ role: "user", text: "draft it" }] },
 			onProgress,
 		);
@@ -162,6 +166,7 @@ describe("executeIssueChatRequest", () => {
 
 		const response = await executeIssueChatRequest(
 			{ githubService },
+			undefined,
 			{ messages: [{ role: "user", text: "create it" }] },
 			onProgress,
 		);
@@ -195,6 +200,7 @@ describe("executeIssueChatRequest", () => {
 
 		const response = await executeIssueChatRequest(
 			{ githubService },
+			undefined,
 			{ messages: [{ role: "user", text: "create it" }] },
 			onProgress,
 		);
@@ -228,6 +234,120 @@ describe("executeIssueChatRequest", () => {
 						html_url: "https://github.com/mbrooks/tars/issues/99",
 					},
 				}),
+			}),
+		);
+	});
+
+	it("registers with TaskControlService when requestId is provided", async () => {
+		const { chatIssueViaLLM } = await import("./issue-chat.js");
+		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({
+			shouldCreate: false,
+			owner: "mbrooks",
+			repo: "tars",
+			draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+			message: "Draft ready",
+			readyToCreate: true,
+		});
+
+		const taskControlService = {
+			register: vi.fn(),
+			unregister: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(),
+			isDraining: vi.fn(),
+			setDraining: vi.fn(),
+		};
+
+		await executeIssueChatRequest(
+			{ githubService, taskControlService },
+			"req-123",
+			{ messages: [{ role: "user", text: "draft it" }] },
+		);
+
+		expect(taskControlService.register).toHaveBeenCalledWith(
+			"req-123",
+			expect.any(Function),
+			expect.any(Function),
+		);
+		expect(taskControlService.unregister).toHaveBeenCalledWith("req-123");
+	});
+
+	it("steers an active issue chat via the registered steer callback", async () => {
+		const { chatIssueViaLLM } = await import("./issue-chat.js");
+		const steerMock = vi.fn();
+		const sessionMock = {
+			steer: steerMock,
+		};
+		vi.mocked(chatIssueViaLLM).mockImplementationOnce(async (input) => {
+			// Simulate the session being created and exposed via onSessionCreated
+			input.onSessionCreated?.(sessionMock as never);
+			return {
+				shouldCreate: false,
+				owner: "mbrooks",
+				repo: "tars",
+				draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+				message: "Draft ready",
+				readyToCreate: true,
+			};
+		});
+
+		const taskControlService = {
+			register: vi.fn(),
+			unregister: vi.fn(),
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(),
+			isDraining: vi.fn(),
+			setDraining: vi.fn(),
+		};
+
+		const requestPromise = executeIssueChatRequest(
+			{ githubService, taskControlService },
+			"req-steer",
+			{ messages: [{ role: "user", text: "draft it" }] },
+		);
+
+		// Wait a tick so registration happens
+		await Promise.resolve();
+
+		// Extract the registered steer callback and invoke it
+		const registerCall = taskControlService.register.mock.calls.find(
+			(call) => call[0] === "req-steer",
+		);
+		expect(registerCall).toBeDefined();
+		const steerCallback = registerCall![2] as (msg: string) => Promise<void>;
+		await steerCallback("focus on performance");
+
+		expect(steerMock).toHaveBeenCalledWith("focus on performance");
+		await requestPromise;
+	});
+
+	it("returns cancelled response when chat is aborted", async () => {
+		const { chatIssueViaLLM } = await import("./issue-chat.js");
+		vi.mocked(chatIssueViaLLM).mockResolvedValueOnce({
+			shouldCreate: false,
+			owner: "",
+			repo: "",
+			draft: { title: "", body: "", labels: [], assignees: [] },
+			message: "Stopped by user.",
+			readyToCreate: false,
+			cancelled: true,
+		});
+		const onProgress = vi.fn();
+
+		const response = await executeIssueChatRequest(
+			{ githubService },
+			undefined,
+			{ messages: [{ role: "user", text: "draft it" }] },
+			onProgress,
+		);
+
+		expect(response.cancelled).toBe(true);
+		expect(onProgress).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				type: "completed",
+				message: "Stopped by user.",
 			}),
 		);
 	});

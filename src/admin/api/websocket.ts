@@ -207,10 +207,10 @@ class WebSocketManager {
 	}
 
 	requestIssueChat(
+		requestId: string,
 		payload: IssueChatPayload,
 		onProgress?: IssueChatProgressCallback,
 	): Promise<IssueChatResponse> {
-		const requestId = `issue-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 		return new Promise<IssueChatResponse>((resolve, reject) => {
 			this.pendingIssueChats.set(requestId, { onProgress, resolve, reject });
 			this.connect();
@@ -226,6 +226,19 @@ class WebSocketManager {
 				}
 			});
 		});
+	}
+
+	abortIssueChat(requestId: string): void {
+		this.send({ type: "issue-chat-abort", requestId });
+		const pending = this.pendingIssueChats.get(requestId);
+		if (pending) {
+			pending.reject(new Error("Aborted"));
+			this.pendingIssueChats.delete(requestId);
+		}
+	}
+
+	steerIssueChat(requestId: string, message: string): void {
+		this.send({ type: "issue-chat-steer", requestId, message });
 	}
 
 	private send(msg: Record<string, unknown>): void {

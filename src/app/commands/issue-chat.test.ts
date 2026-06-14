@@ -105,6 +105,8 @@ function createMockSession(
 				listeners.delete(listener);
 			});
 		}),
+		abort: vi.fn(),
+		steer: vi.fn(),
 		dispose: vi.fn(),
 	};
 	return session;
@@ -442,6 +444,103 @@ describe("chatIssueViaLLM", () => {
 		const paths = overrideResult.agentsFiles.map((f: { path: string }) => f.path);
 		expect(paths.some((p: string) => p.includes("server-skill"))).toBe(true);
 		expect(paths.some((p: string) => p.includes("repo-skill"))).toBe(true);
+	});
+
+	it("calls onSessionCreated when session is created", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([
+			{
+				text: JSON.stringify({
+					message: "Draft ready.",
+					owner: "mbrooks",
+					repo: "tars",
+					draft: { title: "Title", body: "Body", labels: [], assignees: [] },
+					readyToCreate: true,
+					shouldCreate: false,
+				}),
+			},
+		]);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+		const onSessionCreated = vi.fn();
+
+		await chatIssueViaLLM({
+			messages: [{ role: "user", text: "draft this" }],
+			onSessionCreated,
+		});
+
+		expect(onSessionCreated).toHaveBeenCalledWith(session);
+	});
+
+	it("returns cancelled response when abortSignal is already aborted", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([]);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+		const abortController = new AbortController();
+		abortController.abort();
+
+		const result = await chatIssueViaLLM({
+			messages: [{ role: "user", text: "draft this" }],
+			abortSignal: abortController.signal,
+		});
+
+		expect(result.cancelled).toBe(true);
+		expect(result.message).toBe("Stopped by user.");
+		expect(session.prompt).not.toHaveBeenCalled();
+	});
+
+	it("returns cancelled response when abortSignal aborts during prompt", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([]);
+		let rejectPrompt: (reason: Error) => void = () => {};
+		const abortController = new AbortController();
+		session.prompt.mockImplementation(async () => {
+			return new Promise((_resolve, reject) => {
+				rejectPrompt = reject;
+				// Trigger abort now that the listener is registered and rejectPrompt is set
+				abortController.abort();
+			});
+		});
+		session.abort.mockImplementation(() => {
+			rejectPrompt(new Error("Session aborted"));
+		});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		const result = await chatIssueViaLLM({
+			messages: [{ role: "user", text: "draft this" }],
+			abortSignal: abortController.signal,
+		});
+
+		expect(result.cancelled).toBe(true);
+		expect(result.message).toBe("Stopped by user.");
+		expect(session.abort).toHaveBeenCalled();
+	});
+
+	it("disposes the session even when aborted", async () => {
+		const mockModel = { provider: "test", id: "model" };
+		(resolveConfiguredModel as ReturnType<typeof vi.fn>).mockReturnValue(mockModel);
+		const session = createMockSession([]);
+		let rejectPrompt: (reason: Error) => void = () => {};
+		session.prompt.mockImplementation(async () => {
+			return new Promise((_resolve, reject) => {
+				rejectPrompt = reject;
+			});
+		});
+		session.abort.mockImplementation(() => {
+			rejectPrompt(new Error("Session aborted"));
+		});
+		const abortController = new AbortController();
+		abortController.abort();
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session });
+
+		await chatIssueViaLLM({
+			messages: [{ role: "user", text: "draft this" }],
+			abortSignal: abortController.signal,
+		});
+
+		expect(session.dispose).toHaveBeenCalled();
 	});
 
 	it("defaults missing draft payload fields safely", async () => {
