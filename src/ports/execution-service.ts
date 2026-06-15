@@ -8,11 +8,13 @@ export interface ExecutionService {
 		comment?: string,
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
 	): Promise<ExecutionResult>;
 	executePRReview(
 		state: SessionState,
 		prReview: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
 	): Promise<ExecutionResult>;
 }

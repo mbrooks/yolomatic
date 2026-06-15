@@ -167,6 +167,34 @@ describe("SessionManager", () => {
 		);
 	});
 
+	it("persists execution time fields through updateStatus", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 24, "Title", "Body", "/tmp/ws");
+		const started = await manager.updateStatus("mbrooks", "tars", 24, "working", {
+			taskStartedAt: "2026-01-01T00:00:00Z",
+			taskFinishedAt: undefined,
+		});
+		expect(started.taskStartedAt).toBe("2026-01-01T00:00:00Z");
+		expect(started.taskFinishedAt).toBeUndefined();
+
+		const finished = await manager.updateStatus("mbrooks", "tars", 24, "working", {
+			taskFinishedAt: "2026-01-01T00:01:00Z",
+			totalExecutionTimeMs: 60000,
+		});
+		expect(finished.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
+		expect(finished.totalExecutionTimeMs).toBe(60000);
+
+		const persisted = JSON.parse(
+			await readFile(path.join(sessionsDir, "github-mbrooks-tars", "issue-24.state.json"), "utf8"),
+		) as { taskStartedAt?: string; taskFinishedAt?: string; totalExecutionTimeMs?: number };
+		expect(persisted.taskStartedAt).toBe("2026-01-01T00:00:00Z");
+		expect(persisted.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
+		expect(persisted.totalExecutionTimeMs).toBe(60000);
+	});
+
 	it("marks session as seeded", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const store = new SessionStore(sessionsDir);

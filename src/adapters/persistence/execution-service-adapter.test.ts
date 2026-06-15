@@ -27,7 +27,7 @@ describe("ExecutionServiceAdapter", () => {
 
 		const result = await adapter.execute(state, "comment");
 
-		expect(executor.execute).toHaveBeenCalledWith(state, "comment", undefined, undefined, undefined);
+		expect(executor.execute).toHaveBeenCalledWith(state, "comment", undefined, undefined, undefined, undefined, undefined);
 		expect(result).toBe(mockResult);
 	});
 
@@ -55,7 +55,7 @@ describe("ExecutionServiceAdapter", () => {
 		const prReview = { comments: [{ body: "Fix", user: "reviewer" } as PRReviewComment], reviewBody: "Review" };
 		const result = await adapter.executePRReview(state, prReview);
 
-		expect(executor.execute).toHaveBeenCalledWith(state, undefined, prReview, undefined, undefined);
+		expect(executor.execute).toHaveBeenCalledWith(state, undefined, prReview, undefined, undefined, undefined, undefined);
 		expect(result).toBe(mockResult);
 	});
 });

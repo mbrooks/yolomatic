@@ -23,7 +23,7 @@ function makeDeps(overrides?: {
 		delete: vi.fn(),
 		archive: vi.fn(),
 		createSession: vi.fn(),
-		updateStatus: vi.fn(async (_o, _r, _i, status: string) => ({ ...state, status } as SessionState)),
+		updateStatus: vi.fn(async (_o, _r, _i, status: string, updates?: Partial<SessionState>) => ({ ...state, status, ...updates } as SessionState)),
 		markSeeded: vi.fn(),
 		associatePR: vi.fn(),
 		incrementIterationCount: vi.fn(),
@@ -751,5 +751,87 @@ describe("ExecuteSession", () => {
 		await execute.run(state);
 
 		expect(deps.executor.execute).toHaveBeenCalled();
+	});
+
+	it("records task execution start and finish timestamps", async () => {
+		const deps = makeDeps();
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"working",
+			expect.objectContaining({
+				taskStartedAt: expect.any(String),
+				taskFinishedAt: undefined,
+			}),
+		);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"working",
+			expect.objectContaining({
+				taskFinishedAt: expect.any(String),
+				totalExecutionTimeMs: expect.any(Number),
+			}),
+		);
+	});
+
+	it("bumps lastActivity on every model output event", async () => {
+		let activityCallback: (() => void) | undefined;
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async (_state, _comment, _signal, _onSessionCreated, onActivity) => {
+					activityCallback = onActivity;
+					if (onActivity) {
+						onActivity();
+						onActivity();
+					}
+					return { status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." };
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(activityCallback).toBeDefined();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"working",
+			expect.objectContaining({ lastActivity: expect.any(String) }),
+		);
+		const heartbeatCalls = (deps.sessions.updateStatus as ReturnType<typeof vi.fn>).mock.calls.filter(
+			(call: unknown[]) => (call[4] as Partial<SessionState> | undefined)?.lastActivity !== undefined,
+		);
+		expect(heartbeatCalls.length).toBeGreaterThanOrEqual(2);
 	});
 });

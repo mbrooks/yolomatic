@@ -181,6 +181,95 @@ describe("SessionStore", () => {
 		await expect(access(store.getSessionPath("mbrooks", "tars", 7))).rejects.toThrow();
 	});
 
+	it("computes archive paths", () => {
+		const store = new SessionStore("/tmp/sessions");
+		expect(store.getArchivePath("/tmp/archive", "mbrooks", "tars", 1)).toBe(
+			"/tmp/archive/github-mbrooks-tars/issue-1.state.json",
+		);
+		expect(store.getSessionArchivePath("/tmp/archive", "mbrooks", "tars", 1)).toBe(
+			"/tmp/archive/github-mbrooks-tars/issue-1.jsonl",
+		);
+	});
+
+	it("archives session files", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const state = {
+			issueNumber: 8,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Archive me",
+			body: "Body",
+			status: "complete" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 8),
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		await store.set(state);
+		await writeFile(state.sessionPath, "log line\n");
+		expect(await store.exists("mbrooks", "tars", 8)).toBe(true);
+
+		const archiveDir = path.join(dir, "archive");
+		await store.archive(state, archiveDir);
+
+		expect(await store.exists("mbrooks", "tars", 8)).toBe(false);
+		expect(await store.get("mbrooks", "tars", 8)).toBeNull();
+		await expect(access(store.getArchivePath(archiveDir, "mbrooks", "tars", 8))).resolves.toBeUndefined();
+		await expect(access(store.getSessionArchivePath(archiveDir, "mbrooks", "tars", 8))).resolves.toBeUndefined();
+	});
+
+	it("getAll skips non-directory entries and non-state files", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const state = {
+			issueNumber: 9,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Filtered",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 9),
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		await store.set(state);
+		await writeFile(path.join(dir, "not-a-dir.txt"), "ignore me");
+		const repoDir = path.join(dir, "github-mbrooks-tars");
+		await writeFile(path.join(repoDir, "issue-9.log"), "ignore me");
+
+		const all = await store.getAll();
+		expect(all.length).toBe(1);
+		expect(all[0].issueNumber).toBe(9);
+	});
+
+	it("archives is idempotent when files are missing", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		const store = new SessionStore(dir);
+
+		const state = {
+			issueNumber: 10,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Missing files",
+			body: "Body",
+			status: "complete" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 10),
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		await store.set(state);
+		await store.delete("mbrooks", "tars", 10);
+
+		await expect(store.archive(state, path.join(dir, "archive"))).resolves.toBeUndefined();
+	});
+
 	it("delete is idempotent for missing sessions", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
 		const store = new SessionStore(dir);

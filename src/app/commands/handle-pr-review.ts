@@ -242,6 +242,11 @@ export class HandlePRReview {
 
 		let result: ExecutionResult;
 		try {
+			const onActivity = () => {
+				void this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
+					lastActivity: new Date().toISOString(),
+				});
+			};
 			result = await this.deps.executor.executePRReview(
 				state,
 				{
@@ -254,6 +259,8 @@ export class HandlePRReview {
 					reviewBody,
 				},
 				abortController.signal,
+				undefined,
+				onActivity,
 			);
 		} catch (error) {
 			if (abortController.signal.aborted) {
