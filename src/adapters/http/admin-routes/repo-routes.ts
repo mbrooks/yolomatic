@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readBody } from "../../../webhook/http-utils.js";
 import { sendJson } from "../response-helpers.js";
 import {
-	checkAdminJson,
-	mapResultToStatus,
+	AdminRouteRegistry,
+	ValidationError,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
+import { mapResultToStatus } from "../admin-router-shared.js";
 
 interface ConfiguredRepository {
 	owner: string;
@@ -45,33 +45,26 @@ function parseConfiguredRepositories(raw: string | undefined): ConfiguredReposit
 	}
 }
 
-export async function handleRepoRoutes(
-	request: IncomingMessage,
-	response: ServerResponse,
-	deps: AdminRouterDeps,
-	pathname: string,
-): Promise<boolean> {
-	const scanMatch = /^\/api\/repos\/scan$/u.exec(pathname);
-	if (scanMatch && request.method === "POST") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		try {
-			const user = await deps.githubService.getAuthenticatedUser();
-			if (!user) {
-				sendJson(response, 500, { error: "GitHub token is invalid or not configured" });
-				return true;
+const registry = new AdminRouteRegistry()
+	.route({
+		method: "POST",
+		pattern: /^\/api\/repos\/scan$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
 			}
-			const discovered = await deps.githubService.listAccessibleRepositories();
-			const currentRaw = deps.settingsStore.get("configured_repositories") ?? "[]";
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const user = await ctx.deps.githubService.getAuthenticatedUser();
+			if (!user) {
+				sendJson(ctx.response, 500, { error: "GitHub token is invalid or not configured" });
+				return;
+			}
+			const discovered = await ctx.deps.githubService.listAccessibleRepositories();
+			const currentRaw = ctx.deps.settingsStore.get("configured_repositories") ?? "[]";
 			const current = parseConfiguredRepositories(currentRaw);
 			const seen = new Set(current.map((r) => `${r.owner}/${r.repo}`.toLowerCase()));
 			let added = 0;
@@ -83,113 +76,79 @@ export async function handleRepoRoutes(
 					added++;
 				}
 			}
-			deps.settingsStore.set("configured_repositories", JSON.stringify(current));
-			sendJson(response, 200, { repos: discovered, added });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const repoContextMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/context$/u.exec(pathname);
-	if (repoContextMatch && request.method === "GET") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		const [, owner, repo] = repoContextMatch;
-		try {
+			ctx.deps.settingsStore.set("configured_repositories", JSON.stringify(current));
+			return { status: 200, body: { repos: discovered, added } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/context$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			const [owner, repo] = ctx.params;
 			const [labels, templates, recentCommits, relatedIssues] = await Promise.all([
-				deps.githubService.listLabels(owner, repo),
-				deps.githubService.getIssueTemplates(owner, repo),
-				deps.githubService.listRecentCommits(owner, repo, 5),
-				deps.githubService.listRelatedIssues(
-					owner,
-					repo,
-					"bug OR feature OR enhancement",
-					5,
-				),
+				ctx.deps.githubService.listLabels(owner, repo),
+				ctx.deps.githubService.getIssueTemplates(owner, repo),
+				ctx.deps.githubService.listRecentCommits(owner, repo, 5),
+				ctx.deps.githubService.listRelatedIssues(owner, repo, "bug OR feature OR enhancement", 5),
 			]);
-			sendJson(response, 200, {
-				labels,
-				templates,
-				recentCommits,
-				relatedIssues,
-			});
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const repoIssuesMatch = /^\/api\/repos\/([^/]+)\/([^/]+)\/issues$/u.exec(pathname);
-	if (repoIssuesMatch && request.method === "GET") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		const [, owner, repo] = repoIssuesMatch;
-		try {
-			const issues = await deps.githubService.listOpenIssues(owner, repo);
-			sendJson(response, 200, { issues });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const assignMatch =
-		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/assign$/u.exec(pathname);
-	if (assignMatch && request.method === "POST") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		if (!deps.startIssueSession) {
-			sendJson(response, 500, { error: "Session executor not configured" });
-			return true;
-		}
-		const [, owner, repo, issueNumberStr] = assignMatch;
-		const issueNumber = Number.parseInt(issueNumberStr, 10);
-		if (Number.isNaN(issueNumber)) {
-			sendJson(response, 400, { error: "Invalid issue number" });
-			return true;
-		}
-		const tarsUsername = deps.settingsStore.get("github_username");
-		if (!tarsUsername) {
-			sendJson(response, 500, { error: "TARS GitHub username not configured" });
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+			return { status: 200, body: { labels, templates, recentCommits, relatedIssues } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/issues$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			const [owner, repo] = ctx.params;
+			const issues = await ctx.deps.githubService.listOpenIssues(owner, repo);
+			return { status: 200, body: { issues } };
+		},
+	})
+	.route<{
+		title?: string;
+		body?: string;
+		labels?: string[];
+	}>({
+		method: "POST",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/assign$/u,
+		parseBody: true,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			if (!ctx.deps.startIssueSession) {
+				sendJson(ctx.response, 500, { error: "Session executor not configured" });
+				return;
+			}
+			const [owner, repo, issueNumberStr] = ctx.params;
+			const issueNumber = Number.parseInt(issueNumberStr, 10);
+			const tarsUsername = ctx.deps.settingsStore.get("github_username");
+			if (!tarsUsername) {
+				sendJson(ctx.response, 500, { error: "TARS GitHub username not configured" });
+				return;
+			}
+			const body = ctx.body as {
 				title?: string;
 				body?: string;
 				labels?: string[];
 			};
 			if (!body.title) {
-				sendJson(response, 400, { error: "Missing required field: title" });
-				return true;
+				throw new ValidationError("Missing required field: title");
 			}
-			await deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [
-				tarsUsername,
-			]);
-			deps.startIssueSession.execute(
+			await ctx.deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [tarsUsername]);
+			ctx.deps.startIssueSession.execute(
 				owner,
 				repo,
 				issueNumber,
@@ -200,55 +159,49 @@ export async function handleRepoRoutes(
 				const message = error instanceof Error ? error.message : String(error);
 				process.stdout.write(`[webhook] background session error: ${message}\n`);
 			});
-			sendJson(response, 202, { started: true, status: "queued", message: "Session started in background" });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[webhook] assign error: ${message}\n`);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const startSessionMatch =
-		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/start-session$/u.exec(pathname);
-	if (startSessionMatch && request.method === "POST") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		if (!deps.startIssueSession) {
-			sendJson(response, 500, { error: "Session executor not configured" });
-			return true;
-		}
-		const [, owner, repo, issueNumberStr] = startSessionMatch;
-		const issueNumber = Number.parseInt(issueNumberStr, 10);
-		if (Number.isNaN(issueNumber)) {
-			sendJson(response, 400, { error: "Invalid issue number" });
-			return true;
-		}
-		const tarsUsername = deps.settingsStore.get("github_username");
-		if (!tarsUsername) {
-			sendJson(response, 500, { error: "TARS GitHub username not configured" });
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+			return {
+				status: 202,
+				body: { started: true, status: "queued", message: "Session started in background" },
+			};
+		},
+	})
+	.route<{
+		title?: string;
+		body?: string;
+		labels?: string[];
+	}>({
+		method: "POST",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/start-session$/u,
+		parseBody: true,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			if (!ctx.deps.startIssueSession) {
+				sendJson(ctx.response, 500, { error: "Session executor not configured" });
+				return;
+			}
+			const [owner, repo, issueNumberStr] = ctx.params;
+			const issueNumber = Number.parseInt(issueNumberStr, 10);
+			const tarsUsername = ctx.deps.settingsStore.get("github_username");
+			if (!tarsUsername) {
+				sendJson(ctx.response, 500, { error: "TARS GitHub username not configured" });
+				return;
+			}
+			const body = ctx.body as {
 				title?: string;
 				body?: string;
 				labels?: string[];
 			};
 			if (!body.title) {
-				sendJson(response, 400, { error: "Missing required field: title" });
-				return true;
+				throw new ValidationError("Missing required field: title");
 			}
-			const result = await deps.startIssueSession.execute(
+			const result = await ctx.deps.startIssueSession.execute(
 				owner,
 				repo,
 				issueNumber,
@@ -257,72 +210,47 @@ export async function handleRepoRoutes(
 				body.labels ?? [],
 			);
 			if (!result.success) {
-				sendJson(response, mapResultToStatus(result.code), { error: result.message });
-				return true;
+				sendJson(ctx.response, mapResultToStatus(result.code), { error: result.message });
+				return;
 			}
-			sendJson(response, 200, result.data);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[webhook] start-session error: ${message}\n`);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
+			return { status: 200, body: result.data };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/close$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			const [owner, repo, issueNumberStr] = ctx.params;
+			const issueNumber = Number.parseInt(issueNumberStr, 10);
+			await ctx.deps.githubService.closeIssue(owner, repo, issueNumber);
+			return { status: 200, body: { closed: true } };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/mark-do-not-work$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			const [owner, repo, issueNumberStr] = ctx.params;
+			const issueNumber = Number.parseInt(issueNumberStr, 10);
+			await ctx.deps.githubService.addLabels(owner, repo, issueNumber, ["wontfix"]);
+			await ctx.deps.githubService.closeIssue(owner, repo, issueNumber);
+			return { status: 200, body: { closed: true, labeled: true } };
+		},
+	});
 
-	const closeMatch =
-		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/close$/u.exec(pathname);
-	if (closeMatch && request.method === "POST") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		const [, owner, repo, issueNumberStr] = closeMatch;
-		const issueNumber = Number.parseInt(issueNumberStr, 10);
-		if (Number.isNaN(issueNumber)) {
-			sendJson(response, 400, { error: "Invalid issue number" });
-			return true;
-		}
-		try {
-			await deps.githubService.closeIssue(owner, repo, issueNumber);
-			sendJson(response, 200, { closed: true });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[webhook] close error: ${message}\n`);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const markDoNotWorkMatch =
-		/^\/api\/repos\/([^/]+)\/([^/]+)\/issues\/(-?\d+)\/mark-do-not-work$/u.exec(pathname);
-	if (markDoNotWorkMatch && request.method === "POST") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		const [, owner, repo, issueNumberStr] = markDoNotWorkMatch;
-		const issueNumber = Number.parseInt(issueNumberStr, 10);
-		if (Number.isNaN(issueNumber)) {
-			sendJson(response, 400, { error: "Invalid issue number" });
-			return true;
-		}
-		try {
-			await deps.githubService.addLabels(owner, repo, issueNumber, ["wontfix"]);
-			await deps.githubService.closeIssue(owner, repo, issueNumber);
-			sendJson(response, 200, { closed: true, labeled: true });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[webhook] mark-do-not-work error: ${message}\n`);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	return false;
+export async function handleRepoRoutes(
+	request: IncomingMessage,
+	response: ServerResponse,
+	deps: AdminRouterDeps,
+	pathname: string,
+): Promise<boolean> {
+	return registry.handle(request, response, deps, pathname);
 }

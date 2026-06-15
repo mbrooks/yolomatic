@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { WorkspaceConfig } from "./config.js";
+import type { WorkspaceService } from "../ports/workspace-service.js";
 import { EmptyRepositoryError } from "./errors.js";
 
 const execFileAsync = promisify(execFile);
@@ -46,7 +47,7 @@ function normalizeSegment(value: string, label: string): string {
 	return trimmed;
 }
 
-export class WorkspaceManager {
+export class WorkspaceManager implements WorkspaceService {
 	public constructor(
 		private readonly config: WorkspaceConfig,
 		private readonly runCommand: CommandRunner = async (command, args, options) => {

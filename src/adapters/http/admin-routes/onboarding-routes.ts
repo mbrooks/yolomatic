@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
-import { readBody } from "../../../webhook/http-utils.js";
 import { adminHtml, serveAdminAsset } from "../asset-server.js";
 import { sendHtml, sendJson } from "../response-helpers.js";
 import {
+	AdminRouteRegistry,
+	ValidationError,
 	checkAdminTextAllowOnboarding,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
@@ -47,79 +48,82 @@ function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	});
 }
 
-export async function handleOnboardingRoutes(
-	request: IncomingMessage,
-	response: ServerResponse,
-	deps: AdminRouterDeps,
-	pathname: string,
-): Promise<boolean> {
-	if (request.method === "GET" && pathname === "/api/onboarding/status") {
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		const missing = getMissingOnboardingSettings(deps);
-		sendJson(response, 200, { complete: missing.length === 0, missing });
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/onboarding/verify-token") {
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				token?: string;
-			};
+const registry = new AdminRouteRegistry()
+	.route({
+		method: "GET",
+		pattern: /^\/api\/onboarding\/status$/u,
+		auth: false,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const missing = getMissingOnboardingSettings(ctx.deps);
+			return { status: 200, body: { complete: missing.length === 0, missing } };
+		},
+	})
+	.route<{ token?: string }>({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/verify-token$/u,
+		auth: false,
+		parseBody: true,
+		handler: async (ctx) => {
+			const body = ctx.body as { token?: string };
 			const token = body.token?.trim();
 			if (!token) {
-				sendJson(response, 400, { error: "Token is required" });
-				return true;
+				throw new ValidationError("Token is required");
 			}
 			const gh = new GitHubServiceAdapter({ githubToken: token });
 			const user = await gh.getAuthenticatedUser();
 			if (!user) {
-				sendJson(response, 400, { error: "Unable to verify token. Please check the token and try again." });
-				return true;
+				sendJson(ctx.response, 400, {
+					error: "Unable to verify token. Please check the token and try again.",
+				});
+				return;
 			}
-			sendJson(response, 200, { username: user.login });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/onboarding/generate-secret") {
-		const secret = randomBytes(96).toString("hex");
-		sendJson(response, 200, { secret });
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/onboarding/repos") {
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				token?: string;
-			};
+			return { status: 200, body: { username: user.login } };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/generate-secret$/u,
+		auth: false,
+		handler: async () => {
+			const secret = randomBytes(96).toString("hex");
+			return { status: 200, body: { secret } };
+		},
+	})
+	.route<{ token?: string }>({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/repos$/u,
+		auth: false,
+		parseBody: true,
+		handler: async (ctx) => {
+			const body = ctx.body as { token?: string };
 			const token = body.token?.trim();
 			if (!token) {
-				sendJson(response, 400, { error: "Token is required" });
-				return true;
+				throw new ValidationError("Token is required");
 			}
 			const gh = new GitHubServiceAdapter({ githubToken: token });
 			const repos = await gh.listAccessibleRepositories();
-			sendJson(response, 200, { repositories: repos });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/onboarding/init-workspaces") {
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+			return { status: 200, body: { repositories: repos } };
+		},
+	})
+	.route<{
+		token?: string;
+		username?: string;
+		repos?: Array<{ owner: string; repo: string }>;
+	}>({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/init-workspaces$/u,
+		auth: false,
+		parseBody: true,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const body = ctx.body as {
 				token?: string;
 				username?: string;
 				repos?: Array<{ owner: string; repo: string }>;
@@ -128,17 +132,15 @@ export async function handleOnboardingRoutes(
 			const username = body.username?.trim();
 			const repos = body.repos ?? [];
 			if (!token || !username) {
-				sendJson(response, 400, { error: "Token and username are required" });
-				return true;
+				throw new ValidationError("Token and username are required");
 			}
-			storeConfiguredRepositories(deps, repos);
+			storeConfiguredRepositories(ctx.deps, repos);
 			if (repos.length === 0) {
-				sendJson(response, 200, { initialized: [] });
-				return true;
+				return { status: 200, body: { initialized: [] } };
 			}
 
-			const workspacesDir = deps.settingsStore.getString("workspaces_dir", "./workspaces");
-			const defaultBranch = deps.settingsStore.getString("default_branch", "main");
+			const workspacesDir = ctx.deps.settingsStore.getString("workspaces_dir", "./workspaces");
+			const defaultBranch = ctx.deps.settingsStore.getString("default_branch", "main");
 			const manager = new WorkspaceManager({
 				workspacesDir,
 				githubUsername: username,
@@ -156,53 +158,51 @@ export async function handleOnboardingRoutes(
 					process.stdout.write(`[onboarding] failed to initialize ${repo.owner}/${repo.repo}: ${message}\n`);
 				}
 			}
-			sendJson(response, 200, { initialized });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/onboarding") {
-		if (!deps.settingsStore) {
-			sendJson(response, 500, { error: "Settings store not configured" });
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<
-				string,
-				string
-			>;
+			return { status: 200, body: { initialized } };
+		},
+	})
+	.route<Record<string, string>>({
+		method: "POST",
+		pattern: /^\/api\/onboarding$/u,
+		auth: false,
+		parseBody: true,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const body = ctx.body as Record<string, string>;
 			const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => !body[key]?.trim());
 			if (missing.length > 0) {
-				sendJson(response, 400, {
+				sendJson(ctx.response, 400, {
 					error: `Missing required fields: ${missing.join(", ")}`,
 				});
-				return true;
+				return;
 			}
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
-				deps.settingsStore.set(key, body[key].trim());
+				ctx.deps.settingsStore.set(key, body[key].trim());
 			}
-			const storedMissing = getMissingOnboardingSettings(deps);
+			const storedMissing = getMissingOnboardingSettings(ctx.deps);
 			const activated = storedMissing.length === 0;
-			sendJson(response, 200, { success: true, activated, requiresRestart: [] });
-			if (activated && deps.onOnboardingComplete) {
+			if (activated && ctx.deps.onOnboardingComplete) {
 				setImmediate(() => {
-					void Promise.resolve(deps.onOnboardingComplete?.()).catch((error) => {
+					void Promise.resolve(ctx.deps.onOnboardingComplete?.()).catch((error) => {
 						const message = error instanceof Error ? error.message : String(error);
 						process.stderr.write(`[onboarding] activation failed: ${message}\n`);
 					});
 				});
 			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
+			return { status: 200, body: { success: true, activated, requiresRestart: [] } };
+		},
+	});
 
-	if (request.method === "GET" && (pathname === "/tarsadmin" || pathname === "/tarsadmin/")) {
+export async function handleOnboardingRoutes(
+	request: IncomingMessage,
+	response: ServerResponse,
+	deps: AdminRouterDeps,
+	pathname: string,
+): Promise<boolean> {
+	if (pathname === "/tarsadmin" || pathname === "/tarsadmin/") {
 		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
 			return true;
 		}
@@ -210,17 +210,13 @@ export async function handleOnboardingRoutes(
 		return true;
 	}
 
-	if (request.method === "GET" && pathname.startsWith("/tarsadmin/")) {
+	if (pathname.startsWith("/tarsadmin/")) {
 		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
 			return true;
 		}
-		await serveAdminAsset(
-			response,
-			deps.adminAssetsDir,
-			pathname.slice("/tarsadmin/".length),
-		);
+		await serveAdminAsset(response, deps.adminAssetsDir, pathname.slice("/tarsadmin/".length));
 		return true;
 	}
 
-	return false;
+	return registry.handle(request, response, deps, pathname);
 }

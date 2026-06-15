@@ -1,7 +1,8 @@
+import type { SessionRepository } from "../ports/session-repository.js";
 import type { SessionStore, SessionState, SessionStatus } from "./store.js";
 import { isTerminalStatus } from "./store.js";
 
-export class SessionManager {
+export class SessionManager implements SessionRepository {
 	public constructor(
 		private readonly sessionsDir: string,
 		private readonly store: SessionStore,
@@ -50,6 +51,10 @@ export class SessionManager {
 
 	async getSession(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
 		return this.store.get(owner, repo, issueNumber);
+	}
+
+	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
+		return this.getSession(owner, repo, issueNumber);
 	}
 
 	async resumeSession(

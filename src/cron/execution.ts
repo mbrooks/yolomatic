@@ -26,12 +26,8 @@ export async function runCronExecution(
 
 	await mkdir(path.dirname(sessionPath), { recursive: true });
 
-	return deps.executor.execute(
+	return deps.executor.executeWithOverride(
 		state,
-		undefined,
-		undefined,
-		undefined,
-		undefined,
 		buildCronPrompt(job),
 	);
 }
