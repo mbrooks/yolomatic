@@ -46,6 +46,12 @@ export interface SessionState {
 	cronJobName?: string;
 	cronScheduleExpression?: string;
 	cronTriggerTime?: string;
+	/** ISO timestamp when the current/latest task execution started. */
+	taskStartedAt?: string;
+	/** ISO timestamp when the current/latest task execution finished. */
+	taskFinishedAt?: string;
+	/** Cumulative time spent executing tasks across all iterations, in milliseconds. */
+	totalExecutionTimeMs?: number;
 }
 
 export class SessionStore {

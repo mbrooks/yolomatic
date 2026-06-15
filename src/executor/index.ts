@@ -37,8 +37,12 @@ export class PiAgentExecutor {
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
 		overridePrompt?: string,
+		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
+		const notifyActivity = () => {
+			onActivity?.();
+		};
 		const key = buildSessionKey(state.owner, state.repo, state.issueNumber);
 
 		let prompt: string;
@@ -103,6 +107,7 @@ export class PiAgentExecutor {
 				if (event.assistantMessageEvent.type === "thinking_end") {
 					logger.logThought(event.assistantMessageEvent.content);
 					recordSessionLog(key, { level: "info", message: event.assistantMessageEvent.content, details: { type: "thinking" } });
+					notifyActivity();
 				}
 			}
 
@@ -113,6 +118,7 @@ export class PiAgentExecutor {
 					message: `${event.toolName} ${JSON.stringify(event.args).slice(0, 200)}`,
 					details: { type: "tool_execution_start", toolName: event.toolName, args: event.args },
 				});
+				notifyActivity();
 			}
 
 			if (event.type === "tool_execution_end") {
@@ -122,6 +128,7 @@ export class PiAgentExecutor {
 					message: `${event.toolName} ${event.isError ? "failed" : "done"}`,
 					details: { type: "tool_execution_end", toolName: event.toolName, result: event.result, isError: event.isError },
 				});
+				notifyActivity();
 				selfMonitor.recordToolEnd(event.toolName, event.result, event.isError);
 				if (selfMonitor.hasFatalError()) {
 					void session.abort();
@@ -138,6 +145,7 @@ export class PiAgentExecutor {
 					message: `Auto-retry ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`,
 					details: { type: "auto_retry_start", attempt: event.attempt, maxAttempts: event.maxAttempts, errorMessage: event.errorMessage },
 				});
+				notifyActivity();
 			}
 
 			if (event.type === "auto_retry_end" && !event.success && event.finalError) {
@@ -147,6 +155,7 @@ export class PiAgentExecutor {
 					message: `Auto-retry failed: ${event.finalError}`,
 					details: { type: "auto_retry_end", success: false, finalError: event.finalError },
 				});
+				notifyActivity();
 			}
 		});
 
@@ -164,6 +173,7 @@ export class PiAgentExecutor {
 				message: `Prompt execution failed: ${error instanceof Error ? error.message : String(error)}`,
 				details: { type: "prompt_error", error: error instanceof Error ? error.message : String(error) },
 			});
+			notifyActivity();
 			if (abortSignal?.aborted) {
 				return {
 					status: "cancelled",
@@ -225,6 +235,7 @@ export class PiAgentExecutor {
 			message: rawResponse || "(no response)",
 			details: { type: "response", status: parseExecutionResult(rawResponse).status },
 		});
+		notifyActivity();
 
 		return parseExecutionResult(rawResponse);
 	}

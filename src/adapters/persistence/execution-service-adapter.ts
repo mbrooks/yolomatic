@@ -11,8 +11,9 @@ export class ExecutionServiceAdapter implements ExecutionService {
 		comment?: string,
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
 	): Promise<ExecutionResult> {
-		return this.executor.execute(state, comment, undefined, abortSignal, onSessionCreated);
+		return this.executor.execute(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity);
 	}
 
 	executePRReview(
@@ -20,7 +21,8 @@ export class ExecutionServiceAdapter implements ExecutionService {
 		prReview: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
 	): Promise<ExecutionResult> {
-		return this.executor.execute(state, undefined, prReview, abortSignal, onSessionCreated);
+		return this.executor.execute(state, undefined, prReview, abortSignal, onSessionCreated, undefined, onActivity);
 	}
 }

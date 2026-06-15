@@ -43,6 +43,9 @@ function makeSession(status: "working" | "pending" | "waiting-feedback" | "compl
 		staleReason: null,
 		stale: null,
 		sessionType: "github_issue" as const,
+		taskStartedAt: null,
+		taskFinishedAt: null,
+		totalExecutionTimeMs: null,
 	};
 }
 

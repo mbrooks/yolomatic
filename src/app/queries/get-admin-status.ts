@@ -38,6 +38,9 @@ export interface AdminStatusSessionView {
 		prState: string | null;
 	} | null;
 	sessionType: "github_issue" | "cron";
+	taskStartedAt: string | null;
+	taskFinishedAt: string | null;
+	totalExecutionTimeMs: number | null;
 	cronJobId?: string;
 	cronJobName?: string;
 	cronScheduleExpression?: string;
@@ -203,6 +206,9 @@ export class GetAdminStatus {
 							}
 						: null,
 					sessionType: s.sessionType ?? "github_issue",
+					taskStartedAt: s.taskStartedAt ?? null,
+					taskFinishedAt: s.taskFinishedAt ?? null,
+					totalExecutionTimeMs: s.totalExecutionTimeMs ?? null,
 					cronJobId: s.cronJobId,
 					cronJobName: s.cronJobName,
 					cronScheduleExpression: s.cronScheduleExpression,
