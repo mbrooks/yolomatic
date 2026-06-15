@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { SessionState, SessionStore } from "./store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
+import type { StaleSessionService } from "../ports/stale-session-service.js";
 import { createOctokit } from "../adapters/github/octokit.js";
 
 export type StaleClassification =
@@ -21,7 +22,7 @@ export interface StaleSessionInfo {
 	prState?: string;
 }
 
-export class StaleSessionDetector {
+export class StaleSessionDetector implements StaleSessionService {
 	private readonly octokit: Octokit;
 
 	public constructor(

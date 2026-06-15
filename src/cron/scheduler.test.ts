@@ -77,6 +77,11 @@ function createMockDeps() {
 				summary: "Updated deps.",
 				rawResponse: "TARS_STATUS: complete\nUpdated deps.",
 			})),
+			executeWithOverride: vi.fn(async () => ({
+				status: "complete" as const,
+				summary: "Updated deps.",
+				rawResponse: "TARS_STATUS: complete\nUpdated deps.",
+			})),
 		} as unknown as PiAgentExecutor,
 		github: {
 			createPullRequest: createPullRequest as AnyFunction,
@@ -214,7 +219,7 @@ describe("executeCronJob", () => {
 
 	it("marks job as failed when cron execution is cancelled", async () => {
 		const deps = createMockDeps();
-		deps.executor.execute = vi.fn(async () => ({
+		deps.executor.executeWithOverride = vi.fn(async () => ({
 			status: "cancelled" as const,
 			summary: "",
 			rawResponse: "",
@@ -347,12 +352,8 @@ describe("executeCronJob", () => {
 			"default-base",
 			"main",
 		);
-		expect(deps.executor.execute).toHaveBeenCalledWith(
+		expect(deps.executor.executeWithOverride).toHaveBeenCalledWith(
 			expect.any(Object),
-			undefined,
-			undefined,
-			undefined,
-			undefined,
 			expect.stringContaining("(no instructions provided)"),
 		);
 	});
@@ -385,7 +386,7 @@ describe("tickCrons", () => {
 		const executionGate = new Promise<void>((resolve) => {
 			resolveExecution = resolve;
 		});
-		deps.executor.execute = vi.fn(async () => {
+		deps.executor.executeWithOverride = vi.fn(async () => {
 			await executionGate;
 			return {
 				status: "complete" as const,

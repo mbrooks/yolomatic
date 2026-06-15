@@ -1,4 +1,6 @@
-export class TaskController {
+import type { TaskControlService } from "./ports/task-control-service.js";
+
+export class TaskController implements TaskControlService {
 	private readonly active = new Map<string, { abort: () => void; steer?: (msg: string) => Promise<void> }>();
 	private draining = false;
 

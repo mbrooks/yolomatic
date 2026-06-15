@@ -1,61 +1,42 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readBody } from "../../../webhook/http-utils.js";
 import { computeNextRunAt, type CronScheduleType } from "../../../cron/store.js";
 import { sendJson } from "../response-helpers.js";
 import {
-	checkAdminJson,
+	AdminRouteRegistry,
+	NotFoundError,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 
-export async function handleCronRoutes(
-	request: IncomingMessage,
-	response: ServerResponse,
-	deps: AdminRouterDeps,
-	pathname: string,
-): Promise<boolean> {
-	if (!pathname.startsWith("/api/crons/")) {
-		return false;
-	}
-	if (!checkAdminJson(request, response, deps)) {
-		return true;
-	}
-	if (!deps.cronStore) {
-		sendJson(response, 500, { error: "Cron store not configured" });
-		return true;
-	}
-
-	const listMatch = /^\/api\/crons\/([^/]+)\/([^/]+)$/u.exec(pathname);
-	if (listMatch && request.method === "GET") {
-		const [, owner, repo] = listMatch;
-		try {
-			const jobs = await deps.cronStore.listForRepo(owner, repo);
-			sendJson(response, 200, { crons: jobs });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	if (listMatch && request.method === "POST") {
-		const [, owner, repo] = listMatch;
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				name?: string;
+const registry = new AdminRouteRegistry()
+	.route<{
+		name?: string;
+		description?: string;
+		prompt?: string;
+		scheduleType?: string;
+		scheduleValue?: string;
+		branch?: string;
+		notificationChannel?: string;
+	}>({
+		method: "POST",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)$/u,
+		parseBody: true,
+		required: ["name", "prompt", "scheduleType", "scheduleValue"],
+		handler: async (ctx) => {
+			const [owner, repo] = ctx.params;
+			const body = ctx.body as {
+				name: string;
 				description?: string;
-				prompt?: string;
-				scheduleType?: string;
-				scheduleValue?: string;
+				prompt: string;
+				scheduleType: string;
+				scheduleValue: string;
 				branch?: string;
 				notificationChannel?: string;
 			};
-			if (!body.name || !body.prompt || !body.scheduleType || !body.scheduleValue) {
-				sendJson(response, 400, {
-					error: "Missing required fields: name, prompt, scheduleType, scheduleValue",
-				});
-				return true;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
 			}
-			const job = await deps.cronStore.createJob(
+			const job = await ctx.deps.cronStore.createJob(
 				owner,
 				repo,
 				body.name,
@@ -66,40 +47,62 @@ export async function handleCronRoutes(
 				body.branch || "main",
 				body.notificationChannel || null,
 			);
-			sendJson(response, 201, job);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
-
-	const detailMatch = /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)$/u.exec(pathname);
-	if (detailMatch && request.method === "GET") {
-		const [, owner, repo, id] = detailMatch;
-		try {
-			const job = await deps.cronStore.get(owner, repo, id);
+			return { status: 201, body: job };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)$/u,
+		handler: async (ctx) => {
+			const [owner, repo] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			const jobs = await ctx.deps.cronStore.listForRepo(owner, repo);
+			return { status: 200, body: { crons: jobs } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)$/u,
+		handler: async (ctx) => {
+			const [owner, repo, id] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			const job = await ctx.deps.cronStore.get(owner, repo, id);
 			if (!job) {
-				sendJson(response, 404, { error: "Cron job not found" });
-				return true;
+				throw new NotFoundError("Cron job not found");
 			}
-			sendJson(response, 200, job);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	if (detailMatch && request.method === "PATCH") {
-		const [, owner, repo, id] = detailMatch;
-		try {
-			const existing = await deps.cronStore.get(owner, repo, id);
+			return { status: 200, body: job };
+		},
+	})
+	.route<Partial<{
+		name: string;
+		description: string;
+		prompt: string;
+		scheduleType: string;
+		scheduleValue: string;
+		branch: string;
+		notificationChannel: string;
+		enabled: boolean;
+	}>>({
+		method: "PATCH",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)$/u,
+		parseBody: true,
+		handler: async (ctx) => {
+			const [owner, repo, id] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			const existing = await ctx.deps.cronStore.get(owner, repo, id);
 			if (!existing) {
-				sendJson(response, 404, { error: "Cron job not found" });
-				return true;
+				throw new NotFoundError("Cron job not found");
 			}
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as Partial<{
+			const body = ctx.body as Partial<{
 				name: string;
 				description: string;
 				prompt: string;
@@ -140,63 +143,65 @@ export async function handleCronRoutes(
 				existing.enabled = body.enabled;
 			}
 			if (shouldRecompute) {
-				existing.nextRunAt = computeNextRunAt(
-					existing.scheduleType,
-					existing.scheduleValue,
-				);
+				existing.nextRunAt = computeNextRunAt(existing.scheduleType, existing.scheduleValue);
 			}
-			await deps.cronStore.set(existing);
-			sendJson(response, 200, existing);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 400, { error: message });
-		}
-		return true;
-	}
-
-	if (detailMatch && request.method === "DELETE") {
-		const [, owner, repo, id] = detailMatch;
-		try {
-			await deps.cronStore.delete(owner, repo, id);
-			sendJson(response, 200, { deleted: true });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const runsMatch = /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)\/runs$/u.exec(pathname);
-	if (runsMatch && request.method === "GET") {
-		const [, owner, repo, id] = runsMatch;
-		try {
-			const runs = await deps.cronStore.getRuns(owner, repo, id);
-			sendJson(response, 200, { runs });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	const runMatch = /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)\/run$/u.exec(pathname);
-	if (runMatch && request.method === "POST") {
-		const [, owner, repo, id] = runMatch;
-		try {
-			const job = await deps.cronStore.get(owner, repo, id);
+			await ctx.deps.cronStore.set(existing);
+			return { status: 200, body: existing };
+		},
+	})
+	.route({
+		method: "DELETE",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)$/u,
+		handler: async (ctx) => {
+			const [owner, repo, id] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			await ctx.deps.cronStore.delete(owner, repo, id);
+			return { status: 200, body: { deleted: true } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)\/runs$/u,
+		handler: async (ctx) => {
+			const [owner, repo, id] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			const runs = await ctx.deps.cronStore.getRuns(owner, repo, id);
+			return { status: 200, body: { runs } };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/crons\/([^/]+)\/([^/]+)\/([^/]+)\/run$/u,
+		handler: async (ctx) => {
+			const [owner, repo, id] = ctx.params;
+			if (!ctx.deps.cronStore) {
+				sendJson(ctx.response, 500, { error: "Cron store not configured" });
+				return;
+			}
+			const job = await ctx.deps.cronStore.get(owner, repo, id);
 			if (!job) {
-				sendJson(response, 404, { error: "Cron job not found" });
-				return true;
+				throw new NotFoundError("Cron job not found");
 			}
 			job.nextRunAt = new Date().toISOString();
-			await deps.cronStore.set(job);
-			sendJson(response, 200, { queued: true });
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
+			await ctx.deps.cronStore.set(job);
+			return { status: 200, body: { queued: true } };
+		},
+	});
 
-	return false;
+export async function handleCronRoutes(
+	request: IncomingMessage,
+	response: ServerResponse,
+	deps: AdminRouterDeps,
+	pathname: string,
+): Promise<boolean> {
+	if (!pathname.startsWith("/api/crons/")) {
+		return false;
+	}
+	return registry.handle(request, response, deps, pathname);
 }
