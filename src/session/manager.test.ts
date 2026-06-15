@@ -438,4 +438,121 @@ describe("SessionManager", () => {
 			"Cannot resume a session in 'pending' status. Only paused sessions can be resumed.",
 		);
 	});
+
+	it("exposes getSessionKey and getSessionPath helpers", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		expect(manager.getSessionKey("mbrooks", "tars", 30)).toContain("mbrooks");
+		expect(manager.getSessionPath("mbrooks", "tars", 30)).toContain("issue-30");
+	});
+
+	it("implements SessionRepository.get as an alias for getSession", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 31, "Title", "Body", "/tmp/ws");
+		const session = await manager.get("mbrooks", "tars", 31);
+		expect(session?.title).toBe("Title");
+		await expect(manager.get("mbrooks", "tars", 999)).resolves.toBeNull();
+	});
+
+	it("saves, lists, and deletes sessions", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const created = await manager.createSession("mbrooks", "tars", 32, "Title", "Body", "/tmp/ws");
+		created.status = "working";
+		const saved = await manager.save(created);
+		expect(saved.status).toBe("working");
+
+		const all = await manager.getAll();
+		expect(all.length).toBeGreaterThan(0);
+
+		await manager.delete("mbrooks", "tars", 32);
+		await expect(manager.getSession("mbrooks", "tars", 32)).resolves.toBeNull();
+	});
+
+	it("archives a session", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const archiveDir = path.join(sessionsDir, "archive");
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		const created = await manager.createSession("mbrooks", "tars", 33, "Title", "Body", "/tmp/ws");
+		await manager.archive(created, archiveDir);
+		await expect(manager.getSession("mbrooks", "tars", 33)).resolves.toBeNull();
+	});
+
+	it("archives a session by owner/repo/issue number", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const archiveDir = path.join(sessionsDir, "archive");
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 38, "Title", "Body", "/tmp/ws");
+		await manager.archiveSession("mbrooks", "tars", 38, archiveDir);
+		await expect(manager.getSession("mbrooks", "tars", 38)).resolves.toBeNull();
+	});
+
+	it("marks a session complete", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 34, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markComplete("mbrooks", "tars", 34);
+		expect(updated.status).toBe("complete");
+	});
+
+	it("marks a session failed with a reason", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 35, "Title", "Body", "/tmp/ws");
+		const existing = await manager.updateStatus("mbrooks", "tars", 35, "working", {
+			staleReason: "old",
+		});
+		const updated = await manager.markFailed("mbrooks", "tars", 35, "boom");
+		expect(updated.status).toBe("failed");
+		expect(updated.staleReason).toBe("boom");
+		expect(updated.summary).toBe("boom");
+	});
+
+	it("preserves existing staleReason when markFailed has no reason", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 36, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "tars", 36, "working", { staleReason: "existing" });
+		const updated = await manager.markFailed("mbrooks", "tars", 36);
+		expect(updated.staleReason).toBe("existing");
+	});
+
+	it("marks a session stale", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "tars", 37, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markStale("mbrooks", "tars", 37, "no activity");
+		expect(updated.staleReason).toBe("no activity");
+		expect(updated.staleDetectedAt).toBeDefined();
+	});
+
+	it("throws for archive, complete, failed, stale and cancel on missing sessions", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
+		const store = new SessionStore(sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await expect(manager.markComplete("mbrooks", "tars", 999)).rejects.toThrow("No session");
+		await expect(manager.markFailed("mbrooks", "tars", 999)).rejects.toThrow("No session");
+		await expect(manager.markStale("mbrooks", "tars", 999, "reason")).rejects.toThrow("No session");
+		await expect(manager.cancelSession("mbrooks", "tars", 999)).rejects.toThrow("No session");
+	});
 });

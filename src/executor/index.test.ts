@@ -190,7 +190,7 @@ describe("PiAgentExecutor", () => {
 		};
 
 		const onActivity = vi.fn();
-		await executor.execute(state, undefined, undefined, undefined, undefined, undefined, onActivity);
+		await executor.execute(state, undefined, undefined, undefined, onActivity);
 
 		expect(onActivity).toHaveBeenCalledTimes(1);
 
@@ -323,7 +323,7 @@ describe("PiAgentExecutor", () => {
 
 		const controller = new AbortController();
 		controller.abort();
-		const result = await executor.execute(state, undefined, undefined, controller.signal);
+		const result = await executor.execute(state, undefined, controller.signal);
 		expect(result.status).toBe("cancelled");
 		expect(result.summary).toBe("Task cancelled before execution started.");
 	});
@@ -410,7 +410,7 @@ describe("PiAgentExecutor", () => {
 		};
 
 		const controller = new AbortController();
-		const result = await executor.execute(state, undefined, undefined, controller.signal);
+		const result = await executor.execute(state, undefined, controller.signal);
 		expect(result.status).toBe("cancelled");
 		expect(result.summary).toBe("Task cancelled by admin.");
 		expect(abort).toHaveBeenCalled();
@@ -425,7 +425,7 @@ describe("PiAgentExecutor", () => {
 		const onSessionCreated = vi.fn();
 
 		const executor = new PiAgentExecutor({ soulPath });
-		const result = await executor.execute(makeState(7), undefined, undefined, undefined, onSessionCreated, "custom prompt");
+		const result = await executor.executeWithOverride(makeState(7), "custom prompt", undefined, onSessionCreated);
 
 		expect(result.status).toBe("complete");
 		expect(mockSession.prompt).toHaveBeenCalledWith("custom prompt");
@@ -443,7 +443,7 @@ describe("PiAgentExecutor", () => {
 		expect(feedbackSession.prompt).toHaveBeenCalledWith(expect.stringContaining("Human feedback received"));
 
 		const reviewSession = mockSuccessfulSession().mockSession;
-		await executor.execute(makeState(9), undefined, { comments: [], reviewBody: "Please add tests" });
+		await executor.executePRReview(makeState(9), { comments: [], reviewBody: "Please add tests" });
 		expect(reviewSession.prompt).toHaveBeenCalledWith(expect.stringContaining("PR review feedback received"));
 	});
 

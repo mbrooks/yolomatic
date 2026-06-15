@@ -11,6 +11,114 @@ import type { SkillStore } from "../../skills/store.js";
 import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import { sendJson } from "./response-helpers.js";
 import { requireAdminJson, requireAdminText } from "./admin-auth.js";
+import { readBody } from "../../webhook/http-utils.js";
+
+export class ValidationError extends Error {}
+export class NotFoundError extends Error {}
+
+export interface AdminRouteContext {
+	request: IncomingMessage;
+	response: ServerResponse;
+	deps: AdminRouterDeps;
+	requestUrl?: URL;
+	body: unknown;
+	params: string[];
+}
+
+export interface AdminRouteDefinition<TBody extends object = Record<string, unknown>> {
+	method: string;
+	pattern: RegExp;
+	auth?: boolean;
+	parseBody?: boolean;
+	required?: string[];
+	parseErrorStatus?: number;
+	handler: (ctx: AdminRouteContext) => Promise<void | { status: number; body: unknown }>;
+}
+
+export class AdminRouteRegistry {
+	private readonly routes: AdminRouteDefinition<any>[] = [];
+
+	route<TBody extends object>(definition: AdminRouteDefinition<TBody>): this {
+		this.routes.push(definition);
+		return this;
+	}
+
+	async handle(
+		request: IncomingMessage,
+		response: ServerResponse,
+		deps: AdminRouterDeps,
+		pathname: string,
+		requestUrl?: URL,
+	): Promise<boolean> {
+		for (const definition of this.routes) {
+			if (request.method !== definition.method) {
+				continue;
+			}
+			const match = definition.pattern.exec(pathname);
+			if (!match) {
+				continue;
+			}
+
+			if (definition.auth !== false) {
+				if (!checkAdminJson(request, response, deps)) {
+					return true;
+				}
+			}
+
+			let body: unknown = {};
+			if (definition.parseBody) {
+				try {
+					const raw = await readBody(request);
+					body = raw.length === 0 ? {} : JSON.parse(raw.toString("utf8"));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[admin] ${pathname} body parse error: ${message}\n`);
+					sendJson(response, definition.parseErrorStatus ?? 400, { error: message });
+					return true;
+				}
+			}
+
+			if (definition.required && definition.required.length > 0) {
+				const missing = definition.required.filter((field) => {
+					const value = (body as Record<string, unknown>)[field];
+					return value === undefined || value === null || value === "";
+				});
+				if (missing.length > 0) {
+					const suffix = missing.join(", ");
+					const message = `Missing required field${missing.length === 1 ? "" : "s"}: ${suffix}`;
+					sendJson(response, 400, { error: message });
+					return true;
+				}
+			}
+
+			try {
+				const result = await definition.handler({
+					request,
+					response,
+					deps,
+					requestUrl,
+					body,
+					params: match.slice(1) as string[],
+				});
+				if (result) {
+					sendJson(response, result.status, result.body);
+				}
+			} catch (error) {
+				if (error instanceof ValidationError) {
+					sendJson(response, 400, { error: error.message });
+				} else if (error instanceof NotFoundError) {
+					sendJson(response, 404, { error: error.message });
+				} else {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[admin] ${pathname} error: ${message}\n`);
+					sendJson(response, 500, { error: message });
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+}
 
 export interface AdminRouterDeps {
 	cronStore?: CronStore;

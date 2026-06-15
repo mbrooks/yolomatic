@@ -1,15 +1,12 @@
 import { Octokit } from "@octokit/rest";
 
+import type { SessionRepository } from "../ports/session-repository.js";
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { TaskController } from "../task-controller.js";
 
-import { SessionRepositoryAdapter } from "../adapters/persistence/session-repository-adapter.js";
-import { WorkspaceServiceAdapter } from "../adapters/persistence/workspace-service-adapter.js";
-import { ExecutionServiceAdapter } from "../adapters/persistence/execution-service-adapter.js";
-import { TaskControlServiceAdapter } from "../adapters/persistence/task-control-service-adapter.js";
 import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.js";
 import { systemClock } from "../ports/clock.js";
 import { HandleIssueEvent } from "../app/commands/handle-issue-event.js";
@@ -93,6 +90,18 @@ export interface WebhookHandlers {
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean;
 }
 
+function asSessionRepository(manager: SessionManager): SessionRepository {
+	return new Proxy(manager, {
+		get(target, prop) {
+			if (prop === "get") {
+				return target.getSession.bind(target);
+			}
+			const value = (target as unknown as Record<string, unknown>)[prop as string];
+			return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+		},
+	}) as SessionRepository;
+}
+
 export class GitHubIssueHandlers implements WebhookHandlers {
 	private readonly inFlight = new Set<string>();
 	private readonly handleIssueEventCmd: HandleIssueEvent;
@@ -116,10 +125,10 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			eventStore?: GitHubEventStateStore;
 		},
 	) {
-		const sessions = new SessionRepositoryAdapter(deps.sessionManager);
-		const workspaces = new WorkspaceServiceAdapter(deps.workspaceManager);
-		const executor = new ExecutionServiceAdapter(deps.executor);
-		const tasks = new TaskControlServiceAdapter(deps.taskController ?? new TaskController());
+		const sessions = asSessionRepository(deps.sessionManager);
+		const workspaces = deps.workspaceManager;
+		const executor = deps.executor;
+		const tasks = deps.taskController ?? new TaskController();
 		const github = new GitHubServiceAdapter({ githubToken: deps.githubToken, octokit: deps.octokit });
 
 		const execDeps = {
