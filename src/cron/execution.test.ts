@@ -50,7 +50,7 @@ function makeSessionState(partial: Partial<SessionState> = {}): SessionState {
 describe("runCronExecution", () => {
 	it("resets the cron worktree and invokes the executor with the cron prompt", async () => {
 		const createOrResetCronWorktree = vi.fn(async () => ({}));
-		const execute = vi.fn(async () => ({
+		const executeWithOverride = vi.fn(async () => ({
 			status: "complete" as const,
 			summary: "Done",
 			rawResponse: "TARS_STATUS: complete\nDone",
@@ -60,7 +60,7 @@ describe("runCronExecution", () => {
 			workspaceManager: {
 				createOrResetCronWorktree: createOrResetCronWorktree as AnyFunction,
 			} as unknown as WorkspaceManager,
-			executor: { execute: execute as AnyFunction } as unknown as PiAgentExecutor,
+			executor: { executeWithOverride: executeWithOverride as AnyFunction } as unknown as PiAgentExecutor,
 		};
 		const state = makeSessionState();
 
@@ -73,12 +73,8 @@ describe("runCronExecution", () => {
 
 		expect(result.status).toBe("complete");
 		expect(createOrResetCronWorktree).toHaveBeenCalledWith("mbrooks", "tars", "test-cron-1", "main");
-		expect(execute).toHaveBeenCalledWith(
+		expect(executeWithOverride).toHaveBeenCalledWith(
 			state,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
 			expect.stringContaining("(no instructions provided)"),
 		);
 	});

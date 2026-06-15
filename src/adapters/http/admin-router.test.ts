@@ -746,7 +746,7 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required fields");
+		expect(body.error).toContain("Missing required field");
 	});
 
 	it("POST /api/maintenance rejects invalid body", async () => {
@@ -917,7 +917,7 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required fields");
+		expect(body.error).toContain("Missing required field");
 	});
 
 	it("POST /api/issues/generate rejects missing fields", async () => {
@@ -933,7 +933,7 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required fields");
+		expect(body.error).toContain("Missing required field");
 	});
 
 	it("POST /api/issues rejects missing fields", async () => {
@@ -949,7 +949,7 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required fields");
+		expect(body.error).toContain("Missing required field");
 	});
 
 	it("POST /api/issues/chat returns chat result when shouldCreate is false", async () => {
@@ -2113,7 +2113,7 @@ describe("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required fields");
+		expect(body.error).toContain("Missing required field");
 	});
 
 	it("DELETE returns 401 when not admin", async () => {

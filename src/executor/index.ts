@@ -17,20 +17,51 @@ import { resolveConfiguredModel } from "./model-selection.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
+import type { ExecutionService } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
 export { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 export { extractText, getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 export { loadSoulContent } from "./soul-loader.js";
 
-export class PiAgentExecutor {
+export class PiAgentExecutor implements ExecutionService {
 	private readonly soulPath: string;
 
 	constructor(options: { soulPath: string }) {
 		this.soulPath = options.soulPath;
 	}
 
-	async execute(
+	execute(
+		state: SessionState,
+		comment?: string,
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
+	): Promise<ExecutionResult> {
+		return this.run(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity);
+	}
+
+	executePRReview(
+		state: SessionState,
+		prReview: { comments: PRReviewComment[]; reviewBody?: string },
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
+	): Promise<ExecutionResult> {
+		return this.run(state, undefined, prReview, abortSignal, onSessionCreated, undefined, onActivity);
+	}
+
+	executeWithOverride(
+		state: SessionState,
+		overridePrompt: string,
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: AgentSession) => void,
+		onActivity?: () => void,
+	): Promise<ExecutionResult> {
+		return this.run(state, undefined, undefined, abortSignal, onSessionCreated, overridePrompt, onActivity);
+	}
+
+	private async run(
 		state: SessionState,
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },

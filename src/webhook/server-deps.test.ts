@@ -123,7 +123,7 @@ describe("createWebhookServerDeps", () => {
 		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/tars#1");
 		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/tars#1");
 		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/tars#1", "comment");
-		expect(taskController.register).toHaveBeenCalledWith("mbrooks/tars#1", expect.any(Function), undefined);
+		expect(taskController.register).toHaveBeenCalledWith("mbrooks/tars#1", expect.any(Function));
 		expect(taskController.unregister).toHaveBeenCalledWith("mbrooks/tars#1");
 		expect(taskController.isDraining).toHaveBeenCalled();
 		expect(taskController.setDraining).toHaveBeenCalledWith(false);

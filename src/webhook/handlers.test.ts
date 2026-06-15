@@ -102,6 +102,11 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				summary: "Fixed.",
 				rawResponse: "TARS_STATUS: complete\nFixed.",
 			})),
+			executePRReview: vi.fn(async () => ({
+				status: "complete" as never,
+				summary: "Fixed.",
+				rawResponse: "TARS_STATUS: complete\nFixed.",
+			})),
 		};
 		return { octokit, sessionManager, workspaceManager, executor };
 	}
@@ -380,10 +385,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).toHaveBeenCalledWith(
 			expect.objectContaining({ issueNumber: 56 }),
 			"Please resume work",
-			undefined,
 			expect.any(AbortSignal),
 			expect.any(Function),
-			undefined,
 			expect.any(Function),
 		);
 	});
@@ -426,7 +429,6 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			"tars/issue-56",
 			"TARS: Fixed",
-			undefined,
 		);
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});

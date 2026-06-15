@@ -1,10 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readBody } from "../../../webhook/http-utils.js";
 import { generateIssueViaLLM } from "../../../app/commands/generate-issue.js";
 import type { RepoContext } from "../../../app/commands/issue-prompts.js";
 import { sendJson } from "../response-helpers.js";
 import {
-	checkAdminJson,
+	AdminRouteRegistry,
+	ValidationError,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import {
@@ -12,31 +12,29 @@ import {
 	type IssueChatRequestBody,
 } from "../../../app/commands/issue-chat-request.js";
 
-export async function handleIssueRoutes(
-	request: IncomingMessage,
-	response: ServerResponse,
-	deps: AdminRouterDeps,
-	pathname: string,
-): Promise<boolean> {
-	if (request.method === "POST" && pathname === "/api/issues/generate") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				owner?: string;
-				repo?: string;
-				prompt?: string;
+const registry = new AdminRouteRegistry()
+	.route<{
+		owner?: string;
+		repo?: string;
+		prompt?: string;
+		privacyMode?: boolean;
+		selectedTemplate?: string;
+		context?: RepoContext;
+	}>({
+		method: "POST",
+		pattern: /^\/api\/issues\/generate$/u,
+		parseBody: true,
+		parseErrorStatus: 500,
+		required: ["owner", "repo", "prompt"],
+		handler: async (ctx) => {
+			const body = ctx.body as {
+				owner: string;
+				repo: string;
+				prompt: string;
 				privacyMode?: boolean;
 				selectedTemplate?: string;
 				context?: RepoContext;
 			};
-			if (!body.owner || !body.repo || !body.prompt) {
-				sendJson(response, 400, {
-					error: "Missing required fields: owner, repo, prompt",
-				});
-				return true;
-			}
 			const generated = await generateIssueViaLLM(
 				body.owner,
 				body.repo,
@@ -47,60 +45,49 @@ export async function handleIssueRoutes(
 					selectedTemplate: body.selectedTemplate,
 				},
 			);
-			sendJson(response, 200, generated);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/issues/chat") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as IssueChatRequestBody;
+			return { status: 200, body: generated };
+		},
+	})
+	.route<IssueChatRequestBody>({
+		method: "POST",
+		pattern: /^\/api\/issues\/chat$/u,
+		parseBody: true,
+		parseErrorStatus: 500,
+		handler: async (ctx) => {
+			const body = ctx.body as IssueChatRequestBody;
 			if (!Array.isArray(body.messages) || body.messages.length === 0) {
-				sendJson(response, 400, { error: "Missing required field: messages" });
-				return true;
+				throw new ValidationError("Missing required field: messages");
 			}
-			sendJson(response, 200, await executeIssueChatRequest(deps, undefined, body));
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(
-				response,
-				message === "Missing required field: messages" ? 400 : 500,
-				{ error: message },
-			);
-		}
-		return true;
-	}
-
-	if (request.method === "POST" && pathname === "/api/issues") {
-		if (!checkAdminJson(request, response, deps)) {
-			return true;
-		}
-		if (!deps.githubService) {
-			sendJson(response, 500, { error: "GitHub service not configured" });
-			return true;
-		}
-		try {
-			const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-				owner?: string;
-				repo?: string;
-				title?: string;
+			return { status: 200, body: await executeIssueChatRequest(ctx.deps, undefined, body) };
+		},
+	})
+	.route<{
+		owner?: string;
+		repo?: string;
+		title?: string;
+		body?: string;
+		labels?: string[];
+		assignees?: string[];
+	}>({
+		method: "POST",
+		pattern: /^\/api\/issues$/u,
+		parseBody: true,
+		parseErrorStatus: 500,
+		required: ["owner", "repo", "title"],
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			const body = ctx.body as {
+				owner: string;
+				repo: string;
+				title: string;
 				body?: string;
 				labels?: string[];
 				assignees?: string[];
 			};
-			if (!body.owner || !body.repo || !body.title) {
-				sendJson(response, 400, {
-					error: "Missing required fields: owner, repo, title",
-				});
-				return true;
-			}
-			const issue = await deps.githubService.createIssue(
+			const issue = await ctx.deps.githubService.createIssue(
 				body.owner,
 				body.repo,
 				body.title,
@@ -108,13 +95,15 @@ export async function handleIssueRoutes(
 				body.labels,
 				body.assignees,
 			);
-			sendJson(response, 201, issue);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			sendJson(response, 500, { error: message });
-		}
-		return true;
-	}
+			return { status: 201, body: issue };
+		},
+	});
 
-	return false;
+export async function handleIssueRoutes(
+	request: IncomingMessage,
+	response: ServerResponse,
+	deps: AdminRouterDeps,
+	pathname: string,
+): Promise<boolean> {
+	return registry.handle(request, response, deps, pathname);
 }

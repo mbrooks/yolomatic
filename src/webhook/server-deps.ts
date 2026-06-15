@@ -2,10 +2,6 @@ import { resolve } from "node:path";
 
 import { systemClock } from "../ports/clock.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
-import { WorkspaceServiceAdapter } from "../adapters/persistence/workspace-service-adapter.js";
-import { TaskControlServiceAdapter } from "../adapters/persistence/task-control-service-adapter.js";
-import { StaleSessionServiceAdapter } from "../adapters/persistence/stale-session-service-adapter.js";
-import { ExecutionServiceAdapter } from "../adapters/persistence/execution-service-adapter.js";
 import { GetAdminStatus } from "../app/queries/get-admin-status.js";
 import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
@@ -61,9 +57,9 @@ export function createWebhookServerDeps(
 	cleanupCommand: CleanupOldSessions;
 } {
 	const sessionRepo = new SessionStoreRepositoryAdapter(sessionStore);
-	const workspaceService = workspaceManager ? new WorkspaceServiceAdapter(workspaceManager) : fallbackWorkspaceService;
-	const taskService = taskController ? new TaskControlServiceAdapter(taskController) : fallbackTaskController;
-	const staleService = staleDetector ? new StaleSessionServiceAdapter(staleDetector) : { detectStaleSessions: async () => [] };
+	const workspaceService = workspaceManager ?? fallbackWorkspaceService;
+	const taskService = taskController ?? fallbackTaskController;
+	const staleService = staleDetector ?? { detectStaleSessions: async () => [] };
 
 	let startIssueSession: StartIssueSession | undefined;
 	if (githubService && settingsStore && executor) {
@@ -76,7 +72,7 @@ export function createWebhookServerDeps(
 				workspaceService,
 				githubService,
 				taskService,
-				new ExecutionServiceAdapter(executor),
+				executor,
 				systemClock,
 				defaultBranch,
 				githubUsername,
