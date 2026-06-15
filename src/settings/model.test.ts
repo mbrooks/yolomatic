@@ -100,6 +100,23 @@ describe("settings/model", () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
+    it("assigns a category to every definition", () => {
+      for (const def of SETTING_DEFINITIONS) {
+        expect(def.category).toBeTruthy();
+      }
+    });
+
+    it("groups settings into expected categories", () => {
+      expect(getSettingDefinition("github_token")?.category).toBe("github-integration");
+      expect(getSettingDefinition("admin_username")?.category).toBe("authentication");
+      expect(getSettingDefinition("port")?.category).toBe("server");
+      expect(getSettingDefinition("workspaces_dir")?.category).toBe("file-system");
+      expect(getSettingDefinition("max_worktrees")?.category).toBe("git-worktrees");
+      expect(getSettingDefinition("self_report_enabled")?.category).toBe("agent-behavior");
+      expect(getSettingDefinition("pi_agent_model")?.category).toBe("ai-llm");
+      expect(getSettingDefinition("log_level")?.category).toBe("logging");
+    });
+
     it("defines GitHub event ingestion settings", () => {
       expect(getSettingDefinition("github_event_mode")?.default).toBe("webhook");
       expect(getSettingDefinition("github_poll_interval_ms")?.default).toBe("60000");

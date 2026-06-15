@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { parseHash, buildHash, navigate, useRoute } from "./routes.js";
+import { parseHash, buildHash, navigate, useRoute, DEFAULT_SETTINGS_TAB } from "./routes.js";
 
 describe("navigate", () => {
 	beforeEach(() => {
@@ -13,8 +13,8 @@ describe("navigate", () => {
 	});
 
 	it("sets window.location.hash", () => {
-		navigate({ screen: "settings", tab: "general" });
-		expect(window.location.hash).toBe("#/settings");
+		navigate({ screen: "settings", tab: DEFAULT_SETTINGS_TAB });
+		expect(window.location.hash).toBe(`#/settings/${DEFAULT_SETTINGS_TAB}`);
 	});
 });
 
@@ -138,12 +138,24 @@ describe("parseHash", () => {
 		});
 	});
 
+	it("parses settings view with default category tab", () => {
+		expect(parseHash("#/settings")).toEqual({ screen: "settings", tab: DEFAULT_SETTINGS_TAB });
+	});
+
+	it("parses settings view with category tab", () => {
+		expect(parseHash("#/settings/ai-llm")).toEqual({ screen: "settings", tab: "ai-llm" });
+	});
+
 	it("parses server-skills view", () => {
 		expect(parseHash("#/settings/skills")).toEqual({ screen: "settings", tab: "skills" });
 	});
 
 	it("parses invitations view", () => {
 		expect(parseHash("#/settings/invitations")).toEqual({ screen: "settings", tab: "invitations" });
+	});
+
+	it("defaults settings tab to first category for unknown slug", () => {
+		expect(parseHash("#/settings/unknown")).toEqual({ screen: "settings", tab: DEFAULT_SETTINGS_TAB });
 	});
 });
 
@@ -217,8 +229,16 @@ describe("buildHash", () => {
 		).toBe("#/repos/mbrooks/tars/skills");
 	});
 
+	it("builds settings root", () => {
+		expect(buildHash({ screen: "settings" })).toBe("#/settings");
+	});
+
 	it("builds server-skills view", () => {
 		expect(buildHash({ screen: "settings", tab: "skills" })).toBe("#/settings/skills");
+	});
+
+	it("builds settings category tab view", () => {
+		expect(buildHash({ screen: "settings", tab: "logging" })).toBe("#/settings/logging");
 	});
 
 	it("round-trips skills tab", () => {
@@ -248,5 +268,10 @@ describe("buildHash", () => {
 	it("round-trips invitations tab", () => {
 		const hash = buildHash({ screen: "settings" as const, tab: "invitations" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "invitations" }));
+	});
+
+	it("round-trips settings category tab", () => {
+		const hash = buildHash({ screen: "settings" as const, tab: "file-system" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "file-system" }));
 	});
 });

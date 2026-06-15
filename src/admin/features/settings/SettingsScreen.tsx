@@ -1,17 +1,20 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
-import { navigate } from "../../app/routes.js";
+import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
+import type { SettingsCategoryTab } from "../../app/routes.js";
+
+export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
 
 export function SettingsScreen({
 	onBack,
-	tab = "general",
+	tab = DEFAULT_SETTINGS_TAB,
 }: {
 	onBack: () => void;
-	tab?: "general" | "skills" | "invitations";
+	tab?: SettingsTab;
 }): React.ReactElement {
 	const [settings, setSettings] = useState<SettingView[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -67,6 +70,11 @@ export function SettingsScreen({
 		}
 	}, [changedKeys, edited]);
 
+	const filteredSettings = useMemo(() => {
+		if (tab === "skills" || tab === "invitations") return [];
+		return settings.filter((s) => s.category === tab);
+	}, [settings, tab]);
+
 	if (loading) {
 		return (
 			<div className="settings-screen">
@@ -99,7 +107,7 @@ export function SettingsScreen({
 					{error && <div className="error-banner">{error}</div>}
 
 					<div className="settings-list">
-						{settings.map((setting) => (
+						{filteredSettings.map((setting) => (
 							<SettingRow
 								key={setting.key}
 								setting={setting}
@@ -125,16 +133,19 @@ export function SettingsScreen({
 	);
 }
 
-function SettingsTabs({ activeTab }: { activeTab: "general" | "skills" | "invitations" }): React.ReactElement {
+function SettingsTabs({ activeTab }: { activeTab: SettingsTab }): React.ReactElement {
 	return (
 		<div className="repo-tabs">
-			<button
-				className={`repo-tab${activeTab === "general" ? " active" : ""}`}
-				onClick={() => navigate({ screen: "settings", tab: "general" })}
-				type="button"
-			>
-				General
-			</button>
+			{SETTINGS_CATEGORY_TABS.map(({ slug, label }) => (
+				<button
+					key={slug}
+					className={`repo-tab${activeTab === slug ? " active" : ""}`}
+					onClick={() => navigate({ screen: "settings", tab: slug })}
+					type="button"
+				>
+					{label}
+				</button>
+			))}
 			<button
 				className={`repo-tab${activeTab === "skills" ? " active" : ""}`}
 				onClick={() => navigate({ screen: "settings", tab: "skills" })}
