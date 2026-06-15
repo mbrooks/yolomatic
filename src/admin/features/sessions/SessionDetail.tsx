@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ActionButton, useAction } from "../../components/ActionButton.js";
 import { SESSION_ACTIONS, sendSessionCommand, type SessionActionConfig } from "../../api/sessions.js";
 import { useSessionLog } from "../../hooks/useSessionLog.js";
-import { formatRelative } from "../../lib/format.js";
+import { formatRelative, formatMs } from "../../lib/format.js";
 import type { Session } from "../../app/types.js";
 import { SessionLogPanel } from "./SessionLogPanel.js";
 
@@ -48,6 +48,24 @@ export function SessionDetail({
 					<dd>{selected.workspacePath}</dd>
 					<dt>Last activity</dt>
 					<dd>{formatRelative(selected.lastActivity)}</dd>
+					{selected.totalExecutionTimeMs !== null ? (
+						<>
+							<dt>Total execution time</dt>
+							<dd>{formatMs(selected.totalExecutionTimeMs)}</dd>
+						</>
+					) : null}
+					{selected.taskStartedAt ? (
+						<>
+							<dt>Task started</dt>
+							<dd>{formatRelative(selected.taskStartedAt)}</dd>
+						</>
+					) : null}
+					{selected.taskFinishedAt ? (
+						<>
+							<dt>Task finished</dt>
+							<dd>{formatRelative(selected.taskFinishedAt)}</dd>
+						</>
+					) : null}
 					{!isCron ? (
 						<>
 							<dt>Issue</dt>

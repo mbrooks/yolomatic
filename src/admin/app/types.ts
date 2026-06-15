@@ -71,6 +71,9 @@ export type Session = {
 	staleReason: string | null;
 	stale: StaleInfo | null;
 	sessionType: SessionType;
+	taskStartedAt: string | null;
+	taskFinishedAt: string | null;
+	totalExecutionTimeMs: number | null;
 	cronJobId?: string;
 	cronJobName?: string;
 	cronScheduleExpression?: string;

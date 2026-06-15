@@ -257,6 +257,8 @@ describe("HandlePRReview", () => {
 				reviewBody: undefined,
 			},
 			expect.any(AbortSignal),
+			undefined,
+			expect.any(Function),
 		);
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
@@ -386,6 +388,8 @@ describe("HandlePRReview", () => {
 				reviewBody: "Please add more tests.",
 			},
 			expect.any(AbortSignal),
+			undefined,
+			expect.any(Function),
 		);
 	});
 

@@ -149,6 +149,65 @@ describe("PiAgentExecutor", () => {
 		}
 	});
 
+	it("notifies onActivity for each model output event", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const unsubscribe = vi.fn();
+		let subscribeCallback: ((event: unknown) => void) | undefined;
+		const mockSession = {
+			subscribe: vi.fn((cb: (event: unknown) => void) => {
+				subscribeCallback = cb;
+				return unsubscribe;
+			}),
+			prompt: vi.fn(),
+			messages: [
+				{ role: "assistant", content: "TARS_STATUS: complete\nDone." },
+			],
+		};
+
+		const mockRegistry = {
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		};
+
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const state = {
+			issueNumber: 101,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+
+		const onActivity = vi.fn();
+		await executor.execute(state, undefined, undefined, undefined, undefined, undefined, onActivity);
+
+		expect(onActivity).toHaveBeenCalledTimes(1);
+
+		if (subscribeCallback) {
+			subscribeCallback({
+				type: "message_update",
+				assistantMessageEvent: { type: "thinking_end", content: "thought" },
+			});
+			subscribeCallback({ type: "tool_execution_start", toolName: "read", args: {} });
+			subscribeCallback({ type: "tool_execution_end", toolName: "read", result: "ok" });
+			subscribeCallback({ type: "auto_retry_start", errorMessage: "err", attempt: 1, maxAttempts: 3 });
+			subscribeCallback({ type: "auto_retry_end", success: false, finalError: "failed" });
+		}
+
+		expect(onActivity).toHaveBeenCalledTimes(6);
+	});
+
 	it("logs and rethrows when session.prompt throws", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");

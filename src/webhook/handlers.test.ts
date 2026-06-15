@@ -383,6 +383,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			undefined,
 			expect.any(AbortSignal),
 			expect.any(Function),
+			undefined,
+			expect.any(Function),
 		);
 	});
 
