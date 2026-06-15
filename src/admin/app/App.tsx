@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useServerState } from "../hooks/useServerState.js";
-import { useRoute, navigate, type Route } from "./routes.js";
+import { useRoute, navigate, DEFAULT_SETTINGS_TAB, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
@@ -311,7 +311,7 @@ function AppContent({
 	}
 
 	if (route.screen === "settings") {
-		return <SettingsScreen onBack={onBack} tab={route.tab ?? "general"} />;
+		return <SettingsScreen onBack={onBack} tab={route.tab ?? DEFAULT_SETTINGS_TAB} />;
 	}
 
 	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} repos={repos} />;

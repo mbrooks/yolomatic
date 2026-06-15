@@ -1,12 +1,29 @@
 import { useEffect, useState } from "react";
 
+export const SETTINGS_CATEGORY_TABS = [
+	{ slug: "github-integration", label: "GitHub Integration" },
+	{ slug: "authentication", label: "Authentication" },
+	{ slug: "server", label: "Server" },
+	{ slug: "file-system", label: "File System" },
+	{ slug: "git-worktrees", label: "Git & Worktrees" },
+	{ slug: "agent-behavior", label: "Agent Behavior" },
+	{ slug: "ai-llm", label: "AI / LLM" },
+	{ slug: "logging", label: "Logging" },
+] as const;
+
+export type SettingsCategoryTab = typeof SETTINGS_CATEGORY_TABS[number]["slug"];
+
+export const SETTINGS_TAB_SLUGS: readonly SettingsCategoryTab[] = SETTINGS_CATEGORY_TABS.map((t) => t.slug);
+
+export const DEFAULT_SETTINGS_TAB: SettingsCategoryTab = SETTINGS_CATEGORY_TABS[0].slug;
+
 export type Route =
 	| { screen: "dashboard" }
 	| { screen: "repos" }
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" | "issues" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
 	| { screen: "new-issue"; owner?: string; repo?: string }
-	| { screen: "settings"; tab?: "general" | "skills" | "invitations" };
+	| { screen: "settings"; tab?: "skills" | "invitations" | SettingsCategoryTab };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
@@ -17,8 +34,14 @@ export function parseHash(hash: string): Route {
 		return { screen: "new-issue" };
 	}
 	if (path[0] === "settings") {
-		const tab = path[1] === "skills" ? "skills" : path[1] === "invitations" ? "invitations" : "general";
-		return { screen: "settings", tab };
+		const slug = path[1];
+		if (slug === "skills" || slug === "invitations") {
+			return { screen: "settings", tab: slug };
+		}
+		if (slug && SETTINGS_TAB_SLUGS.includes(slug as SettingsCategoryTab)) {
+			return { screen: "settings", tab: slug as SettingsCategoryTab };
+		}
+		return { screen: "settings", tab: DEFAULT_SETTINGS_TAB };
 	}
 	if (path[0] === "dashboard") {
 		return { screen: "dashboard" };
@@ -62,6 +85,9 @@ export function buildHash(route: Route): string {
 	if (route.screen === "settings") {
 		if (route.tab === "skills") return "#/settings/skills";
 		if (route.tab === "invitations") return "#/settings/invitations";
+		if (route.tab && SETTINGS_TAB_SLUGS.includes(route.tab)) {
+			return `#/settings/${route.tab}`;
+		}
 		return "#/settings";
 	}
 	if (route.screen === "dashboard") return "#/dashboard";

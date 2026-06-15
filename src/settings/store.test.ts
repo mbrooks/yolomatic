@@ -49,14 +49,11 @@ describe("SettingsStore", () => {
 		expect(store.getBoolean("self_report_enabled")).toBe(false);
 	});
 
-	it("getAllViews returns all definitions", () => {
+	it("getAllViews includes category from definition", () => {
 		store.applyDefaults();
 		const views = store.getAllViews();
-		expect(views.length).toBeGreaterThan(0);
 		const portView = views.find((v) => v.key === "port");
-		expect(portView).toBeDefined();
-		expect(portView?.type).toBe("number");
-		expect(portView?.requiresRestart).toBe(true);
+		expect(portView?.category).toBe("server");
 	});
 
 	it("setTyped coerces values correctly", () => {

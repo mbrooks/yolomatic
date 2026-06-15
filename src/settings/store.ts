@@ -110,6 +110,7 @@ export class SettingsStore {
 				requiresRestart: def.requiresRestart,
 				sensitive: def.sensitive,
 				updatedAt: entry?.updatedAt ?? "",
+				category: def.category,
 			};
 		});
 	}
