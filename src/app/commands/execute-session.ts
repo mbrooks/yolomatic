@@ -98,16 +98,38 @@ export class ExecuteSession {
 			},
 		);
 
+		const sessionStatus = current.status;
+		const onActivity = () => {
+			void this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
+				lastActivity: new Date().toISOString(),
+			});
+		};
+
 		let result: ExecutionResult;
 		try {
-			result = await this.deps.executor.execute(
-				current,
-				comment,
-				abortController.signal,
-				(session) => {
-					resolveSession?.(session);
-				},
-			);
+			current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
+				taskStartedAt: new Date().toISOString(),
+				taskFinishedAt: undefined,
+			});
+			const taskStartedAt = new Date(current.taskStartedAt!).getTime();
+			const priorExecutionTimeMs = current.totalExecutionTimeMs ?? 0;
+			try {
+				result = await this.deps.executor.execute(
+					current,
+					comment,
+					abortController.signal,
+					(session) => {
+						resolveSession?.(session);
+					},
+					onActivity,
+				);
+			} finally {
+				const durationMs = Date.now() - taskStartedAt;
+				current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
+					taskFinishedAt: new Date().toISOString(),
+					totalExecutionTimeMs: priorExecutionTimeMs + durationMs,
+				});
+			}
 		} catch (error) {
 			if (abortController.signal.aborted) {
 				process.stdout.write(`[execute] execution aborted for ${key}\n`);
