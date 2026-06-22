@@ -28,6 +28,7 @@ describe("createTarsModelRegistry", () => {
 			apiKey: "ollama",
 			models: expect.arrayContaining([
 				expect.objectContaining({ id: "kimi-k2.7-code:cloud" }),
+				expect.objectContaining({ id: "glm-5.2:cloud" }),
 			]),
 		}));
 		expect(registry).toBe(mockRegistry);

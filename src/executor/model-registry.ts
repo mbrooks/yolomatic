@@ -25,6 +25,19 @@ export function createTarsModelRegistry(authStorage: AuthStorage): ModelRegistry
 					supportsDeveloperRole: false,
 				},
 			},
+			{
+				id: "glm-5.2:cloud",
+				name: "glm-5.2:cloud",
+				api: "openai-completions",
+				reasoning: true,
+				input: ["text", "image"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 1_048_576,
+				maxTokens: 16_384,
+				compat: {
+					supportsDeveloperRole: false,
+				},
+			},
 		],
 	});
 
