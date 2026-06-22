@@ -113,6 +113,22 @@ export class PiAgentExecutor implements ExecutionService {
 			);
 		}
 
+		const resolvedModelId = configuredModel
+			? `${configuredModel.provider}/${configuredModel.id}`
+			: "(pi defaults)";
+		recordSessionLog(key, {
+			level: "info",
+			message:
+				`Using model: ${resolvedModelId}` +
+				(process.env.PI_AGENT_MODEL?.trim() && !configuredModel ? " (PI_AGENT_MODEL unresolved, fell back)" : ""),
+			details: {
+				type: "model",
+				provider: configuredModel?.provider,
+				modelId: configuredModel?.id,
+				configured: process.env.PI_AGENT_MODEL?.trim() ?? null,
+			},
+		});
+
 		const { session } = await createAgentSession({
 			cwd: state.workspacePath,
 			sessionManager: piSessionManager,
