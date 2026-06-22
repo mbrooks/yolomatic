@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { unlinkSync } from "node:fs";
 import { SettingsStore } from "./store.js";
 
@@ -105,5 +105,42 @@ describe("SettingsStore", () => {
 		expect(store.isEmpty()).toBe(true);
 		store.set("port", "6767");
 		expect(store.isEmpty()).toBe(false);
+	});
+
+	describe("onChange", () => {
+		it("fires with (key, value) after set", () => {
+			const listener = vi.fn();
+			store.onChange(listener);
+			store.set("port", "5555");
+			expect(listener).toHaveBeenCalledWith("port", "5555");
+		});
+
+		it("fires with (key, formatted) after setTyped", () => {
+			const listener = vi.fn();
+			store.onChange(listener);
+			store.setTyped("self_report_enabled", true);
+			expect(listener).toHaveBeenCalledWith("self_report_enabled", "true");
+		});
+
+		it("unsubscribe stops further notifications", () => {
+			const listener = vi.fn();
+			const unsubscribe = store.onChange(listener);
+			unsubscribe();
+			store.set("port", "7777");
+			expect(listener).not.toHaveBeenCalled();
+		});
+
+		it("isolates throwing listeners and does not break the save", () => {
+			const throwing = vi.fn(() => {
+				throw new Error("boom");
+			});
+			const healthy = vi.fn();
+			store.onChange(throwing);
+			store.onChange(healthy);
+			store.set("port", "8888");
+			expect(throwing).toHaveBeenCalledWith("port", "8888");
+			expect(healthy).toHaveBeenCalledWith("port", "8888");
+			expect(store.get("port")).toBe("8888");
+		});
 	});
 });

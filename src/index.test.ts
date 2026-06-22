@@ -33,6 +33,7 @@ vi.mock("./settings/store.js", () => ({
 	SettingsStore: vi.fn(() => ({
 		seedFromEnv: vi.fn(),
 		applyDefaults: vi.fn(),
+		onChange: vi.fn(() => () => {}),
 	})),
 }));
 
@@ -124,7 +125,8 @@ import { createWebhookServer } from "./webhook/server.js";
 import { main, noOpHandlers } from "./index.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { SessionStore } from "./session/store.js";
-import { isBootstrapComplete } from "./config.js";
+import { SettingsStore } from "./settings/store.js";
+import { isBootstrapComplete, getConfig } from "./config.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
 import { startGitHubPolling } from "./github-events/polling.js";
 
@@ -465,6 +467,15 @@ describe("main", () => {
 		}));
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
+	});
+
+	it("re-syncs config to env when settings change", async () => {
+		await main();
+		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+		expect(settingsStoreMock.onChange).toHaveBeenCalledWith(expect.any(Function));
+		const listener = settingsStoreMock.onChange.mock.calls[0][0];
+		listener();
+		expect(getConfig).toHaveBeenCalledTimes(2);
 	});
 });
 
