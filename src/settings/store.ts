@@ -11,10 +11,13 @@ import {
 } from "./model.js";
 import type { SettingEntry, SettingDefinition, SettingView } from "./model.js";
 
+export type SettingsChangeListener = (key: string, value: string) => void;
+
 export class SettingsStore {
 	private readonly db: DatabaseSync;
 	private readonly insertStmt: StatementSync;
 	private readonly getStmt: StatementSync;
+	private readonly listeners = new Set<SettingsChangeListener>();
 
 	public constructor(dbPath: string) {
 		mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -27,6 +30,24 @@ export class SettingsStore {
 			`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
 			 ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
 		);
+	}
+
+	onChange(listener: SettingsChangeListener): () => void {
+		this.listeners.add(listener);
+		return () => {
+			this.listeners.delete(listener);
+		};
+	}
+
+	private notify(key: string, value: string): void {
+		for (const listener of this.listeners) {
+			try {
+				listener(key, value);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				process.stdout.write(`[settings] change listener error for ${key}: ${message}\n`);
+			}
+		}
 	}
 
 	get(key: string): string | undefined {
@@ -71,6 +92,7 @@ export class SettingsStore {
 			throw new Error(`Unknown setting: ${key}`);
 		}
 		this.insertStmt.run(key, value, new Date().toISOString());
+		this.notify(key, value);
 	}
 
 	setTyped(key: string, value: string | number | boolean): void {
@@ -80,6 +102,7 @@ export class SettingsStore {
 		}
 		const formatted = formatSettingValue(def, value);
 		this.insertStmt.run(key, formatted, new Date().toISOString());
+		this.notify(key, formatted);
 	}
 
 	getAll(): SettingEntry[] {
