@@ -49,7 +49,7 @@ describe("HandleIssueComment", () => {
 			addLabels: vi.fn(async () => {}),
 			removeLabel: vi.fn(async () => {}),
 			getPullRequest: vi.fn(async () => ({
-				head: { ref: "tars/cron-job-123" },
+				head: { ref: "tars/custom-branch-123" },
 				state: "open",
 				merged: false,
 			})),
@@ -99,7 +99,7 @@ describe("HandleIssueComment", () => {
 		return { handler, sessions, github, prReview, tasks };
 	}
 
-	it("routes cron PR comments through the stored PR mapping", async () => {
+	it("routes non-issue branch PR comments through the stored PR mapping", async () => {
 		const { handler, sessions, github, prReview } = createHandler();
 		sessions.findSessionByPR.mockResolvedValue({
 			issueNumber: 56,
@@ -112,7 +112,6 @@ describe("HandleIssueComment", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
-			sessionType: "github_issue",
 			prNumber: 99,
 			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		} as never);
@@ -131,7 +130,7 @@ describe("HandleIssueComment", () => {
 			expect.objectContaining({
 				pull_request: expect.objectContaining({
 					number: 99,
-					head: { ref: "tars/cron-job-123" },
+					head: { ref: "tars/custom-branch-123" },
 				}),
 			}),
 		);

@@ -5,9 +5,7 @@ import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
-import { CronScreen } from "../features/crons/CronScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
-import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
 import { IssuesScreen } from "../features/issues/IssuesScreen.js";
@@ -30,7 +28,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "new-issue" || route.screen === "settings") return null;
+		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "settings" || route.screen === "new-issue") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
@@ -41,7 +39,7 @@ export function App(): React.ReactElement {
 	}, [sessions, route]);
 
 	const handleSelectRepo = useCallback((owner: string, repo: string) => {
-		navigate({ screen: "repo", owner, repo });
+		navigate({ screen: "repo", owner, repo, tab: "sessions" });
 	}, []);
 
 	const handleSelectWorking = useCallback(() => {
@@ -81,7 +79,7 @@ export function App(): React.ReactElement {
 	);
 
 	const handleSelectTab = useCallback(
-		(tab: "sessions" | "crons" | "skills" | "issues") => {
+		(tab: "sessions" | "skills" | "issues") => {
 			if (route.screen === "repo") {
 				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
 			}
@@ -94,14 +92,6 @@ export function App(): React.ReactElement {
 	const handleSelectSettings = useCallback(() => {
 		navigate({ screen: "settings" });
 	}, []);
-
-	const handleNewIssueForRepo = useCallback(() => {
-		if (route.screen === "repo") {
-			navigate({ screen: "new-issue", owner: route.owner, repo: route.repo });
-		} else {
-			navigate({ screen: "new-issue" });
-		}
-	}, [route]);
 
 	const lastUpdated = useMemo(() => {
 		if (serverState.status === "loading") return "Loading...";
@@ -143,7 +133,6 @@ export function App(): React.ReactElement {
 					onBack={handleBackToDashboard}
 					onSelectRepos={handleSelectReposList}
 					onSelectTab={handleSelectTab}
-					onNewIssueForRepo={handleNewIssueForRepo}
 					onSelectSettings={handleSelectSettings}
 				/>
 			)}
@@ -195,7 +184,6 @@ function AppContent({
 	onBack,
 	onSelectRepos,
 	onSelectTab,
-	onNewIssueForRepo,
 	onSelectSettings,
 }: {
 	route: Route;
@@ -213,8 +201,7 @@ function AppContent({
 	onMutate: () => void;
 	onBack: () => void;
 	onSelectRepos: () => void;
-	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
-	onNewIssueForRepo: () => void;
+	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
@@ -227,7 +214,6 @@ function AppContent({
 				sessions={sessions}
 				onSelectWorking={onSelectWorking}
 				onSelectRepos={onSelectRepos}
-				onNewIssue={onNewIssueForRepo}
 				onSelectSession={onSelectSession}
 			/>
 		);
@@ -259,27 +245,14 @@ function AppContent({
 	}
 
 	if (route.screen === "repo") {
-		if (route.tab === "crons") {
-			return (
-				<CronScreen
-					owner={route.owner}
-					repo={route.repo}
-					activeTab={route.tab ?? "issues"}
-					onSelectTab={onSelectTab}
-					onBack={onBack}
-					onNewIssue={onNewIssueForRepo}
-				/>
-			);
-		}
 		if (route.tab === "skills") {
 			return (
 				<RepoSkillsScreen
 					owner={route.owner}
 					repo={route.repo}
-					activeTab={route.tab ?? "issues"}
+					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
-					onNewIssue={onNewIssueForRepo}
 				/>
 			);
 		}
@@ -293,9 +266,8 @@ function AppContent({
 					breadcrumbLabel={`${route.owner}/${route.repo}`}
 					onBack={onBack}
 					emptyMessage="No sessions for this repository."
-					activeTab={route.tab ?? "issues"}
+					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
-					onNewIssue={onNewIssueForRepo}
 				/>
 			);
 		}
@@ -305,7 +277,6 @@ function AppContent({
 				repo={route.repo}
 				onSelectTab={onSelectTab}
 				onBack={onBack}
-				onNewIssue={onNewIssueForRepo}
 			/>
 		);
 	}
@@ -314,5 +285,17 @@ function AppContent({
 		return <SettingsScreen onBack={onBack} tab={route.tab ?? DEFAULT_SETTINGS_TAB} />;
 	}
 
-	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} repos={repos} />;
+	navigate({ screen: "dashboard" });
+	return (
+		<DashboardScreen
+			agentStatus={agentStatus}
+			uptime={uptime}
+			draining={draining}
+			repos={repos}
+			sessions={sessions}
+			onSelectWorking={onSelectWorking}
+			onSelectRepos={onSelectRepos}
+			onSelectSession={onSelectSession}
+		/>
+	);
 }

@@ -3,14 +3,13 @@ import { Breadcrumb } from "./Breadcrumb.js";
 import { EmptyState } from "./EmptyState.js";
 import { RepoTabs } from "./RepoTabs.js";
 
-export type RepoScopedTab = "sessions" | "crons" | "skills" | "issues";
+export type RepoScopedTab = "sessions" | "skills" | "issues";
 
 export function RepoScopedScreenShell({
 	owner,
 	repo,
 	activeTab,
 	onSelectTab,
-	onNewIssue,
 	onBack,
 	loading,
 	loadingMessage,
@@ -23,7 +22,6 @@ export function RepoScopedScreenShell({
 	repo: string;
 	activeTab: RepoScopedTab;
 	onSelectTab: (tab: RepoScopedTab) => void;
-	onNewIssue?: () => void;
 	onBack: () => void;
 	loading: boolean;
 	loadingMessage: string;
@@ -34,7 +32,7 @@ export function RepoScopedScreenShell({
 }): React.ReactElement {
 	return (
 		<>
-			<RepoTabs activeTab={activeTab} onSelectTab={onSelectTab} onNewIssue={onNewIssue} />
+			<RepoTabs activeTab={activeTab} onSelectTab={onSelectTab} />
 			<Breadcrumb label={`${owner}/${repo}`} onBack={onBack} />
 			{loading && empty ? (
 				<div className="empty">{loadingMessage}</div>

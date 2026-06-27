@@ -51,7 +51,6 @@ export class SessionStoreRepositoryAdapter implements SessionRepository {
 			lastActivity: new Date().toISOString(),
 			createdAt: new Date().toISOString(),
 			seeded: false,
-			sessionType: "github_issue",
 		};
 		return this.store.set(state);
 	}

@@ -10,13 +10,11 @@ export function IssuesScreen({
 	repo,
 	onBack,
 	onSelectTab,
-	onNewIssue,
 }: {
 	owner: string;
 	repo: string;
 	onBack: () => void;
-	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
-	onNewIssue?: () => void;
+	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
 }): React.ReactElement {
 	const { issues, loading, reload } = useRepoIssues(owner, repo);
 	const [selected, setSelected] = useState<OpenIssue | null>(null);
@@ -36,7 +34,6 @@ export function IssuesScreen({
 			repo={repo}
 			activeTab="issues"
 			onSelectTab={onSelectTab}
-			onNewIssue={onNewIssue}
 			onBack={onBack}
 			loading={issues.length === 0 && loading}
 			loadingMessage="Loading issues..."

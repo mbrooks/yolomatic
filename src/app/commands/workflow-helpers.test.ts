@@ -26,7 +26,6 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 		workspacePath: "/tmp/ws/.worktrees/issue-56",
 		lastActivity: new Date().toISOString(),
 		seeded: true,
-		sessionType: "github_issue",
 		...overrides,
 	};
 }

@@ -16,7 +16,6 @@ describe("HandlePRReview", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
-			sessionType: "github_issue",
 			...overrides,
 		};
 	}
@@ -125,11 +124,11 @@ describe("HandlePRReview", () => {
 		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
 	});
 
-	it("processes cron PR feedback using the stored PR mapping", async () => {
+	it("processes non-issue branch PR feedback using the stored PR mapping", async () => {
 		const { handler, sessions, workspaces, executor, github, tasks } = createHandler();
 		const session = makeSession({
-			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/cron-job-123",
-			branch: "tars/cron-job-123",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/custom-branch-123",
+			branch: "tars/custom-branch-123",
 			prNumber: 99,
 			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		});
@@ -138,7 +137,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/cron-job-123" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "tars/custom-branch-123" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please update the generated file", user: { login: "user" }, path: "src/foo.ts", line: 42 },
@@ -148,8 +147,8 @@ describe("HandlePRReview", () => {
 		expect(executor.executePRReview).toHaveBeenCalledTimes(1);
 		expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-tars/.worktrees/cron-job-123",
-			"tars/cron-job-123",
+			"/tmp/workspaces/mbrooks-tars/.worktrees/custom-branch-123",
+			"tars/custom-branch-123",
 			"TARS: Fix the typo",
 		);
 		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
