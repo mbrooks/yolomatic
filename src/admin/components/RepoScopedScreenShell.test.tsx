@@ -8,7 +8,7 @@ function renderShell(overrides: Partial<React.ComponentProps<typeof RepoScopedSc
 	const props: React.ComponentProps<typeof RepoScopedScreenShell> = {
 		owner: "mbrooks",
 		repo: "tars",
-		activeTab: "issues",
+		activeTab: "sessions",
 		onSelectTab: vi.fn(),
 		onBack: vi.fn(),
 		loading: false,
@@ -28,8 +28,10 @@ describe("RepoScopedScreenShell", () => {
 
 		expect(screen.getByText("mbrooks/tars")).toBeTruthy();
 		expect(screen.getByText("Repo content")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Issues" }));
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
 
+		expect(props.onSelectTab).toHaveBeenCalledWith("issues");
 		expect(props.onBack).toHaveBeenCalled();
 	});
 
