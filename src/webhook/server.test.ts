@@ -73,7 +73,6 @@ describe("createWebhookServer", () => {
 				_workspaceManager?: unknown,
 				_staleDetector?: unknown,
 				_archiveDir?: unknown,
-				_cronStore?: unknown,
 				_adminAssetsDir?: unknown,
 				_githubService?: unknown,
 				settingsStore?: unknown,

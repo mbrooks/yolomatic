@@ -2,7 +2,6 @@ import type { Server } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
-import type { IssueChatProgressEvent, IssueChatRequestBody, IssueChatResponse } from "../app/commands/issue-chat-request.js";
 import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 
@@ -10,16 +9,11 @@ export type ClientMessage =
 	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "unsubscribe-log"; owner: string; repo: string; issueNumber: number }
 	| { type: "subscribe-status" }
-	| { type: "unsubscribe-status" }
-	| { type: "issue-chat"; requestId: string; payload: IssueChatRequestBody }
-	| { type: "issue-chat-abort"; requestId: string }
-	| { type: "issue-chat-steer"; requestId: string; message: string };
+	| { type: "unsubscribe-status" };
 
 export type ServerMessage =
 	| { type: "log-entry"; sessionKey: string; entry: SessionLogEntry }
 	| { type: "status"; data: unknown }
-	| { type: "issue-chat-progress"; requestId: string; event: IssueChatProgressEvent }
-	| { type: "issue-chat-response"; requestId: string; response: IssueChatResponse }
 	| { type: "error"; message: string };
 
 export interface CredentialProvider {
@@ -30,19 +24,10 @@ export interface StatusProvider {
 	getStatus(): Promise<unknown>;
 }
 
-export interface IssueChatProvider {
-	runIssueChat(
-		requestId: string,
-		payload: IssueChatRequestBody,
-		onProgress: (event: IssueChatProgressEvent) => void,
-	): Promise<IssueChatResponse>;
-}
-
 export function createAdminWebSocketServer(
 	httpServer: Server,
 	credentialProvider: CredentialProvider,
 	statusProvider?: StatusProvider,
-	issueChatProvider?: IssueChatProvider,
 	taskControlService?: TaskControlService,
 ): {
 	broadcastLog: (sessionKey: string, entry: SessionLogEntry) => void;
@@ -138,46 +123,6 @@ export function createAdminWebSocketServer(
 					if (!hasStatusSubscribers()) {
 						stopStatusPolling();
 					}
-				} else if (msg.type === "issue-chat") {
-					if (!issueChatProvider) {
-						if (ws.readyState === WebSocket.OPEN) {
-							ws.send(JSON.stringify({ type: "error", message: "Issue chat is not configured" } satisfies ServerMessage));
-						}
-						return;
-					}
-					void issueChatProvider.runIssueChat(msg.requestId, msg.payload, (event) => {
-						if (ws.readyState !== WebSocket.OPEN) {
-							return;
-						}
-						ws.send(JSON.stringify({
-							type: "issue-chat-progress",
-							requestId: msg.requestId,
-							event,
-						} satisfies ServerMessage));
-					}).then((response) => {
-						if (ws.readyState !== WebSocket.OPEN) {
-							return;
-						}
-						ws.send(JSON.stringify({
-							type: "issue-chat-response",
-							requestId: msg.requestId,
-							response,
-						} satisfies ServerMessage));
-					}).catch((error: unknown) => {
-						if (ws.readyState !== WebSocket.OPEN) {
-							return;
-						}
-						const message = error instanceof Error ? error.message : String(error);
-						ws.send(JSON.stringify({
-							type: "issue-chat-progress",
-							requestId: msg.requestId,
-							event: { type: "error", message },
-						} satisfies ServerMessage));
-					});
-				} else if (msg.type === "issue-chat-abort") {
-					taskControlService?.cancel(msg.requestId);
-				} else if (msg.type === "issue-chat-steer") {
-					void taskControlService?.steer(msg.requestId, msg.message);
 				}
 			} catch {
 				// ignore invalid messages

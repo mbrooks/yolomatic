@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS_TAB: SettingsCategoryTab = SETTINGS_CATEGORY_TABS[
 export type Route =
 	| { screen: "dashboard" }
 	| { screen: "repos" }
-	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "crons" | "skills" | "issues" }
+	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "skills" | "issues" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
 	| { screen: "new-issue"; owner?: string; repo?: string }
 	| { screen: "settings"; tab?: "skills" | "invitations" | SettingsCategoryTab };
@@ -51,9 +51,9 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			let issueNumber: number | undefined;
-			let tab: "sessions" | "crons" | "skills" | "issues" = "issues";
+			let tab: "sessions" | "skills" | "issues" = "sessions";
 			if (path[3]) {
-				if (path[3] === "crons" || path[3] === "skills" || path[3] === "issues" || path[3] === "sessions") {
+				if (path[3] === "skills" || path[3] === "issues" || path[3] === "sessions") {
 					tab = path[3];
 					if (path[4]) {
 						const num = Number.parseInt(path[4], 10);
@@ -100,7 +100,7 @@ export function buildHash(route: Route): string {
 	}
 	if (route.screen === "repo") {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
-		const tab = route.tab === "crons" ? "/crons" : route.tab === "skills" ? "/skills" : route.tab === "sessions" ? "/sessions" : "";
+		const tab = route.tab === "skills" ? "/skills" : route.tab === "issues" ? "/issues" : "";
 		if (route.issueNumber !== undefined) {
 			return `${base}${tab}/${route.issueNumber}`;
 		}

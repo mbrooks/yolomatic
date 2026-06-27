@@ -43,13 +43,9 @@ export function SessionListPane({
 							<div className="list-col repo">
 								{session.owner}/{session.repo}
 							</div>
-							<div className="list-col issue">
-								{session.sessionType === "cron" ? "–" : `#${session.issueNumber}`}
-							</div>
+							<div className="list-col issue">#{session.issueNumber}</div>
 							<div className="list-col type">
-								<span className={`type-badge ${session.sessionType}`}>
-									{session.sessionType === "cron" ? "Cron" : "Issue"}
-								</span>
+								<span className="type-badge issue">Issue</span>
 							</div>
 							<div className="list-col status">
 								<span className={`status-badge ${session.status}`}>{session.status}</span>

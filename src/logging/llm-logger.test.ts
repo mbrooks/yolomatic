@@ -20,11 +20,11 @@ describe("LlmLogger", () => {
 	}
 
 	it("logs with custom session tag when provided", () => {
-		const logger = new LlmLogger("tars", 0, "tars-cron-abc123");
+		const logger = new LlmLogger("tars", 0, "tars-job-abc123");
 		logger.logPrompt("Hello world", 2);
 
 		const lines = getLines();
-		expect(lines.some((l) => l.includes("[tars-cron-abc123]"))).toBe(true);
+		expect(lines.some((l) => l.includes("[tars-job-abc123]"))).toBe(true);
 	});
 
 	it("logs prompts with token info", () => {

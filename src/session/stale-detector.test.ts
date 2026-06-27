@@ -85,17 +85,6 @@ function makeDetector(options: {
 }
 
 describe("StaleSessionDetector", () => {
-	it("skips GitHub API calls for cron sessions", async () => {
-		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "tars", issueNumber: -1, sessionType: "cron", status: "working" })],
-		});
-
-		const result = await detector.detectStaleSessions();
-		expect(result).toHaveLength(1);
-		expect(result[0].isStale).toBe(false);
-		expect(result[0].classification).toBe("unknown");
-	});
-
 	it("skips non-working sessions", async () => {
 		const detector = makeDetector({
 			sessions: [makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "pending" })],

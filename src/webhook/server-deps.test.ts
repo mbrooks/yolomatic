@@ -71,7 +71,6 @@ describe("createWebhookServerDeps", () => {
 		const staleDetector = {
 			detectStaleSessions: vi.fn(async () => []),
 		};
-		const cronStore = { getAll: vi.fn(async () => []) };
 		const githubService = { postComment: vi.fn() };
 		const settingsStore = {
 			get: vi.fn((key: string) => {
@@ -101,7 +100,6 @@ describe("createWebhookServerDeps", () => {
 			workspaceManager as never,
 			staleDetector as never,
 			"/tmp/archive",
-			cronStore as never,
 			"/tmp/admin-assets",
 			githubService as never,
 			settingsStore as never,
@@ -131,7 +129,6 @@ describe("createWebhookServerDeps", () => {
 		const status = await deps.getAdminStatus.execute();
 		expect(status.success).toBe(true);
 		expect(staleDetector.detectStaleSessions).toHaveBeenCalled();
-		expect(deps.cronStore).toBe(cronStore);
 		expect(deps.githubService).toBe(githubService);
 		expect(deps.adminUsername).toBe("admin");
 		expect(deps.adminPassword).toBe("secret");

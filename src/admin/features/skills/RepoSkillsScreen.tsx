@@ -12,14 +12,12 @@ export function RepoSkillsScreen({
 	activeTab,
 	onSelectTab,
 	onBack,
-	onNewIssue,
 }: {
 	owner: string;
 	repo: string;
-	activeTab: "sessions" | "crons" | "skills" | "issues";
-	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
+	activeTab: "sessions" | "skills" | "issues";
+	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
 	onBack: () => void;
-	onNewIssue?: () => void;
 }): React.ReactElement {
 	const { skills, loading, reload } = useRepoSkills(owner, repo);
 	const [selectedSkill, setSelectedSkill] = useState<RepoSkill | null>(null);
@@ -50,7 +48,6 @@ export function RepoSkillsScreen({
 			repo={repo}
 			activeTab={activeTab}
 			onSelectTab={onSelectTab}
-			onNewIssue={onNewIssue}
 			onBack={onBack}
 			loading={loading}
 			loadingMessage="Loading skills..."
