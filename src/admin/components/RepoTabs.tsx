@@ -3,11 +3,9 @@ import React from "react";
 export function RepoTabs({
 	activeTab,
 	onSelectTab,
-	onNewIssue,
 }: {
 	activeTab: "sessions" | "skills" | "issues";
 	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
-	onNewIssue?: () => void;
 }): React.ReactElement {
 	return (
 		<div className="repo-tabs">
@@ -32,11 +30,6 @@ export function RepoTabs({
 			>
 				Skills
 			</button>
-			{onNewIssue ? (
-				<button className="repo-tab new-issue" onClick={onNewIssue} type="button">
-					+ New Issue
-				</button>
-			) : null}
 		</div>
 	);
 }

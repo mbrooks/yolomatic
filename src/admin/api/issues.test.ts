@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assignIssue, chatIssue, createIssue, fetchRepoContext, generateIssue, fetchOpenIssues, startIssueSession } from "./issues.js";
+import { assignIssue, closeIssue, fetchOpenIssues, markIssueDoNotWork, startIssueSession } from "./issues.js";
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -11,111 +11,6 @@ function jsonResponse(data: unknown, status = 200): Response {
 describe("issues api", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
-	});
-
-	it("creates issues via POST", async () => {
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			jsonResponse({ number: 42, html_url: "http://issue/42" }),
-		);
-
-		await expect(
-			createIssue({
-				owner: "mbrooks",
-				repo: "tars",
-				title: "Bug report",
-				body: "details",
-				labels: ["bug"],
-				assignees: ["mbrooks"],
-			}),
-		).resolves.toEqual({ number: 42, html_url: "http://issue/42" });
-
-		expect(fetchSpy).toHaveBeenCalledWith("/api/issues", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				owner: "mbrooks",
-				repo: "tars",
-				title: "Bug report",
-				body: "details",
-				labels: ["bug"],
-				assignees: ["mbrooks"],
-			}),
-		});
-	});
-
-	it("generates issue drafts via POST", async () => {
-		vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			jsonResponse({ title: "Generated", body: "Body", labels: ["bug"], assignees: [] }),
-		);
-
-		await expect(
-			generateIssue({
-				owner: "mbrooks",
-				repo: "tars",
-				prompt: "make an issue",
-			}),
-		).resolves.toEqual({
-			title: "Generated",
-			body: "Body",
-			labels: ["bug"],
-			assignees: [],
-		});
-	});
-
-	it("sends issue chat payloads via POST", async () => {
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			jsonResponse({
-				message: "Draft updated.",
-				owner: "mbrooks",
-				repo: "tars",
-				draft: { title: "Generated", body: "Body", labels: ["bug"], assignees: [] },
-				readyToCreate: true,
-				shouldCreate: false,
-			}),
-		);
-
-		await expect(
-			chatIssue({
-				owner: "mbrooks",
-				repo: "tars",
-				messages: [{ role: "user", text: "hello" }],
-			}),
-		).resolves.toMatchObject({
-			message: "Draft updated.",
-			owner: "mbrooks",
-			repo: "tars",
-			readyToCreate: true,
-		});
-
-		expect(fetchSpy).toHaveBeenCalledWith("/api/issues/chat", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				owner: "mbrooks",
-				repo: "tars",
-				messages: [{ role: "user", text: "hello" }],
-			}),
-		});
-	});
-
-	it("fetches repo context via GET", async () => {
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			jsonResponse({
-				labels: ["bug"],
-				templates: [{ name: "Bug Report", body: "template" }],
-				recentCommits: ["abc123"],
-				relatedIssues: [{ number: 1, title: "Old", state: "open" }],
-			}),
-		);
-
-		await expect(fetchRepoContext("mbrooks", "tars")).resolves.toEqual({
-			labels: ["bug"],
-			templates: [{ name: "Bug Report", body: "template" }],
-			recentCommits: ["abc123"],
-			relatedIssues: [{ number: 1, title: "Old", state: "open" }],
-		});
-
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/context");
 	});
 
 	it("fetches open issues via GET", async () => {
@@ -163,6 +58,34 @@ describe("issues api", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
+		});
+	});
+
+	it("closes issue via POST", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			jsonResponse({ closed: true }),
+		);
+
+		await expect(closeIssue("mbrooks", "tars", 42)).resolves.toEqual({ closed: true });
+
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/close", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({}),
+		});
+	});
+
+	it("marks issue as do-not-work via POST", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			jsonResponse({ closed: true, labeled: true }),
+		);
+
+		await expect(markIssueDoNotWork("mbrooks", "tars", 42)).resolves.toEqual({ closed: true, labeled: true });
+
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({}),
 		});
 	});
 });

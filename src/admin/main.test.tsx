@@ -179,7 +179,6 @@ describe("App", () => {
 		expect(screen.queryByText("Uptime")).not.toBeNull();
 		expect(screen.queryAllByText("Repositories").length).toBeGreaterThan(0);
 		expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
-		expect(screen.queryAllByRole("button", { name: /New Issue/ }).length).toBeGreaterThan(0);
 	});
 
 	it("navigates to working view via quick link", async () => {

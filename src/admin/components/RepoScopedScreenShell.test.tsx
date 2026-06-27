@@ -10,7 +10,6 @@ function renderShell(overrides: Partial<React.ComponentProps<typeof RepoScopedSc
 		repo: "tars",
 		activeTab: "issues",
 		onSelectTab: vi.fn(),
-		onNewIssue: vi.fn(),
 		onBack: vi.fn(),
 		loading: false,
 		loadingMessage: "Loading repo data...",
@@ -29,10 +28,8 @@ describe("RepoScopedScreenShell", () => {
 
 		expect(screen.getByText("mbrooks/tars")).toBeTruthy();
 		expect(screen.getByText("Repo content")).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "+ New Issue" }));
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
 
-		expect(props.onNewIssue).toHaveBeenCalled();
 		expect(props.onBack).toHaveBeenCalled();
 	});
 

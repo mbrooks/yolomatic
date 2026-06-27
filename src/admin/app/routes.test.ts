@@ -96,14 +96,6 @@ describe("parseHash", () => {
 		expect(parseHash("#/working")).toEqual({ screen: "working" });
 	});
 
-	it("parses new-issue view", () => {
-		expect(parseHash("#/new-issue")).toEqual({ screen: "new-issue" });
-	});
-
-	it("parses new-issue view with owner and repo", () => {
-		expect(parseHash("#/new-issue/mbrooks/tars")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "tars" });
-	});
-
 	it("defaults to dashboard for unknown", () => {
 		expect(parseHash("")).toEqual({ screen: "dashboard" });
 	});
@@ -148,10 +140,6 @@ describe("buildHash", () => {
 		expect(buildHash({ screen: "repos" })).toBe("#/repos");
 	});
 
-	it("builds new-issue view", () => {
-		expect(buildHash({ screen: "new-issue" })).toBe("#/new-issue");
-	});
-
 	it("builds repo detail", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
@@ -180,10 +168,6 @@ describe("buildHash", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "skills" }),
 		).toBe("#/repos/mbrooks/tars/skills/140");
-	});
-
-	it("builds new-issue view with owner and repo", () => {
-		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
 	});
 
 	it("round-trips issues tab", () => {

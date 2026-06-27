@@ -12,7 +12,6 @@ import type { RepoSkillService } from "../skills/repo-skill-service.js";
 import type { PiAgentExecutor } from "../executor/index.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
-import { executeIssueChatRequest } from "../app/commands/issue-chat-request.js";
 import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
@@ -150,9 +149,6 @@ export function createWebhookServer(
 		server,
 		credentialProvider,
 		statusProvider,
-		{
-			runIssueChat: (requestId, payload, onProgress) => executeIssueChatRequest(serverDeps, requestId, payload, onProgress),
-		},
 		serverDeps.taskController,
 	);
 

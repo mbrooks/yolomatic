@@ -11,7 +11,6 @@ export function DashboardScreen({
 	sessions,
 	onSelectWorking,
 	onSelectRepos,
-	onNewIssue,
 	onSelectSession,
 }: {
 	agentStatus: AgentStatus;
@@ -21,7 +20,6 @@ export function DashboardScreen({
 	sessions: Session[];
 	onSelectWorking: () => void;
 	onSelectRepos: () => void;
-	onNewIssue: () => void;
 	onSelectSession: (session: Session) => void;
 }): React.ReactElement {
 	const feedbackCount = sessions.filter((s) => s.status === "waiting-feedback").length;
@@ -74,10 +72,6 @@ export function DashboardScreen({
 					<button className="quick-link" onClick={onSelectRepos} type="button">
 						<span className="quick-link-icon">📁</span>
 						<span className="quick-link-label">Repositories</span>
-					</button>
-					<button className="quick-link" onClick={onNewIssue} type="button">
-						<span className="quick-link-icon">+</span>
-						<span className="quick-link-label">New Issue</span>
 					</button>
 				</div>
 			</div>

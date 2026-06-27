@@ -6,7 +6,6 @@ import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
-import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
 import { IssuesScreen } from "../features/issues/IssuesScreen.js";
@@ -29,7 +28,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "new-issue" || route.screen === "settings") return null;
+		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "settings") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
@@ -94,14 +93,6 @@ export function App(): React.ReactElement {
 		navigate({ screen: "settings" });
 	}, []);
 
-	const handleNewIssueForRepo = useCallback(() => {
-		if (route.screen === "repo") {
-			navigate({ screen: "new-issue", owner: route.owner, repo: route.repo });
-		} else {
-			navigate({ screen: "new-issue" });
-		}
-	}, [route]);
-
 	const lastUpdated = useMemo(() => {
 		if (serverState.status === "loading") return "Loading...";
 		if (serverState.status === "error") return `Error: ${serverState.error}`;
@@ -142,7 +133,6 @@ export function App(): React.ReactElement {
 					onBack={handleBackToDashboard}
 					onSelectRepos={handleSelectReposList}
 					onSelectTab={handleSelectTab}
-					onNewIssueForRepo={handleNewIssueForRepo}
 					onSelectSettings={handleSelectSettings}
 				/>
 			)}
@@ -194,7 +184,6 @@ function AppContent({
 	onBack,
 	onSelectRepos,
 	onSelectTab,
-	onNewIssueForRepo,
 	onSelectSettings,
 }: {
 	route: Route;
@@ -213,7 +202,6 @@ function AppContent({
 	onBack: () => void;
 	onSelectRepos: () => void;
 	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
-	onNewIssueForRepo: () => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
@@ -226,7 +214,6 @@ function AppContent({
 				sessions={sessions}
 				onSelectWorking={onSelectWorking}
 				onSelectRepos={onSelectRepos}
-				onNewIssue={onNewIssueForRepo}
 				onSelectSession={onSelectSession}
 			/>
 		);
@@ -266,7 +253,6 @@ function AppContent({
 					activeTab={route.tab ?? "issues"}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
-					onNewIssue={onNewIssueForRepo}
 				/>
 			);
 		}
@@ -282,7 +268,6 @@ function AppContent({
 					emptyMessage="No sessions for this repository."
 					activeTab={route.tab ?? "issues"}
 					onSelectTab={onSelectTab}
-					onNewIssue={onNewIssueForRepo}
 				/>
 			);
 		}
@@ -292,7 +277,6 @@ function AppContent({
 				repo={route.repo}
 				onSelectTab={onSelectTab}
 				onBack={onBack}
-				onNewIssue={onNewIssueForRepo}
 			/>
 		);
 	}
@@ -301,5 +285,17 @@ function AppContent({
 		return <SettingsScreen onBack={onBack} tab={route.tab ?? DEFAULT_SETTINGS_TAB} />;
 	}
 
-	return <NewIssueScreen onBack={onBack} prefillOwner={route.owner} prefillRepo={route.repo} repos={repos} />;
+	navigate({ screen: "dashboard" });
+	return (
+		<DashboardScreen
+			agentStatus={agentStatus}
+			uptime={uptime}
+			draining={draining}
+			repos={repos}
+			sessions={sessions}
+			onSelectWorking={onSelectWorking}
+			onSelectRepos={onSelectRepos}
+			onSelectSession={onSelectSession}
+		/>
+	);
 }

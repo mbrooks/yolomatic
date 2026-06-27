@@ -13,21 +13,6 @@ vi.mock("./asset-server.js", () => ({
 	}),
 }));
 
-vi.mock("../../app/commands/generate-issue.js", () => ({
-	generateIssueViaLLM: vi.fn(async () => ({ title: "Generated", body: "Body", labels: [], assignees: [] })),
-}));
-
-vi.mock("../../app/commands/issue-chat.js", () => ({
-	chatIssueViaLLM: vi.fn(async () => ({
-		shouldCreate: false,
-		draft: { title: "", body: "", labels: [], assignees: [] },
-		message: "",
-		owner: "",
-		repo: "",
-		readyToCreate: false,
-	})),
-}));
-
 function makeBasicAuth(username: string, password: string): string {
 	return "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
 }
@@ -67,12 +52,7 @@ describe("handleAdminRoute", () => {
 	let store: SettingsStore;
 	let deps: Parameters<typeof handleAdminRoute>[2];
 	let githubService: {
-		listLabels: ReturnType<typeof vi.fn>;
-		getIssueTemplates: ReturnType<typeof vi.fn>;
-		listRecentCommits: ReturnType<typeof vi.fn>;
-		listRelatedIssues: ReturnType<typeof vi.fn>;
 		listOpenIssues: ReturnType<typeof vi.fn>;
-		createIssue: ReturnType<typeof vi.fn>;
 		listPendingInvitations: ReturnType<typeof vi.fn>;
 		acceptInvitation: ReturnType<typeof vi.fn>;
 		updateIssueAssignees: ReturnType<typeof vi.fn>;
@@ -88,12 +68,7 @@ describe("handleAdminRoute", () => {
 		}
 		store = new SettingsStore(TEST_DB);
 		githubService = {
-			listLabels: vi.fn(async () => []),
-			getIssueTemplates: vi.fn(async () => []),
-			listRecentCommits: vi.fn(async () => []),
-			listRelatedIssues: vi.fn(async () => []),
 			listOpenIssues: vi.fn(async () => []),
-			createIssue: vi.fn(async () => ({ number: 99, html_url: "https://github.com/mbrooks/tars/issues/99" })),
 			listPendingInvitations: vi.fn(async () => []),
 			acceptInvitation: vi.fn(async () => undefined),
 			updateIssueAssignees: vi.fn(async () => undefined),
@@ -412,60 +387,8 @@ describe("handleAdminRoute", () => {
 
 
 
-	it("GET /api/repos/:owner/:repo/context returns context", async () => {
-		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/context",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.labels).toEqual([]);
-	});
 
-	it("POST /api/issues/generate returns generated issue", async () => {
-		const { generateIssueViaLLM } = await import("../../app/commands/generate-issue.js");
-		vi.mocked(generateIssueViaLLM).mockResolvedValue({
-			title: "Generated Title",
-			body: "Generated Body",
-			labels: [],
-			assignees: [],
-		});
-
-		const req = mockRequest({
-			url: "/api/issues/generate",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ owner: "mbrooks", repo: "tars", prompt: "Write an issue" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.title).toBe("Generated Title");
-	});
-
-	it("POST /api/issues creates an issue", async () => {
-		const req = mockRequest({
-			url: "/api/issues",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ owner: "mbrooks", repo: "tars", title: "New Issue" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(201);
-		const body = JSON.parse(String(res.body));
-		expect(body.number).toBe(99);
-	});
 
 	it("GET /api/settings blanks sensitive values", async () => {
 		store.set("github_token", "supersecret");
@@ -663,95 +586,10 @@ describe("handleAdminRoute", () => {
 
 
 
-	it("POST /api/issues/generate rejects missing fields", async () => {
-		const req = mockRequest({
-			url: "/api/issues/generate",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ owner: "mbrooks" }),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(400);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required field");
-	});
 
-	it("POST /api/issues rejects missing fields", async () => {
-		const req = mockRequest({
-			url: "/api/issues",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ owner: "mbrooks" }),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(400);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required field");
-	});
 
-	it("POST /api/issues/chat returns chat result when shouldCreate is false", async () => {
-		const req = mockRequest({
-			url: "/api/issues/chat",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ messages: [{ role: "user", text: "Hello" }] }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.shouldCreate).toBe(false);
-	});
-
-	it("POST /api/issues/chat returns ready message when shouldCreate true but missing repo/title", async () => {
-		const { chatIssueViaLLM } = await import("../../app/commands/issue-chat.js");
-		vi.mocked(chatIssueViaLLM).mockResolvedValue({
-			shouldCreate: true,
-			owner: "mbrooks",
-			repo: "",
-			draft: { title: "", body: "", labels: [], assignees: [] },
-			message: "Need more info",
-			readyToCreate: false,
-		});
-
-		const req = mockRequest({
-			url: "/api/issues/chat",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ messages: [{ role: "user", text: "Hello" }] }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.readyToCreate).toBe(false);
-	});
-
-	it("GET /api/repos/:owner/:repo/context returns 500 when githubService missing", async () => {
-		const noGhDeps = { ...deps, githubService: undefined };
-		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/context",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noGhDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("GitHub service not configured");
-	});
 
 	it("POST /api/onboarding rejects invalid JSON", async () => {
 		const req = mockRequest({
@@ -802,59 +640,8 @@ describe("handleAdminRoute", () => {
 
 
 
-	it("POST /api/issues/chat rejects invalid JSON", async () => {
-		const req = mockRequest({
-			url: "/api/issues/chat",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: "not json",
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-	});
 
-	it("GET /api/repos/:owner/:repo/context handles service error", async () => {
-		githubService.listLabels.mockRejectedValue(new Error("Network error"));
-		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/context",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-	});
-
-	it("POST /api/issues/chat creates issue when ready", async () => {
-		const { chatIssueViaLLM } = await import("../../app/commands/issue-chat.js");
-		vi.mocked(chatIssueViaLLM).mockResolvedValue({
-			shouldCreate: true,
-			owner: "mbrooks",
-			repo: "tars",
-			draft: { title: "Chat Title", body: "Chat Body", labels: [], assignees: [] },
-			message: "Created",
-			readyToCreate: true,
-		});
-
-		const req = mockRequest({
-			url: "/api/issues/chat",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ messages: [{ role: "user", text: "Hello" }] }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.createdIssue.number).toBe(99);
-	});
 
 	it("GET /api/onboarding/status returns 500 when settingsStore missing", async () => {
 		const noStoreDeps = { ...deps, settingsStore: undefined };
@@ -915,22 +702,6 @@ describe("handleAdminRoute", () => {
 
 
 
-	it("POST /api/issues returns 500 when githubService missing", async () => {
-		const noGhDeps = { ...deps, githubService: undefined };
-		const req = mockRequest({
-			url: "/api/issues",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ owner: "mbrooks", repo: "tars", title: "New Issue" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noGhDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("GitHub service not configured");
-	});
 
 	it("GET /api/settings returns 500 when settingsStore missing", async () => {
 		const noStoreDeps = { ...deps, settingsStore: undefined };
@@ -1155,25 +926,6 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(200);
 	});
 
-	it("POST /api/issues/chat filters out invalid messages", async () => {
-		const req = mockRequest({
-			url: "/api/issues/chat",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({
-				messages: [
-					{ role: "user", text: "Hello" },
-					{ role: "assistant" },
-					{ role: "bot", text: "Hi" },
-				],
-			}),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-	});
 
 	it("PATCH /api/settings rejects invalid JSON", async () => {
 		const req = mockRequest({
