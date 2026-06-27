@@ -22,10 +22,17 @@ export type Route =
 	| { screen: "repos" }
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "skills" | "issues" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
+	| { screen: "new-issue"; owner?: string; repo?: string }
 	| { screen: "settings"; tab?: "skills" | "invitations" | SettingsCategoryTab };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
+	if (path[0] === "new-issue") {
+		if (path.length >= 3) {
+			return { screen: "new-issue", owner: decodeURIComponent(path[1]), repo: decodeURIComponent(path[2]) };
+		}
+		return { screen: "new-issue" };
+	}
 	if (path[0] === "settings") {
 		const slug = path[1];
 		if (slug === "skills" || slug === "invitations") {
@@ -85,6 +92,12 @@ export function buildHash(route: Route): string {
 	}
 	if (route.screen === "dashboard") return "#/dashboard";
 	if (route.screen === "repos") return "#/repos";
+	if (route.screen === "new-issue") {
+		if (route.owner && route.repo) {
+			return `#/new-issue/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
+		}
+		return "#/new-issue";
+	}
 	if (route.screen === "repo") {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
 		const tab = route.tab === "skills" ? "/skills" : route.tab === "issues" ? "/issues" : "";

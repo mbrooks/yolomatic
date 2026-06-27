@@ -28,7 +28,7 @@ export function App(): React.ReactElement {
 	}, []);
 
 	const selectedSession = useMemo(() => {
-		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "settings") return null;
+		if (route.screen === "dashboard" || route.screen === "repos" || route.screen === "settings" || route.screen === "new-issue") return null;
 		if (route.issueNumber === undefined) return null;
 		return (
 			sessions.find(
