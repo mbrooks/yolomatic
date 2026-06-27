@@ -1,4 +1,3 @@
-import type { CronStore } from "../../cron/store.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
@@ -37,14 +36,9 @@ export interface AdminStatusSessionView {
 		issueState: string | null;
 		prState: string | null;
 	} | null;
-	sessionType: "github_issue" | "cron";
 	taskStartedAt: string | null;
 	taskFinishedAt: string | null;
 	totalExecutionTimeMs: number | null;
-	cronJobId?: string;
-	cronJobName?: string;
-	cronScheduleExpression?: string;
-	cronTriggerTime?: string;
 }
 
 export interface AdminStatusView {
@@ -99,7 +93,6 @@ export class GetAdminStatus {
 		private readonly stale: StaleSessionService,
 		private readonly clock: Clock,
 		private readonly taskControl: TaskControlService,
-		private readonly cronStore?: CronStore,
 		private readonly settingsStore?: SettingsStore,
 	) {}
 
@@ -119,39 +112,6 @@ export class GetAdminStatus {
 
 		let repos = buildRepoSummaries(sorted);
 
-		if (this.cronStore) {
-			try {
-				const crons = await this.cronStore.getAll();
-				const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`, r]));
-				for (const cron of crons) {
-					const key = `${cron.owner}/${cron.repo}`;
-					const existing = repoMap.get(key);
-					if (existing) {
-						existing.cronCount++;
-						const cronActivity = cron.lastRunAt ?? cron.createdAt;
-						if (cronActivity > (existing.lastActivity ?? "")) {
-							existing.lastActivity = cronActivity;
-						}
-					} else {
-						repoMap.set(key, {
-							owner: cron.owner,
-							repo: cron.repo,
-							sessionCount: 0,
-							activeCount: 0,
-							cronCount: 1,
-							lastActivity: cron.lastRunAt ?? cron.createdAt,
-						});
-					}
-				}
-				repos = Array.from(repoMap.values()).sort((a, b) => {
-					if (a.owner !== b.owner) return a.owner.localeCompare(b.owner);
-					return a.repo.localeCompare(b.repo);
-				});
-			} catch {
-				// ignore cron store errors
-			}
-		}
-
 		if (this.settingsStore) {
 			const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`.toLowerCase(), r]));
 			for (const configured of parseConfiguredRepositories(this.settingsStore.get("configured_repositories"))) {
@@ -164,7 +124,6 @@ export class GetAdminStatus {
 					repo: configured.repo,
 					sessionCount: 0,
 					activeCount: 0,
-					cronCount: 0,
 					lastActivity: null,
 				});
 			}
@@ -205,14 +164,9 @@ export class GetAdminStatus {
 								prState: stale.prState ?? null,
 							}
 						: null,
-					sessionType: s.sessionType ?? "github_issue",
 					taskStartedAt: s.taskStartedAt ?? null,
 					taskFinishedAt: s.taskFinishedAt ?? null,
 					totalExecutionTimeMs: s.totalExecutionTimeMs ?? null,
-					cronJobId: s.cronJobId,
-					cronJobName: s.cronJobName,
-					cronScheduleExpression: s.cronScheduleExpression,
-					cronTriggerTime: s.cronTriggerTime,
 				};
 			}),
 		};

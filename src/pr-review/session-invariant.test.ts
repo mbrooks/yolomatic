@@ -39,7 +39,7 @@ describe("PR session invariants", () => {
 	});
 
 	it("accepts non-issue branches when the PR is already associated with the session", () => {
-		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "tars/cron-job-123")).toBeNull();
+		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "tars/custom-branch-123")).toBeNull();
 	});
 
 	it("rejects a head branch for a different issue", () => {

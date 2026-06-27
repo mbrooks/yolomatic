@@ -52,16 +52,6 @@ export class StaleSessionDetector implements StaleSessionService {
 		const lastActivity = new Date(session.lastActivity).getTime();
 		const ageMs = now - lastActivity;
 
-		if (session.sessionType === "cron") {
-			return {
-				session,
-				isStale: false,
-				ageMs,
-				classification: "unknown",
-				worktreeDirty: null,
-			};
-		}
-
 		if (session.status !== "working") {
 			return {
 				session,

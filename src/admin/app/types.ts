@@ -30,8 +30,6 @@ export type SessionLogResponse = {
 	logs: LogEntry[];
 };
 
-export type SessionType = "github_issue" | "cron";
-
 export type SkillSource = "server" | "repo" | "inherited";
 
 export type ServerSkill = {
@@ -70,14 +68,9 @@ export type Session = {
 	staleDetectedAt: string | null;
 	staleReason: string | null;
 	stale: StaleInfo | null;
-	sessionType: SessionType;
 	taskStartedAt: string | null;
 	taskFinishedAt: string | null;
 	totalExecutionTimeMs: number | null;
-	cronJobId?: string;
-	cronJobName?: string;
-	cronScheduleExpression?: string;
-	cronTriggerTime?: string;
 };
 
 export type RepoSummary = {
@@ -85,7 +78,6 @@ export type RepoSummary = {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
-	cronCount: number;
 	lastActivity: string | null;
 };
 
@@ -95,39 +87,4 @@ export type StatusResponse = {
 	draining: boolean;
 	repos: RepoSummary[];
 	sessions: Session[];
-};
-
-export type CronScheduleType = "daily" | "weekly" | "interval" | "custom";
-
-export type CronJob = {
-	id: string;
-	owner: string;
-	repo: string;
-	name: string;
-	description: string;
-	prompt: string;
-	scheduleType: CronScheduleType;
-	scheduleValue: string;
-	branch: string;
-	notificationChannel: string | null;
-	enabled: boolean;
-	nextRunAt: string;
-	lastRunAt: string | null;
-	lastRunStatus: "success" | "failure" | null;
-	lastError: string | null;
-	createdAt: string;
-	prUrl: string | null;
-	prNumber: number | null;
-};
-
-export type CronRun = {
-	id: string;
-	cronId: string;
-	owner: string;
-	repo: string;
-	startedAt: string;
-	finishedAt: string;
-	status: "success" | "failure";
-	output: string;
-	error: string | null;
 };

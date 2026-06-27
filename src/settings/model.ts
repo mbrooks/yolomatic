@@ -156,7 +156,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 	{
 		key: "memory_dir",
 		type: "string",
-		description: "Directory for SQLite databases (cron, settings)",
+		description: "Directory for SQLite databases (settings)",
 		default: "./memory",
 		requiresRestart: true,
 		sensitive: false,

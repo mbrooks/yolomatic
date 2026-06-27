@@ -57,27 +57,19 @@ describe("detectSessionRisk", () => {
 		expect(risk.reasons).toContain("Session title looks like a generated PR title.");
 	});
 
-	it("flags wrong workspace path", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 42, workspacePath: "/tmp/wrong-path" });
+	it("flags body referencing a different issue", () => {
+		const session = makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 42, body: "Fixes #99" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(true);
-		expect(risk.reasons).toContain("Workspace path does not end with issue-42.");
+		expect(risk.reasons).toContain("Session body references issue #99.");
+		expect(risk.referencedIssueNumber).toBe(99);
 	});
 
-	it("returns no risk for cron sessions regardless of workspace path", () => {
-		const session = makeSession({
-			owner: "mbrooks",
-			repo: "tars",
-			issueNumber: -42,
-			title: "TARS: Fix bug",
-			body: "Fixes #99",
-			workspacePath: "/tmp/cron-worktree",
-			sessionType: "cron",
-		});
+	it("allows body referencing the same issue", () => {
+		const session = makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 42, body: "Fixes #42" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(false);
-		expect(risk.reasons).toHaveLength(0);
-		expect(risk.referencedIssueNumber).toBeNull();
+		expect(risk.referencedIssueNumber).toBe(42);
 	});
 });
 
@@ -90,22 +82,18 @@ describe("buildRepoSummaries", () => {
 		];
 		const summaries = buildRepoSummaries(sessions);
 		expect(summaries).toHaveLength(2);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
-		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: expect.any(String) });
+		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, lastActivity: expect.any(String) });
+	});
+
+	it("counts first terminal session as inactive", () => {
+		const sessions = [makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "complete" })];
+		const summaries = buildRepoSummaries(sessions);
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 0, lastActivity: expect.any(String) });
 	});
 
 	it("returns empty array for no sessions", () => {
 		expect(buildRepoSummaries([])).toEqual([]);
-	});
-
-	it("includes cron sessions in repo counts", () => {
-		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
-			makeSession({ owner: "mbrooks", repo: "tars", issueNumber: -1, status: "complete", sessionType: "cron" }),
-		];
-		const summaries = buildRepoSummaries(sessions);
-		expect(summaries).toHaveLength(1);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, cronCount: 0, lastActivity: expect.any(String) });
 	});
 });
 

@@ -19,7 +19,6 @@ function makeRepo(overrides: Partial<RepoSummary> = {}): RepoSummary {
 		repo: "tars",
 		sessionCount: 1,
 		activeCount: 0,
-		cronCount: 0,
 		lastActivity: "2026-01-01T00:00:00Z",
 		...overrides,
 	};

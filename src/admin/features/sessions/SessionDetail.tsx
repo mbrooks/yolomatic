@@ -13,7 +13,7 @@ export function SessionDetail({
 }: {
 	selected: Session | null;
 	onMutate: () => void;
-	activeTab?: "sessions" | "crons" | "skills" | "issues";
+	activeTab?: "sessions" | "skills" | "issues";
 }): React.ReactElement {
 	const [paused, setPaused] = useState(false);
 	const logState = useSessionLog(selected, paused);
@@ -26,13 +26,10 @@ export function SessionDetail({
 		);
 	}
 
-	const isCron = selected.sessionType === "cron";
-
 	return (
 		<div className="detail-pane">
 			<div className="detail-title">
 				{selected.owner}/{selected.repo}#{selected.issueNumber}
-				{isCron && selected.cronJobName ? ` - ${selected.cronJobName}` : ""}
 			</div>
 
 			<div className="detail-section">
@@ -66,48 +63,28 @@ export function SessionDetail({
 							<dd>{formatRelative(selected.taskFinishedAt)}</dd>
 						</>
 					) : null}
-					{!isCron ? (
-						<>
-							<dt>Issue</dt>
-							<dd>
-								<a
-									href={`https://github.com/${selected.owner}/${selected.repo}/issues/${selected.issueNumber}`}
-									target="_blank"
-									rel="noreferrer"
-								>
-									#{selected.issueNumber}
+					<>
+						<dt>Issue</dt>
+						<dd>
+							<a
+								href={`https://github.com/${selected.owner}/${selected.repo}/issues/${selected.issueNumber}`}
+								target="_blank"
+								rel="noreferrer"
+							>
+								#{selected.issueNumber}
+							</a>
+						</dd>
+						<dt>Pull request</dt>
+						<dd>
+							{selected.prUrl ? (
+								<a href={selected.prUrl} target="_blank" rel="noreferrer">
+									PR #{selected.prNumber ?? "open"}
 								</a>
-							</dd>
-							<dt>Pull request</dt>
-							<dd>
-								{selected.prUrl ? (
-									<a href={selected.prUrl} target="_blank" rel="noreferrer">
-										PR #{selected.prNumber ?? "open"}
-									</a>
-								) : (
-									"None"
-								)}
-							</dd>
-						</>
-					) : null}
-					{isCron && selected.cronJobId ? (
-						<>
-							<dt>Cron job</dt>
-							<dd>{selected.cronJobName ?? selected.cronJobId}</dd>
-							{selected.cronScheduleExpression ? (
-								<>
-									<dt>Schedule</dt>
-									<dd>{selected.cronScheduleExpression}</dd>
-								</>
-							) : null}
-							{selected.cronTriggerTime ? (
-								<>
-									<dt>Trigger time</dt>
-									<dd>{formatRelative(selected.cronTriggerTime)}</dd>
-								</>
-							) : null}
-						</>
-					) : null}
+							) : (
+								"None"
+							)}
+						</dd>
+					</>
 				</dl>
 			</div>
 

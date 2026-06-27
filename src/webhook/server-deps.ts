@@ -8,7 +8,6 @@ import { GetSessionLog } from "../app/queries/get-session-log.js";
 import { RunSessionCommand } from "../app/commands/run-session-command.js";
 import { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
-import type { CronStore } from "../cron/store.js";
 import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
@@ -48,7 +47,6 @@ export function createWebhookServerDeps(
 	workspaceManager?: WorkspaceManager,
 	staleDetector?: StaleSessionDetector,
 	archiveDir?: string,
-	cronStore?: CronStore,
 	adminAssetsDir = resolve(process.cwd(), "dist/admin"),
 	githubService?: GitHubService,
 	settingsStore?: SettingsStore,
@@ -82,8 +80,7 @@ export function createWebhookServerDeps(
 	}
 
 	return {
-		cronStore,
-		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, cronStore, settingsStore),
+		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, settingsStore),
 		getSession: new GetSession(sessionRepo),
 		getSessionLog: new GetSessionLog(sessionRepo),
 		runSessionCommand: new RunSessionCommand(sessionRepo, workspaceService, taskService, systemClock, archiveDir),

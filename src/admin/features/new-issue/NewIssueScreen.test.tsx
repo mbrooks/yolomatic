@@ -14,8 +14,8 @@ function mockJsonResponse(data: unknown, status = 200): Response {
 }
 
 const mockRepos = [
-	{ owner: "mbrooks", repo: "tars", sessionCount: 5, activeCount: 2, cronCount: 0, lastActivity: "2024-01-01" },
-	{ owner: "other", repo: "repo", sessionCount: 1, activeCount: 0, cronCount: 0, lastActivity: null },
+	{ owner: "mbrooks", repo: "tars", sessionCount: 5, activeCount: 2, lastActivity: "2024-01-01" },
+	{ owner: "other", repo: "repo", sessionCount: 1, activeCount: 0, lastActivity: null },
 ];
 
 describe("NewIssueScreen", () => {

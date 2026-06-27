@@ -9,48 +9,6 @@ export interface Migration {
 export const MIGRATIONS: Migration[] = [
 	{
 		id: 1,
-		name: "create_cron_tables",
-		up(db) {
-			db.exec(`
-				CREATE TABLE IF NOT EXISTS cron_jobs (
-					id TEXT PRIMARY KEY,
-					owner TEXT NOT NULL,
-					repo TEXT NOT NULL,
-					name TEXT NOT NULL,
-					description TEXT NOT NULL,
-					prompt TEXT NOT NULL,
-					scheduleType TEXT NOT NULL,
-					scheduleValue TEXT NOT NULL,
-					branch TEXT NOT NULL,
-					notificationChannel TEXT,
-					enabled INTEGER NOT NULL DEFAULT 1,
-					nextRunAt TEXT NOT NULL,
-					lastRunAt TEXT,
-					lastRunStatus TEXT,
-					lastError TEXT,
-					createdAt TEXT NOT NULL
-				)
-			`);
-			db.exec(`
-				CREATE TABLE IF NOT EXISTS cron_runs (
-					id TEXT PRIMARY KEY,
-					cronId TEXT NOT NULL,
-					owner TEXT NOT NULL,
-					repo TEXT NOT NULL,
-					startedAt TEXT NOT NULL,
-					finishedAt TEXT NOT NULL,
-					status TEXT NOT NULL,
-					output TEXT NOT NULL,
-					error TEXT
-				)
-			`);
-			db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_owner_repo ON cron_jobs(owner, repo)`);
-			db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_jobs_next_run ON cron_jobs(nextRunAt)`);
-			db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_runs_cronId ON cron_runs(cronId)`);
-		},
-	},
-	{
-		id: 2,
 		name: "create_settings_table",
 		up(db) {
 			db.exec(`
@@ -63,15 +21,7 @@ export const MIGRATIONS: Migration[] = [
 		},
 	},
 	{
-		id: 3,
-		name: "add_cron_pr_columns",
-		up(db) {
-			db.exec(`ALTER TABLE cron_jobs ADD COLUMN prUrl TEXT`);
-			db.exec(`ALTER TABLE cron_jobs ADD COLUMN prNumber INTEGER`);
-		},
-	},
-	{
-		id: 4,
+		id: 2,
 		name: "create_skills_table",
 		up(db) {
 			db.exec(`
@@ -88,7 +38,7 @@ export const MIGRATIONS: Migration[] = [
 		},
 	},
 	{
-		id: 5,
+		id: 3,
 		name: "create_github_event_tables",
 		up(db) {
 			db.exec(`
@@ -113,7 +63,7 @@ export const MIGRATIONS: Migration[] = [
 		},
 	},
 	{
-		id: 6,
+		id: 4,
 		name: "create_github_poll_subjects",
 		up(db) {
 			db.exec(`
