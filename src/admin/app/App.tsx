@@ -39,7 +39,7 @@ export function App(): React.ReactElement {
 	}, [sessions, route]);
 
 	const handleSelectRepo = useCallback((owner: string, repo: string) => {
-		navigate({ screen: "repo", owner, repo });
+		navigate({ screen: "repo", owner, repo, tab: "sessions" });
 	}, []);
 
 	const handleSelectWorking = useCallback(() => {
@@ -250,7 +250,7 @@ function AppContent({
 				<RepoSkillsScreen
 					owner={route.owner}
 					repo={route.repo}
-					activeTab={route.tab ?? "issues"}
+					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
 					onBack={onBack}
 				/>
@@ -266,7 +266,7 @@ function AppContent({
 					breadcrumbLabel={`${route.owner}/${route.repo}`}
 					onBack={onBack}
 					emptyMessage="No sessions for this repository."
-					activeTab={route.tab ?? "issues"}
+					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
 				/>
 			);

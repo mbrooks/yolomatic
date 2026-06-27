@@ -48,7 +48,7 @@ describe("parseHash", () => {
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: undefined,
-			tab: "issues",
+			tab: "sessions",
 		});
 	});
 
@@ -68,7 +68,7 @@ describe("parseHash", () => {
 			owner: "mbrooks",
 			repo: "tars",
 			issueNumber: 140,
-			tab: "issues",
+			tab: "sessions",
 		});
 	});
 
@@ -94,6 +94,14 @@ describe("parseHash", () => {
 
 	it("parses working view", () => {
 		expect(parseHash("#/working")).toEqual({ screen: "working" });
+	});
+
+	it("parses new-issue view", () => {
+		expect(parseHash("#/new-issue")).toEqual({ screen: "new-issue" });
+	});
+
+	it("parses new-issue view with owner and repo", () => {
+		expect(parseHash("#/new-issue/mbrooks/tars")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "tars" });
 	});
 
 	it("defaults to dashboard for unknown", () => {
@@ -140,34 +148,48 @@ describe("buildHash", () => {
 		expect(buildHash({ screen: "repos" })).toBe("#/repos");
 	});
 
-	it("builds repo detail", () => {
+	it("builds new-issue view", () => {
+		expect(buildHash({ screen: "new-issue" })).toBe("#/new-issue");
+	});
+
+	it("builds repo detail (sessions default)", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
 		).toBe("#/repos/mbrooks/tars");
 	});
 
-	it("builds repo detail with sessions tab", () => {
+	it("builds repo detail with issues tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars/sessions");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
+		).toBe("#/repos/mbrooks/tars/issues");
 	});
 
-	it("builds repo detail with issue number", () => {
+	it("builds repo detail with explicit sessions tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "issues" }),
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
+		).toBe("#/repos/mbrooks/tars");
+	});
+
+	it("builds repo detail with issue number (sessions default)", () => {
+		expect(
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
 		).toBe("#/repos/mbrooks/tars/140");
 	});
 
-	it("builds repo detail with sessions tab and issue number", () => {
+	it("builds repo detail with issues tab and issue number", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars/sessions/140");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "issues" }),
+		).toBe("#/repos/mbrooks/tars/issues/140");
 	});
 
 	it("builds repo detail with skills tab and issue number", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "skills" }),
 		).toBe("#/repos/mbrooks/tars/skills/140");
+	});
+
+	it("builds new-issue view with owner and repo", () => {
+		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
 	});
 
 	it("round-trips issues tab", () => {

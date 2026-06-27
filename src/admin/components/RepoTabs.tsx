@@ -10,18 +10,18 @@ export function RepoTabs({
 	return (
 		<div className="repo-tabs">
 			<button
-				className={`repo-tab${activeTab === "issues" ? " active" : ""}`}
-				onClick={() => onSelectTab("issues")}
-				type="button"
-			>
-				Issues
-			</button>
-			<button
 				className={`repo-tab${activeTab === "sessions" ? " active" : ""}`}
 				onClick={() => onSelectTab("sessions")}
 				type="button"
 			>
 				Sessions
+			</button>
+			<button
+				className={`repo-tab${activeTab === "issues" ? " active" : ""}`}
+				onClick={() => onSelectTab("issues")}
+				type="button"
+			>
+				Issues
 			</button>
 			<button
 				className={`repo-tab${activeTab === "skills" ? " active" : ""}`}
