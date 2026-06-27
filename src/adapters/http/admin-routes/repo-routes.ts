@@ -148,21 +148,19 @@ const registry = new AdminRouteRegistry()
 				throw new ValidationError("Missing required field: title");
 			}
 			await ctx.deps.githubService.updateIssueAssignees(owner, repo, issueNumber, [tarsUsername]);
-			ctx.deps.startIssueSession.execute(
+			const result = await ctx.deps.startIssueSession.execute(
 				owner,
 				repo,
 				issueNumber,
 				body.title,
 				body.body ?? "",
 				body.labels ?? [],
-			).catch((error: unknown) => {
-				const message = error instanceof Error ? error.message : String(error);
-				process.stdout.write(`[webhook] background session error: ${message}\n`);
-			});
-			return {
-				status: 202,
-				body: { started: true, status: "queued", message: "Session started in background" },
-			};
+			);
+			if (!result.success) {
+				sendJson(ctx.response, mapResultToStatus(result.code), { error: result.message });
+				return;
+			}
+			return { status: 200, body: result.data };
 		},
 	})
 	.route<{

@@ -288,7 +288,7 @@ describe("handleRepoRoutes", () => {
 			expect(body.error).toBe("Missing required field: title");
 		});
 
-		it("assigns issue, starts session in background, and returns 202", async () => {
+		it("assigns issue, starts session, and returns result", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
 				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
@@ -298,15 +298,15 @@ describe("handleRepoRoutes", () => {
 			);
 
 			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(202);
+			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.started).toBe(true);
-			expect(body.status).toBe("queued");
+			expect(body.status).toBe("working");
 			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
 			expect(startIssueSession.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 		});
 
-		it("returns 202 even when background session reports a conflict", async () => {
+		it("returns 409 when session is already executing", async () => {
 			const res = response();
 			const conflictSession = {
 				execute: vi.fn(async () => ({
@@ -323,9 +323,9 @@ describe("handleRepoRoutes", () => {
 			);
 
 			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(202);
+			expect(res.statusCode).toBe(409);
 			const body = JSON.parse(String(res.body));
-			expect(body.status).toBe("queued");
+			expect(body.error).toBe("Session is already being executed");
 		});
 
 		it("handles service errors from assignment", async () => {
@@ -345,7 +345,7 @@ describe("handleRepoRoutes", () => {
 			expect(body.error).toBe("API error");
 		});
 
-		it("returns 202 even when background session throws", async () => {
+		it("handles service errors from startIssueSession", async () => {
 			const res = response();
 			githubService.updateIssueAssignees.mockResolvedValue(undefined);
 			const failingSession = {
@@ -361,9 +361,9 @@ describe("handleRepoRoutes", () => {
 			);
 
 			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(202);
+			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
-			expect(body.status).toBe("queued");
+			expect(body.error).toBe("Execution failed");
 		});
 	});
 
