@@ -3,7 +3,6 @@ import { unlinkSync } from "node:fs";
 import http from "node:http";
 import { handleAdminRoute } from "./admin-router.js";
 import { SettingsStore } from "../../settings/store.js";
-import type { CronJob } from "../../cron/store.js";
 
 const TEST_DB = "/tmp/tars-admin-router-test.sqlite";
 
@@ -67,14 +66,6 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 describe("handleAdminRoute", () => {
 	let store: SettingsStore;
 	let deps: Parameters<typeof handleAdminRoute>[2];
-	let cronStore: {
-		listForRepo: ReturnType<typeof vi.fn>;
-		createJob: ReturnType<typeof vi.fn>;
-		get: ReturnType<typeof vi.fn>;
-		set: ReturnType<typeof vi.fn>;
-		delete: ReturnType<typeof vi.fn>;
-		getRuns: ReturnType<typeof vi.fn>;
-	};
 	let githubService: {
 		listLabels: ReturnType<typeof vi.fn>;
 		getIssueTemplates: ReturnType<typeof vi.fn>;
@@ -96,33 +87,6 @@ describe("handleAdminRoute", () => {
 			// ignore
 		}
 		store = new SettingsStore(TEST_DB);
-		cronStore = {
-			listForRepo: vi.fn(async () => []),
-			createJob: vi.fn(async (_o: string, _r: string, name: string) => ({
-				id: "cron-1",
-				owner: "mbrooks",
-				repo: "tars",
-				name,
-				description: "",
-				prompt: "test",
-				scheduleType: "daily" as const,
-				scheduleValue: "09:00",
-				branch: "main",
-				notificationChannel: null,
-				enabled: true,
-				nextRunAt: "2025-01-01T09:00:00Z",
-				lastRunAt: null,
-				lastRunStatus: null,
-				lastError: null,
-				createdAt: "2025-01-01T00:00:00Z",
-				prUrl: null,
-				prNumber: null,
-			})),
-			get: vi.fn(async () => null),
-			set: vi.fn(async (job: CronJob) => job),
-			delete: vi.fn(async () => undefined),
-			getRuns: vi.fn(async () => []),
-		};
 		githubService = {
 			listLabels: vi.fn(async () => []),
 			getIssueTemplates: vi.fn(async () => []),
@@ -187,7 +151,6 @@ describe("handleAdminRoute", () => {
 				saveRepoSkill: vi.fn(async () => ({ success: true })),
 				deleteRepoSkill: vi.fn(async () => ({ success: true })),
 			} as never,
-			cronStore: cronStore as never,
 			githubService: githubService as never,
 			startIssueSession: {
 				execute: vi.fn(async () => ({
@@ -442,180 +405,12 @@ describe("handleAdminRoute", () => {
 		expect(body.acknowledged).toBe(true);
 	});
 
-	it("GET /api/crons/:owner/:repo lists jobs", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.crons).toEqual([]);
-	});
 
-	it("POST /api/crons/:owner/:repo creates a job", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({
-				name: "Daily cleanup",
-				prompt: "Clean up old sessions",
-				scheduleType: "daily",
-				scheduleValue: "09:00",
-			}),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(201);
-		const body = JSON.parse(String(res.body));
-		expect(body.name).toBe("Daily cleanup");
-	});
 
-	it("GET /api/crons/:owner/:repo/:id returns a job", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
 
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.id).toBe("cron-1");
-	});
-
-	it("PATCH /api/crons/:owner/:repo/:id updates a job", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Old",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
-
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "New" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.name).toBe("New");
-	});
-
-	it("DELETE /api/crons/:owner/:repo/:id removes a job", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "DELETE",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.deleted).toBe(true);
-	});
-
-	it("GET /api/crons/:owner/:repo/:id/runs returns runs", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1/runs",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.runs).toEqual([]);
-	});
-
-	it("POST /api/crons/:owner/:repo/:id/run queues a job", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
-
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1/run",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.queued).toBe(true);
-	});
 
 	it("GET /api/repos/:owner/:repo/context returns context", async () => {
 		const req = mockRequest({
@@ -864,61 +659,9 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(404);
 	});
 
-	it("GET /api/crons/:owner/:repo/:id returns 404 when not found", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/missing",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(404);
-	});
 
-	it("PATCH /api/crons/:owner/:repo/:id returns 404 when not found", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/missing",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "New" }),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(404);
-	});
-
-	it("POST /api/crons/:owner/:repo/:id/run returns 404 when not found", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/missing/run",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(404);
-	});
-
-	it("POST /api/crons/:owner/:repo rejects missing fields", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "Daily" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(400);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("Missing required field");
-	});
 
 	it("POST /api/issues/generate rejects missing fields", async () => {
 		const req = mockRequest({
@@ -1057,33 +800,7 @@ describe("handleAdminRoute", () => {
 		expect(body.error).toBe("Settings store not configured");
 	});
 
-	it("POST /api/crons/:owner/:repo rejects invalid JSON", async () => {
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: "not json",
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(400);
-	});
-
-	it("GET /api/crons/:owner/:repo handles list error", async () => {
-		cronStore.listForRepo.mockRejectedValue(new Error("DB error"));
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-	});
 
 	it("POST /api/issues/chat rejects invalid JSON", async () => {
 		const req = mockRequest({
@@ -1191,119 +908,12 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(200);
 	});
 
-	it("GET /api/crons/:owner/:repo returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
 
-	it("POST /api/crons/:owner/:repo returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "Daily", prompt: "test", scheduleType: "daily", scheduleValue: "09:00" }),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
 
-	it("GET /api/crons/:owner/:repo/:id returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
 
-	it("PATCH /api/crons/:owner/:repo/:id returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ name: "New" }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
-
-	it("DELETE /api/crons/:owner/:repo/:id returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "DELETE",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
-
-	it("GET /api/crons/:owner/:repo/:id/runs returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1/runs",
-			method: "GET",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
-
-	it("POST /api/crons/:owner/:repo/:id/run returns 500 when cronStore missing", async () => {
-		const noCronDeps = { ...deps, cronStore: undefined };
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1/run",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, noCronDeps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Cron store not configured");
-	});
 
 	it("POST /api/issues returns 500 when githubService missing", async () => {
 		const noGhDeps = { ...deps, githubService: undefined };
@@ -1452,116 +1062,8 @@ describe("handleAdminRoute", () => {
 		expect(body.error).toContain("disk error");
 	});
 
-	it("PATCH /api/crons/:owner/:repo/:id recomputes schedule when scheduleType changes", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
 
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ scheduleType: "weekly", scheduleValue: "Mon 09:00" }),
-		});
-		const res = mockResponse();
 
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.scheduleType).toBe("weekly");
-		expect(cronStore.set).toHaveBeenCalled();
-	});
-
-	it("PATCH /api/crons/:owner/:repo/:id recomputes schedule when enabled from false to true", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: false,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
-
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ enabled: true }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.enabled).toBe(true);
-		expect(cronStore.set).toHaveBeenCalled();
-	});
-
-	it("POST /api/crons/:owner/:repo/:id/run handles set error", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
-		cronStore.set.mockRejectedValue(new Error("DB error"));
-
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1/run",
-			method: "POST",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-	});
 
 	it("GET /api/status/working returns false when no working sessions", async () => {
 		deps.getAdminStatus = {
@@ -1687,42 +1189,6 @@ describe("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(400);
 	});
 
-	it("PATCH /api/crons/:owner/:repo/:id disables enabled job", async () => {
-		cronStore.get.mockResolvedValue({
-			id: "cron-1",
-			owner: "mbrooks",
-			repo: "tars",
-			name: "Test",
-			description: "",
-			prompt: "test",
-			scheduleType: "daily" as const,
-			scheduleValue: "09:00",
-			branch: "main",
-			notificationChannel: null,
-			enabled: true,
-			nextRunAt: "2025-01-01T09:00:00Z",
-			lastRunAt: null,
-			lastRunStatus: null,
-			lastError: null,
-			createdAt: "2025-01-01T00:00:00Z",
-			prUrl: null,
-			prNumber: null,
-		});
-
-		const req = mockRequest({
-			url: "/api/crons/mbrooks/tars/cron-1",
-			method: "PATCH",
-			headers: { authorization: makeBasicAuth("admin", "secret") },
-			body: JSON.stringify({ enabled: false }),
-		});
-		const res = mockResponse();
-
-		const handled = await handleAdminRoute(req, res, deps);
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.enabled).toBe(false);
-	});
 
 	it("GET /api/settings handles getAllViews throwing", async () => {
 		const brokenStore = new SettingsStore(TEST_DB);

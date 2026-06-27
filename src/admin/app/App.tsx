@@ -5,7 +5,6 @@ import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
-import { CronScreen } from "../features/crons/CronScreen.js";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { NewIssueScreen } from "../features/new-issue/NewIssueScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
@@ -81,7 +80,7 @@ export function App(): React.ReactElement {
 	);
 
 	const handleSelectTab = useCallback(
-		(tab: "sessions" | "crons" | "skills" | "issues") => {
+		(tab: "sessions" | "skills" | "issues") => {
 			if (route.screen === "repo") {
 				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
 			}
@@ -213,7 +212,7 @@ function AppContent({
 	onMutate: () => void;
 	onBack: () => void;
 	onSelectRepos: () => void;
-	onSelectTab: (tab: "sessions" | "crons" | "skills" | "issues") => void;
+	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
 	onNewIssueForRepo: () => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
@@ -259,18 +258,6 @@ function AppContent({
 	}
 
 	if (route.screen === "repo") {
-		if (route.tab === "crons") {
-			return (
-				<CronScreen
-					owner={route.owner}
-					repo={route.repo}
-					activeTab={route.tab ?? "issues"}
-					onSelectTab={onSelectTab}
-					onBack={onBack}
-					onNewIssue={onNewIssueForRepo}
-				/>
-			);
-		}
 		if (route.tab === "skills") {
 			return (
 				<RepoSkillsScreen

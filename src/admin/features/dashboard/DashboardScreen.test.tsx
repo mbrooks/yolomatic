@@ -127,15 +127,6 @@ describe("DashboardScreen", () => {
 		expect(onSelectSession).not.toHaveBeenCalled();
 	});
 
-	it("shows dash for cron session issue number", () => {
-		const sessions = [makeSession({ sessionType: "cron", issueNumber: null as unknown as number })];
-		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
-
-		const recentActivity = document.querySelector(".activity-list");
-		expect(recentActivity).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("–")).not.toBeNull();
-	});
-
 	it("limits recent sessions to 10", () => {
 		const sessions = Array.from({ length: 15 }, (_, i) =>
 			makeSession({

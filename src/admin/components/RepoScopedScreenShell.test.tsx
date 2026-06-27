@@ -29,11 +29,9 @@ describe("RepoScopedScreenShell", () => {
 
 		expect(screen.getByText("mbrooks/tars")).toBeTruthy();
 		expect(screen.getByText("Repo content")).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "Crons" }));
 		fireEvent.click(screen.getByRole("button", { name: "+ New Issue" }));
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
 
-		expect(props.onSelectTab).toHaveBeenCalledWith("crons");
 		expect(props.onNewIssue).toHaveBeenCalled();
 		expect(props.onBack).toHaveBeenCalled();
 	});

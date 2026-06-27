@@ -37,9 +37,6 @@ vi.mock("./settings/store.js", () => ({
 	})),
 }));
 
-vi.mock("./cron/store.js", () => ({
-	CronStore: vi.fn(() => ({})),
-}));
 
 vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
@@ -77,9 +74,6 @@ vi.mock("./executor/index.js", () => ({
 	})),
 }));
 
-vi.mock("./cron/scheduler.js", () => ({
-	startCronScheduler: vi.fn(),
-}));
 
 vi.mock("./github-events/polling.js", () => ({
 	startGitHubPolling: vi.fn(),
@@ -178,7 +172,6 @@ describe("main", () => {
 			}),
 			expect.any(Object),
 			expect.any(String),
-			expect.anything(),
 			undefined,
 			expect.any(Object),
 			expect.any(Object),
@@ -244,7 +237,6 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(String),
-			expect.anything(),
 			undefined,
 			expect.any(Object),
 			expect.any(Object),
@@ -299,7 +291,6 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(String),
-			expect.anything(),
 			undefined,
 			expect.any(Object),
 			expect.any(Object),

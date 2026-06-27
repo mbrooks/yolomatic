@@ -82,16 +82,6 @@ describe("parseHash", () => {
 		});
 	});
 
-	it("parses repo detail with crons tab and issue number", () => {
-		expect(parseHash("#/repos/mbrooks/tars/crons/140")).toEqual({
-			screen: "repo",
-			owner: "mbrooks",
-			repo: "tars",
-			issueNumber: 140,
-			tab: "crons",
-		});
-	});
-
 	it("parses repo detail with skills tab and issue number", () => {
 		expect(parseHash("#/repos/mbrooks/tars/skills/140")).toEqual({
 			screen: "repo",
@@ -99,16 +89,6 @@ describe("parseHash", () => {
 			repo: "tars",
 			issueNumber: 140,
 			tab: "skills",
-		});
-	});
-
-	it("parses repo detail (crons tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars/crons")).toEqual({
-			screen: "repo",
-			owner: "mbrooks",
-			repo: "tars",
-			issueNumber: undefined,
-			tab: "crons",
 		});
 	});
 
@@ -184,12 +164,6 @@ describe("buildHash", () => {
 		).toBe("#/repos/mbrooks/tars/sessions");
 	});
 
-	it("builds repo detail with crons tab", () => {
-		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "crons" }),
-		).toBe("#/repos/mbrooks/tars/crons");
-	});
-
 	it("builds repo detail with issue number", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "issues" }),
@@ -200,12 +174,6 @@ describe("buildHash", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
 		).toBe("#/repos/mbrooks/tars/sessions/140");
-	});
-
-	it("builds repo detail with crons tab and issue number", () => {
-		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "crons" }),
-		).toBe("#/repos/mbrooks/tars/crons/140");
 	});
 
 	it("builds repo detail with skills tab and issue number", () => {
@@ -249,11 +217,6 @@ describe("buildHash", () => {
 	it("round-trips sessions tab with issue number", () => {
 		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "sessions", issueNumber: 140 }));
-	});
-
-	it("round-trips crons tab with issue number", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "crons" as const });
-		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "crons", issueNumber: 140 }));
 	});
 
 	it("round-trips skills tab with issue number", () => {

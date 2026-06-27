@@ -114,7 +114,7 @@ export function DashboardScreen({
 									{session.owner}/{session.repo}
 								</div>
 								<div className="activity-issue">
-									{session.sessionType === "cron" ? "–" : `#${session.issueNumber}`}
+									#{session.issueNumber}
 								</div>
 								<div className={`activity-status ${session.status}`}>{session.status}</div>
 								<div className="activity-time">{formatRelative(session.lastActivity)}</div>

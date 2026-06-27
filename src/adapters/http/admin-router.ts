@@ -1,6 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AdminRouterDeps } from "./admin-router-shared.js";
-import { handleCronRoutes } from "./admin-routes/cron-routes.js";
 import { handleIssueRoutes } from "./admin-routes/issue-routes.js";
 import { handleOnboardingRoutes } from "./admin-routes/onboarding-routes.js";
 import { handleRepoRoutes } from "./admin-routes/repo-routes.js";
@@ -29,7 +28,6 @@ export async function handleAdminRoute(
 		(await handleOnboardingRoutes(request, response, deps, pathname)) ||
 		(await handleStatusRoutes(request, response, deps, pathname)) ||
 		(await handleSessionRoutes(request, response, deps, requestUrl, pathname)) ||
-		(await handleCronRoutes(request, response, deps, pathname)) ||
 		(await handleRepoRoutes(request, response, deps, pathname)) ||
 		(await handleIssueRoutes(request, response, deps, pathname)) ||
 		(await handleSettingsRoutes(request, response, deps, pathname)) ||

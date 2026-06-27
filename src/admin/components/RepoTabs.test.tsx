@@ -14,7 +14,6 @@ describe("RepoTabs", () => {
 			/>,
 		);
 		expect(screen.getByText("Sessions")).toBeDefined();
-		expect(screen.getByText("Crons")).toBeDefined();
 		expect(screen.getByText("Skills")).toBeDefined();
 		expect(screen.getByText("Issues")).toBeDefined();
 		expect(screen.getByText("+ New Issue")).toBeDefined();

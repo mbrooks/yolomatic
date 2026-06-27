@@ -5,7 +5,6 @@ import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
-import type { CronStore } from "../cron/store.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
@@ -38,7 +37,6 @@ export function createWebhookServer(
 	workspaceManager?: WorkspaceManager,
 	staleDetector?: StaleSessionDetector,
 	archiveDir?: string,
-	cronStore?: CronStore,
 	options: WebhookServerOptions = {},
 	githubService?: GitHubService,
 	settingsStore?: SettingsStore,
@@ -54,7 +52,6 @@ export function createWebhookServer(
 		workspaceManager,
 		staleDetector,
 		archiveDir,
-		cronStore,
 		options.adminAssetsDir,
 		githubService,
 		settingsStore,

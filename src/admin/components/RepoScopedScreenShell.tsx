@@ -3,7 +3,7 @@ import { Breadcrumb } from "./Breadcrumb.js";
 import { EmptyState } from "./EmptyState.js";
 import { RepoTabs } from "./RepoTabs.js";
 
-export type RepoScopedTab = "sessions" | "crons" | "skills" | "issues";
+export type RepoScopedTab = "sessions" | "skills" | "issues";
 
 export function RepoScopedScreenShell({
 	owner,

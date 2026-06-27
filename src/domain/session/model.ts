@@ -32,14 +32,6 @@ export function detectSessionRisk(session: SessionState): SessionRisk {
 	const reasons: string[] = [];
 	let referencedIssueNumber: number | null = null;
 
-	if (session.sessionType === "cron") {
-		return {
-			suspectedMisroute: false,
-			reasons: [],
-			referencedIssueNumber: null,
-		};
-	}
-
 	const fixesMatch = /^Fixes #(\d+)/u.exec(session.body.trim());
 	if (fixesMatch) {
 		referencedIssueNumber = Number.parseInt(fixesMatch[1], 10);
@@ -68,7 +60,6 @@ export interface RepoSummary {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
-	cronCount: number;
 	lastActivity: string | null;
 }
 
@@ -89,7 +80,6 @@ export function buildRepoSummaries(sessions: SessionState[]): RepoSummary[] {
 				repo: s.repo,
 				sessionCount: 1,
 				activeCount: isTerminalStatus(s.status) ? 0 : 1,
-				cronCount: 0,
 				lastActivity: s.lastActivity,
 			});
 		}

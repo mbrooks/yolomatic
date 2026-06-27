@@ -4,7 +4,6 @@ import type { GetSession } from "../../app/queries/get-session.js";
 import type { GetSessionLog } from "../../app/queries/get-session-log.js";
 import type { RunSessionCommand } from "../../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../../app/commands/start-issue-session.js";
-import type { CronStore } from "../../cron/store.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { SettingsStore } from "../../settings/store.js";
 import type { SkillStore } from "../../skills/store.js";
@@ -121,7 +120,6 @@ export class AdminRouteRegistry {
 }
 
 export interface AdminRouterDeps {
-	cronStore?: CronStore;
 	getAdminStatus: GetAdminStatus;
 	getSession: GetSession;
 	getSessionLog: GetSessionLog;

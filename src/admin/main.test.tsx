@@ -88,8 +88,8 @@ describe("App", () => {
 				uptime: "1m",
 				draining: false,
 				repos: [
-					{ owner: "mbrooks", repo: "tars", sessionCount: 3, activeCount: 2, cronCount: 0, lastActivity: new Date().toISOString() },
-					{ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 0, cronCount: 0, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "tars", sessionCount: 3, activeCount: 2, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [
 					{
@@ -305,7 +305,7 @@ describe("App", () => {
 				uptime: "1m",
 				draining: true,
 				repos: [
-					{ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 0, cronCount: 0, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [],
 			});

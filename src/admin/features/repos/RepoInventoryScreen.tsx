@@ -4,7 +4,7 @@ import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
 import { scanRepos } from "../../api/repos.js";
 
-type SortKey = "repo" | "activeCount" | "sessionCount" | "cronCount" | "lastActivity";
+type SortKey = "repo" | "activeCount" | "sessionCount" | "lastActivity";
 type SortDir = "asc" | "desc";
 
 function sortRepos(repos: RepoSummary[], key: SortKey, dir: SortDir): RepoSummary[] {
@@ -20,9 +20,6 @@ function sortRepos(repos: RepoSummary[], key: SortKey, dir: SortDir): RepoSummar
 				break;
 			case "sessionCount":
 				cmp = a.sessionCount - b.sessionCount || a.activeCount - b.activeCount;
-				break;
-			case "cronCount":
-				cmp = a.cronCount - b.cronCount;
 				break;
 			case "lastActivity": {
 				const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
@@ -120,9 +117,6 @@ export function RepoInventoryScreen({
 								<th className="repo-th" onClick={() => handleSort("sessionCount")}>
 									Total{sortIndicator("sessionCount")}
 								</th>
-								<th className="repo-th" onClick={() => handleSort("cronCount")}>
-									Crons{sortIndicator("cronCount")}
-								</th>
 								<th className="repo-th" onClick={() => handleSort("lastActivity")}>
 									Last Activity{sortIndicator("lastActivity")}
 								</th>
@@ -150,7 +144,6 @@ export function RepoInventoryScreen({
 									</td>
 									<td className="repo-td">{repo.activeCount}</td>
 									<td className="repo-td">{repo.sessionCount}</td>
-									<td className="repo-td">{repo.cronCount}</td>
 									<td className="repo-td">
 										{repo.lastActivity ? formatRelative(repo.lastActivity) : "–"}
 									</td>
