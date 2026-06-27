@@ -16,7 +16,6 @@ export function SessionScreen({
 	emptyMessage,
 	activeTab,
 	onSelectTab,
-	onNewIssue,
 }: {
 	sessions: Session[];
 	selected: Session | null;
@@ -27,7 +26,6 @@ export function SessionScreen({
 	emptyMessage: string;
 	activeTab?: "sessions" | "skills" | "issues";
 	onSelectTab?: (tab: "sessions" | "skills" | "issues") => void;
-	onNewIssue?: () => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -35,7 +33,6 @@ export function SessionScreen({
 				<RepoTabs
 					activeTab={activeTab ?? "sessions"}
 					onSelectTab={onSelectTab}
-					onNewIssue={onNewIssue}
 				/>
 			) : null}
 			<Breadcrumb label={breadcrumbLabel} onBack={onBack} />

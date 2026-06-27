@@ -34,7 +34,6 @@ const defaultProps = {
 	sessions: [] as Session[],
 	onSelectWorking: vi.fn(),
 	onSelectRepos: vi.fn(),
-	onNewIssue: vi.fn(),
 	onSelectSession: vi.fn(),
 };
 
@@ -161,14 +160,12 @@ describe("DashboardScreen", () => {
 	it("calls quick link handlers", () => {
 		const onSelectWorking = vi.fn();
 		const onSelectRepos = vi.fn();
-		const onNewIssue = vi.fn();
 
 		render(
 			<DashboardScreen
 				{...defaultProps}
 				onSelectWorking={onSelectWorking}
 				onSelectRepos={onSelectRepos}
-				onNewIssue={onNewIssue}
 			/>,
 		);
 
@@ -177,9 +174,6 @@ describe("DashboardScreen", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
 		expect(onSelectRepos).toHaveBeenCalledTimes(1);
-
-		fireEvent.click(screen.getByRole("button", { name: /New Issue/ }));
-		expect(onNewIssue).toHaveBeenCalledTimes(1);
 	});
 
 	it("shows draining state when draining is true", () => {
