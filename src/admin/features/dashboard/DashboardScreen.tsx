@@ -66,11 +66,11 @@ export function DashboardScreen({
 				<h2>Quick Links</h2>
 				<div className="quick-link-grid">
 					<button className="quick-link" onClick={onSelectWorking} type="button">
-						<span className="quick-link-icon">▶</span>
+						<span className="quick-link-icon">01</span>
 						<span className="quick-link-label">Active Sessions</span>
 					</button>
 					<button className="quick-link" onClick={onSelectRepos} type="button">
-						<span className="quick-link-icon">📁</span>
+						<span className="quick-link-icon">02</span>
 						<span className="quick-link-label">Repositories</span>
 					</button>
 				</div>

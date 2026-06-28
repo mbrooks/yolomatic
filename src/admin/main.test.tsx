@@ -77,6 +77,10 @@ function mockStatusResponse(data: unknown): Response {
 	});
 }
 
+function getPrimaryNavButton(name: RegExp | string): HTMLElement {
+	return within(screen.getByRole("navigation", { name: "Primary" })).getByRole("button", { name });
+}
+
 describe("App", () => {
 	let fetchSpy: any;
 
@@ -188,7 +192,7 @@ describe("App", () => {
 			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(getPrimaryNavButton(/Active Sessions/));
 
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
@@ -237,7 +241,7 @@ describe("App", () => {
 			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(getPrimaryNavButton(/Active Sessions/));
 
 		await waitFor(() => {
 			expect(screen.queryByText("No active tasks.")).not.toBeNull();
@@ -254,7 +258,8 @@ describe("App", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+			expect(screen.getByRole("button", { name: "Dashboard" })).not.toBeNull();
+			expect(screen.getAllByText("mbrooks/tars").length).toBeGreaterThan(0);
 		});
 	});
 
@@ -265,7 +270,7 @@ describe("App", () => {
 			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(getPrimaryNavButton(/Active Sessions/));
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: "Dashboard" })).not.toBeNull();
 		});
@@ -284,7 +289,7 @@ describe("App", () => {
 			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
+		fireEvent.click(getPrimaryNavButton(/Active Sessions/));
 
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: /mbrooks\/tars #1/i })).not.toBeNull();
@@ -294,6 +299,77 @@ describe("App", () => {
 
 		await waitFor(() => {
 			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();
+		});
+	});
+
+	it("shows the last 10 sessions in the sidebar with a full sessions link", async () => {
+		fetchSpy.mockImplementation(async () => {
+			return mockStatusResponse({
+				agent: "online",
+				uptime: "1m",
+				draining: false,
+				repos: [],
+				sessions: Array.from({ length: 12 }, (_, index) => ({
+					owner: "mbrooks",
+					repo: "tars",
+					issueNumber: index + 1,
+					status: "working",
+					workspacePath: `/ws/${index + 1}`,
+					branch: `tars/issue-${index + 1}`,
+					lastActivity: new Date(Date.now() - index * 1000).toISOString(),
+					createdAt: new Date(Date.now() - (index + 1) * 3600000).toISOString(),
+					prUrl: null,
+					prNumber: null,
+					risk: { suspectedMisroute: false, reasons: [], referencedIssueNumber: null },
+					staleDetectedAt: null,
+					staleReason: null,
+					stale: null,
+				})),
+			});
+		});
+
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "View all sessions" })).not.toBeNull();
+		});
+
+		const sidebarSessionButtons = screen.getAllByText(/Issue #/);
+		expect(sidebarSessionButtons).toHaveLength(10);
+		expect(screen.getByText("Issue #1")).not.toBeNull();
+		expect(screen.queryByText("Issue #11")).toBeNull();
+	});
+
+	it("shows the most active repos in the sidebar and expands to all repos", async () => {
+		fetchSpy.mockImplementation(async () => {
+			return mockStatusResponse({
+				agent: "online",
+				uptime: "1m",
+				draining: false,
+				repos: Array.from({ length: 12 }, (_, index) => ({
+					owner: "mbrooks",
+					repo: `repo-${index + 1}`,
+					sessionCount: 20 - index,
+					activeCount: 20 - index,
+					lastActivity: new Date(Date.now() - index * 1000).toISOString(),
+				})),
+				sessions: [],
+			});
+		});
+
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Show all repos" })).not.toBeNull();
+		});
+
+		expect(screen.getByText("mbrooks/repo-1")).not.toBeNull();
+		expect(screen.queryByText("mbrooks/repo-11")).toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: "Show all repos" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("mbrooks/repo-11")).not.toBeNull();
 		});
 	});
 

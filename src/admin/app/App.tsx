@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useServerState } from "../hooks/useServerState.js";
 import { useRoute, navigate, DEFAULT_SETTINGS_TAB, type Route } from "./routes.js";
-import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
 import { RepoInventoryScreen } from "../features/repos/RepoInventoryScreen.js";
 import { SessionScreen } from "../features/sessions/SessionScreen.js";
@@ -12,8 +11,11 @@ import { IssuesScreen } from "../features/issues/IssuesScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
+const SIDEBAR_PREVIEW_LIMIT = 10;
+
 export function App(): React.ReactElement {
 	const [tick, setTick] = useState(0);
+	const [showAllRepos, setShowAllRepos] = useState(false);
 	const serverState = useServerState(tick);
 	const route = useRoute();
 
@@ -44,6 +46,15 @@ export function App(): React.ReactElement {
 
 	const handleSelectWorking = useCallback(() => {
 		navigate({ screen: "working" });
+	}, []);
+
+	const handleSelectSessionPage = useCallback((session: Session) => {
+		navigate({
+			screen: "working",
+			owner: session.owner,
+			repo: session.repo,
+			issueNumber: session.issueNumber,
+		});
 	}, []);
 
 	const handleBackToDashboard = useCallback(() => {
@@ -93,6 +104,20 @@ export function App(): React.ReactElement {
 		navigate({ screen: "settings" });
 	}, []);
 
+	const recentSessions = useMemo(
+		() =>
+			[...sessions]
+				.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+				.slice(0, SIDEBAR_PREVIEW_LIMIT),
+		[sessions],
+	);
+
+	const sortedRepos = useMemo(() => [...repos].sort(compareRepoActivity), [repos]);
+	const repoPreview = useMemo(
+		() => (showAllRepos ? sortedRepos : sortedRepos.slice(0, SIDEBAR_PREVIEW_LIMIT)),
+		[showAllRepos, sortedRepos],
+	);
+
 	const lastUpdated = useMemo(() => {
 		if (serverState.status === "loading") return "Loading...";
 		if (serverState.status === "error") return `Error: ${serverState.error}`;
@@ -104,66 +129,222 @@ export function App(): React.ReactElement {
 		return sessions.filter((s) => s.owner === route.owner && s.repo === route.repo);
 	}, [sessions, route]);
 
+	const pageTitle = useMemo(() => {
+		if (route.screen === "working") return "Active Sessions";
+		if (route.screen === "repos") return "Repositories";
+		if (route.screen === "repo") return `${route.owner}/${route.repo}`;
+		if (route.screen === "settings") return "Settings";
+		return "Dashboard";
+	}, [route]);
+
 	return (
-		<div className="app">
+		<div className="app-shell">
 			{serverState.status === "ready" && serverState.data.draining && <RestartBanner />}
-			<AppHeader
-				agentStatus={agentStatus}
-				isSettingsActive={isSettingsActive}
-				onSettings={handleSelectSettings}
+			<AppSidebar
+				route={route}
+				recentSessions={recentSessions}
+				repos={repoPreview}
+				hasMoreRepos={sortedRepos.length > SIDEBAR_PREVIEW_LIMIT}
+				showAllRepos={showAllRepos}
+				onToggleRepos={() => setShowAllRepos((current) => !current)}
+				onSelectWorking={handleSelectWorking}
+				onSelectSession={handleSelectSessionPage}
+				onSelectRepo={handleSelectRepo}
+				onSelectRepos={handleSelectReposList}
+				onSelectSettings={handleSelectSettings}
+				onSelectDashboard={handleBackToDashboard}
 			/>
 
-			{serverState.status === "error" ? (
-				<div className="empty">Unable to reach API</div>
-			) : (
-				<AppContent
-					route={route}
-					repos={repos}
-					workingSessions={workingSessions}
-					repoSessions={repoSessions}
-					selectedSession={selectedSession}
-					sessions={sessions}
-					agentStatus={agentStatus}
-					uptime={serverState.status === "ready" ? serverState.data.uptime : ""}
-					draining={serverState.status === "ready" ? serverState.data.draining : false}
-					onSelectRepo={handleSelectRepo}
-					onSelectWorking={handleSelectWorking}
-					onSelectSession={handleSelectSession}
-					onMutate={handleMutate}
-					onBack={handleBackToDashboard}
-					onSelectRepos={handleSelectReposList}
-					onSelectTab={handleSelectTab}
-					onSelectSettings={handleSelectSettings}
-				/>
-			)}
+			<div className="app-frame">
+				<AppHeader pageTitle={pageTitle} agentStatus={agentStatus} lastUpdated={lastUpdated} />
 
-			<div className="last-updated">{lastUpdated}</div>
+				<div className="app-content">
+					{serverState.status === "error" ? (
+						<div className="empty">Unable to reach API</div>
+					) : (
+						<AppContent
+							route={route}
+							repos={repos}
+							workingSessions={workingSessions}
+							repoSessions={repoSessions}
+							selectedSession={selectedSession}
+							sessions={sessions}
+							agentStatus={agentStatus}
+							uptime={serverState.status === "ready" ? serverState.data.uptime : ""}
+							draining={serverState.status === "ready" ? serverState.data.draining : false}
+							onSelectRepo={handleSelectRepo}
+							onSelectWorking={handleSelectWorking}
+							onSelectSession={handleSelectSession}
+							onMutate={handleMutate}
+							onBack={handleBackToDashboard}
+							onSelectRepos={handleSelectReposList}
+							onSelectTab={handleSelectTab}
+							onSelectSettings={handleSelectSettings}
+						/>
+					)}
+				</div>
+			</div>
 		</div>
 	);
 }
 
 function AppHeader({
+	pageTitle,
 	agentStatus,
-	isSettingsActive,
-	onSettings,
+	lastUpdated,
 }: {
+	pageTitle: string;
 	agentStatus: AgentStatus;
-	isSettingsActive: boolean;
-	onSettings: () => void;
+	lastUpdated: string;
 }): React.ReactElement {
 	return (
-		<header>
-			<h1>TARS Admin</h1>
-			<div className="header-actions">
-				<button
-					className={`global-tab${isSettingsActive ? " active" : ""}`}
-					onClick={onSettings}
-					type="button"
-				>
-					Settings
-				</button>
+		<header className="app-header">
+			<div>
+				<p className="eyebrow">Windmill Admin</p>
+				<h1>{pageTitle}</h1>
+			</div>
+			<div className="header-meta">
+				<div className="header-status">
+					<span className="header-status-dot" data-status={agentStatus} />
+					<span>{agentStatus === "offline" ? "Offline" : `Agent ${agentStatus}`}</span>
+				</div>
+				<div className="last-updated">{lastUpdated}</div>
 			</div>
 		</header>
+	);
+}
+
+function AppSidebar({
+	route,
+	recentSessions,
+	repos,
+	hasMoreRepos,
+	showAllRepos,
+	onToggleRepos,
+	onSelectWorking,
+	onSelectSession,
+	onSelectRepo,
+	onSelectRepos,
+	onSelectSettings,
+	onSelectDashboard,
+}: {
+	route: Route;
+	recentSessions: Session[];
+	repos: RepoSummary[];
+	hasMoreRepos: boolean;
+	showAllRepos: boolean;
+	onToggleRepos: () => void;
+	onSelectWorking: () => void;
+	onSelectSession: (session: Session) => void;
+	onSelectRepo: (owner: string, repo: string) => void;
+	onSelectRepos: () => void;
+	onSelectSettings: () => void;
+	onSelectDashboard: () => void;
+}): React.ReactElement {
+	return (
+		<aside className="sidebar">
+			<button className="sidebar-brand" onClick={onSelectDashboard} type="button">
+				<span className="sidebar-brand-mark">T</span>
+				<span>
+					<strong>TARS</strong>
+					<small>Windmill Admin</small>
+				</span>
+			</button>
+
+			<nav className="sidebar-nav" aria-label="Primary">
+				<SidebarNavButton
+					active={route.screen === "working"}
+					label="Active Sessions"
+					onClick={onSelectWorking}
+				/>
+				<SidebarNavButton
+					active={route.screen === "repos" || route.screen === "repo"}
+					label="Repos"
+					onClick={onSelectRepos}
+				/>
+				<SidebarNavButton
+					active={route.screen === "settings"}
+					label="Settings"
+					onClick={onSelectSettings}
+				/>
+			</nav>
+
+			<section className="sidebar-section">
+				<div className="sidebar-section-header">
+					<h2>Active Sessions</h2>
+				</div>
+				<div className="sidebar-list">
+					{recentSessions.length === 0 ? (
+						<p className="sidebar-empty">No recent sessions.</p>
+					) : (
+						recentSessions.map((session) => (
+							<button
+								key={`${session.owner}/${session.repo}#${session.issueNumber}`}
+								className="sidebar-list-item"
+								onClick={() => onSelectSession(session)}
+								type="button"
+							>
+								<span className="sidebar-item-title">{session.owner}/{session.repo}</span>
+								<span className="sidebar-item-meta">Issue #{session.issueNumber}</span>
+							</button>
+						))
+					)}
+				</div>
+				<button className="sidebar-link" onClick={onSelectWorking} type="button">
+					View all sessions
+				</button>
+			</section>
+
+			<section className="sidebar-section">
+				<div className="sidebar-section-header">
+					<h2>Repos</h2>
+				</div>
+				<div className="sidebar-list">
+					{repos.length === 0 ? (
+						<p className="sidebar-empty">No repositories yet.</p>
+					) : (
+						repos.map((repo) => (
+							<button
+								key={`${repo.owner}/${repo.repo}`}
+								className="sidebar-list-item"
+								onClick={() => onSelectRepo(repo.owner, repo.repo)}
+								type="button"
+							>
+								<span className="sidebar-item-title">{repo.owner}/{repo.repo}</span>
+								<span className="sidebar-item-meta">
+									{repo.activeCount} active · {repo.sessionCount} sessions
+								</span>
+							</button>
+						))
+					)}
+				</div>
+				{hasMoreRepos ? (
+					<button className="sidebar-link" onClick={onToggleRepos} type="button">
+						{showAllRepos ? "Show top 10" : "Show all repos"}
+					</button>
+				) : null}
+			</section>
+		</aside>
+	);
+}
+
+function SidebarNavButton({
+	active,
+	label,
+	onClick,
+}: {
+	active: boolean;
+	label: string;
+	onClick: () => void;
+}): React.ReactElement {
+	return (
+		<button
+			className={`sidebar-nav-button${active ? " active" : ""}`}
+			onClick={onClick}
+			type="button"
+		>
+			{label}
+		</button>
 	);
 }
 
@@ -298,4 +479,18 @@ function AppContent({
 			onSelectSession={onSelectSession}
 		/>
 	);
+}
+
+function compareRepoActivity(a: RepoSummary, b: RepoSummary): number {
+	const activeCount = b.activeCount - a.activeCount;
+	if (activeCount !== 0) return activeCount;
+
+	const sessionCount = b.sessionCount - a.sessionCount;
+	if (sessionCount !== 0) return sessionCount;
+
+	const lastActivity = (b.lastActivity ? new Date(b.lastActivity).getTime() : 0)
+		- (a.lastActivity ? new Date(a.lastActivity).getTime() : 0);
+	if (lastActivity !== 0) return lastActivity;
+
+	return `${a.owner}/${a.repo}`.localeCompare(`${b.owner}/${b.repo}`);
 }
