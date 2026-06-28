@@ -6,43 +6,63 @@ import {
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { mapResultToStatus } from "../admin-router-shared.js";
+import {
+	findConfiguredRepository,
+	parseConfiguredRepositories,
+	stringifyConfiguredRepositories,
+	upsertConfiguredRepository,
+	type RepoGitHubEventMode,
+} from "../../../repos/configured-repositories.js";
 
-interface ConfiguredRepository {
-	owner: string;
-	repo: string;
+interface RepoSettingView {
+	key: "github_event_mode" | "default_branch";
+	value: string;
+	default: string;
+	override: string | null;
+	inherited: boolean;
+	requiresRestart: boolean;
+	description: string;
+	options?: string[];
 }
 
-function parseConfiguredRepositories(raw: string | undefined): ConfiguredRepository[] {
-	if (!raw?.trim()) {
-		return [];
-	}
-	try {
-		const parsed = JSON.parse(raw) as unknown;
-		if (!Array.isArray(parsed)) {
-			return [];
-		}
-		const repos: ConfiguredRepository[] = [];
-		const seen = new Set<string>();
-		for (const item of parsed) {
-			if (!item || typeof item !== "object") {
-				continue;
-			}
-			const owner = "owner" in item && typeof item.owner === "string" ? item.owner.trim() : "";
-			const repo = "repo" in item && typeof item.repo === "string" ? item.repo.trim() : "";
-			if (!owner || !repo) {
-				continue;
-			}
-			const key = `${owner}/${repo}`.toLowerCase();
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			repos.push({ owner, repo });
-		}
-		return repos;
-	} catch {
-		return [];
-	}
+function normalizeGlobalEventMode(raw: string): RepoGitHubEventMode {
+	const mode = raw.trim().toLowerCase();
+	return mode === "polling" || mode === "both" ? mode : "webhook";
+}
+
+function buildRepoSettingViews(
+	deps: AdminRouterDeps,
+	owner: string,
+	repo: string,
+): RepoSettingView[] {
+	const globalEventMode = normalizeGlobalEventMode(deps.settingsStore!.getString("github_event_mode", "webhook"));
+	const globalDefaultBranch = deps.settingsStore!.getString("default_branch", "main");
+	const configured = findConfiguredRepository(
+		parseConfiguredRepositories(deps.settingsStore!.get("configured_repositories")),
+		owner,
+		repo,
+	);
+	return [
+		{
+			key: "github_event_mode",
+			value: configured?.settings?.github_event_mode ?? globalEventMode,
+			default: globalEventMode,
+			override: configured?.settings?.github_event_mode ?? null,
+			inherited: !configured?.settings?.github_event_mode,
+			requiresRestart: true,
+			description: "Choose whether this repository is driven by GitHub webhooks, polling, or both.",
+			options: ["webhook", "polling", "both"],
+		},
+		{
+			key: "default_branch",
+			value: configured?.settings?.default_branch ?? globalDefaultBranch,
+			default: globalDefaultBranch,
+			override: configured?.settings?.default_branch ?? null,
+			inherited: !configured?.settings?.default_branch,
+			requiresRestart: false,
+			description: "Override the base branch used for new worktrees, empty repo initialization, and pull requests.",
+		},
+	];
 }
 
 const registry = new AdminRouteRegistry()
@@ -76,8 +96,68 @@ const registry = new AdminRouteRegistry()
 					added++;
 				}
 			}
-			ctx.deps.settingsStore.set("configured_repositories", JSON.stringify(current));
+			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
 			return { status: 200, body: { repos: discovered, added } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/settings$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const [owner, repo] = ctx.params;
+			return { status: 200, body: { settings: buildRepoSettingViews(ctx.deps, owner, repo) } };
+		},
+	})
+	.route<{
+		github_event_mode?: string;
+		default_branch?: string;
+	}>({
+		method: "PATCH",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/settings$/u,
+		parseBody: true,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const [owner, repo] = ctx.params;
+			const body = ctx.body as { github_event_mode?: string; default_branch?: string };
+			const configuredRepositories = parseConfiguredRepositories(ctx.deps.settingsStore.get("configured_repositories"));
+			const existing = findConfiguredRepository(configuredRepositories, owner, repo) ?? { owner, repo };
+			const settings = { ...(existing.settings ?? {}) };
+			const requiresRestart: string[] = [];
+
+			if ("github_event_mode" in body) {
+				const mode = body.github_event_mode?.trim().toLowerCase();
+				if (mode === "webhook" || mode === "polling" || mode === "both") {
+					settings.github_event_mode = mode;
+					requiresRestart.push("github_event_mode");
+				} else if (!mode) {
+					delete settings.github_event_mode;
+				} else {
+					throw new ValidationError("github_event_mode must be webhook, polling, or both");
+				}
+			}
+
+			if ("default_branch" in body) {
+				const branch = body.default_branch?.trim();
+				if (branch) {
+					settings.default_branch = branch;
+				} else {
+					delete settings.default_branch;
+				}
+			}
+
+			const nextRepositories = upsertConfiguredRepository(
+				configuredRepositories,
+				Object.keys(settings).length > 0 ? { owner, repo, settings } : { owner, repo },
+			);
+			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(nextRepositories));
+			return { status: 200, body: { updated: ["github_event_mode", "default_branch"], requiresRestart } };
 		},
 	})
 	.route({

@@ -17,6 +17,7 @@ import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { PiAgentExecutor } from "../executor/index.js";
+import { parseConfiguredRepositories, resolveConfiguredRepoDefaultBranch } from "../repos/configured-repositories.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -64,6 +65,13 @@ export function createWebhookServerDeps(
 		const defaultBranch = settingsStore.getString("default_branch", "main");
 		const githubUsername = settingsStore.get("github_username") ?? "";
 		const selfReportEnabled = settingsStore.getBoolean("self_report_enabled", true);
+		const resolveDefaultBranch = (owner: string, repo: string) =>
+			resolveConfiguredRepoDefaultBranch(
+				parseConfiguredRepositories(settingsStore.get("configured_repositories")),
+				owner,
+				repo,
+				defaultBranch,
+			);
 		if (githubUsername) {
 			startIssueSession = new StartIssueSession(
 				sessionRepo,
@@ -72,7 +80,7 @@ export function createWebhookServerDeps(
 				taskService,
 				executor,
 				systemClock,
-				defaultBranch,
+				resolveDefaultBranch,
 				githubUsername,
 				selfReportEnabled,
 			);

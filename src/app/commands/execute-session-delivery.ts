@@ -12,7 +12,8 @@ export class ExecuteSessionDelivery {
 			sessions: SessionRepository;
 			workspaces: WorkspaceService;
 			github: GitHubService;
-			defaultBranch: string;
+			defaultBranch?: string;
+			resolveDefaultBranch?: (owner: string, repo: string) => string;
 			reporter: ExecuteSessionReporter;
 		},
 	) {}
@@ -143,7 +144,7 @@ export class ExecuteSessionDelivery {
 		result: import("../../executor/index.js").ExecutionResult,
 		current: import("../../session/store.js").SessionState,
 	): Promise<{ url?: string; outcome: "pr-created" | "pr-existed" | "no-changes" }> {
-		const base = this.deps.defaultBranch;
+		const base = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 		const head = `tars/issue-${issueNumber}`;
 
 		const gitDiff = await this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(() => "");
