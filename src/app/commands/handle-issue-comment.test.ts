@@ -10,7 +10,19 @@ describe("HandleIssueComment", () => {
 			save: vi.fn(),
 			delete: vi.fn(),
 			archive: vi.fn(),
-			createSession: vi.fn(),
+			createSession: vi.fn(async () => ({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+				title: "Issue",
+				body: "Body",
+				status: "pending",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+				labels: [],
+			})),
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -25,7 +37,7 @@ describe("HandleIssueComment", () => {
 			markStale: vi.fn(),
 		};
 		const workspaces = {
-			createOrGetWorktree: vi.fn(),
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "tars/issue-42" })),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(),
 			commitAndPushPath: vi.fn(),
@@ -151,5 +163,54 @@ describe("HandleIssueComment", () => {
 		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
 		expect(prReview.execute).not.toHaveBeenCalled();
 		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("posts a busy message when an active session cannot be steered", async () => {
+		const { handler, github, tasks } = createHandler();
+		tasks.isActive.mockReturnValue(true);
+		tasks.steer.mockResolvedValue(false);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [{ name: "tars" }],
+				assignee: { login: "tars-bot" },
+			},
+			comment: { id: 1, body: "Please update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "TARS is busy. Comment could not be steered.");
+	});
+
+	it("queues feedback during draining mode", async () => {
+		const { handler, github, sessions, tasks } = createHandler();
+		tasks.isDraining.mockReturnValue(true);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [{ name: "tars" }],
+				assignee: { login: "tars-bot" },
+			},
+			comment: { id: 1, body: "Please update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessions.updateStatus).toHaveBeenCalled();
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			42,
+			"Deploy in progress. Feedback will be processed after restart.",
+		);
 	});
 });

@@ -5,7 +5,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { RepoTabs } from "./RepoTabs.js";
 
 describe("RepoTabs", () => {
-	it("renders tabs in Sessions, Issues, Skills order", () => {
+	it("renders tabs in Sessions, Issues, Skills, Settings order", () => {
 		render(
 			<RepoTabs
 				activeTab="sessions"
@@ -13,7 +13,7 @@ describe("RepoTabs", () => {
 			/>,
 		);
 		const buttons = screen.getAllByRole("button");
-		expect(buttons.map((b) => b.textContent)).toEqual(["Sessions", "Issues", "Skills"]);
+		expect(buttons.map((b) => b.textContent)).toEqual(["Sessions", "Issues", "Skills", "Settings"]);
 	});
 
 	it("marks the active tab", () => {
@@ -26,6 +26,7 @@ describe("RepoTabs", () => {
 		expect(screen.getByText("Sessions").classList.contains("active")).toBe(true);
 		expect(screen.getByText("Issues").classList.contains("active")).toBe(false);
 		expect(screen.getByText("Skills").classList.contains("active")).toBe(false);
+		expect(screen.getByText("Settings").classList.contains("active")).toBe(false);
 	});
 
 	it("calls onSelectTab when a tab is clicked", () => {

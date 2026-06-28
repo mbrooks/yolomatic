@@ -47,7 +47,16 @@ describe("handleRepoRoutes", () => {
 	};
 
 	const settingsStore = {
-		get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+		get: vi.fn((key: string) => {
+			if (key === "github_username") return "tars-bot";
+			if (key === "configured_repositories") return "[]";
+			return undefined;
+		}),
+		getString: vi.fn((key: string, fallback?: string) => {
+			if (key === "github_event_mode") return "webhook";
+			if (key === "default_branch") return "main";
+			return fallback ?? "";
+		}),
 		set: vi.fn(),
 	};
 
@@ -194,6 +203,116 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBe("API error");
+		});
+	});
+
+	describe("repo settings routes", () => {
+		it("returns effective repo settings", async () => {
+			const res = response();
+			(settingsStore.get as ReturnType<typeof vi.fn>).mockImplementation((key: string): string | undefined => {
+				if (key === "github_username") return "tars-bot";
+				if (key === "configured_repositories") {
+					return JSON.stringify([
+						{
+							owner: "mbrooks",
+							repo: "tars",
+							settings: { github_event_mode: "polling", default_branch: "master" },
+						},
+					]);
+				}
+				return undefined;
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/settings", "GET"),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.settings).toEqual([
+				expect.objectContaining({ key: "github_event_mode", value: "polling", override: "polling" }),
+				expect.objectContaining({ key: "default_branch", value: "master", override: "master" }),
+			]);
+		});
+
+		it("updates repo settings overrides", async () => {
+			const res = response();
+			(settingsStore.get as ReturnType<typeof vi.fn>).mockImplementation((key: string): string | undefined => {
+				if (key === "github_username") return "tars-bot";
+				if (key === "configured_repositories") return JSON.stringify([{ owner: "mbrooks", repo: "tars" }]);
+				return undefined;
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "polling", default_branch: "master" })),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(settingsStore.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([
+					{
+						owner: "mbrooks",
+						repo: "tars",
+						settings: { github_event_mode: "polling", default_branch: "master" },
+					},
+				]),
+			);
+		});
+
+		it("rejects invalid github_event_mode overrides", async () => {
+			const res = response();
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "bad-mode" })),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("github_event_mode must be webhook, polling, or both");
+		});
+
+		it("clears repo-specific overrides when blank values are submitted", async () => {
+			const res = response();
+			(settingsStore.get as ReturnType<typeof vi.fn>).mockImplementation((key: string): string | undefined => {
+				if (key === "github_username") return "tars-bot";
+				if (key === "configured_repositories") {
+					return JSON.stringify([
+						{
+							owner: "mbrooks",
+							repo: "tars",
+							settings: { github_event_mode: "polling", default_branch: "master" },
+						},
+					]);
+				}
+				return undefined;
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "", default_branch: "" })),
+				res,
+				makeDeps(),
+				"/api/repos/mbrooks/tars/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(settingsStore.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([{ owner: "mbrooks", repo: "tars" }]),
+			);
 		});
 	});
 

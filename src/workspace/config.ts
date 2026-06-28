@@ -6,6 +6,7 @@ export interface WorkspaceConfig {
 	githubUsername: string;
 	githubToken: string;
 	defaultBranch: string;
+	resolveDefaultBranch?: (owner: string, repo: string) => string;
 	maxWorktrees?: number;
 	evictionStrategy?: "fifo" | "lru";
 }

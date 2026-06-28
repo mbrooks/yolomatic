@@ -9,6 +9,11 @@ import {
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
+import {
+	parseConfiguredRepositories,
+	stringifyConfiguredRepositories,
+	upsertConfiguredRepository,
+} from "../../../repos/configured-repositories.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
@@ -23,22 +28,16 @@ function storeConfiguredRepositories(
 	deps: AdminRouterDeps,
 	repos: Array<{ owner: string; repo: string }>,
 ): void {
-	const configured = repos
-		.map((repo) => ({
-			owner: repo.owner.trim(),
-			repo: repo.repo.trim(),
-		}))
-		.filter((repo) => repo.owner && repo.repo);
-	const seen = new Set<string>();
-	const unique = configured.filter((repo) => {
-		const key = `${repo.owner}/${repo.repo}`.toLowerCase();
-		if (seen.has(key)) {
-			return false;
+	let configured = parseConfiguredRepositories(deps.settingsStore!.get("configured_repositories"));
+	for (const repo of repos) {
+		const owner = repo.owner.trim();
+		const name = repo.repo.trim();
+		if (!owner || !name) {
+			continue;
 		}
-		seen.add(key);
-		return true;
-	});
-	deps.settingsStore!.set("configured_repositories", JSON.stringify(unique));
+		configured = upsertConfiguredRepository(configured, { owner, repo: name });
+	}
+	deps.settingsStore!.set("configured_repositories", stringifyConfiguredRepositories(configured));
 }
 
 function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
