@@ -720,6 +720,49 @@ describe("GitHubServiceAdapter", () => {
 			}));
 		});
 
+		it("filters out closed issues when listing issues updated since", async () => {
+			const issues = [
+				{
+					number: 1,
+					title: "Open issue",
+					body: "Body",
+					state: "open",
+					created_at: "2026-06-01T00:00:00Z",
+					updated_at: "2026-06-01T00:01:00Z",
+					labels: [],
+					assignee: { login: "tars-bot" },
+					assignees: [{ login: "tars-bot" }],
+					user: { login: "human" },
+				},
+				{
+					number: 2,
+					title: "Closed issue",
+					body: "Body",
+					state: "closed",
+					created_at: "2026-06-01T00:00:00Z",
+					updated_at: "2026-06-01T00:02:00Z",
+					labels: [],
+					assignee: { login: "tars-bot" },
+					assignees: [{ login: "tars-bot" }],
+					user: { login: "human" },
+				},
+			];
+			const octokit = createMockOctokit({
+				issues: {
+					listForRepo: vi.fn(async ({ state }: { state?: string }) => ({
+						data: state === "open" ? issues.filter((i) => i.state === "open") : issues,
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listIssuesUpdatedSince("mbrooks", "tars", "2026-06-01T00:00:00Z");
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual(expect.objectContaining({ number: 1, state: "open" }));
+			expect(octokit.issues.listForRepo).toHaveBeenCalledWith(
+				expect.objectContaining({ owner: "mbrooks", repo: "tars", state: "open" }),
+			);
+		});
+
 		it("lists issue comments with issue context", async () => {
 			const octokit = createMockOctokit({
 				issues: {
