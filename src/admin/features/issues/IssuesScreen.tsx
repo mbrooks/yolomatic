@@ -14,7 +14,7 @@ export function IssuesScreen({
 	owner: string;
 	repo: string;
 	onBack: () => void;
-	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
+	onSelectTab: (tab: "sessions" | "skills" | "issues" | "settings") => void;
 }): React.ReactElement {
 	const { issues, loading, reload } = useRepoIssues(owner, repo);
 	const [selected, setSelected] = useState<OpenIssue | null>(null);

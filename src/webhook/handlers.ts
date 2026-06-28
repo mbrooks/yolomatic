@@ -17,6 +17,7 @@ import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
 import type { GitHubEvent, GitHubEventStateStore } from "../github-events/model.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
+import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventMode } from "../repos/configured-repositories.js";
 
 interface IssueLabel {
 	name?: string;
@@ -117,7 +118,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: PiAgentExecutor;
 			githubToken: string;
 			githubUsername: string;
-			defaultBranch: string;
+			defaultBranch?: string;
+			resolveDefaultBranch?: (owner: string, repo: string) => string;
+			resolveGitHubEventMode?: (owner: string, repo: string) => RepoGitHubEventMode;
 			selfReportEnabled: boolean;
 			octokit?: Octokit;
 			taskController?: TaskController;
@@ -139,6 +142,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			tasks,
 			clock: systemClock,
 			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
 			githubUsername: deps.githubUsername,
 			selfReportEnabled: deps.selfReportEnabled,
 		};
@@ -150,6 +154,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			github,
 			clock: systemClock,
 			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
 			githubUsername: deps.githubUsername,
 			selfReportEnabled: deps.selfReportEnabled,
 			executor: execDeps,
@@ -171,6 +176,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			tasks,
 			github,
 			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
 			githubUsername: deps.githubUsername,
 			adminGithubUsername: deps.adminGithubUsername,
 			executor: execDeps,
@@ -193,6 +199,17 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 	}
 
 	async handleGitHubEvent(event: GitHubEvent): Promise<void> {
+		if (this.deps.resolveGitHubEventMode) {
+			const mode = this.deps.resolveGitHubEventMode(event.owner, event.repo);
+			if (event.source === "webhook" && !repoModeIncludesWebhook(mode)) {
+				process.stdout.write(`[webhook] ignored ${event.type} for ${event.owner}/${event.repo}: repo mode is ${mode}\n`);
+				return;
+			}
+			if (event.source === "polling" && !repoModeIncludesPolling(mode)) {
+				process.stdout.write(`[github-poll] ignored ${event.type} for ${event.owner}/${event.repo}: repo mode is ${mode}\n`);
+				return;
+			}
+		}
 		await this.dispatcher.dispatch(event);
 	}
 

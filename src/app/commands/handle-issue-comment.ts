@@ -34,7 +34,8 @@ export class HandleIssueComment {
 			workspaces: WorkspaceService;
 			tasks: TaskControlService;
 			github: GitHubService;
-			defaultBranch: string;
+			defaultBranch?: string;
+			resolveDefaultBranch?: (owner: string, repo: string) => string;
 			githubUsername: string;
 			adminGithubUsername?: string;
 			executor: ExecuteSessionDeps;
@@ -54,6 +55,7 @@ export class HandleIssueComment {
 		const repo = payload.repository.name;
 		const issueNumber = payload.issue.number;
 		const key = issueSessionKey(owner, repo, issueNumber);
+		const defaultBranch = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 
 		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: comment from ${this.deps.githubUsername}\n`);
@@ -186,7 +188,7 @@ export class HandleIssueComment {
 			payload.issue.title ?? "",
 			payload.issue.body ?? "",
 			payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-			this.deps.defaultBranch,
+			defaultBranch,
 		);
 
 		if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session, [payload.comment.body])) {

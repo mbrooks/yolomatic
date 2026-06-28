@@ -15,8 +15,8 @@ export function RepoSkillsScreen({
 }: {
 	owner: string;
 	repo: string;
-	activeTab: "sessions" | "skills" | "issues";
-	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
+	activeTab: "sessions" | "skills" | "issues" | "settings";
+	onSelectTab: (tab: "sessions" | "skills" | "issues" | "settings") => void;
 	onBack: () => void;
 }): React.ReactElement {
 	const { skills, loading, reload } = useRepoSkills(owner, repo);

@@ -118,6 +118,16 @@ describe("parseHash", () => {
 		});
 	});
 
+	it("parses repo detail (settings tab)", () => {
+		expect(parseHash("#/repos/mbrooks/tars/settings")).toEqual({
+			screen: "repo",
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: undefined,
+			tab: "settings",
+		});
+	});
+
 	it("parses settings view with default category tab", () => {
 		expect(parseHash("#/settings")).toEqual({ screen: "settings", tab: DEFAULT_SETTINGS_TAB });
 	});
@@ -203,6 +213,12 @@ describe("buildHash", () => {
 		).toBe("#/repos/mbrooks/tars/skills");
 	});
 
+	it("builds repo detail with settings tab", () => {
+		expect(
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "settings" }),
+		).toBe("#/repos/mbrooks/tars/settings");
+	});
+
 	it("builds settings root", () => {
 		expect(buildHash({ screen: "settings" })).toBe("#/settings");
 	});
@@ -218,6 +234,11 @@ describe("buildHash", () => {
 	it("round-trips skills tab", () => {
 		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "skills" }));
+	});
+
+	it("round-trips settings tab", () => {
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "settings" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "settings" }));
 	});
 
 	it("round-trips sessions tab with issue number", () => {
