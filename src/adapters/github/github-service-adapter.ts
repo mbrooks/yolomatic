@@ -282,7 +282,7 @@ export class GitHubServiceAdapter implements GitHubService {
 			const { data } = await this.octokit.issues.listForRepo({
 				owner,
 				repo,
-				state: "all",
+				state: "open",
 				since,
 				sort: "updated",
 				direction: "asc",
