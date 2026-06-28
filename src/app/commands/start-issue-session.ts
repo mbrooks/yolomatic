@@ -22,7 +22,7 @@ export class StartIssueSession {
 		private readonly tasks: TaskControlService,
 		private readonly executor: ExecutionService,
 		private readonly clock: Clock,
-		private readonly defaultBranch: string,
+		private readonly defaultBranchOrResolver: string | ((owner: string, repo: string) => string),
 		private readonly githubUsername: string,
 		private readonly selfReportEnabled: boolean,
 	) {}
@@ -37,6 +37,10 @@ export class StartIssueSession {
 	): Promise<AppResult<StartIssueSessionResult>> {
 		try {
 			const key = issueSessionKey(owner, repo, issueNumber);
+			const defaultBranch =
+				typeof this.defaultBranchOrResolver === "function"
+					? this.defaultBranchOrResolver(owner, repo)
+					: this.defaultBranchOrResolver;
 
 			if (this.tasks.isActive(key)) {
 				return fail("conflict", "Session is already being executed");
@@ -54,7 +58,7 @@ export class StartIssueSession {
 				title,
 				body,
 				labels,
-				this.defaultBranch,
+				defaultBranch,
 			);
 
 			if (session.status !== "pending") {
@@ -72,7 +76,11 @@ export class StartIssueSession {
 				github: this.github,
 				tasks: this.tasks,
 				clock: this.clock,
-				defaultBranch: this.defaultBranch,
+				defaultBranch,
+				resolveDefaultBranch:
+					typeof this.defaultBranchOrResolver === "function"
+						? this.defaultBranchOrResolver
+						: undefined,
 				githubUsername: this.githubUsername,
 				selfReportEnabled: this.selfReportEnabled,
 			};

@@ -16,6 +16,13 @@ import { WorkspaceManager } from "./workspace/manager.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 import { GitHubEventStore } from "./github-events/store.js";
 import { startGitHubPolling } from "./github-events/polling.js";
+import {
+	parseConfiguredRepositories,
+	repoModeIncludesPolling,
+	repoModeIncludesWebhook,
+	resolveConfiguredRepoDefaultBranch,
+	resolveConfiguredRepoGitHubEventMode,
+} from "./repos/configured-repositories.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -61,6 +68,11 @@ export async function main(): Promise<void> {
 
 	async function startRuntime(nextConfig: typeof config): Promise<void> {
 		syncConfigToEnv(nextConfig);
+		const configuredRepositories = () => parseConfiguredRepositories(settingsStore.get("configured_repositories"));
+		const resolveDefaultBranch = (owner: string, repo: string) =>
+			resolveConfiguredRepoDefaultBranch(configuredRepositories(), owner, repo, nextConfig.defaultBranch);
+		const resolveGitHubEventMode = (owner: string, repo: string) =>
+			resolveConfiguredRepoGitHubEventMode(configuredRepositories(), owner, repo, nextConfig.githubEventMode);
 
 		const sessionManager = new SessionManager(nextConfig.sessionsDir, sessionStore);
 		const workspaceManager = new WorkspaceManager({
@@ -68,6 +80,7 @@ export async function main(): Promise<void> {
 			githubUsername: nextConfig.githubUsername,
 			githubToken: nextConfig.githubToken,
 			defaultBranch: nextConfig.defaultBranch,
+			resolveDefaultBranch,
 			maxWorktrees: nextConfig.maxWorktrees,
 			evictionStrategy: nextConfig.evictionStrategy,
 		});
@@ -79,7 +92,8 @@ export async function main(): Promise<void> {
 			executor,
 			githubToken: nextConfig.githubToken,
 			githubUsername: nextConfig.githubUsername,
-			defaultBranch: nextConfig.defaultBranch,
+			resolveDefaultBranch,
+			resolveGitHubEventMode,
 			selfReportEnabled: nextConfig.selfReportEnabled,
 			taskController,
 			adminGithubUsername: nextConfig.adminGithubUsername,
@@ -102,8 +116,11 @@ export async function main(): Promise<void> {
 			defaultBranch: nextConfig.defaultBranch,
 		});
 		const github = new GitHubServiceAdapter({ githubToken: nextConfig.githubToken });
-		const githubEventsEnabled = nextConfig.githubEventMode === "webhook" || nextConfig.githubEventMode === "both";
-		const pollingEnabled = nextConfig.githubEventMode === "polling" || nextConfig.githubEventMode === "both";
+		const repoModes = configuredRepositories().map((repo) =>
+			resolveConfiguredRepoGitHubEventMode([repo], repo.owner, repo.repo, nextConfig.githubEventMode),
+		);
+		const githubEventsEnabled = repoModeIncludesWebhook(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesWebhook(mode));
+		const pollingEnabled = repoModeIncludesPolling(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesPolling(mode));
 		const activeHandlers = githubEventsEnabled ? handlers : noOpHandlers;
 		const server = createWebhookServer(
 			nextConfig.webhookSecret,
@@ -132,6 +149,7 @@ export async function main(): Promise<void> {
 				eventStore,
 				githubUsername: nextConfig.githubUsername,
 				intervalMs: nextConfig.githubPollIntervalMs,
+				shouldPollRepo: (owner, repo) => repoModeIncludesPolling(resolveGitHubEventMode(owner, repo)),
 				dispatch: (event) => handlers.handleGitHubEvent(event),
 			});
 		}

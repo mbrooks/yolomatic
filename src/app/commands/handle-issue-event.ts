@@ -33,7 +33,8 @@ export class HandleIssueEvent {
 			tasks: TaskControlService;
 			github: GitHubService;
 			clock: Clock;
-			defaultBranch: string;
+			defaultBranch?: string;
+			resolveDefaultBranch?: (owner: string, repo: string) => string;
 			githubUsername: string;
 			selfReportEnabled: boolean;
 			executor: ExecuteSessionDeps;
@@ -53,6 +54,7 @@ export class HandleIssueEvent {
 		const repo = payload.repository.name;
 		const issue = payload.issue;
 		const key = issueSessionKey(owner, repo, issue.number);
+		const defaultBranch = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 
 		if (payload.sender.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
@@ -134,7 +136,7 @@ export class HandleIssueEvent {
 				issue.title,
 				issue.body ?? "",
 				issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-				this.deps.defaultBranch,
+				defaultBranch,
 			);
 
 			if (session.status !== "pending") {

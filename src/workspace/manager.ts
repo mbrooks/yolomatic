@@ -75,6 +75,7 @@ export class WorkspaceManager implements WorkspaceService {
 	async createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<WorktreeInfo> {
 		const normalizedOwner = normalizeSegment(owner, "owner");
 		const normalizedRepo = normalizeSegment(repo, "repo");
+		const defaultBranch = this.config.resolveDefaultBranch?.(normalizedOwner, normalizedRepo) ?? this.config.defaultBranch;
 		const bareRepoPath = this.getBareRepoPath(normalizedOwner, normalizedRepo);
 		const worktreePath = this.getWorktreePath(normalizedOwner, normalizedRepo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
@@ -98,7 +99,7 @@ export class WorkspaceManager implements WorkspaceService {
 
 		const existsBranch = await this.branchExists(bareRepoPath, branchName);
 		await this.updateDefaultBranch(bareRepoPath);
-		const baseRef = await this.resolveBaseRef(bareRepoPath);
+		const baseRef = await this.resolveBaseRef(bareRepoPath, defaultBranch);
 
 		try {
 			if (existsBranch) {
@@ -308,13 +309,13 @@ export class WorkspaceManager implements WorkspaceService {
 		}
 	}
 
-	private async resolveBaseRef(bareRepoPath: string): Promise<string> {
+	private async resolveBaseRef(bareRepoPath: string, defaultBranch: string): Promise<string> {
 		const candidates = [
 			"origin/HEAD",
-			`origin/${this.config.defaultBranch}`,
-			`refs/remotes/origin/${this.config.defaultBranch}`,
-			this.config.defaultBranch,
-			`refs/heads/${this.config.defaultBranch}`,
+			`origin/${defaultBranch}`,
+			`refs/remotes/origin/${defaultBranch}`,
+			defaultBranch,
+			`refs/heads/${defaultBranch}`,
 			"HEAD",
 		];
 

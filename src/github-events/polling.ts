@@ -29,6 +29,7 @@ export interface GitHubPollingDeps {
 	eventStore: GitHubEventStateStore;
 	githubUsername: string;
 	intervalMs: number;
+	shouldPollRepo?: (owner: string, repo: string) => boolean;
 	now?: () => Date;
 }
 
@@ -243,6 +244,9 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 	const events: GitHubEvent[] = [];
 
 	for (const repo of repos) {
+		if (deps.shouldPollRepo && !deps.shouldPollRepo(repo.owner, repo.repo)) {
+			continue;
+		}
 		try {
 			const [issues, issueEvents, comments, prs, reviews, reviewComments] = await Promise.all([
 				deps.github.listIssuesUpdatedSince(repo.owner, repo.repo, since),

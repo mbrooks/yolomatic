@@ -205,4 +205,24 @@ describe("StartIssueSession", () => {
 			expect(result.message).toBe("Workspace error");
 		}
 	});
+
+	it("supports resolving the default branch per repo", async () => {
+		const { repo, workspaces, github, tasks, executor } = makeCommand(null);
+		const command = new StartIssueSession(
+			repo,
+			workspaces,
+			github,
+			tasks,
+			executor,
+			{ now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 },
+			(owner, repoName) => (owner === "mbrooks" && repoName === "tars" ? "master" : "main"),
+			"tars-bot",
+			true,
+		);
+
+		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+
+		expect(result.success).toBe(true);
+		expect(executor.execute).toHaveBeenCalled();
+	});
 });

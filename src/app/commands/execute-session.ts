@@ -21,7 +21,8 @@ export interface ExecuteSessionDeps {
 	github: GitHubService;
 	tasks: TaskControlService;
 	clock: Clock;
-	defaultBranch: string;
+	defaultBranch?: string;
+	resolveDefaultBranch?: (owner: string, repo: string) => string;
 	githubUsername: string;
 	selfReportEnabled: boolean;
 }
@@ -42,6 +43,7 @@ export class ExecuteSession {
 			workspaces: deps.workspaces,
 			github: deps.github,
 			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
 			reporter: this.reporter,
 		});
 	}

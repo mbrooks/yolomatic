@@ -9,6 +9,7 @@ import { DashboardScreen } from "../features/dashboard/DashboardScreen.js";
 import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
 import { IssuesScreen } from "../features/issues/IssuesScreen.js";
+import { RepoSettingsScreen } from "../features/repos/RepoSettingsScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
@@ -79,7 +80,7 @@ export function App(): React.ReactElement {
 	);
 
 	const handleSelectTab = useCallback(
-		(tab: "sessions" | "skills" | "issues") => {
+		(tab: "sessions" | "skills" | "issues" | "settings") => {
 			if (route.screen === "repo") {
 				navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab });
 			}
@@ -201,7 +202,7 @@ function AppContent({
 	onMutate: () => void;
 	onBack: () => void;
 	onSelectRepos: () => void;
-	onSelectTab: (tab: "sessions" | "skills" | "issues") => void;
+	onSelectTab: (tab: "sessions" | "skills" | "issues" | "settings") => void;
 	onSelectSettings: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
@@ -268,6 +269,16 @@ function AppContent({
 					emptyMessage="No sessions for this repository."
 					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
+				/>
+			);
+		}
+		if (route.tab === "settings") {
+			return (
+				<RepoSettingsScreen
+					owner={route.owner}
+					repo={route.repo}
+					onSelectTab={onSelectTab}
+					onBack={onBack}
 				/>
 			);
 		}

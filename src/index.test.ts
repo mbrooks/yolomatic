@@ -31,6 +31,7 @@ vi.mock("./config.js", () => ({
 
 vi.mock("./settings/store.js", () => ({
 	SettingsStore: vi.fn(() => ({
+		get: vi.fn(() => undefined),
 		seedFromEnv: vi.fn(),
 		applyDefaults: vi.fn(),
 		onChange: vi.fn(() => () => {}),
@@ -244,6 +245,29 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 		);
+	});
+
+	it("starts polling when a configured repository overrides webhook mode to polling", async () => {
+		(SettingsStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			get: vi.fn((key: string) => {
+				if (key === "configured_repositories") {
+					return JSON.stringify([{ owner: "mbrooks", repo: "tars", settings: { github_event_mode: "polling" } }]);
+				}
+				return undefined;
+			}),
+			seedFromEnv: vi.fn(),
+			applyDefaults: vi.fn(),
+			onChange: vi.fn(() => () => {}),
+		}));
+
+		await main();
+
+		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({
+			shouldPollRepo: expect.any(Function),
+		}));
+		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as { shouldPollRepo: (owner: string, repo: string) => boolean };
+		expect(pollingDeps.shouldPollRepo("mbrooks", "tars")).toBe(true);
+		expect(pollingDeps.shouldPollRepo("mbrooks", "case")).toBe(false);
 	});
 
 	it("keeps webhook handlers active and starts polling when event mode is both", async () => {

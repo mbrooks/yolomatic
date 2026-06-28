@@ -11,6 +11,7 @@ import {
 	sortSessionsByRecency,
 } from "../../domain/session/model.js";
 import { formatUptime } from "../../domain/workflow/policy.js";
+import { parseConfiguredRepositories } from "../../repos/configured-repositories.js";
 import type { StaleSessionInfo } from "../../session/stale-detector.js";
 import { ok, type AppResult } from "../result.js";
 
@@ -47,44 +48,6 @@ export interface AdminStatusView {
 	draining: boolean;
 	repos: ReturnType<typeof buildRepoSummaries>;
 	sessions: AdminStatusSessionView[];
-}
-
-interface ConfiguredRepository {
-	owner: string;
-	repo: string;
-}
-
-function parseConfiguredRepositories(raw: string | undefined): ConfiguredRepository[] {
-	if (!raw?.trim()) {
-		return [];
-	}
-	try {
-		const parsed = JSON.parse(raw) as unknown;
-		if (!Array.isArray(parsed)) {
-			return [];
-		}
-		const repos: ConfiguredRepository[] = [];
-		const seen = new Set<string>();
-		for (const item of parsed) {
-			if (!item || typeof item !== "object") {
-				continue;
-			}
-			const owner = "owner" in item && typeof item.owner === "string" ? item.owner.trim() : "";
-			const repo = "repo" in item && typeof item.repo === "string" ? item.repo.trim() : "";
-			if (!owner || !repo) {
-				continue;
-			}
-			const key = `${owner}/${repo}`.toLowerCase();
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			repos.push({ owner, repo });
-		}
-		return repos;
-	} catch {
-		return [];
-	}
 }
 
 export class GetAdminStatus {
