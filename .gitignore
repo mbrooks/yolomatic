@@ -6,3 +6,4 @@ coverage
 /sessions
 /workspaces
 .worktrees
+run-codex-loop.sh
