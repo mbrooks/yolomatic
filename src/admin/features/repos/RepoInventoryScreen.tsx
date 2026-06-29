@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
+import { Modal } from "../../components/Modal.js";
 import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
 import { scanRepos, addRepo } from "../../api/repos.js";
@@ -85,6 +86,19 @@ export function RepoInventoryScreen({
 		}
 	}
 
+	function openAddModal() {
+		setShowAdd(true);
+		setAddError(null);
+		setAddMessage(null);
+	}
+
+	function closeAddModal() {
+		if (addLoading) return;
+		setShowAdd(false);
+		setAddError(null);
+		setAddMessage(null);
+	}
+
 	async function handleAddRepo(event: React.FormEvent) {
 		event.preventDefault();
 		setAddError(null);
@@ -92,20 +106,21 @@ export function RepoInventoryScreen({
 		const owner = addOwner.trim();
 		const repo = addRepoName.trim();
 		if (!owner || !repo) {
-			setAddError("Owner and repo are required");
+			setAddError("Owner and repository name are required");
 			return;
 		}
 		setAddLoading(true);
 		try {
 			const result = await addRepo(owner, repo);
 			if (result.added) {
-				setAddMessage(`Added ${result.fullName ?? `${result.owner}/${result.repo}`}`);
 				setAddOwner("");
 				setAddRepoName("");
+				setAddMessage(`Added ${result.fullName ?? `${result.owner}/${result.repo}`}`);
+				setShowAdd(false);
+				onRescanComplete?.();
 			} else {
 				setAddMessage(result.message ?? "Repository already configured");
 			}
-			onRescanComplete?.();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			setAddError(message);
@@ -123,12 +138,10 @@ export function RepoInventoryScreen({
 						type="button"
 						className="action-btn"
 						onClick={() => {
-							setShowAdd((prev) => !prev);
-							setAddError(null);
-							setAddMessage(null);
+							void openAddModal();
 						}}
 					>
-						{showAdd ? "Cancel" : "➕ Add Repository"}
+						➕ Add Repository
 					</button>
 					<button
 						type="button"
@@ -147,37 +160,64 @@ export function RepoInventoryScreen({
 					<p className="error-text">Rescan failed: {scanError}</p>
 				</div>
 			) : null}
-			{showAdd ? (
+			<Modal open={showAdd} onClose={closeAddModal} title="Add Repository">
 				<form className="repo-add-form" onSubmit={handleAddRepo}>
+					<p className="repo-add-hint">Enter the repository as <code>owner/repo-name</code>.</p>
 					<div className="repo-add-fields">
-						<label className="repo-add-label">
+						<label className="repo-add-label" htmlFor="repo-add-owner">
 							Owner
-							<input
-								type="text"
-								value={addOwner}
-								onChange={(e) => setAddOwner(e.target.value)}
-								placeholder="e.g. octocat"
-								disabled={addLoading}
-							/>
 						</label>
-						<label className="repo-add-label">
-							Repo
-							<input
-								type="text"
-								value={addRepoName}
-								onChange={(e) => setAddRepoName(e.target.value)}
-								placeholder="e.g. hello-world"
-								disabled={addLoading}
-							/>
+						<input
+							id="repo-add-owner"
+							type="text"
+							value={addOwner}
+							onChange={(e) => setAddOwner(e.target.value)}
+							placeholder="e.g. octocat"
+							disabled={addLoading}
+							aria-invalid={addError ? "true" : "false"}
+							aria-describedby="repo-add-error"
+						/>
+
+						<label className="repo-add-label" htmlFor="repo-add-repo">
+							Repository name
 						</label>
+						<input
+							id="repo-add-repo"
+							type="text"
+							value={addRepoName}
+							onChange={(e) => setAddRepoName(e.target.value)}
+							placeholder="e.g. hello-world"
+							disabled={addLoading}
+							aria-invalid={addError ? "true" : "false"}
+							aria-describedby="repo-add-error"
+						/>
 					</div>
-					<button type="submit" className="action-btn" disabled={addLoading}>
-						{addLoading ? "Adding..." : "Add"}
-					</button>
-					{addError ? <p className="error-text">{addError}</p> : null}
-					{addMessage ? <p className="success-text">{addMessage}</p> : null}
+					<div className="repo-add-actions">
+						<button
+							type="button"
+							className="action-btn"
+							onClick={closeAddModal}
+							disabled={addLoading}
+							aria-label="Cancel"
+						>
+							Cancel
+						</button>
+						<button type="submit" className="action-btn" disabled={addLoading}>
+							{addLoading ? "Adding..." : "Add Repository"}
+						</button>
+					</div>
+					{addError ? (
+						<p id="repo-add-error" className="error-text" role="alert">
+							{addError}
+						</p>
+					) : null}
+					{addMessage ? (
+						<p className={addError ? "error-text" : "success-text"} role="status">
+							{addMessage}
+						</p>
+					) : null}
 				</form>
-			) : null}
+			</Modal>
 			{repos.length === 0 ? (
 				<div className="empty-state">
 					<p>No repositories have been used yet.</p>
