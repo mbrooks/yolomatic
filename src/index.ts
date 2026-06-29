@@ -38,7 +38,7 @@ export async function main(): Promise<void> {
 
 	settingsStore.onChange(() => {
 		try {
-			syncConfigToEnv(getConfig(settingsStore));
+			syncLoggingConfigToEnv(getConfig(settingsStore));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[settings] failed to sync env after change: ${message}\n`);
@@ -52,10 +52,8 @@ export async function main(): Promise<void> {
 	let onboardingServer: ReturnType<typeof createWebhookServer> | undefined;
 	let activated = false;
 
-	function syncConfigToEnv(nextConfig: typeof config): void {
-		// Sync database settings to process.env so legacy code paths pick them up.
-		process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
-		process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
+	function syncLoggingConfigToEnv(nextConfig: typeof config): void {
+		// Keep logger settings aligned for code paths that still read process.env.
 		process.env.LOG_LEVEL = nextConfig.logLevel;
 		process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
 		process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
@@ -64,7 +62,7 @@ export async function main(): Promise<void> {
 	}
 
 	async function startRuntime(nextConfig: typeof config): Promise<void> {
-		syncConfigToEnv(nextConfig);
+		syncLoggingConfigToEnv(nextConfig);
 		const configuredRepositories = () => parseConfiguredRepositories(settingsStore.get("configured_repositories"));
 		const resolveDefaultBranch = (owner: string, repo: string) =>
 			resolveConfiguredRepoDefaultBranch(configuredRepositories(), owner, repo, nextConfig.defaultBranch);
@@ -81,7 +79,16 @@ export async function main(): Promise<void> {
 			maxWorktrees: nextConfig.maxWorktrees,
 			evictionStrategy: nextConfig.evictionStrategy,
 		});
-		const executor = new PiAgentExecutor({ soulPath: nextConfig.soulPath });
+		const executor = new PiAgentExecutor({
+			soulPath: nextConfig.soulPath,
+			modelConfig: () => {
+				const currentConfig = getConfig(settingsStore);
+				return {
+					model: currentConfig.piAgentModel,
+					provider: currentConfig.piAgentProvider,
+				};
+			},
+		});
 		const eventStore = new GitHubEventStore(path.join(nextConfig.memoryDir, "bot-state.sqlite"));
 		const handlers = new GitHubIssueHandlers({
 			sessionManager,

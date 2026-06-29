@@ -8,16 +8,22 @@ export interface ModelLookup<TModel extends ModelReference> {
 	getAll(): TModel[];
 }
 
+export interface ConfiguredModelOverride {
+	provider?: string;
+	model?: string;
+}
+
 export function resolveConfiguredModel<TModel extends ModelReference>(
 	registry: ModelLookup<TModel>,
+	override?: ConfiguredModelOverride,
 	env: NodeJS.ProcessEnv = process.env,
 ): TModel | undefined {
-	const configuredModel = env.PI_AGENT_MODEL?.trim();
+	const configuredModel = override?.model?.trim() || env.PI_AGENT_MODEL?.trim();
 	if (!configuredModel) {
 		return undefined;
 	}
 
-	const configuredProvider = env.PI_AGENT_PROVIDER?.trim();
+	const configuredProvider = override?.provider?.trim() || env.PI_AGENT_PROVIDER?.trim();
 	if (configuredProvider) {
 		return registry.find(configuredProvider, configuredModel);
 	}
