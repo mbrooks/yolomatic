@@ -7,11 +7,13 @@ import type { RepoSummary } from "../../app/types.js";
 
 vi.mock("../../api/repos.js", () => ({
 	scanRepos: vi.fn(),
+	addRepo: vi.fn(),
 }));
 
-import { scanRepos } from "../../api/repos.js";
+import { scanRepos, addRepo } from "../../api/repos.js";
 
 const mockedScanRepos = vi.mocked(scanRepos);
+const mockedAddRepo = vi.mocked(addRepo);
 
 function makeRepo(overrides: Partial<RepoSummary> = {}): RepoSummary {
 	return {
@@ -83,6 +85,61 @@ describe("RepoInventoryScreen", () => {
 
 		await waitFor(() => {
 			expect(screen.getByText(/Rescan failed: Token invalid/)).not.toBeNull();
+		});
+	});
+
+	it("shows the add repository form when Add Repository is clicked", async () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+
+		expect(screen.getByLabelText(/owner/i)).not.toBeNull();
+		expect(screen.getByLabelText(/repo/i)).not.toBeNull();
+	});
+
+	it("calls addRepo and refreshes the inventory on successful add", async () => {
+		mockedAddRepo.mockResolvedValue({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: true });
+		const onRescanComplete = vi.fn();
+		render(<RepoInventoryScreen {...defaultProps} onRescanComplete={onRescanComplete} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "octocat" } });
+		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "hello-world" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+		await waitFor(() => {
+			expect(mockedAddRepo).toHaveBeenCalledWith("octocat", "hello-world");
+		});
+		await waitFor(() => {
+			expect(onRescanComplete).toHaveBeenCalled();
+		});
+	});
+
+	it("displays a message when the repository is already configured", async () => {
+		mockedAddRepo.mockResolvedValue({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: false, message: "Repository already configured" });
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "octocat" } });
+		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "hello-world" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/repository already configured/i)).not.toBeNull();
+		});
+	});
+
+	it("displays error when addRepo fails", async () => {
+		mockedAddRepo.mockRejectedValue(new Error("Repository not found or not accessible"));
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "unknown" } });
+		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "missing" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/Repository not found or not accessible/)).not.toBeNull();
 		});
 	});
 });

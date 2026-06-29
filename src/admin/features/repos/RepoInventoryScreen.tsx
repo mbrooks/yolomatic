@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Breadcrumb } from "../../components/Breadcrumb.js";
 import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
-import { scanRepos } from "../../api/repos.js";
+import { scanRepos, addRepo } from "../../api/repos.js";
 
 type SortKey = "repo" | "activeCount" | "sessionCount" | "lastActivity";
 type SortDir = "asc" | "desc";
@@ -47,6 +47,12 @@ export function RepoInventoryScreen({
 	const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "lastActivity", dir: "desc" });
 	const [scanning, setScanning] = useState(false);
 	const [scanError, setScanError] = useState<string | null>(null);
+	const [showAdd, setShowAdd] = useState(false);
+	const [addOwner, setAddOwner] = useState("");
+	const [addRepoName, setAddRepoName] = useState("");
+	const [addLoading, setAddLoading] = useState(false);
+	const [addError, setAddError] = useState<string | null>(null);
+	const [addMessage, setAddMessage] = useState<string | null>(null);
 
 	const sortedRepos = useMemo(
 		() => sortRepos(repos, sort.key, sort.dir),
@@ -79,25 +85,98 @@ export function RepoInventoryScreen({
 		}
 	}
 
+	async function handleAddRepo(event: React.FormEvent) {
+		event.preventDefault();
+		setAddError(null);
+		setAddMessage(null);
+		const owner = addOwner.trim();
+		const repo = addRepoName.trim();
+		if (!owner || !repo) {
+			setAddError("Owner and repo are required");
+			return;
+		}
+		setAddLoading(true);
+		try {
+			const result = await addRepo(owner, repo);
+			if (result.added) {
+				setAddMessage(`Added ${result.fullName ?? `${result.owner}/${result.repo}`}`);
+				setAddOwner("");
+				setAddRepoName("");
+			} else {
+				setAddMessage(result.message ?? "Repository already configured");
+			}
+			onRescanComplete?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			setAddError(message);
+		} finally {
+			setAddLoading(false);
+		}
+	}
+
 	return (
 		<div className="repo-inventory">
 			<div className="repo-inventory-header">
 				<Breadcrumb label="Repositories" onBack={onBack} />
-				<button
-					type="button"
-					className="action-btn"
-					onClick={() => {
-						void handleRescan();
-					}}
-					disabled={scanning}
-				>
-					{scanning ? "🔄 Scanning..." : "🔄 Rescan"}
-				</button>
+				<div className="repo-inventory-actions">
+					<button
+						type="button"
+						className="action-btn"
+						onClick={() => {
+							setShowAdd((prev) => !prev);
+							setAddError(null);
+							setAddMessage(null);
+						}}
+					>
+						{showAdd ? "Cancel" : "➕ Add Repository"}
+					</button>
+					<button
+						type="button"
+						className="action-btn"
+						onClick={() => {
+							void handleRescan();
+						}}
+						disabled={scanning}
+					>
+						{scanning ? "🔄 Scanning..." : "🔄 Rescan"}
+					</button>
+				</div>
 			</div>
 			{scanError ? (
 				<div className="empty-state">
 					<p className="error-text">Rescan failed: {scanError}</p>
 				</div>
+			) : null}
+			{showAdd ? (
+				<form className="repo-add-form" onSubmit={handleAddRepo}>
+					<div className="repo-add-fields">
+						<label className="repo-add-label">
+							Owner
+							<input
+								type="text"
+								value={addOwner}
+								onChange={(e) => setAddOwner(e.target.value)}
+								placeholder="e.g. octocat"
+								disabled={addLoading}
+							/>
+						</label>
+						<label className="repo-add-label">
+							Repo
+							<input
+								type="text"
+								value={addRepoName}
+								onChange={(e) => setAddRepoName(e.target.value)}
+								placeholder="e.g. hello-world"
+								disabled={addLoading}
+							/>
+						</label>
+					</div>
+					<button type="submit" className="action-btn" disabled={addLoading}>
+						{addLoading ? "Adding..." : "Add"}
+					</button>
+					{addError ? <p className="error-text">{addError}</p> : null}
+					{addMessage ? <p className="success-text">{addMessage}</p> : null}
+				</form>
 			) : null}
 			{repos.length === 0 ? (
 				<div className="empty-state">

@@ -271,10 +271,36 @@ export class GitHubServiceAdapter implements GitHubService {
 				owner: repo.owner?.login ?? "",
 				repo: repo.name ?? "",
 				fullName: repo.full_name ?? "",
+				visibility: this.normalizeVisibility(repo.visibility, repo.private),
 			}));
 		} catch {
 			return [];
 		}
+	}
+
+	async getRepository(owner: string, repo: string): Promise<import("../../ports/github-service.js").RepositoryInfo | null> {
+		try {
+			const { data } = await this.octokit.repos.get({ owner, repo });
+			return {
+				owner: data.owner?.login ?? owner,
+				repo: data.name ?? repo,
+				fullName: data.full_name ?? `${owner}/${repo}`,
+				visibility: this.normalizeVisibility(data.visibility, data.private),
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	private normalizeVisibility(
+		visibility: unknown,
+		isPrivate: unknown,
+	): "public" | "private" | "internal" {
+		const normalized = String(visibility ?? "").toLowerCase();
+		if (normalized === "public" || normalized === "private" || normalized === "internal") {
+			return normalized;
+		}
+		return isPrivate ? "private" : "public";
 	}
 
 	async listIssuesUpdatedSince(owner: string, repo: string, since: string): Promise<PollIssue[]> {
