@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
 import { RepoInventoryScreen } from "./RepoInventoryScreen.js";
@@ -32,6 +32,10 @@ const defaultProps = {
 	onBack: vi.fn(),
 	onRescanComplete: vi.fn(),
 };
+
+beforeEach(() => {
+	vi.clearAllMocks();
+});
 
 describe("RepoInventoryScreen", () => {
 	it("renders empty state when no repos", () => {
@@ -88,24 +92,47 @@ describe("RepoInventoryScreen", () => {
 		});
 	});
 
-	it("shows the add repository form when Add Repository is clicked", async () => {
+	it("opens a modal containing the add repository form when Add Repository is clicked", () => {
 		render(<RepoInventoryScreen {...defaultProps} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 
+		expect(screen.getByRole("dialog")).not.toBeNull();
 		expect(screen.getByLabelText(/owner/i)).not.toBeNull();
-		expect(screen.getByLabelText(/repo/i)).not.toBeNull();
+		expect(screen.getByLabelText(/repository name/i)).not.toBeNull();
+		expect(screen.getByRole("button", { name: /^add repository$/i })).not.toBeNull();
 	});
 
-	it("calls addRepo and refreshes the inventory on successful add", async () => {
+	it("closes the modal when Cancel is clicked", () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		expect(screen.getByRole("dialog")).not.toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it("closes the modal when Escape is pressed", () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		const dialog = screen.getByRole("dialog");
+		expect(dialog).not.toBeNull();
+
+		fireEvent.keyDown(dialog, { key: "Escape" });
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it("calls addRepo and refreshes the inventory on successful add, then closes the modal", async () => {
 		mockedAddRepo.mockResolvedValue({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: true });
 		const onRescanComplete = vi.fn();
 		render(<RepoInventoryScreen {...defaultProps} onRescanComplete={onRescanComplete} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "octocat" } });
-		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "hello-world" } });
-		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+		fireEvent.change(screen.getByLabelText(/repository name/i), { target: { value: "hello-world" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
 
 		await waitFor(() => {
 			expect(mockedAddRepo).toHaveBeenCalledWith("octocat", "hello-world");
@@ -113,33 +140,50 @@ describe("RepoInventoryScreen", () => {
 		await waitFor(() => {
 			expect(onRescanComplete).toHaveBeenCalled();
 		});
+		await waitFor(() => {
+			expect(screen.queryByRole("dialog")).toBeNull();
+		});
 	});
 
-	it("displays a message when the repository is already configured", async () => {
+	it("displays a message in the modal when the repository is already configured", async () => {
 		mockedAddRepo.mockResolvedValue({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: false, message: "Repository already configured" });
 		render(<RepoInventoryScreen {...defaultProps} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "octocat" } });
-		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "hello-world" } });
-		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+		fireEvent.change(screen.getByLabelText(/repository name/i), { target: { value: "hello-world" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
 
 		await waitFor(() => {
 			expect(screen.getByText(/repository already configured/i)).not.toBeNull();
 		});
+		expect(screen.getByRole("dialog")).not.toBeNull();
 	});
 
-	it("displays error when addRepo fails", async () => {
+	it("displays an inline error and keeps the modal open when addRepo fails", async () => {
 		mockedAddRepo.mockRejectedValue(new Error("Repository not found or not accessible"));
 		render(<RepoInventoryScreen {...defaultProps} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "unknown" } });
-		fireEvent.change(screen.getByLabelText(/repo/i), { target: { value: "missing" } });
-		fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+		fireEvent.change(screen.getByLabelText(/repository name/i), { target: { value: "missing" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
 
 		await waitFor(() => {
 			expect(screen.getByText(/Repository not found or not accessible/)).not.toBeNull();
 		});
+		expect(screen.getByRole("dialog")).not.toBeNull();
+	});
+
+	it("shows a validation error when owner or repo is missing", async () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/owner and repository name are required/i)).not.toBeNull();
+		});
+		expect(mockedAddRepo).not.toHaveBeenCalled();
 	});
 });
