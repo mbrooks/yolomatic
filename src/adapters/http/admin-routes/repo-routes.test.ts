@@ -44,6 +44,7 @@ describe("handleRepoRoutes", () => {
 		addLabels: vi.fn() as ReturnType<typeof vi.fn>,
 		getAuthenticatedUser: vi.fn() as ReturnType<typeof vi.fn>,
 		listAccessibleRepositories: vi.fn() as ReturnType<typeof vi.fn>,
+		getRepository: vi.fn() as ReturnType<typeof vi.fn>,
 	};
 
 	const settingsStore = {
@@ -731,6 +732,176 @@ describe("handleRepoRoutes", () => {
 		});
 	});
 
+	describe("POST /api/repos", () => {
+		it("adds a new repository manually", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => (key === "configured_repositories" ? "[]" : undefined)),
+				set: vi.fn(),
+			};
+			githubService.getRepository.mockResolvedValue({
+				owner: "octocat",
+				repo: "hello-world",
+				fullName: "octocat/hello-world",
+				visibility: "public",
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat", repo: "hello-world" })),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(true);
+			expect(body.fullName).toBe("octocat/hello-world");
+			expect(store.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([{ owner: "octocat", repo: "hello-world" }]),
+			);
+		});
+
+		it("allows adding a public repository manually", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => (key === "configured_repositories" ? "[]" : undefined)),
+				set: vi.fn(),
+			};
+			githubService.getRepository.mockResolvedValue({
+				owner: "octocat",
+				repo: "hello-world",
+				fullName: "octocat/hello-world",
+				visibility: "public",
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat", repo: "hello-world" })),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(true);
+		});
+
+		it("returns added:false when repository is already configured", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) =>
+					key === "configured_repositories"
+						? JSON.stringify([{ owner: "octocat", repo: "hello-world" }])
+						: undefined,
+				),
+				set: vi.fn(),
+			};
+			githubService.getRepository.mockResolvedValue({
+				owner: "octocat",
+				repo: "hello-world",
+				fullName: "octocat/hello-world",
+				visibility: "public",
+			});
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat", repo: "hello-world" })),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(false);
+			expect(body.message).toBe("Repository already configured");
+			expect(store.set).not.toHaveBeenCalled();
+		});
+
+		it("returns 404 when repository is not found or not accessible", async () => {
+			const res = response();
+			githubService.getRepository.mockResolvedValue(null);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "unknown", repo: "missing" })),
+				res,
+				makeDeps(),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(404);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Repository not found or not accessible");
+		});
+
+		it("returns 400 when owner or repo is missing", async () => {
+			const res = response();
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat" })),
+				res,
+				makeDeps(),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Missing required field: repo");
+		});
+
+		it("returns 400 when owner or repo is empty after trimming", async () => {
+			const res = response();
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "  ", repo: "hello-world" })),
+				res,
+				makeDeps(),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("owner and repo are required");
+		});
+
+		it("returns 500 when githubService is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat", repo: "hello-world" })),
+				res,
+				makeDeps({ githubService: undefined }),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub service not configured");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos", "POST", JSON.stringify({ owner: "octocat", repo: "hello-world" })),
+				res,
+				makeDeps({ settingsStore: undefined }),
+				"/api/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Settings store not configured");
+		});
+	});
+
 	describe("POST /api/repos/scan", () => {
 		it("returns discovered repos and merges into configured_repositories", async () => {
 			const res = response();
@@ -745,8 +916,8 @@ describe("handleRepoRoutes", () => {
 			};
 			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
 			githubService.listAccessibleRepositories.mockResolvedValue([
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
-				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world" },
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			]);
 
 			const handled = await handleRepoRoutes(
@@ -760,13 +931,12 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.repos).toHaveLength(2);
-			expect(body.added).toBe(1);
+			expect(body.added).toBe(0);
+			expect(body.skipped).toHaveLength(1);
+			expect(body.skipped[0].fullName).toBe("octocat/hello-world");
 			expect(store.set).toHaveBeenCalledWith(
 				"configured_repositories",
-				JSON.stringify([
-					{ owner: "mbrooks", repo: "tars" },
-					{ owner: "octocat", repo: "hello-world" },
-				]),
+				JSON.stringify([{ owner: "mbrooks", repo: "tars" }]),
 			);
 		});
 
@@ -843,7 +1013,7 @@ describe("handleRepoRoutes", () => {
 			};
 			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
 			githubService.listAccessibleRepositories.mockResolvedValue([
-				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world" },
+				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "private" },
 			]);
 
 			const handled = await handleRepoRoutes(
@@ -911,6 +1081,41 @@ describe("handleRepoRoutes", () => {
 			expect(store.set).toHaveBeenCalledWith(
 				"configured_repositories",
 				JSON.stringify([{ owner: "valid", repo: "repo" }]),
+			);
+		});
+
+		it("skips public repos and adds private repos during scan", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => (key === "configured_repositories" ? "[]" : undefined)),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([
+				{ owner: "octocat", repo: "public-repo", fullName: "octocat/public-repo", visibility: "public" },
+				{ owner: "octocat", repo: "private-repo", fullName: "octocat/private-repo", visibility: "private" },
+				{ owner: "acme", repo: "internal-repo", fullName: "acme/internal-repo", visibility: "internal" },
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/scan", "POST"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/scan",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.added).toBe(2);
+			expect(body.skipped).toHaveLength(1);
+			expect(body.skipped[0].fullName).toBe("octocat/public-repo");
+			expect(store.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([
+					{ owner: "octocat", repo: "private-repo" },
+					{ owner: "acme", repo: "internal-repo" },
+				]),
 			);
 		});
 	});

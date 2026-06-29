@@ -13,6 +13,8 @@ import {
 	upsertConfiguredRepository,
 	type RepoGitHubEventMode,
 } from "../../../repos/configured-repositories.js";
+import { NotFoundError } from "../admin-router-shared.js";
+import { isPublicVisibility } from "../../../ports/github-service.js";
 
 interface RepoSettingView {
 	key: "github_event_mode" | "default_branch";
@@ -66,6 +68,61 @@ function buildRepoSettingViews(
 }
 
 const registry = new AdminRouteRegistry()
+	.route<{
+		owner?: string;
+		repo?: string;
+	}>({
+		method: "POST",
+		pattern: /^\/api\/repos$/u,
+		parseBody: true,
+		required: ["owner", "repo"],
+		handler: async (ctx) => {
+			if (!ctx.deps.githubService) {
+				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
+				return;
+			}
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const body = ctx.body as { owner?: unknown; repo?: unknown };
+			const owner = String(body.owner).trim();
+			const repo = String(body.repo).trim();
+			if (!owner || !repo) {
+				throw new ValidationError("owner and repo are required");
+			}
+			const info = await ctx.deps.githubService.getRepository(owner, repo);
+			if (!info) {
+				throw new NotFoundError("Repository not found or not accessible");
+			}
+			const currentRaw = ctx.deps.settingsStore.get("configured_repositories") ?? "[]";
+			const current = parseConfiguredRepositories(currentRaw);
+			const key = `${info.owner}/${info.repo}`.toLowerCase();
+			if (current.some((r) => `${r.owner}/${r.repo}`.toLowerCase() === key)) {
+				return {
+					status: 200,
+					body: {
+						owner: info.owner,
+						repo: info.repo,
+						fullName: info.fullName,
+						added: false,
+						message: "Repository already configured",
+					},
+				};
+			}
+			current.push({ owner: info.owner, repo: info.repo });
+			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
+			return {
+				status: 200,
+				body: {
+					owner: info.owner,
+					repo: info.repo,
+					fullName: info.fullName,
+					added: true,
+				},
+			};
+		},
+	})
 	.route({
 		method: "POST",
 		pattern: /^\/api\/repos\/scan$/u,
@@ -88,16 +145,22 @@ const registry = new AdminRouteRegistry()
 			const current = parseConfiguredRepositories(currentRaw);
 			const seen = new Set(current.map((r) => `${r.owner}/${r.repo}`.toLowerCase()));
 			let added = 0;
+			const skipped: import("../../../ports/github-service.js").AccessibleRepo[] = [];
 			for (const repo of discovered) {
 				const key = `${repo.owner}/${repo.repo}`.toLowerCase();
-				if (!seen.has(key)) {
-					seen.add(key);
-					current.push({ owner: repo.owner, repo: repo.repo });
-					added++;
+				if (seen.has(key)) {
+					continue;
 				}
+				if (isPublicVisibility(repo.visibility)) {
+					skipped.push(repo);
+					continue;
+				}
+				seen.add(key);
+				current.push({ owner: repo.owner, repo: repo.repo });
+				added++;
 			}
 			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
-			return { status: 200, body: { repos: discovered, added } };
+			return { status: 200, body: { repos: discovered, added, skipped } };
 		},
 	})
 	.route({

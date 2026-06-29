@@ -34,7 +34,7 @@ function createMockOctokit(overrides?: Partial<{
 			listCommits: vi.fn(async () => ({ data: [] })),
 			listInvitationsForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			acceptInvitationForAuthenticatedUser: vi.fn(async () => ({ data: {} })),
-			get: vi.fn(async () => ({ data: { default_branch: "main" } })),
+			get: vi.fn(async () => ({ data: { default_branch: "main", full_name: "mbrooks/tars", visibility: "private" } })),
 			createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
 			listForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			...(overrides?.repos ?? {}),
@@ -661,13 +661,13 @@ describe("GitHubServiceAdapter", () => {
 	});
 
 	describe("listAccessibleRepositories", () => {
-		it("returns mapped repositories", async () => {
+		it("returns mapped repositories with visibility", async () => {
 			const octokit = createMockOctokit({
 				repos: {
 					listForAuthenticatedUser: vi.fn(async () => ({
 						data: [
-							{ name: "tars", full_name: "mbrooks/tars", owner: { login: "mbrooks" } },
-							{ name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" } },
+							{ name: "tars", full_name: "mbrooks/tars", owner: { login: "mbrooks" }, visibility: "private" },
+							{ name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" }, visibility: "public" },
 						],
 					})),
 				},
@@ -675,8 +675,25 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listAccessibleRepositories();
 			expect(result).toHaveLength(2);
-			expect(result[0]).toEqual({ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" });
-			expect(result[1]).toEqual({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world" });
+			expect(result[0]).toEqual({ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" });
+			expect(result[1]).toEqual({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" });
+		});
+
+		it("falls back to private flag when visibility is missing", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					listForAuthenticatedUser: vi.fn(async () => ({
+						data: [
+							{ name: "tars", full_name: "mbrooks/tars", owner: { login: "mbrooks" }, private: true },
+							{ name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" }, private: false },
+						],
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listAccessibleRepositories();
+			expect(result[0].visibility).toBe("private");
+			expect(result[1].visibility).toBe("public");
 		});
 
 		it("returns empty array on error", async () => {
@@ -688,6 +705,46 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listAccessibleRepositories();
 			expect(result).toEqual([]);
+		});
+	});
+
+	describe("getRepository", () => {
+		it("returns repository info with visibility", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					get: vi.fn(async () => ({
+						data: { name: "tars", full_name: "mbrooks/tars", owner: { login: "mbrooks" }, visibility: "private" },
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getRepository("mbrooks", "tars");
+			expect(result).toEqual({ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" });
+			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars" });
+		});
+
+		it("falls back to private flag when visibility is missing", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					get: vi.fn(async () => ({
+						data: { name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" }, private: false },
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getRepository("octocat", "hello-world");
+			expect(result?.visibility).toBe("public");
+		});
+
+		it("returns null when repo is not accessible", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					get: vi.fn(async () => { throw new Error("Not found"); }),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getRepository("unknown", "missing");
+			expect(result).toBeNull();
 		});
 	});
 
@@ -996,7 +1053,7 @@ describe("GitHubServiceAdapter", () => {
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 
-			expect(await adapter.listAccessibleRepositories()).toEqual([{ owner: "", repo: "", fullName: "" }]);
+			expect(await adapter.listAccessibleRepositories()).toEqual([{ owner: "", repo: "", fullName: "", visibility: "public" }]);
 			expect(await adapter.listIssuesUpdatedSince("mbrooks", "tars", "2026-06-01T00:00:00Z")).toEqual([
 				expect.objectContaining({
 					title: "",

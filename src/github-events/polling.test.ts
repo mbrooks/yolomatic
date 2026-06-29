@@ -28,9 +28,11 @@ function makeStore(last: string | null, subjects: GitHubPollSubject[] = []): Git
 	};
 }
 
+import type { AccessibleRepo } from "../ports/github-service.js";
+
 function makeGithub(overrides = {}) {
 	return {
-		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" }]),
+		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }] as AccessibleRepo[]),
 		listIssuesUpdatedSince: vi.fn(async () => []),
 		listIssueEventsSince: vi.fn(async () => []),
 		listIssueCommentsSince: vi.fn(async () => []),
@@ -191,8 +193,8 @@ describe("tickGitHubPolling", () => {
 		const store = makeStore("2026-06-01T12:00:00.000Z");
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "bad", fullName: "mbrooks/bad" },
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "mbrooks", repo: "bad", fullName: "mbrooks/bad", visibility: "private" },
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async (_owner: string, repo: string) => {
 				if (repo === "bad") throw new Error("boom");
