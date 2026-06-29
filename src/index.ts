@@ -27,10 +27,6 @@ import {
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
-	async handleIssueEvent() {},
-	async handleCommentEvent() {},
-	async handlePullRequestReviewCommentEvent() {},
-	async handlePullRequestReviewEvent() {},
 	isInFlight() { return false; },
 };
 
