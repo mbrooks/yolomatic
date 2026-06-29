@@ -1,4 +1,4 @@
-import { apiPost } from "./client.js";
+import { apiDelete, apiPost } from "./client.js";
 
 export interface AddRepoRequest {
 	owner: string;
@@ -26,10 +26,20 @@ export interface ScanReposResponse {
 	skipped?: AccessibleRepo[];
 }
 
+export interface RemoveRepoResponse {
+	removed: boolean;
+}
+
 export async function addRepo(owner: string, repo: string): Promise<AddRepoResponse> {
 	return apiPost<AddRepoResponse>("/api/repos", { owner, repo });
 }
 
 export async function scanRepos(): Promise<ScanReposResponse> {
 	return apiPost<ScanReposResponse>("/api/repos/scan");
+}
+
+export async function removeRepo(owner: string, repo: string): Promise<RemoveRepoResponse> {
+	return apiDelete<RemoveRepoResponse>(
+		`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+	);
 }
