@@ -3,6 +3,7 @@ import { getSettingDefinition } from "../../../settings/model.js";
 import { sendJson } from "../response-helpers.js";
 import {
 	AdminRouteRegistry,
+	getRequiredDeps,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 
@@ -10,12 +11,10 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/settings$/u,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.settingsStore) {
-				sendJson(ctx.response, 500, { error: "Settings store not configured" });
-				return;
-			}
-			const settings = ctx.deps.settingsStore.getAllViews();
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
+			const settings = settingsStore.getAllViews();
 			return { status: 200, body: { settings } };
 		},
 	})
@@ -23,11 +22,9 @@ const registry = new AdminRouteRegistry()
 		method: "PATCH",
 		pattern: /^\/api\/settings$/u,
 		parseBody: true,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.settingsStore) {
-				sendJson(ctx.response, 500, { error: "Settings store not configured" });
-				return;
-			}
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as Record<string, string | number | boolean>;
 			const requiresRestart: string[] = [];
 			const updated: string[] = [];
@@ -36,7 +33,7 @@ const registry = new AdminRouteRegistry()
 				if (definition?.sensitive && value === "") {
 					continue;
 				}
-				ctx.deps.settingsStore.setTyped(key, value);
+				settingsStore.setTyped(key, value);
 				if (definition?.requiresRestart) {
 					requiresRestart.push(key);
 				}
@@ -48,29 +45,25 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/github\/invitations$/u,
+		requiresDeps: ["githubService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.githubService) {
-				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
-				return;
-			}
-			const invitations = await ctx.deps.githubService.listPendingInvitations();
+			const { githubService } = getRequiredDeps(ctx.deps, ["githubService"]);
+			const invitations = await githubService.listPendingInvitations();
 			return { status: 200, body: { invitations } };
 		},
 	})
 	.route({
 		method: "POST",
 		pattern: /^\/api\/github\/invitations\/([^/]+)\/accept$/u,
+		requiresDeps: ["githubService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.githubService) {
-				sendJson(ctx.response, 500, { error: "GitHub service not configured" });
-				return;
-			}
+			const { githubService } = getRequiredDeps(ctx.deps, ["githubService"]);
 			const invitationId = Number.parseInt(ctx.params[0], 10);
 			if (Number.isNaN(invitationId)) {
 				sendJson(ctx.response, 400, { error: "Invalid invitation ID" });
 				return;
 			}
-			await ctx.deps.githubService.acceptInvitation(invitationId);
+			await githubService.acceptInvitation(invitationId);
 			return { status: 200, body: { accepted: true } };
 		},
 	});

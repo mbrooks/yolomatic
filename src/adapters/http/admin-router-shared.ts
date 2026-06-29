@@ -30,9 +30,23 @@ export interface AdminRouteDefinition<TBody extends object = Record<string, unkn
 	auth?: boolean;
 	parseBody?: boolean;
 	required?: string[];
+	requiresDeps?: RequiredAdminRouteDep[];
 	parseErrorStatus?: number;
 	handler: (ctx: AdminRouteContext) => Promise<void | { status: number; body: unknown }>;
 }
+
+const missingDependencyErrors = {
+	githubService: "GitHub service not configured",
+	settingsStore: "Settings store not configured",
+	skillStore: "Skill store not configured",
+	repoSkillService: "Repo skill service not configured",
+	startIssueSession: "Session executor not configured",
+} satisfies Partial<Record<keyof AdminRouterDeps, string>>;
+
+export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
+export type RouteDepsFor<T extends RequiredAdminRouteDep> = {
+	[K in T]-?: NonNullable<AdminRouterDeps[K]>;
+};
 
 export class AdminRouteRegistry {
 	private readonly routes: AdminRouteDefinition<any>[] = [];
@@ -88,6 +102,23 @@ export class AdminRouteRegistry {
 					sendJson(response, 400, { error: message });
 					return true;
 				}
+			}
+
+			if (
+				definition.requiresDeps &&
+				!requireDeps(
+					{
+						request,
+						response,
+						deps,
+						requestUrl,
+						body,
+						params: match.slice(1) as string[],
+					},
+					definition.requiresDeps,
+				)
+			) {
+				return true;
 			}
 
 			try {
@@ -149,6 +180,27 @@ export function mapResultToStatus(code: string): number {
 		default:
 			return 500;
 	}
+}
+
+export function requireDeps(
+	ctx: AdminRouteContext,
+	requiredDeps: RequiredAdminRouteDep[],
+): boolean {
+	for (const dep of requiredDeps) {
+		if (ctx.deps[dep]) {
+			continue;
+		}
+		sendJson(ctx.response, 500, { error: missingDependencyErrors[dep] });
+		return false;
+	}
+	return true;
+}
+
+export function getRequiredDeps<T extends RequiredAdminRouteDep>(
+	deps: AdminRouterDeps,
+	_requiredDeps: readonly T[],
+): RouteDepsFor<T> {
+	return deps as unknown as RouteDepsFor<T>;
 }
 
 export function getCredentials(deps: AdminRouterDeps): { username?: string; password?: string } {
