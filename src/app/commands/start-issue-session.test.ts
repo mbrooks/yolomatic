@@ -116,6 +116,7 @@ function makeCommand(
 		closeIssue: vi.fn(),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "tars-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
+		getRepository: vi.fn(async () => null),
 	};
 	const tasks: TaskControlService = overrides?.tasks ?? {
 		cancel: vi.fn(() => false),

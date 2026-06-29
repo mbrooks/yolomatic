@@ -50,10 +50,24 @@ export interface PendingInvitation {
 	html_url: string;
 }
 
+export type RepoVisibility = "public" | "private" | "internal";
+
 export interface AccessibleRepo {
 	owner: string;
 	repo: string;
 	fullName: string;
+	visibility: RepoVisibility;
+}
+
+export interface RepositoryInfo {
+	owner: string;
+	repo: string;
+	fullName: string;
+	visibility: RepoVisibility;
+}
+
+export function isPublicVisibility(visibility: RepoVisibility): boolean {
+	return visibility === "public";
 }
 
 export interface PollIssue {
@@ -155,4 +169,5 @@ export interface GitHubService {
 	closeIssue(owner: string, repo: string, issueNumber: number): Promise<void>;
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
+	getRepository(owner: string, repo: string): Promise<RepositoryInfo | null>;
 }

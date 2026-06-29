@@ -78,6 +78,7 @@ function makeDeps(overrides?: {
 		closeIssue: vi.fn(async () => undefined),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 		listAccessibleRepositories: vi.fn(async () => []),
+		getRepository: vi.fn(async () => null),
 	};
 
 	const tasks: TaskControlService = {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- Manual repository management in `tarsadmin`: admins can add repositories by owner/name from the repository inventory page via `POST /api/repos`.
+- Public repositories can only be added manually; `POST /api/repos/scan` now auto-discovers private/internal repositories and reports skipped public repositories in a `skipped` array.
+
 ### Breaking Changes
 - **Default admin port changed from `3000` to `6767`** to avoid common port conflicts with local development services (Node.js/Express, Create React App, Vite, etc.). Users relying on the previous default should explicitly set `PORT=3000` in their environment or update their deployment configurations accordingly.
 
