@@ -173,10 +173,14 @@ export class ExecuteSession {
 			}
 
 			const context = comment ? "Resuming from comment" : "Processing issue";
-			await this.reporter.postFailureComment(owner, repo, issueNumber, error, context);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+			await this.reporter.handleExecutionFailure({
+				owner,
+				repo,
+				sessionIssueNumber: issueNumber,
+				target: { kind: "issue", number: issueNumber },
+				error,
+				context,
+			});
 			throw error;
 		} finally {
 			this.deps.tasks.unregister(key);
@@ -194,71 +198,29 @@ export class ExecuteSession {
 			await this.deps.sessions.markSeeded(owner, repo, issueNumber);
 		}
 
-		await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-
-		if (result.status === "waiting-feedback") {
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "waiting-feedback");
-			process.stdout.write(`[execute] waiting for feedback on ${repo}#${issueNumber}\n`);
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-feedback-required"]);
-			await this.deps.github.postComment(
-				owner,
-				repo,
-				issueNumber,
-				[
-					"Need clarification:",
-					result.summary || "TARS needs more information before continuing.",
-				].join("\n\n"),
-			);
-			return;
-		}
-
 		if (result.status === "complete") {
+			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 			await this.delivery.deliverCompletion(current, result);
 			return;
 		}
 
-		if (result.status === "cancelled") {
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "cancelled");
+		if (result.status === "waiting-feedback") {
+			process.stdout.write(`[execute] waiting for feedback on ${repo}#${issueNumber}\n`);
+		} else if (result.status === "cancelled") {
 			process.stdout.write(`[execute] marked cancelled ${repo}#${issueNumber}\n`);
-			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
-			await this.deps.github.postComment(
-				owner,
-				repo,
-				issueNumber,
-				[
-					"Task cancelled by admin.",
-					"",
-					result.summary || "TARS has stopped working on this issue.",
-					"",
-					"TARS is idle and ready for the next task.",
-				].join("\n"),
-			);
-			return;
+		} else if (result.status === "working") {
+			process.stdout.write(`[execute] left in working state ${repo}#${issueNumber}\n`);
 		}
 
-		if (result.status === "failed") {
-			const context = comment ? "Resuming from comment" : "Processing issue";
-			await this.reporter.postFailureComment(owner, repo, issueNumber, new Error(result.summary), context);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
-			return;
-		}
-
-		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
-		process.stdout.write(`[execute] left in working state ${repo}#${issueNumber}\n`);
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working"]);
-		await this.deps.github.postComment(
+		await this.reporter.handleExecutionResult({
 			owner,
 			repo,
-			issueNumber,
-			[
-				"TARS is still working on this issue.",
-				"",
-				result.summary || "Execution is in progress.",
-			].join("\n"),
-		);
+			sessionIssueNumber: issueNumber,
+			target: { kind: "issue", number: issueNumber },
+			result,
+			context: comment ? "Resuming from comment" : "Processing issue",
+			state: current,
+		});
 	}
 
 	private async validateSessionBeforeExecution(state: SessionState): Promise<string | null> {
