@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+	AdminRouteRegistry,
+	type AdminRouteContext,
 	mapResultToStatus,
 	mergeRepoAndServerSkills,
 	getCredentials,
 	checkAdminJson,
 	checkAdminTextAllowOnboarding,
+	requireDeps,
 } from "./admin-router-shared.js";
 
 vi.mock("./admin-auth.js", () => ({
@@ -13,6 +16,23 @@ vi.mock("./admin-auth.js", () => ({
 }));
 
 describe("admin-router-shared", () => {
+	function mockResponse() {
+		const res = {
+			statusCode: 0,
+			body: "",
+			setHeader: vi.fn(),
+			end: vi.fn((data?: string) => {
+				res.body = data ?? "";
+			}),
+		} as {
+			statusCode: number;
+			body: string;
+			setHeader: ReturnType<typeof vi.fn>;
+			end: ReturnType<typeof vi.fn>;
+		};
+		return res;
+	}
+
 	it("maps unknown result codes to 500", () => {
 		expect(mapResultToStatus("unexpected")).toBe(500);
 	});
@@ -123,5 +143,46 @@ describe("admin-router-shared", () => {
 			["repo-only", "repo"],
 			["shared", "repo"],
 		]);
+	});
+
+	it("requireDeps sends the configured dependency error response", () => {
+		const response = mockResponse();
+		const ctx = {
+			request: { headers: {} },
+			response,
+			deps: {},
+			body: {},
+			params: [],
+		} as unknown as AdminRouteContext;
+
+		const ok = requireDeps(ctx, ["settingsStore"]);
+
+		expect(ok).toBe(false);
+		expect(response.statusCode).toBe(500);
+		expect(JSON.parse(response.body).error).toBe("Settings store not configured");
+	});
+
+	it("registry handles missing route deps before invoking the handler", async () => {
+		const handler = vi.fn(async () => ({ status: 200, body: { ok: true } }));
+		const registry = new AdminRouteRegistry().route({
+			method: "GET",
+			pattern: /^\/api\/settings$/u,
+			auth: false,
+			requiresDeps: ["settingsStore"],
+			handler,
+		});
+		const response = mockResponse();
+
+		const handled = await registry.handle(
+			{ method: "GET", url: "/api/settings", headers: {} } as never,
+			response as never,
+			{} as never,
+			"/api/settings",
+		);
+
+		expect(handled).toBe(true);
+		expect(response.statusCode).toBe(500);
+		expect(JSON.parse(response.body).error).toBe("Settings store not configured");
+		expect(handler).not.toHaveBeenCalled();
 	});
 });

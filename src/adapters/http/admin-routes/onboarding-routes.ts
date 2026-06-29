@@ -6,6 +6,7 @@ import {
 	AdminRouteRegistry,
 	ValidationError,
 	checkAdminTextAllowOnboarding,
+	getRequiredDeps,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
@@ -52,12 +53,13 @@ const registry = new AdminRouteRegistry()
 		method: "GET",
 		pattern: /^\/api\/onboarding\/status$/u,
 		auth: false,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.settingsStore) {
-				sendJson(ctx.response, 500, { error: "Settings store not configured" });
-				return;
-			}
-			const missing = getMissingOnboardingSettings(ctx.deps);
+			const settingsDeps = {
+				...ctx.deps,
+				...getRequiredDeps(ctx.deps, ["settingsStore"]),
+			};
+			const missing = getMissingOnboardingSettings(settingsDeps);
 			return { status: 200, body: { complete: missing.length === 0, missing } };
 		},
 	})
@@ -117,11 +119,12 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/onboarding\/init-workspaces$/u,
 		auth: false,
 		parseBody: true,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.settingsStore) {
-				sendJson(ctx.response, 500, { error: "Settings store not configured" });
-				return;
-			}
+			const settingsDeps = {
+				...ctx.deps,
+				...getRequiredDeps(ctx.deps, ["settingsStore"]),
+			};
 			const body = ctx.body as {
 				token?: string;
 				username?: string;
@@ -133,13 +136,13 @@ const registry = new AdminRouteRegistry()
 			if (!token || !username) {
 				throw new ValidationError("Token and username are required");
 			}
-			storeConfiguredRepositories(ctx.deps, repos);
+			storeConfiguredRepositories(settingsDeps, repos);
 			if (repos.length === 0) {
 				return { status: 200, body: { initialized: [] } };
 			}
 
-			const workspacesDir = ctx.deps.settingsStore.getString("workspaces_dir", "./workspaces");
-			const defaultBranch = ctx.deps.settingsStore.getString("default_branch", "main");
+			const workspacesDir = settingsDeps.settingsStore.getString("workspaces_dir", "./workspaces");
+			const defaultBranch = settingsDeps.settingsStore.getString("default_branch", "main");
 			const manager = new WorkspaceManager({
 				workspacesDir,
 				githubUsername: username,
@@ -165,11 +168,9 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/onboarding$/u,
 		auth: false,
 		parseBody: true,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.settingsStore) {
-				sendJson(ctx.response, 500, { error: "Settings store not configured" });
-				return;
-			}
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as Record<string, string>;
 			const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => !body[key]?.trim());
 			if (missing.length > 0) {
@@ -179,9 +180,12 @@ const registry = new AdminRouteRegistry()
 				return;
 			}
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
-				ctx.deps.settingsStore.set(key, body[key].trim());
+				settingsStore.set(key, body[key].trim());
 			}
-			const storedMissing = getMissingOnboardingSettings(ctx.deps);
+			const storedMissing = getMissingOnboardingSettings({
+				...ctx.deps,
+				settingsStore,
+			});
 			const activated = storedMissing.length === 0;
 			if (activated && ctx.deps.onOnboardingComplete) {
 				setImmediate(() => {
