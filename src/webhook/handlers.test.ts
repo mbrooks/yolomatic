@@ -40,6 +40,18 @@ GitHubIssueHandlers.prototype.handlePullRequestReviewEvent = async function (pay
 
 describe("GitHubIssueHandlers PR review delegation", () => {
 	function createDeps() {
+		const getSession = vi.fn(async () => ({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		}));
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -72,18 +84,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			getSession: vi.fn(async () => ({
-				issueNumber: 56,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "complete" as never,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-				lastActivity: new Date().toISOString(),
-				seeded: true,
-			})),
+			get: getSession,
+			getSession,
 			updateStatus: vi.fn(async () => ({
 				issueNumber: 56,
 				repo: "tars",

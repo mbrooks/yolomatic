@@ -1,6 +1,5 @@
 import { Octokit } from "@octokit/rest";
 
-import type { SessionRepository } from "../ports/session-repository.js";
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
@@ -21,18 +20,6 @@ import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventM
 export interface WebhookHandlers {
 	handleGitHubEvent?(event: GitHubEvent): Promise<void>;
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean;
-}
-
-function asSessionRepository(manager: SessionManager): SessionRepository {
-	return new Proxy(manager, {
-		get(target, prop) {
-			if (prop === "get") {
-				return target.getSession.bind(target);
-			}
-			const value = (target as unknown as Record<string, unknown>)[prop as string];
-			return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
-		},
-	}) as SessionRepository;
 }
 
 export class GitHubIssueHandlers implements WebhookHandlers {
@@ -60,7 +47,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			eventStore?: GitHubEventStateStore;
 		},
 	) {
-		const sessions = asSessionRepository(deps.sessionManager);
+		const sessions = deps.sessionManager;
 		const workspaces = deps.workspaceManager;
 		const executor = deps.executor;
 		const tasks = deps.taskController ?? new TaskController();

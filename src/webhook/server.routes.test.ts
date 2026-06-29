@@ -161,6 +161,13 @@ describe("GitHubIssueHandlers", () => {
 							seeded: false,
 						};
 			}),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 99,
 				repo: "tars",
@@ -260,6 +267,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 42,
 				repo: "tars",
@@ -406,6 +420,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 42,
 				repo: "tars",
@@ -503,6 +524,13 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => {
 				if (storedSession) {
 					storedSession.status = status;
@@ -592,6 +620,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -683,6 +718,13 @@ describe("GitHubIssueHandlers", () => {
 					seeded: false,
 				};
 			}),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -805,6 +847,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
 				issueNumber: 7,
 				repo: "tars",
@@ -912,6 +961,13 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => {
 				if (storedSession) {
 					storedSession.status = status;
@@ -1000,6 +1056,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1135,6 +1198,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1268,6 +1338,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
 				repo: "teamhub-case",
@@ -1375,6 +1452,13 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => null),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -1461,6 +1545,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1541,6 +1632,13 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 				resumeOnBoot: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1629,6 +1727,13 @@ describe("GitHubIssueHandlers", () => {
 				resumeOnBoot: true,
 				queuedComments: ["Please also add tests."],
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1705,6 +1810,13 @@ describe("GitHubIssueHandlers", () => {
 				status: "complete" as const,
 				lastActivity: new Date().toISOString(),
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
@@ -1748,6 +1860,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -1835,6 +1954,13 @@ describe("GitHubIssueHandlers", () => {
 				prNumber: 99,
 				prUrl: "https://github.com/mbrooks/tars/pull/99",
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
