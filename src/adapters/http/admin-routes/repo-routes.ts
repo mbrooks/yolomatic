@@ -9,6 +9,7 @@ import { mapResultToStatus } from "../admin-router-shared.js";
 import {
 	findConfiguredRepository,
 	parseConfiguredRepositories,
+	removeConfiguredRepository,
 	stringifyConfiguredRepositories,
 	upsertConfiguredRepository,
 	type RepoGitHubEventMode,
@@ -221,6 +222,22 @@ const registry = new AdminRouteRegistry()
 			);
 			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(nextRepositories));
 			return { status: 200, body: { updated: ["github_event_mode", "default_branch"], requiresRestart } };
+		},
+	})
+	.route({
+		method: "DELETE",
+		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)$/u,
+		handler: async (ctx) => {
+			if (!ctx.deps.settingsStore) {
+				sendJson(ctx.response, 500, { error: "Settings store not configured" });
+				return;
+			}
+			const [owner, repo] = ctx.params;
+			const current = parseConfiguredRepositories(ctx.deps.settingsStore.get("configured_repositories"));
+			const next = removeConfiguredRepository(current, owner, repo);
+			const removed = next.length < current.length;
+			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(next));
+			return { status: 200, body: { removed } };
 		},
 	})
 	.route({

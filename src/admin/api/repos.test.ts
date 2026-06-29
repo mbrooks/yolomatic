@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { addRepo, scanRepos } from "./repos.js";
+import { addRepo, removeRepo, scanRepos } from "./repos.js";
 
 global.fetch = vi.fn();
 
@@ -74,5 +74,41 @@ describe("scanRepos", () => {
 		} as Response);
 
 		await expect(scanRepos()).rejects.toThrow("Internal Server Error");
+	});
+});
+
+describe("removeRepo", () => {
+	it("returns remove result on success", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ removed: true }),
+		} as Response);
+
+		const result = await removeRepo("octocat", "hello-world");
+		expect(result.removed).toBe(true);
+		expect(mockedFetch).toHaveBeenCalledWith("/api/repos/octocat/hello-world", { method: "DELETE" });
+	});
+
+	it("throws when response is not ok", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: false,
+			status: 404,
+			statusText: "Not Found",
+			json: async () => ({ error: "Repository not configured" }),
+		} as Response);
+
+		await expect(removeRepo("unknown", "missing")).rejects.toThrow("Repository not configured");
+	});
+
+	it("falls back to statusText when error body has no error field", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: false,
+			status: 500,
+			statusText: "Internal Server Error",
+			json: async () => ({}),
+		} as Response);
+
+		await expect(removeRepo("x", "y")).rejects.toThrow("Internal Server Error");
 	});
 });

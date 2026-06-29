@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	findConfiguredRepository,
 	parseConfiguredRepositories,
+	removeConfiguredRepository,
 	repoModeIncludesPolling,
 	repoModeIncludesWebhook,
 	resolveConfiguredRepoDefaultBranch,
@@ -72,5 +73,34 @@ describe("configured-repositories", () => {
 		expect(repoModeIncludesPolling("polling")).toBe(true);
 		expect(repoModeIncludesPolling("both")).toBe(true);
 		expect(repoModeIncludesPolling("webhook")).toBe(false);
+	});
+
+	describe("removeConfiguredRepository", () => {
+		it("removes a configured repository by owner and repo", () => {
+			const repositories = parseConfiguredRepositories(
+				JSON.stringify([
+					{ owner: "mbrooks", repo: "tars" },
+					{ owner: "octocat", repo: "hello-world" },
+				]),
+			);
+			const updated = removeConfiguredRepository(repositories, "mbrooks", "tars");
+			expect(updated).toEqual([{ owner: "octocat", repo: "hello-world" }]);
+		});
+
+		it("matches case-insensitively", () => {
+			const repositories = parseConfiguredRepositories(
+				JSON.stringify([{ owner: "Mbrooks", repo: "Tars" }]),
+			);
+			const updated = removeConfiguredRepository(repositories, "mbrooks", "tars");
+			expect(updated).toEqual([]);
+		});
+
+		it("returns the same list when the repository is not configured", () => {
+			const repositories = parseConfiguredRepositories(
+				JSON.stringify([{ owner: "mbrooks", repo: "tars" }]),
+			);
+			const updated = removeConfiguredRepository(repositories, "unknown", "missing");
+			expect(updated).toEqual(repositories);
+		});
 	});
 });

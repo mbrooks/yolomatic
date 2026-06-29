@@ -124,6 +124,15 @@ export function findConfiguredRepository(
 	return repositories.find((entry) => `${entry.owner}/${entry.repo}`.toLowerCase() === key);
 }
 
+export function removeConfiguredRepository(
+	repositories: ConfiguredRepository[],
+	owner: string,
+	repo: string,
+): ConfiguredRepository[] {
+	const key = `${owner}/${repo}`.toLowerCase();
+	return repositories.filter((entry) => `${entry.owner}/${entry.repo}`.toLowerCase() !== key);
+}
+
 export function resolveConfiguredRepoDefaultBranch(
 	repositories: ConfiguredRepository[],
 	owner: string,
