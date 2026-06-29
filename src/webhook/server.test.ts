@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GitHubEvent } from "../github-events/model.js";
+
 const sendText = vi.fn();
 const handleAdminRoute = vi.fn(async () => false);
 const readBody = vi.fn(async () => Buffer.from("{}"));
@@ -10,10 +12,8 @@ const onSessionLogEvent = vi.fn();
 
 function makeHandlers() {
 	return {
-		handleIssueEvent: vi.fn(),
-		handleCommentEvent: vi.fn(async () => {}),
-		handlePullRequestReviewCommentEvent: vi.fn(),
-		handlePullRequestReviewEvent: vi.fn(),
+		handleGitHubEvent: vi.fn(async (_event: GitHubEvent) => {}),
+		isInFlight: vi.fn(() => false),
 	};
 }
 
@@ -160,14 +160,14 @@ describe("createWebhookServer", () => {
 		expect(sendText).not.toHaveBeenCalled();
 	});
 
-it("routes signed issue_comment webhooks to the comment handler", async () => {
+	it("routes signed issue_comment webhooks through the normalized dispatcher", async () => {
 		const handlers = {
-			handleIssueEvent: vi.fn(),
-			handleCommentEvent: vi.fn(async () => {}),
-			handlePullRequestReviewCommentEvent: vi.fn(),
-			handlePullRequestReviewEvent: vi.fn(),
+			handleGitHubEvent: vi.fn(async (_event: GitHubEvent) => {}),
+			isInFlight: vi.fn(() => false),
 		};
-		readBody.mockResolvedValueOnce(Buffer.from('{"action":"created"}'));
+		readBody.mockResolvedValueOnce(
+			Buffer.from('{"action":"created","comment":{"id":1,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+		);
 
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", handlers as never, {} as never);
@@ -186,13 +186,23 @@ it("routes signed issue_comment webhooks to the comment handler", async () => {
 		);
 
 		expect(verifySignature).toHaveBeenCalled();
-		expect(handlers.handleCommentEvent).toHaveBeenCalledWith({ action: "created" });
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "issue_comment",
+				owner: "mbrooks",
+				repo: "tars",
+				source: "webhook",
+				payload: expect.objectContaining({ action: "created" }),
+			}),
+		);
 		expect(sendText).toHaveBeenCalledWith({}, 200, "OK");
 	});
 
-	it("routes issues webhooks to the issue handler", async () => {
+	it("routes issues webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
-		readBody.mockResolvedValueOnce(Buffer.from('{"action":"opened"}'));
+		readBody.mockResolvedValueOnce(
+			Buffer.from('{"action":"opened","issue":{"number":12,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+		);
 
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", handlers as never, {} as never);
@@ -209,13 +219,23 @@ it("routes signed issue_comment webhooks to the comment handler", async () => {
 			{},
 		);
 
-		expect(handlers.handleIssueEvent).toHaveBeenCalledWith({ action: "opened" });
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "issue",
+				owner: "mbrooks",
+				repo: "tars",
+				source: "webhook",
+				payload: expect.objectContaining({ action: "opened" }),
+			}),
+		);
 		expect(sendText).toHaveBeenCalledWith({}, 200, "OK");
 	});
 
-	it("routes pull_request_review_comment webhooks to the review-comment handler", async () => {
+	it("routes pull_request_review_comment webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
-		readBody.mockResolvedValueOnce(Buffer.from('{"action":"created"}'));
+		readBody.mockResolvedValueOnce(
+			Buffer.from('{"action":"created","comment":{"id":2,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+		);
 
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", handlers as never, {} as never);
@@ -232,15 +252,20 @@ it("routes signed issue_comment webhooks to the comment handler", async () => {
 			{},
 		);
 
-		expect(handlers.handlePullRequestReviewCommentEvent).toHaveBeenCalledWith({
-			action: "created",
-		});
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "pull_request_review_comment",
+				payload: expect.objectContaining({ action: "created" }),
+			}),
+		);
 		expect(sendText).toHaveBeenCalledWith({}, 200, "OK");
 	});
 
-	it("routes pull_request_review webhooks to the review handler", async () => {
+	it("routes pull_request_review webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
-		readBody.mockResolvedValueOnce(Buffer.from('{"action":"submitted"}'));
+		readBody.mockResolvedValueOnce(
+			Buffer.from('{"action":"submitted","review":{"id":3,"submitted_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+		);
 
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", handlers as never, {} as never);
@@ -257,9 +282,12 @@ it("routes signed issue_comment webhooks to the comment handler", async () => {
 			{},
 		);
 
-		expect(handlers.handlePullRequestReviewEvent).toHaveBeenCalledWith({
-			action: "submitted",
-		});
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "pull_request_review",
+				payload: expect.objectContaining({ action: "submitted" }),
+			}),
+		);
 		expect(sendText).toHaveBeenCalledWith({}, 200, "OK");
 	});
 
@@ -301,14 +329,14 @@ it("routes signed issue_comment webhooks to the comment handler", async () => {
 			{},
 		);
 
-		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).not.toHaveBeenCalled();
 		expect(sendText).toHaveBeenCalledWith({}, 200, "OK");
 	});
 
 	it("returns 500 when a webhook handler throws", async () => {
 		readBody.mockResolvedValueOnce(Buffer.from('{"action":"created"}'));
 		const handlers = makeHandlers();
-		handlers.handleCommentEvent.mockRejectedValueOnce(new Error("boom"));
+		handlers.handleGitHubEvent.mockRejectedValueOnce(new Error("boom"));
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", handlers as never, {} as never);
 
