@@ -23,6 +23,13 @@ vi.mock("./config.js", () => ({
 		staleThresholdMs: 14400000,
 		maxWorktrees: 10,
 		evictionStrategy: "lru",
+		piAgentModel: undefined,
+		piAgentProvider: undefined,
+		logLevel: "info",
+		logPrompts: true,
+		logThoughts: true,
+		logTools: true,
+		logResponses: true,
 		githubEventMode: "webhook",
 		githubPollIntervalMs: 60000,
 	})),
@@ -83,10 +90,6 @@ vi.mock("./github-events/polling.js", () => ({
 vi.mock("./webhook/handlers.js", () => ({
 	GitHubIssueHandlers: vi.fn(() => ({
 		handleGitHubEvent: vi.fn(),
-		handleIssueEvent: vi.fn(),
-		handleCommentEvent: vi.fn(),
-		handlePullRequestReviewCommentEvent: vi.fn(),
-		handlePullRequestReviewEvent: vi.fn(),
 		isInFlight: vi.fn(() => false),
 		resumeInterruptedSession: vi.fn(),
 	})),
@@ -98,6 +101,7 @@ vi.mock("./webhook/server.js", () => ({
 			if (typeof cb === "function") cb();
 			return { close: vi.fn() };
 		}),
+		close: vi.fn((cb?: (error?: Error) => void) => cb?.()),
 	})),
 	cleanupOldSessions: vi.fn(),
 }));
@@ -117,6 +121,7 @@ vi.mock("./skills/repo-skill-service.js", () => ({
 }));
 
 import { createWebhookServer } from "./webhook/server.js";
+import { PiAgentExecutor } from "./executor/index.js";
 import { main, noOpHandlers } from "./index.js";
 import { GitHubIssueHandlers } from "./webhook/handlers.js";
 import { SessionStore } from "./session/store.js";
@@ -124,6 +129,7 @@ import { SettingsStore } from "./settings/store.js";
 import { isBootstrapComplete, getConfig } from "./config.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
 import { startGitHubPolling } from "./github-events/polling.js";
+import { cleanupOldSessions } from "./webhook/server.js";
 
 describe("main", () => {
 	beforeEach(() => {
@@ -131,10 +137,6 @@ describe("main", () => {
 		vi.mocked(isBootstrapComplete).mockReturnValue(true);
 		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
 			handleGitHubEvent: vi.fn(),
-			handleIssueEvent: vi.fn(),
-			handleCommentEvent: vi.fn(),
-			handlePullRequestReviewCommentEvent: vi.fn(),
-			handlePullRequestReviewEvent: vi.fn(),
 			isInFlight: vi.fn(() => false),
 			resumeInterruptedSession: vi.fn(),
 		}));
@@ -148,15 +150,110 @@ describe("main", () => {
 		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
 	});
 
+	it("uses a dummy onboarding secret when bootstrap is incomplete and no secret is configured", async () => {
+		vi.mocked(getConfig).mockReturnValueOnce({
+			port: 6767,
+			webhookSecret: "",
+			sessionsDir: "/tmp/sessions",
+			archiveDir: "/tmp/sessions/archive",
+			memoryDir: "/tmp/memory",
+			defaultBranch: "main",
+			githubToken: "token",
+			githubUsername: "tars-bot",
+			workspacesDir: "/tmp/workspaces",
+			soulPath: "/tmp/SOUL.md",
+			selfReportEnabled: true,
+			adminUsername: "admin",
+			adminPassword: "secret",
+			adminGithubUsername: "admin",
+			cleanupRetentionDays: undefined,
+			staleThresholdMs: 14400000,
+			maxWorktrees: 10,
+			evictionStrategy: "lru",
+			piAgentModel: undefined,
+			piAgentProvider: undefined,
+			logLevel: "info",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+			githubEventMode: "webhook",
+			githubPollIntervalMs: 60000,
+		});
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
+
+		await main();
+
+		expect(createWebhookServer).toHaveBeenCalledWith(
+			"dummy-onboarding-secret",
+			noOpHandlers,
+			expect.any(Object),
+			undefined,
+			undefined,
+			expect.any(Object),
+			undefined,
+			undefined,
+			undefined,
+			expect.any(Object),
+			undefined,
+			expect.any(Object),
+		);
+	});
+
+	it("starts the full runtime once onboarding completes and only activates once", async () => {
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false).mockReturnValue(true);
+
+		await main();
+		const onboardingOptions = vi.mocked(createWebhookServer).mock.calls[0]?.[9] as {
+			onOnboardingComplete: () => Promise<void>;
+		};
+		const onboardingServer = vi.mocked(createWebhookServer).mock.results[0]?.value;
+
+		await onboardingOptions.onOnboardingComplete();
+		expect(onboardingServer.close).toHaveBeenCalledTimes(1);
+		expect(createWebhookServer).toHaveBeenCalledTimes(2);
+
+		await onboardingOptions.onOnboardingComplete();
+		expect(createWebhookServer).toHaveBeenCalledTimes(2);
+	});
+
+	it("keeps onboarding mode active when bootstrap is still incomplete after a settings refresh", async () => {
+		vi.mocked(isBootstrapComplete).mockReturnValue(false);
+
+		await main();
+		const onboardingOptions = vi.mocked(createWebhookServer).mock.calls[0]?.[9] as {
+			onOnboardingComplete: () => Promise<void>;
+		};
+
+		await onboardingOptions.onOnboardingComplete();
+		expect(createWebhookServer).toHaveBeenCalledTimes(1);
+	});
+
+	it("surfaces onboarding server close errors when activation begins", async () => {
+		const closeError = new Error("close failed");
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false).mockReturnValue(true);
+		vi.mocked(createWebhookServer).mockImplementationOnce(() => ({
+			listen: vi.fn((port, cb) => {
+				if (typeof cb === "function") cb();
+			}),
+			close: vi.fn((cb?: (error?: Error) => void) => cb?.(closeError)),
+		}) as never);
+
+		await main();
+		const onboardingOptions = vi.mocked(createWebhookServer).mock.calls[0]?.[9] as {
+			onOnboardingComplete: () => Promise<void>;
+		};
+
+		await expect(onboardingOptions.onOnboardingComplete()).rejects.toThrow("close failed");
+		expect(createWebhookServer).toHaveBeenCalledTimes(1);
+	});
+
 	it("creates webhook server and listens on configured port", async () => {
 		await main();
 		expect(createWebhookServer).toHaveBeenCalledWith(
 			"secret",
 			expect.objectContaining({
-				handleIssueEvent: expect.any(Function),
-				handleCommentEvent: expect.any(Function),
-				handlePullRequestReviewCommentEvent: expect.any(Function),
-				handlePullRequestReviewEvent: expect.any(Function),
+				handleGitHubEvent: expect.any(Function),
 			}),
 			expect.objectContaining({
 				get: expect.any(Function),
@@ -179,6 +276,9 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
+			expect.objectContaining({
+				execute: expect.any(Function),
+			}),
 		);
 		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
@@ -244,6 +344,9 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
+			expect.objectContaining({
+				execute: expect.any(Function),
+			}),
 		);
 	});
 
@@ -321,6 +424,9 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
+			expect.objectContaining({
+				execute: expect.any(Function),
+			}),
 		);
 	});
 
@@ -439,7 +545,45 @@ describe("main", () => {
 		expect(createWebhookServer).toHaveBeenCalled();
 	});
 
+	it("logs string resume errors from interrupted sessions", async () => {
+		const mockGetAll = vi.fn(async () => [
+			{
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				status: "working",
+				workspacePath: "/tmp/ws",
+				title: "Title",
+				body: "Body",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			},
+		]);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+			getAll: mockGetAll,
+		}));
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
+		mockFn.mockImplementation(() => ({
+			resumeInterruptedSession: vi.fn(async () => { throw "resume string"; }),
+			isInFlight: vi.fn(() => false),
+		}));
+
+		await main();
+
+		expect(stdout).toHaveBeenCalledWith("[startup] failed to resume mbrooks/tars#1: resume string\n");
+	});
+
 	it("runs cleanup when retention is configured", async () => {
+		const originalSetInterval = global.setInterval;
+		const unref = vi.fn();
+		const setIntervalMock = vi.fn((callback: () => void) => {
+			callback();
+			return { unref } as never;
+		});
+		global.setInterval = setIntervalMock as unknown as typeof setInterval;
 		const { getConfig } = await import("./config.js");
 		vi.mocked(getConfig).mockReturnValueOnce({
 			port: 6767,
@@ -470,8 +614,14 @@ describe("main", () => {
 			githubEventMode: "webhook",
 			githubPollIntervalMs: 60000,
 		});
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
+		try {
+			await main();
+			expect(createWebhookServer).toHaveBeenCalled();
+			expect(cleanupOldSessions).toHaveBeenCalledTimes(2);
+			expect(unref).toHaveBeenCalledTimes(1);
+		} finally {
+			global.setInterval = originalSetInterval;
+		}
 	});
 
 	it("handles resume outer catch error", async () => {
@@ -484,7 +634,92 @@ describe("main", () => {
 		expect(createWebhookServer).toHaveBeenCalled();
 	});
 
-	it("re-syncs config to env when settings change", async () => {
+	it("logs string resume outer errors", async () => {
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		(SessionStore as any).mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+			getAll: vi.fn(async () => { throw "resume outer string"; }),
+		}));
+
+		await main();
+
+		expect(stdout).toHaveBeenCalledWith("[startup] resume error: resume outer string\n");
+	});
+
+	it("passes a live model config getter into the executor", async () => {
+		vi.mocked(getConfig)
+			.mockReturnValueOnce({
+				port: 6767,
+				webhookSecret: "secret",
+				sessionsDir: "/tmp/sessions",
+				archiveDir: "/tmp/sessions/archive",
+				memoryDir: "/tmp/memory",
+				defaultBranch: "main",
+				githubToken: "token",
+				githubUsername: "tars-bot",
+				workspacesDir: "/tmp/workspaces",
+				soulPath: "/tmp/SOUL.md",
+				selfReportEnabled: true,
+				adminUsername: "admin",
+				adminPassword: "secret",
+				adminGithubUsername: "admin",
+				cleanupRetentionDays: undefined,
+				staleThresholdMs: 14400000,
+				maxWorktrees: 10,
+				evictionStrategy: "lru",
+				piAgentModel: "initial-model",
+				piAgentProvider: "ollama",
+				logLevel: "info",
+				logPrompts: true,
+				logThoughts: true,
+				logTools: true,
+				logResponses: true,
+				githubEventMode: "webhook",
+				githubPollIntervalMs: 60000,
+			})
+			.mockReturnValue({
+				port: 6767,
+				webhookSecret: "secret",
+				sessionsDir: "/tmp/sessions",
+				archiveDir: "/tmp/sessions/archive",
+				memoryDir: "/tmp/memory",
+				defaultBranch: "main",
+				githubToken: "token",
+				githubUsername: "tars-bot",
+				workspacesDir: "/tmp/workspaces",
+				soulPath: "/tmp/SOUL.md",
+				selfReportEnabled: true,
+				adminUsername: "admin",
+				adminPassword: "secret",
+				adminGithubUsername: "admin",
+				cleanupRetentionDays: undefined,
+				staleThresholdMs: 14400000,
+				maxWorktrees: 10,
+				evictionStrategy: "lru",
+				piAgentModel: "updated-model",
+				piAgentProvider: "github-copilot",
+				logLevel: "info",
+				logPrompts: true,
+				logThoughts: true,
+				logTools: true,
+				logResponses: true,
+				githubEventMode: "webhook",
+				githubPollIntervalMs: 60000,
+			});
+
+		await main();
+		const executorOptions = vi.mocked(PiAgentExecutor).mock.calls[0]?.[0] as {
+			modelConfig: () => { model?: string; provider?: string };
+		};
+
+		expect(executorOptions.modelConfig()).toEqual({
+			model: "updated-model",
+			provider: "github-copilot",
+		});
+	});
+
+	it("re-reads config when settings change", async () => {
 		await main();
 		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
 		expect(settingsStoreMock.onChange).toHaveBeenCalledWith(expect.any(Function));
@@ -492,27 +727,25 @@ describe("main", () => {
 		listener();
 		expect(getConfig).toHaveBeenCalledTimes(2);
 	});
+
+	it("logs settings refresh failures from the change listener", async () => {
+		await main();
+		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+		const listener = settingsStoreMock.onChange.mock.calls[0][0];
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		vi.mocked(getConfig).mockImplementationOnce(() => {
+			throw "boom";
+		});
+
+		listener();
+
+		expect(stdout).toHaveBeenCalledWith("[settings] failed to sync env after change: boom\n");
+	});
 });
 
 describe("noOpHandlers", () => {
-	it("handleIssueEvent does nothing", async () => {
-		await expect(noOpHandlers.handleIssueEvent({})).resolves.toBeUndefined();
-	});
-
 	it("handleGitHubEvent does nothing", async () => {
 		await expect(noOpHandlers.handleGitHubEvent?.({} as never)).resolves.toBeUndefined();
-	});
-
-	it("handleCommentEvent does nothing", async () => {
-		await expect(noOpHandlers.handleCommentEvent({})).resolves.toBeUndefined();
-	});
-
-	it("handlePullRequestReviewCommentEvent does nothing", async () => {
-		await expect(noOpHandlers.handlePullRequestReviewCommentEvent({})).resolves.toBeUndefined();
-	});
-
-	it("handlePullRequestReviewEvent does nothing", async () => {
-		await expect(noOpHandlers.handlePullRequestReviewEvent({})).resolves.toBeUndefined();
 	});
 
 	it("isInFlight returns false", () => {

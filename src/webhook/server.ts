@@ -10,6 +10,7 @@ import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
 import type { PiAgentExecutor } from "../executor/index.js";
+import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
@@ -42,6 +43,7 @@ export function createWebhookServer(
 	skillStore?: SkillStore,
 	repoSkillService?: RepoSkillService,
 	executor?: PiAgentExecutor,
+	startIssueSession?: StartIssueSession,
 ) {
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -55,6 +57,7 @@ export function createWebhookServer(
 		githubService,
 		settingsStore,
 		executor,
+		startIssueSession,
 	);
 
 	serverDeps.skillStore = skillStore;
@@ -125,14 +128,6 @@ export function createWebhookServer(
 				for (const githubEvent of normalized) {
 					await handlers.handleGitHubEvent(githubEvent);
 				}
-			} else if (event === "issues") {
-				await handlers.handleIssueEvent(payload);
-			} else if (event === "issue_comment") {
-				await handlers.handleCommentEvent(payload);
-			} else if (event === "pull_request_review_comment") {
-				await handlers.handlePullRequestReviewCommentEvent(payload);
-			} else if (event === "pull_request_review") {
-				await handlers.handlePullRequestReviewEvent(payload);
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

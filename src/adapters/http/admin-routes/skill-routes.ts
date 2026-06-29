@@ -3,6 +3,7 @@ import { sendJson } from "../response-helpers.js";
 import {
 	AdminRouteRegistry,
 	NotFoundError,
+	getRequiredDeps,
 	mergeRepoAndServerSkills,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
@@ -11,12 +12,10 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/skills$/u,
+		requiresDeps: ["skillStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.skillStore) {
-				sendJson(ctx.response, 500, { error: "Skill store not configured" });
-				return;
-			}
-			const skills = await ctx.deps.skillStore.listAll();
+			const { skillStore } = getRequiredDeps(ctx.deps, ["skillStore"]);
+			const skills = await skillStore.listAll();
 			return { status: 200, body: { skills } };
 		},
 	})
@@ -29,17 +28,15 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/skills$/u,
 		parseBody: true,
 		required: ["name", "content"],
+		requiresDeps: ["skillStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.skillStore) {
-				sendJson(ctx.response, 500, { error: "Skill store not configured" });
-				return;
-			}
+			const { skillStore } = getRequiredDeps(ctx.deps, ["skillStore"]);
 			const body = ctx.body as {
 				name: string;
 				description?: string;
 				content: string;
 			};
-			const skill = await ctx.deps.skillStore.create({
+			const skill = await skillStore.create({
 				name: body.name,
 				description: body.description || "",
 				content: body.content,
@@ -50,13 +47,11 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/skills\/([^/]+)$/u,
+		requiresDeps: ["skillStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.skillStore) {
-				sendJson(ctx.response, 500, { error: "Skill store not configured" });
-				return;
-			}
+			const { skillStore } = getRequiredDeps(ctx.deps, ["skillStore"]);
 			const [id] = ctx.params;
-			const skill = await ctx.deps.skillStore.get(id);
+			const skill = await skillStore.get(id);
 			if (!skill) {
 				throw new NotFoundError("Skill not found");
 			}
@@ -71,11 +66,9 @@ const registry = new AdminRouteRegistry()
 		method: "PATCH",
 		pattern: /^\/api\/skills\/([^/]+)$/u,
 		parseBody: true,
+		requiresDeps: ["skillStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.skillStore) {
-				sendJson(ctx.response, 500, { error: "Skill store not configured" });
-				return;
-			}
+			const { skillStore } = getRequiredDeps(ctx.deps, ["skillStore"]);
 			const [id] = ctx.params;
 			const body = ctx.body as Partial<{
 				name: string;
@@ -83,7 +76,7 @@ const registry = new AdminRouteRegistry()
 				content: string;
 			}>;
 			try {
-				const updated = await ctx.deps.skillStore.update(id, body);
+				const updated = await skillStore.update(id, body);
 				if (!updated) {
 					throw new NotFoundError("Skill not found");
 				}
@@ -101,26 +94,22 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "DELETE",
 		pattern: /^\/api\/skills\/([^/]+)$/u,
+		requiresDeps: ["skillStore"],
 		handler: async (ctx) => {
-			if (!ctx.deps.skillStore) {
-				sendJson(ctx.response, 500, { error: "Skill store not configured" });
-				return;
-			}
+			const { skillStore } = getRequiredDeps(ctx.deps, ["skillStore"]);
 			const [id] = ctx.params;
-			await ctx.deps.skillStore.delete(id);
+			await skillStore.delete(id);
 			return { status: 200, body: { deleted: true } };
 		},
 	})
 	.route({
 		method: "GET",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/skills$/u,
+		requiresDeps: ["repoSkillService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.repoSkillService) {
-				sendJson(ctx.response, 500, { error: "Repo skill service not configured" });
-				return;
-			}
+			const { repoSkillService } = getRequiredDeps(ctx.deps, ["repoSkillService"]);
 			const [owner, repo] = ctx.params;
-			const repoSkills = await ctx.deps.repoSkillService.listRepoSkills(owner, repo);
+			const repoSkills = await repoSkillService.listRepoSkills(owner, repo);
 			const serverSkills = ctx.deps.skillStore ? await ctx.deps.skillStore.listAll() : [];
 			return { status: 200, body: { skills: mergeRepoAndServerSkills(repoSkills, serverSkills) } };
 		},
@@ -134,18 +123,16 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/skills$/u,
 		parseBody: true,
 		required: ["name", "content"],
+		requiresDeps: ["repoSkillService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.repoSkillService) {
-				sendJson(ctx.response, 500, { error: "Repo skill service not configured" });
-				return;
-			}
+			const { repoSkillService } = getRequiredDeps(ctx.deps, ["repoSkillService"]);
 			const [owner, repo] = ctx.params;
 			const body = ctx.body as {
 				name: string;
 				description?: string;
 				content: string;
 			};
-			const result = await ctx.deps.repoSkillService.saveRepoSkill(owner, repo, {
+			const result = await repoSkillService.saveRepoSkill(owner, repo, {
 				name: body.name,
 				description: body.description || "",
 				content: body.content,
@@ -154,7 +141,7 @@ const registry = new AdminRouteRegistry()
 				sendJson(ctx.response, 500, { error: result.error || "Failed to save skill" });
 				return;
 			}
-			const updated = await ctx.deps.repoSkillService.listRepoSkills(owner, repo);
+			const updated = await repoSkillService.listRepoSkills(owner, repo);
 			const found = updated.find((skill) => skill.name === body.name);
 			return { status: 201, body: found ?? { name: body.name } };
 		},
@@ -162,13 +149,11 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/skills\/([^/]+)$/u,
+		requiresDeps: ["repoSkillService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.repoSkillService) {
-				sendJson(ctx.response, 500, { error: "Repo skill service not configured" });
-				return;
-			}
+			const { repoSkillService } = getRequiredDeps(ctx.deps, ["repoSkillService"]);
 			const [owner, repo, name] = ctx.params;
-			const skill = await ctx.deps.repoSkillService.getRepoSkill(owner, repo, name);
+			const skill = await repoSkillService.getRepoSkill(owner, repo, name);
 			if (!skill) {
 				throw new NotFoundError("Skill not found");
 			}
@@ -183,11 +168,9 @@ const registry = new AdminRouteRegistry()
 		method: "PATCH",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/skills\/([^/]+)$/u,
 		parseBody: true,
+		requiresDeps: ["repoSkillService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.repoSkillService) {
-				sendJson(ctx.response, 500, { error: "Repo skill service not configured" });
-				return;
-			}
+			const { repoSkillService } = getRequiredDeps(ctx.deps, ["repoSkillService"]);
 			const [owner, repo, name] = ctx.params;
 			const body = ctx.body as Partial<{
 				name: string;
@@ -195,14 +178,14 @@ const registry = new AdminRouteRegistry()
 				content: string;
 			}>;
 			try {
-				const existing = await ctx.deps.repoSkillService.getRepoSkill(owner, repo, name);
+				const existing = await repoSkillService.getRepoSkill(owner, repo, name);
 				if (!existing) {
 					throw new NotFoundError("Skill not found");
 				}
 				if (body.name !== undefined && body.name !== name) {
-					await ctx.deps.repoSkillService.deleteRepoSkill(owner, repo, name);
+					await repoSkillService.deleteRepoSkill(owner, repo, name);
 				}
-				const result = await ctx.deps.repoSkillService.saveRepoSkill(owner, repo, {
+				const result = await repoSkillService.saveRepoSkill(owner, repo, {
 					name: body.name ?? name,
 					description: body.description ?? existing.description,
 					content: body.content ?? existing.content,
@@ -225,13 +208,11 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "DELETE",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/skills\/([^/]+)$/u,
+		requiresDeps: ["repoSkillService"],
 		handler: async (ctx) => {
-			if (!ctx.deps.repoSkillService) {
-				sendJson(ctx.response, 500, { error: "Repo skill service not configured" });
-				return;
-			}
+			const { repoSkillService } = getRequiredDeps(ctx.deps, ["repoSkillService"]);
 			const [owner, repo, name] = ctx.params;
-			const result = await ctx.deps.repoSkillService.deleteRepoSkill(owner, repo, name);
+			const result = await repoSkillService.deleteRepoSkill(owner, repo, name);
 			if (!result.success) {
 				sendJson(ctx.response, 500, { error: result.error || "Failed to delete skill" });
 				return;

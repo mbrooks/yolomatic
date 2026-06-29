@@ -109,9 +109,8 @@ export class RunSessionCommand {
 					});
 				}
 				if (session.status === "working") {
-					session.status = "cancelled";
-					session.lastActivity = now;
-					await this.sessions.save(session);
+					const updated = await this.sessions.cancelSession(owner, repo, issueNumber);
+					session.status = updated.status;
 				}
 				return ok<CancelResult>({
 					cancelled: false,
@@ -128,20 +127,10 @@ export class RunSessionCommand {
 				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
 				clearSessionLogs(key);
-				const originalStatus = session.status;
-				session.status = "pending";
-				session.summary = undefined;
-				session.prUrl = undefined;
-				session.prNumber = undefined;
-				session.seeded = false;
-				session.iterationCount = undefined;
-				session.restartCount = (session.restartCount ?? 0) + 1;
-				session.restartedFrom = originalStatus;
-				session.lastActivity = now;
-				await this.sessions.save(session);
+				const restarted = await this.sessions.restartSession(owner, repo, issueNumber);
 				return ok<RestartResult>({
 					restarted: true,
-					status: "pending",
+					status: restarted.status,
 					message: "Session restarted. Workspace reset to fresh state. TARS will re-process on the next triggering event.",
 				});
 			}
@@ -151,12 +140,10 @@ export class RunSessionCommand {
 				if (!pauseCheck.ok) {
 					return fail("invalid_state", pauseCheck.reason);
 				}
-				session.status = "paused";
-				session.lastActivity = now;
-				await this.sessions.save(session);
+				const paused = await this.sessions.pauseSession(owner, repo, issueNumber);
 				return ok<PauseResult>({
 					paused: true,
-					status: session.status,
+					status: paused.status,
 					message: "Session paused. It will not be picked up for execution until resumed.",
 				});
 			}
@@ -166,12 +153,10 @@ export class RunSessionCommand {
 				if (!resumeCheck.ok) {
 					return fail("invalid_state", resumeCheck.reason);
 				}
-				session.status = "pending";
-				session.lastActivity = now;
-				await this.sessions.save(session);
+				const resumed = await this.sessions.unpauseSession(owner, repo, issueNumber);
 				return ok<ResumeResult>({
 					resumed: true,
-					status: session.status,
+					status: resumed.status,
 					message: "Session resumed. It will be picked up for execution on the next triggering event.",
 				});
 			}
@@ -191,22 +176,24 @@ export class RunSessionCommand {
 			}
 
 			case "mark-failed": {
-				session.status = "failed";
-				session.summary = "Marked failed by admin cleanup.";
-				session.lastActivity = now;
-				await this.sessions.save(session);
+				let updated = await this.sessions.markFailed(owner, repo, issueNumber);
+				if (!updated.summary) {
+					updated = await this.sessions.updateStatus(owner, repo, issueNumber, updated.status, {
+						summary: "Marked failed by admin cleanup.",
+						staleDetectedAt: updated.staleDetectedAt,
+						staleReason: updated.staleReason,
+					});
+				}
 				return ok<MarkResult>({
-					status: session.status,
+					status: updated.status,
 					message: "Session marked as failed.",
 				});
 			}
 
 			case "mark-complete": {
-				session.status = "complete";
-				session.lastActivity = now;
-				await this.sessions.save(session);
+				const updated = await this.sessions.markComplete(owner, repo, issueNumber);
 				return ok<MarkResult>({
-					status: session.status,
+					status: updated.status,
 					message: "Session marked as complete.",
 				});
 			}

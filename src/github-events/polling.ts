@@ -1,12 +1,12 @@
 import type {
-	AccessibleRepo,
+	GitHubPollingService,
 	PollIssue,
 	PollIssueComment,
 	PollIssueEvent,
 	PollPRReview,
 	PollPRReviewComment,
 	PollPullRequest,
-} from "../ports/github-service.js";
+} from "../ports/github-polling-service.js";
 import type { GitHubEvent, GitHubEventStateStore, GitHubPollSubject } from "./model.js";
 
 const POLL_OVERLAP_MS = 2 * 60 * 1000;
@@ -16,15 +16,7 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export interface GitHubPollingDeps {
-	github: {
-		listAccessibleRepositories(): Promise<AccessibleRepo[]>;
-		listIssuesUpdatedSince(owner: string, repo: string, since: string): Promise<PollIssue[]>;
-		listIssueEventsSince(owner: string, repo: string, since: string): Promise<PollIssueEvent[]>;
-		listIssueCommentsSince(owner: string, repo: string, since: string): Promise<PollIssueComment[]>;
-		listPullRequestsUpdatedSince(owner: string, repo: string, since: string): Promise<PollPullRequest[]>;
-		listPRReviewsSince(owner: string, repo: string, since: string): Promise<PollPRReview[]>;
-		listPRReviewCommentsSince(owner: string, repo: string, since: string): Promise<PollPRReviewComment[]>;
-	};
+	github: GitHubPollingService;
 	dispatch(event: GitHubEvent): Promise<void>;
 	eventStore: GitHubEventStateStore;
 	githubUsername: string;

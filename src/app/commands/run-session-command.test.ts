@@ -19,17 +19,29 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 		delete: vi.fn(),
 		archive: vi.fn(),
 		createSession: vi.fn(),
-		updateStatus: vi.fn(),
+		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
+			...(state as SessionState),
+			status,
+			...updates,
+		})),
 		markSeeded: vi.fn(),
 		associatePR: vi.fn(),
 		incrementIterationCount: vi.fn(),
 		findSessionByPR: vi.fn(),
-		cancelSession: vi.fn(),
-		pauseSession: vi.fn(),
-		unpauseSession: vi.fn(),
-		restartSession: vi.fn(),
-		markComplete: vi.fn(),
-		markFailed: vi.fn(),
+		cancelSession: vi.fn(async () => ({ ...(state as SessionState), status: "cancelled" as const })),
+		pauseSession: vi.fn(async () => ({ ...(state as SessionState), status: "paused" as const })),
+		unpauseSession: vi.fn(async () => ({ ...(state as SessionState), status: "pending" as const })),
+		restartSession: vi.fn(
+			async () =>
+				({
+					...(state as SessionState),
+					status: "pending" as const,
+					summary: undefined,
+					prNumber: undefined,
+				}) satisfies SessionState,
+		),
+		markComplete: vi.fn(async () => ({ ...(state as SessionState), status: "complete" as const })),
+		markFailed: vi.fn(async () => ({ ...(state as SessionState), status: "failed" as const })),
 		markStale: vi.fn(),
 	} as unknown as SessionRepository;
 }
@@ -96,7 +108,7 @@ describe("RunSessionCommand", () => {
 		const { command, repo } = makeCommand(state);
 		const result = await command.execute("mbrooks", "tars", 1, "cancel");
 		expect(result.success).toBe(true);
-		expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: "cancelled" }));
+		expect(repo.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
 	});
 
 	it("pauses a working session", async () => {
@@ -104,7 +116,7 @@ describe("RunSessionCommand", () => {
 		const { command, repo } = makeCommand(state);
 		const result = await command.execute("mbrooks", "tars", 1, "pause");
 		expect(result.success).toBe(true);
-		expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: "paused" }));
+		expect(repo.pauseSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
 	});
 
 	it("rejects pausing an already paused session", async () => {
@@ -122,7 +134,7 @@ describe("RunSessionCommand", () => {
 		const { command, repo } = makeCommand(state);
 		const result = await command.execute("mbrooks", "tars", 1, "resume");
 		expect(result.success).toBe(true);
-		expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: "pending" }));
+		expect(repo.unpauseSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
 	});
 
 	it("rejects resuming a working session", async () => {
@@ -141,9 +153,7 @@ describe("RunSessionCommand", () => {
 		const result = await command.execute("mbrooks", "tars", 1, "restart");
 		expect(result.success).toBe(true);
 		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
-		expect(repo.save).toHaveBeenCalledWith(
-			expect.objectContaining({ status: "pending", summary: undefined, prNumber: undefined }),
-		);
+		expect(repo.restartSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
 	});
 
 	it("rejects restarting a completed session", async () => {
@@ -180,7 +190,14 @@ describe("RunSessionCommand", () => {
 		const { command, repo } = makeCommand(state);
 		const result = await command.execute("mbrooks", "tars", 1, "mark-failed");
 		expect(result.success).toBe(true);
-		expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: "failed" }));
+		expect(repo.markFailed).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			"failed",
+			expect.objectContaining({ summary: "Marked failed by admin cleanup." }),
+		);
 	});
 
 	it("marks session as complete", async () => {
@@ -188,7 +205,7 @@ describe("RunSessionCommand", () => {
 		const { command, repo } = makeCommand(state);
 		const result = await command.execute("mbrooks", "tars", 1, "mark-complete");
 		expect(result.success).toBe(true);
-		expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: "complete" }));
+		expect(repo.markComplete).toHaveBeenCalledWith("mbrooks", "tars", 1);
 	});
 
 	it("archives a session when archiveDir is configured", async () => {

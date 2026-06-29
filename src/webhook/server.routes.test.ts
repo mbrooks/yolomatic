@@ -9,6 +9,7 @@ import WebSocket from "ws";
 
 import { createWebhookServer, cleanupOldSessions, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
+import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 
 import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
 import { SettingsStore } from "../settings/store.js";
@@ -34,6 +35,48 @@ function makeRequest(
 		req.end();
 	});
 }
+
+function makeWebhookHandlers() {
+	return {
+		handleGitHubEvent: vi.fn(async () => {}),
+		isInFlight: vi.fn(() => false),
+	};
+}
+
+declare module "./handlers.js" {
+	interface GitHubIssueHandlers {
+		handleIssueEvent(payload: unknown): Promise<void>;
+		handleCommentEvent(payload: unknown): Promise<void>;
+		handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
+		handlePullRequestReviewEvent(payload: unknown): Promise<void>;
+	}
+}
+
+async function dispatchWebhook(
+	handlers: GitHubIssueHandlers,
+	event: string,
+	payload: unknown,
+): Promise<void> {
+	const [normalized] = normalizeWebhookEvent(event, payload, "test-delivery");
+	expect(normalized).toBeDefined();
+	await handlers.handleGitHubEvent(normalized!);
+}
+
+GitHubIssueHandlers.prototype.handleIssueEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "issues", payload);
+};
+
+GitHubIssueHandlers.prototype.handleCommentEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "issue_comment", payload);
+};
+
+GitHubIssueHandlers.prototype.handlePullRequestReviewCommentEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "pull_request_review_comment", payload);
+};
+
+GitHubIssueHandlers.prototype.handlePullRequestReviewEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "pull_request_review", payload);
+};
 
 describe("verifySignature", () => {
 	it("accepts a valid GitHub webhook signature", () => {
@@ -118,6 +161,13 @@ describe("GitHubIssueHandlers", () => {
 							seeded: false,
 						};
 			}),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 99,
 				repo: "tars",
@@ -217,6 +267,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 42,
 				repo: "tars",
@@ -363,6 +420,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 42,
 				repo: "tars",
@@ -460,6 +524,13 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => {
 				if (storedSession) {
 					storedSession.status = status;
@@ -549,6 +620,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -640,6 +718,13 @@ describe("GitHubIssueHandlers", () => {
 					seeded: false,
 				};
 			}),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -762,6 +847,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
 				issueNumber: 7,
 				repo: "tars",
@@ -869,6 +961,13 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => {
 				if (storedSession) {
 					storedSession.status = status;
@@ -957,6 +1056,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1092,6 +1198,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1225,6 +1338,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
 				repo: "teamhub-case",
@@ -1332,6 +1452,13 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => null),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -1418,6 +1545,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1498,6 +1632,13 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 				resumeOnBoot: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1586,6 +1727,13 @@ describe("GitHubIssueHandlers", () => {
 				resumeOnBoot: true,
 				queuedComments: ["Please also add tests."],
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
 				repo: "tars",
@@ -1662,6 +1810,13 @@ describe("GitHubIssueHandlers", () => {
 				status: "complete" as const,
 				lastActivity: new Date().toISOString(),
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
@@ -1705,6 +1860,13 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -1792,6 +1954,13 @@ describe("GitHubIssueHandlers", () => {
 				prNumber: 99,
 				prUrl: "https://github.com/mbrooks/tars/pull/99",
 			})),
+			get(owner: string, repo: string, issueNumber: number) {
+				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
+					owner,
+					repo,
+					issueNumber,
+				);
+			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
@@ -1867,7 +2036,7 @@ describe("createWebhookServer", () => {
 	}
 
 	it("returns 404 for non-POST or non-/webhook routes", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1882,7 +2051,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("returns 401 for invalid signature", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1900,13 +2069,17 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("calls handleIssueEvent for valid issues webhook", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+	it("calls handleGitHubEvent for valid issues webhook", async () => {
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "opened" });
+		const payload = JSON.stringify({
+			action: "opened",
+			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
 		const response = await makeRequest(
@@ -1923,26 +2096,34 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handleIssueEvent).toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "issue",
+				owner: "mbrooks",
+				repo: "tars",
+				payload: expect.objectContaining({ action: "opened" }),
+			}),
+		);
 
 		server.close();
 	});
 
 	it("returns 500 when handler throws", async () => {
 		const handlers = {
-			handleIssueEvent: vi.fn(async () => {
+			handleGitHubEvent: vi.fn(async () => {
 				throw new Error("boom");
 			}),
-			handleCommentEvent: vi.fn(),
-			handlePullRequestReviewCommentEvent: vi.fn(),
-			handlePullRequestReviewEvent: vi.fn(),
 			isInFlight: vi.fn(() => false),
 		};
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "opened" });
+		const payload = JSON.stringify({
+			action: "opened",
+			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
 		const response = await makeRequest(
@@ -1963,7 +2144,7 @@ describe("createWebhookServer", () => {
 	});
 
 	it("ignores unsupported events and returns 200", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -1984,20 +2165,14 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
-		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).not.toHaveBeenCalled();
 
 		server.close();
 	});
 
 	it("returns 401 when signature header is missing", async () => {
 		const handlers = {
-			handleIssueEvent: vi.fn(),
-			handleCommentEvent: vi.fn(),
-			handlePullRequestReviewCommentEvent: vi.fn(),
-			handlePullRequestReviewEvent: vi.fn(),
+			handleGitHubEvent: vi.fn(),
 			isInFlight: vi.fn(() => false),
 		};
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
@@ -2022,13 +2197,17 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("calls handlePullRequestReviewCommentEvent for valid PR review comment webhook", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+	it("calls handleGitHubEvent for valid PR review comment webhook", async () => {
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "created", comment: {} });
+		const payload = JSON.stringify({
+			action: "created",
+			comment: { id: 2, created_at: "2026-06-28T00:00:00.000Z" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
 		const response = await makeRequest(
@@ -2045,18 +2224,27 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handlePullRequestReviewCommentEvent).toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "pull_request_review_comment",
+				payload: expect.objectContaining({ action: "created" }),
+			}),
+		);
 
 		server.close();
 	});
 
-	it("calls handlePullRequestReviewEvent for valid PR review webhook", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+	it("calls handleGitHubEvent for valid PR review webhook", async () => {
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "submitted", review: {} });
+		const payload = JSON.stringify({
+			action: "submitted",
+			review: { id: 3, submitted_at: "2026-06-28T00:00:00.000Z" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
 		const response = await makeRequest(
@@ -2073,13 +2261,18 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handlePullRequestReviewEvent).toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "pull_request_review",
+				payload: expect.objectContaining({ action: "submitted" }),
+			}),
+		);
 
 		server.close();
 	});
 
 	it("ignores event when x-github-event header is missing", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -2099,10 +2292,7 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handleIssueEvent).not.toHaveBeenCalled();
-		expect(handlers.handleCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewCommentEvent).not.toHaveBeenCalled();
-		expect(handlers.handlePullRequestReviewEvent).not.toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).not.toHaveBeenCalled();
 
 		server.close();
 	});
@@ -3938,12 +4128,16 @@ describe("createWebhookServer", () => {
 	});
 
 	it("handles issue_comment webhook through server", async () => {
-		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const handlers = makeWebhookHandlers();
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const payload = JSON.stringify({ action: "created", comment: { body: "hello" } });
+		const payload = JSON.stringify({
+			action: "created",
+			comment: { id: 4, body: "hello", created_at: "2026-06-28T00:00:00.000Z" },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
 		const response = await makeRequest(
@@ -3959,7 +4153,12 @@ describe("createWebhookServer", () => {
 			payload,
 		);
 		expect(response.statusCode).toBe(200);
-		expect(handlers.handleCommentEvent).toHaveBeenCalled();
+		expect(handlers.handleGitHubEvent).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "issue_comment",
+				payload: expect.objectContaining({ action: "created" }),
+			}),
+		);
 
 		server.close();
 	});

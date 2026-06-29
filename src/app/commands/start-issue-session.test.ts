@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StartIssueSession } from "./start-issue-session.js";
+import { createStartIssueSession, StartIssueSession } from "./start-issue-session.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
@@ -147,6 +147,38 @@ function makeCommand(
 }
 
 describe("StartIssueSession", () => {
+	it("builds the command from a shared factory", () => {
+		const repo = makeMockRepo(null);
+		const workspaces = {
+			createOrGetWorktree: vi.fn(),
+			removeWorktree: vi.fn(),
+			commitAndPush: vi.fn(),
+			commitAndPushPath: vi.fn(),
+			hasChanges: vi.fn(),
+			getWorktreePath: vi.fn(),
+			getGitStatus: vi.fn(),
+			getGitDiff: vi.fn(),
+		} as unknown as WorkspaceService;
+		const github = { updateIssueAssignees: vi.fn() } as unknown as GitHubService;
+		const tasks = { isActive: vi.fn(() => false) } as unknown as TaskControlService;
+		const executor = { execute: vi.fn() } as unknown as ExecutionService;
+		const clock: Clock = { now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 };
+
+		const command = createStartIssueSession({
+			sessions: repo,
+			workspaces,
+			github,
+			tasks,
+			executor,
+			clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		expect(command).toBeInstanceOf(StartIssueSession);
+	});
+
 	it("assigns issue, creates session, and starts execution", async () => {
 		const { command, github, executor } = makeCommand(null);
 		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", ["bug"]);

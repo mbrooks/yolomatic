@@ -14,6 +14,19 @@ export interface StartIssueSessionResult {
 	message: string;
 }
 
+export interface StartIssueSessionDeps {
+	sessions: SessionRepository;
+	workspaces: WorkspaceService;
+	github: GitHubService;
+	tasks: TaskControlService;
+	executor: ExecutionService;
+	clock: Clock;
+	defaultBranch: string;
+	resolveDefaultBranch?: (owner: string, repo: string) => string;
+	githubUsername: string;
+	selfReportEnabled: boolean;
+}
+
 export class StartIssueSession {
 	constructor(
 		private readonly sessions: SessionRepository,
@@ -107,4 +120,18 @@ export class StartIssueSession {
 			return fail("internal", message);
 		}
 	}
+}
+
+export function createStartIssueSession(deps: StartIssueSessionDeps): StartIssueSession {
+	return new StartIssueSession(
+		deps.sessions,
+		deps.workspaces,
+		deps.github,
+		deps.tasks,
+		deps.executor,
+		deps.clock,
+		deps.resolveDefaultBranch ?? deps.defaultBranch,
+		deps.githubUsername,
+		deps.selfReportEnabled,
+	);
 }
