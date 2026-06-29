@@ -317,6 +317,106 @@ describe("handleRepoRoutes", () => {
 		});
 	});
 
+	describe("DELETE /api/repos/:owner/:repo", () => {
+		it("removes the configured repository and persists the remaining list", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => {
+					if (key === "configured_repositories") {
+						return JSON.stringify([
+							{ owner: "mbrooks", repo: "tars" },
+							{ owner: "octocat", repo: "hello-world" },
+						]);
+					}
+					return undefined;
+				}),
+				set: vi.fn(),
+			};
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars", "DELETE"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/mbrooks/tars",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.removed).toBe(true);
+			expect(store.set).toHaveBeenCalledWith(
+				"configured_repositories",
+				JSON.stringify([{ owner: "octocat", repo: "hello-world" }]),
+			);
+		});
+
+		it("matches owner and repo case-insensitively", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => {
+					if (key === "configured_repositories") {
+						return JSON.stringify([{ owner: "Mbrooks", repo: "Tars" }]);
+					}
+					return undefined;
+				}),
+				set: vi.fn(),
+			};
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars", "DELETE"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/mbrooks/tars",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.removed).toBe(true);
+			expect(store.set).toHaveBeenCalledWith("configured_repositories", JSON.stringify([]));
+		});
+
+		it("returns removed:false when the repository is not configured", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => {
+					if (key === "configured_repositories") {
+						return JSON.stringify([{ owner: "octocat", repo: "hello-world" }]);
+					}
+					return undefined;
+				}),
+				set: vi.fn(),
+			};
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars", "DELETE"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/mbrooks/tars",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.removed).toBe(false);
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/tars", "DELETE"),
+				res,
+				makeDeps({ settingsStore: undefined }),
+				"/api/repos/mbrooks/tars",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Settings store not configured");
+		});
+	});
+
 	describe("POST /api/repos/:owner/:repo/issues/:number/assign", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();

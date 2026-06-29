@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchRepoSettings, updateRepoSettings, type RepoSettingView } from "../../api/repo-settings.js";
+import { removeRepo } from "../../api/repos.js";
+import { navigate } from "../../app/routes.js";
 import { RepoScopedScreenShell } from "../../components/RepoScopedScreenShell.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 
@@ -17,6 +19,7 @@ export function RepoSettingsScreen({
 	const [settings, setSettings] = useState<RepoSettingView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [removing, setRemoving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [pendingRestart, setPendingRestart] = useState(false);
 	const [edited, setEdited] = useState<Record<string, string>>({});
@@ -66,6 +69,21 @@ export function RepoSettingsScreen({
 			setSaving(false);
 		}
 	}, [changedKeys, edited, load, owner, repo]);
+
+	const handleRemove = useCallback(async () => {
+		if (!window.confirm(`Are you sure you want to remove ${owner}/${repo}?`)) {
+			return;
+		}
+		setRemoving(true);
+		setError(null);
+		try {
+			await removeRepo(owner, repo);
+			navigate({ screen: "repos" });
+		} catch (err) {
+			setError(err instanceof Error ? err.message : String(err));
+			setRemoving(false);
+		}
+	}, [owner, repo]);
 
 	const empty = useMemo(() => settings.length === 0 && !loading, [settings.length, loading]);
 
@@ -135,6 +153,18 @@ export function RepoSettingsScreen({
 						disabled={saving || changedKeys.size === 0}
 					>
 						{saving ? "Saving..." : "Save Changes"}
+					</button>
+				</div>
+				<div className="settings-actions danger-zone">
+					<button
+						className="action-btn delete"
+						type="button"
+						onClick={() => {
+							void handleRemove();
+						}}
+						disabled={removing}
+					>
+						{removing ? "Removing..." : "Remove Repository"}
 					</button>
 				</div>
 			</div>

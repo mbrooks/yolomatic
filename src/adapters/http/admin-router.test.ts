@@ -48,7 +48,7 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 	return res;
 }
 
-describe("handleAdminRoute", () => {
+describe.sequential("handleAdminRoute", () => {
 	let store: SettingsStore;
 	let deps: Parameters<typeof handleAdminRoute>[2];
 	let githubService: {
