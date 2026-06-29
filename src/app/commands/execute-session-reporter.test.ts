@@ -20,6 +20,7 @@ function makeDeps() {
 			createOrGetWorktree: vi.fn(),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(),
+			commitAndPushPath: vi.fn(async () => true),
 			hasChanges: vi.fn(),
 			getWorktreePath: vi.fn(),
 			getGitStatus: vi.fn(async () => " M src/main.ts"),
@@ -53,7 +54,7 @@ describe("ExecuteSessionReporter", () => {
 	it("posts generic failure comment for non-rate-limit errors", async () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
-		await reporter.postFailureComment("mbrooks", "tars", 1, new Error("something blew up"), "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "tars", new Error("something blew up"), "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -71,7 +72,7 @@ describe("ExecuteSessionReporter", () => {
 	it("posts generic failure comment when error is not an Error instance", async () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
-		await reporter.postFailureComment("mbrooks", "tars", 1, "plain string error", "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "tars", "plain string error", "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -85,7 +86,7 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error("boom");
 		error.stack = "x".repeat(4000);
-		await reporter.postFailureComment("mbrooks", "tars", 1, error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "tars", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -99,7 +100,7 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error("no stack");
 		delete (error as Error & { stack?: string }).stack;
-		await reporter.postFailureComment("mbrooks", "tars", 1, error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "tars", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -112,7 +113,7 @@ describe("ExecuteSessionReporter", () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error('429 "you (aubiematt) have reached your weekly usage limit..."');
-		await reporter.postFailureComment("mbrooks", "tars", 1, error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "tars", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -130,6 +131,124 @@ describe("ExecuteSessionReporter", () => {
 			"tars",
 			1,
 			expect.not.stringContaining("Full trace"),
+		);
+	});
+
+	it("posts failure comments to PRs", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.postFailureComment(
+			{ kind: "pull_request", number: 99 },
+			"mbrooks",
+			"tars",
+			new Error("review failed"),
+			"Processing PR review",
+		);
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("**TARS failed.**"),
+		);
+	});
+
+	it("handles waiting-feedback for issue targets", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.handleExecutionResult({
+			owner: "mbrooks",
+			repo: "tars",
+			sessionIssueNumber: 1,
+			target: { kind: "issue", number: 1 },
+			result: { status: "waiting-feedback", summary: "Need more detail", rawResponse: "" },
+			context: "Processing issue",
+			state: {
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			},
+		});
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "waiting-feedback");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-feedback-required"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("Need clarification:"),
+		);
+	});
+
+	it("handles complete results for PR targets", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.handleExecutionResult({
+			owner: "mbrooks",
+			repo: "tars",
+			sessionIssueNumber: 1,
+			target: { kind: "pull_request", number: 99 },
+			result: { status: "complete", summary: "Fixed the bug.", rawResponse: "" },
+			context: "Processing PR review",
+			state: {
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				labels: ["bug"],
+				branch: "tars/issue-1",
+			},
+		});
+		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "tars/issue-1", "fix: Fix the bug");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("iteration complete"),
+		);
+	});
+
+	it("handles failed results for PR targets", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.handleExecutionResult({
+			owner: "mbrooks",
+			repo: "tars",
+			sessionIssueNumber: 1,
+			target: { kind: "pull_request", number: 99 },
+			result: { status: "failed", summary: "plain failure", rawResponse: "" },
+			context: "Processing PR review",
+			state: {
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 1,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			},
+		});
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("**TARS failed.**"),
 		);
 	});
 

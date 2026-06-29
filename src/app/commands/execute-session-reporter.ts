@@ -7,9 +7,15 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { SessionState } from "../../session/store.js";
 import type { FatalErrorCategory } from "../../self-monitor/types.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
-import { isRateLimitError } from "../../executor/index.js";
+import { isRateLimitError, type ExecutionResult } from "../../executor/index.js";
+import { generateCommitMessage } from "../../workspace/commit-message.js";
+import { removeWorkflowLabels } from "./workflow-helpers.js";
 
 const execFileAsync = promisify(execFile);
+
+type ExecutionCommentTarget =
+	| { kind: "issue"; number: number }
+	| { kind: "pull_request"; number: number };
 
 export class ExecuteSessionReporter {
 	constructor(
@@ -22,9 +28,9 @@ export class ExecuteSessionReporter {
 	) {}
 
 	async postFailureComment(
+		target: ExecutionCommentTarget,
 		owner: string,
 		repo: string,
-		issueNumber: number,
 		error: unknown,
 		context: string,
 	): Promise<void> {
@@ -37,7 +43,7 @@ export class ExecuteSessionReporter {
 				"",
 				`Error: ${message}`,
 			].join("\n");
-			await this.deps.github.postComment(owner, repo, issueNumber, body);
+			await this.postComment(target, owner, repo, body);
 			return;
 		}
 		const stack = error instanceof Error ? error.stack ?? "" : "";
@@ -53,7 +59,113 @@ export class ExecuteSessionReporter {
 			`<pre>${truncatedStack}</pre>`,
 			"</details>",
 		].join("\n");
-		await this.deps.github.postComment(owner, repo, issueNumber, body);
+		await this.postComment(target, owner, repo, body);
+	}
+
+	async handleExecutionFailure(args: {
+		owner: string;
+		repo: string;
+		sessionIssueNumber: number;
+		target: ExecutionCommentTarget;
+		error: unknown;
+		context: string;
+	}): Promise<void> {
+		await this.postFailureComment(args.target, args.owner, args.repo, args.error, args.context);
+		await this.deps.sessions.updateStatus(args.owner, args.repo, args.sessionIssueNumber, "failed");
+		if (args.target.kind === "issue") {
+			await removeWorkflowLabels(this.deps.github, args.owner, args.repo, args.sessionIssueNumber);
+			await this.deps.github.addLabels(args.owner, args.repo, args.sessionIssueNumber, ["tars-failed"]);
+		}
+	}
+
+	async handleExecutionResult(args: {
+		owner: string;
+		repo: string;
+		sessionIssueNumber: number;
+		target: ExecutionCommentTarget;
+		result: ExecutionResult;
+		context: string;
+		state: SessionState;
+	}): Promise<void> {
+		const { owner, repo, sessionIssueNumber, target, result, context, state } = args;
+
+		if (target.kind === "issue") {
+			await removeWorkflowLabels(this.deps.github, owner, repo, sessionIssueNumber);
+		}
+
+		if (result.status === "waiting-feedback") {
+			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "waiting-feedback");
+			if (target.kind === "issue") {
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-feedback-required"]);
+			}
+			await this.postComment(
+				target,
+				owner,
+				repo,
+				[
+					"Need clarification:",
+					result.summary || "TARS needs more information before continuing.",
+				].join("\n\n"),
+			);
+			return;
+		}
+
+		if (result.status === "cancelled") {
+			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "cancelled");
+			if (target.kind === "issue") {
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-cancelled"]);
+			}
+			await this.postComment(
+				target,
+				owner,
+				repo,
+				[
+					"Task cancelled by admin.",
+					"",
+					result.summary || this.defaultCancelledSummary(target),
+					"",
+					"TARS is idle and ready for the next task.",
+				].join("\n"),
+			);
+			return;
+		}
+
+		if (result.status === "failed") {
+			await this.handleExecutionFailure({
+				owner,
+				repo,
+				sessionIssueNumber,
+				target,
+				error: new Error(result.summary),
+				context,
+			});
+			return;
+		}
+
+		if (result.status === "complete") {
+			if (target.kind === "pull_request") {
+				await this.handlePullRequestCompletion(owner, repo, sessionIssueNumber, target.number, state, result);
+				return;
+			}
+			throw new Error("Issue completion should be handled by ExecuteSessionDelivery.");
+		}
+
+		await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "working");
+		if (target.kind === "issue") {
+			await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-working"]);
+		}
+		await this.postComment(
+			target,
+			owner,
+			repo,
+			[
+				target.kind === "issue"
+					? "TARS is still working on this issue."
+					: "TARS is still working on the review feedback.",
+				"",
+				result.summary || "Execution is in progress.",
+			].join("\n"),
+		);
 	}
 
 	async handleDeliveryFailure(
@@ -215,5 +327,66 @@ export class ExecuteSessionReporter {
 		const body = SelfMonitor.formatBugReportBody(error.evidence);
 		const title = SelfMonitor.getIssueTitle(error.evidence);
 		return this.deps.github.fileSelfReport(title, body, ["tars-self-report", "bug"]);
+	}
+
+	private async handlePullRequestCompletion(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		prNumber: number,
+		state: SessionState,
+		result: ExecutionResult,
+	): Promise<void> {
+		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
+		const pushed = await this.deps.workspaces.commitAndPushPath(
+			state.workspacePath,
+			branchName,
+			generateCommitMessage(state.labels, issueNumber, result.summary),
+		);
+		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
+		if (pushed) {
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"**TARS iteration complete.**",
+					"",
+					"Changes pushed to the PR branch.",
+					"",
+					"Summary:",
+					result.summary || "No summary provided.",
+				].join("\n"),
+			);
+			return;
+		}
+
+		await this.deps.github.postPRComment(
+			owner,
+			repo,
+			prNumber,
+			[
+				"**TARS iteration complete.**",
+				"",
+				"No changes were needed.",
+				"",
+				"Summary:",
+				result.summary || "No summary provided.",
+			].join("\n"),
+		);
+	}
+
+	private defaultCancelledSummary(target: ExecutionCommentTarget): string {
+		return target.kind === "issue"
+			? "TARS has stopped working on this issue."
+			: "TARS has stopped working on this review.";
+	}
+
+	private async postComment(target: ExecutionCommentTarget, owner: string, repo: string, body: string): Promise<void> {
+		if (target.kind === "issue") {
+			await this.deps.github.postComment(owner, repo, target.number, body);
+			return;
+		}
+		await this.deps.github.postPRComment(owner, repo, target.number, body);
 	}
 }

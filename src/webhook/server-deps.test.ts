@@ -136,4 +136,27 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.settingsStore).toBe(settingsStore);
 		expect(deps.startIssueSession).toBeDefined();
 	});
+
+	it("reuses a prebuilt StartIssueSession command when provided", () => {
+		const prebuiltStartIssueSession = {
+			execute: vi.fn(),
+		} as never;
+
+		const deps = createWebhookServerDeps(
+			createSessionStore(),
+			"admin",
+			"secret",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			prebuiltStartIssueSession,
+		);
+
+		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);
+	});
 });

@@ -1,9 +1,57 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { GitHubIssueHandlers } from "./handlers.js";
+import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
+
+declare module "./handlers.js" {
+	interface GitHubIssueHandlers {
+		handleIssueEvent(payload: unknown): Promise<void>;
+		handleCommentEvent(payload: unknown): Promise<void>;
+		handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
+		handlePullRequestReviewEvent(payload: unknown): Promise<void>;
+	}
+}
+
+async function dispatchWebhook(
+	handlers: GitHubIssueHandlers,
+	event: string,
+	payload: unknown,
+): Promise<void> {
+	const [normalized] = normalizeWebhookEvent(event, payload, "test-delivery");
+	expect(normalized).toBeDefined();
+	await handlers.handleGitHubEvent(normalized!);
+}
+
+GitHubIssueHandlers.prototype.handleIssueEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "issues", payload);
+};
+
+GitHubIssueHandlers.prototype.handleCommentEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "issue_comment", payload);
+};
+
+GitHubIssueHandlers.prototype.handlePullRequestReviewCommentEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "pull_request_review_comment", payload);
+};
+
+GitHubIssueHandlers.prototype.handlePullRequestReviewEvent = async function (payload: unknown): Promise<void> {
+	await dispatchWebhook(this, "pull_request_review", payload);
+};
 
 describe("GitHubIssueHandlers PR review delegation", () => {
 	function createDeps() {
+		const getSession = vi.fn(async () => ({
+			issueNumber: 56,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete" as never,
+			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+		}));
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -36,18 +84,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			getSession: vi.fn(async () => ({
-				issueNumber: 56,
-				repo: "tars",
-				owner: "mbrooks",
-				title: "Title",
-				body: "Body",
-				status: "complete" as never,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-				lastActivity: new Date().toISOString(),
-				seeded: true,
-			})),
+			get: getSession,
+			getSession,
 			updateStatus: vi.fn(async () => ({
 				issueNumber: 56,
 				repo: "tars",

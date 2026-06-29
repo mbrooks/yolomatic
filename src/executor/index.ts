@@ -13,7 +13,7 @@ import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
-import { resolveConfiguredModel } from "./model-selection.js";
+import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
@@ -24,11 +24,15 @@ export { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRRevi
 export { extractText, getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 export { loadSoulContent } from "./soul-loader.js";
 
+type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
+
 export class PiAgentExecutor implements ExecutionService {
 	private readonly soulPath: string;
+	private readonly modelConfig: ModelConfigProvider;
 
-	constructor(options: { soulPath: string }) {
+	constructor(options: { soulPath: string; modelConfig?: ModelConfigProvider }) {
 		this.soulPath = options.soulPath;
+		this.modelConfig = options.modelConfig;
 	}
 
 	execute(
@@ -106,10 +110,12 @@ export class PiAgentExecutor implements ExecutionService {
 
 		const authStorage = AuthStorage.create();
 		const modelRegistry = createTarsModelRegistry(authStorage);
-		const configuredModel = resolveConfiguredModel(modelRegistry);
-		if (process.env.PI_AGENT_MODEL?.trim() && !configuredModel) {
+		const configuredModelOverride = this.getModelConfig();
+		const configuredModel = resolveConfiguredModel(modelRegistry, configuredModelOverride);
+		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();
+		if (configuredModelName && !configuredModel) {
 			process.stderr.write(
-				`Warning: PI_AGENT_MODEL=${process.env.PI_AGENT_MODEL} did not resolve to a configured Pi model; falling back to Pi defaults.\n`,
+				`Warning: configured Pi model ${configuredModelName} did not resolve; falling back to Pi defaults.\n`,
 			);
 		}
 
@@ -120,12 +126,12 @@ export class PiAgentExecutor implements ExecutionService {
 			level: "info",
 			message:
 				`Using model: ${resolvedModelId}` +
-				(process.env.PI_AGENT_MODEL?.trim() && !configuredModel ? " (PI_AGENT_MODEL unresolved, fell back)" : ""),
+				(configuredModelName && !configuredModel ? " (configured model unresolved, fell back)" : ""),
 			details: {
 				type: "model",
 				provider: configuredModel?.provider,
 				modelId: configuredModel?.id,
-				configured: process.env.PI_AGENT_MODEL?.trim() ?? null,
+				configured: configuredModelName ?? null,
 			},
 		});
 
@@ -285,5 +291,12 @@ export class PiAgentExecutor implements ExecutionService {
 		notifyActivity();
 
 		return parseExecutionResult(rawResponse);
+	}
+
+	private getModelConfig(): ConfiguredModelOverride | undefined {
+		if (typeof this.modelConfig === "function") {
+			return this.modelConfig();
+		}
+		return this.modelConfig;
 	}
 }

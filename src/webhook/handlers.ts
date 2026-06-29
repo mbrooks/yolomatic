@@ -1,6 +1,5 @@
 import { Octokit } from "@octokit/rest";
 
-import type { SessionRepository } from "../ports/session-repository.js";
 import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
@@ -16,91 +15,11 @@ import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-ses
 import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
 import type { GitHubEvent, GitHubEventStateStore } from "../github-events/model.js";
-import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventMode } from "../repos/configured-repositories.js";
-
-interface IssueLabel {
-	name?: string;
-}
-
-interface IssuePayload {
-	action: string;
-	issue: {
-		number: number;
-		title: string;
-		body: string | null;
-		labels?: IssueLabel[];
-		assignee?: { login: string } | null;
-		assignees?: { login: string }[];
-		user?: { login: string };
-	};
-	repository: {
-		name: string;
-		owner: {
-			login: string;
-		};
-	};
-	sender: {
-		login: string;
-	};
-	changes?: {
-		body?: { from: string };
-		title?: { from: string };
-	};
-}
-
-interface CommentPayload {
-	action: string;
-	issue: {
-		number: number;
-		title?: string;
-		body?: string | null;
-		pull_request?: {
-			url: string;
-		};
-		labels?: IssueLabel[];
-		assignee?: { login: string } | null;
-		assignees?: { login: string }[];
-		user?: { login: string };
-	};
-	comment: {
-		id?: number;
-		body: string;
-		user: {
-			login: string;
-			type?: string;
-		};
-	};
-	repository: {
-		name: string;
-		owner: {
-			login: string;
-		};
-	};
-	sender: {
-		login: string;
-	};
-}
 
 export interface WebhookHandlers {
 	handleGitHubEvent?(event: GitHubEvent): Promise<void>;
-	handleIssueEvent(payload: unknown): Promise<void>;
-	handleCommentEvent(payload: unknown): Promise<void>;
-	handlePullRequestReviewCommentEvent(payload: unknown): Promise<void>;
-	handlePullRequestReviewEvent(payload: unknown): Promise<void>;
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean;
-}
-
-function asSessionRepository(manager: SessionManager): SessionRepository {
-	return new Proxy(manager, {
-		get(target, prop) {
-			if (prop === "get") {
-				return target.getSession.bind(target);
-			}
-			const value = (target as unknown as Record<string, unknown>)[prop as string];
-			return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
-		},
-	}) as SessionRepository;
 }
 
 export class GitHubIssueHandlers implements WebhookHandlers {
@@ -128,7 +47,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			eventStore?: GitHubEventStateStore;
 		},
 	) {
-		const sessions = asSessionRepository(deps.sessionManager);
+		const sessions = deps.sessionManager;
 		const workspaces = deps.workspaceManager;
 		const executor = deps.executor;
 		const tasks = deps.taskController ?? new TaskController();
@@ -211,30 +130,6 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			}
 		}
 		await this.dispatcher.dispatch(event);
-	}
-
-	async handleIssueEvent(rawPayload: unknown): Promise<void> {
-		for (const event of normalizeWebhookEvent("issues", rawPayload)) {
-			await this.handleGitHubEvent(event);
-		}
-	}
-
-	async handleCommentEvent(rawPayload: unknown): Promise<void> {
-		for (const event of normalizeWebhookEvent("issue_comment", rawPayload)) {
-			await this.handleGitHubEvent(event);
-		}
-	}
-
-	async handlePullRequestReviewCommentEvent(payload: unknown): Promise<void> {
-		for (const event of normalizeWebhookEvent("pull_request_review_comment", payload)) {
-			await this.handleGitHubEvent(event);
-		}
-	}
-
-	async handlePullRequestReviewEvent(payload: unknown): Promise<void> {
-		for (const event of normalizeWebhookEvent("pull_request_review", payload)) {
-			await this.handleGitHubEvent(event);
-		}
 	}
 
 	async resumeInterruptedSession(owner: string, repo: string, issueNumber: number): Promise<void> {

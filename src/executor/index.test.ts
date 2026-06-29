@@ -421,10 +421,12 @@ describe("PiAgentExecutor", () => {
 		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
 		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
 		const { mockSession } = mockSuccessfulSession();
-		process.env.PI_AGENT_MODEL = "kimi-k2.7-code:cloud";
 		const onSessionCreated = vi.fn();
 
-		const executor = new PiAgentExecutor({ soulPath });
+		const executor = new PiAgentExecutor({
+			soulPath,
+			modelConfig: { model: "kimi-k2.7-code:cloud" },
+		});
 		const result = await executor.executeWithOverride(makeState(7), "custom prompt", undefined, onSessionCreated);
 
 		expect(result.status).toBe("complete");
@@ -447,17 +449,19 @@ describe("PiAgentExecutor", () => {
 		expect(reviewSession.prompt).toHaveBeenCalledWith(expect.stringContaining("PR review feedback received"));
 	});
 
-	it("warns when PI_AGENT_MODEL is configured but cannot be resolved", async () => {
+	it("warns when the configured model cannot be resolved", async () => {
 		const soulPath = await makeSoulPath();
 		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
-		process.env.PI_AGENT_MODEL = "missing-model";
 		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
-		const executor = new PiAgentExecutor({ soulPath });
+		const executor = new PiAgentExecutor({
+			soulPath,
+			modelConfig: { model: "missing-model" },
+		});
 		await executor.execute(makeState(10));
 
-		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("PI_AGENT_MODEL=missing-model did not resolve"));
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("configured Pi model missing-model did not resolve"));
 	});
 
 	it("logs non-rate assistant errors without overriding the parsed result", async () => {
