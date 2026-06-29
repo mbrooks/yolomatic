@@ -110,7 +110,7 @@ const registry = new AdminRouteRegistry()
 				};
 			}
 			current.push({ owner: info.owner, repo: info.repo });
-			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
+			settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
 			return {
 				status: 200,
 				body: {
@@ -155,7 +155,7 @@ const registry = new AdminRouteRegistry()
 				current.push({ owner: repo.owner, repo: repo.repo });
 				added++;
 			}
-			ctx.deps.settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
+			settingsStore.set("configured_repositories", stringifyConfiguredRepositories(current));
 			return { status: 200, body: { repos: discovered, added, skipped } };
 		},
 	})
