@@ -166,31 +166,31 @@ export function RepoInventoryScreen({
 					<div className="repo-add-fields">
 						<label className="repo-add-label" htmlFor="repo-add-owner">
 							Owner
+							<input
+								id="repo-add-owner"
+								type="text"
+								value={addOwner}
+								onChange={(e) => setAddOwner(e.target.value)}
+								placeholder="e.g. octocat"
+								disabled={addLoading}
+								aria-invalid={addError ? "true" : "false"}
+								aria-describedby="repo-add-error"
+							/>
 						</label>
-						<input
-							id="repo-add-owner"
-							type="text"
-							value={addOwner}
-							onChange={(e) => setAddOwner(e.target.value)}
-							placeholder="e.g. octocat"
-							disabled={addLoading}
-							aria-invalid={addError ? "true" : "false"}
-							aria-describedby="repo-add-error"
-						/>
 
 						<label className="repo-add-label" htmlFor="repo-add-repo">
 							Repository name
+							<input
+								id="repo-add-repo"
+								type="text"
+								value={addRepoName}
+								onChange={(e) => setAddRepoName(e.target.value)}
+								placeholder="e.g. hello-world"
+								disabled={addLoading}
+								aria-invalid={addError ? "true" : "false"}
+								aria-describedby="repo-add-error"
+							/>
 						</label>
-						<input
-							id="repo-add-repo"
-							type="text"
-							value={addRepoName}
-							onChange={(e) => setAddRepoName(e.target.value)}
-							placeholder="e.g. hello-world"
-							disabled={addLoading}
-							aria-invalid={addError ? "true" : "false"}
-							aria-describedby="repo-add-error"
-						/>
 					</div>
 					<div className="repo-add-actions">
 						<button
