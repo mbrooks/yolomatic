@@ -103,6 +103,17 @@ describe("RepoInventoryScreen", () => {
 		expect(screen.getByRole("button", { name: /^add repository$/i })).not.toBeNull();
 	});
 
+	it("wraps each input inside its label so the add-repository styles apply", () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+
+		const ownerLabel = screen.getByText("Owner").closest("label");
+		const repoLabel = screen.getByText("Repository name").closest("label");
+		expect(ownerLabel?.querySelector("input#repo-add-owner")).not.toBeNull();
+		expect(repoLabel?.querySelector("input#repo-add-repo")).not.toBeNull();
+	});
+
 	it("closes the modal when Cancel is clicked", () => {
 		render(<RepoInventoryScreen {...defaultProps} />);
 
