@@ -10,6 +10,7 @@ export default defineConfig({
 				env: {
 					NODE_ENV: "development",
 				},
+				maxThreads: 1,
 			},
 		},
 		coverage: {
