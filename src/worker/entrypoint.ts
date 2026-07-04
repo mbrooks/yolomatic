@@ -1,0 +1,31 @@
+import { runWorkerRuntime } from "./runtime.js";
+
+export async function main(): Promise<void> {
+	const socketPath = process.env.TARS_SESSION_SOCKET_PATH?.trim();
+	const sessionKey = process.env.TARS_SESSION_KEY?.trim();
+	const soulPath = process.env.TARS_SOUL_PATH?.trim() || "/app/SOUL.md";
+
+	if (!socketPath) {
+		throw new Error("TARS_SESSION_SOCKET_PATH is required");
+	}
+	if (!sessionKey) {
+		throw new Error("TARS_SESSION_KEY is required");
+	}
+
+	await runWorkerRuntime({
+		socketPath,
+		sessionKey,
+		soulPath,
+		workerVersion: process.env.npm_package_version,
+	});
+}
+
+/* v8 ignore start */
+if (import.meta.url === `file://${process.argv[1]}`) {
+	main().catch((error) => {
+		const message = error instanceof Error ? error.stack ?? error.message : String(error);
+		process.stderr.write(`${message}\n`);
+		process.exitCode = 1;
+	});
+}
+/* v8 ignore stop */

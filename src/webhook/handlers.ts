@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-import type { ExecutionResult, PiAgentExecutor } from "../executor/index.js";
+import type { ExecutionService } from "../ports/execution-service.js";
 import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
@@ -34,7 +34,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		private readonly deps: {
 			sessionManager: SessionManager;
 			workspaceManager: WorkspaceManager;
-			executor: PiAgentExecutor;
+			executor: ExecutionService;
 			githubToken: string;
 			githubUsername: string;
 			defaultBranch?: string;

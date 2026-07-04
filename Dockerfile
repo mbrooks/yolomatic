@@ -11,21 +11,39 @@ COPY . .
 
 RUN npm run build
 
-# Runtime stage
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS base-runtime
 
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV HOME=/home/tars
-ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
 ENV SESSIONS_DIR=/app/sessions
 ENV WORKSPACES_DIR=/app/workspaces
 ENV MEMORY_DIR=/app/memory
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Install git (required for worktrees), GitHub CLI, and Docker CLI
 RUN apt-get update && apt-get install -y ca-certificates git curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app /app
+
+RUN cd /app/.pi/npm \
+  && npm install @ollama/pi-web-search || true
+
+FROM base-runtime AS worker
+
+ENV HOME=/root
+ENV PI_CODING_AGENT_DIR=/root/.pi/agent
+
+CMD ["node", "./dist/worker/entrypoint.js"]
+
+# Runtime stage
+FROM base-runtime AS runtime
+
+ENV HOME=/home/tars
+ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
+
+# Install GitHub CLI and Docker CLI for the control plane container
+RUN apt-get update && apt-get install -y gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
@@ -36,32 +54,13 @@ RUN apt-get update && apt-get install -y ca-certificates git curl gnupg \
     && apt-get update && apt-get install -y gh docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependencies (including devDependencies)
-COPY --from=build /app/node_modules ./node_modules
-COPY package.json package-lock.json ./
-
 # Create non-root user and docker group for socket access
 RUN useradd --create-home --shell /bin/bash tars \
   && groupadd -g 999 docker \
   && usermod -aG docker tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
-  && mkdir -p /app/sessions /app/workspaces /app/memory \
+  && mkdir -p /app/sessions /app/workspaces /app/memory /app/runtime \
   && chown -R tars:tars /app /home/tars
-
-# Copy build artifacts
-COPY --from=build /app/dist ./dist
-
-# Copy TARS extensions
-COPY --chown=tars:tars --from=build /app/.pi ./.pi
-
-# Copy config/context files
-COPY --from=build /app/AGENTS.md ./AGENTS.md
-COPY --from=build /app/SOUL.md ./SOUL.md
-COPY --from=build /app/WORKSPACES.md ./WORKSPACES.md
-
-# Install pi packages (like CASE does)
-RUN cd /app/.pi/npm \
-  && npm install @ollama/pi-web-search || true
 
 USER tars
 
