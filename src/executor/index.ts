@@ -17,7 +17,7 @@ import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-se
 import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
-import type { ExecutionService } from "../ports/execution-service.js";
+import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
 export { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
@@ -39,7 +39,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		comment?: string,
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity);
@@ -49,7 +49,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		prReview: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, undefined, prReview, abortSignal, onSessionCreated, undefined, onActivity);
@@ -59,7 +59,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		overridePrompt: string,
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, undefined, undefined, abortSignal, onSessionCreated, overridePrompt, onActivity);
@@ -70,7 +70,7 @@ export class PiAgentExecutor implements ExecutionService {
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		overridePrompt?: string,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
@@ -143,7 +143,9 @@ export class PiAgentExecutor implements ExecutionService {
 			modelRegistry,
 			model: configuredModel,
 		});
-		onSessionCreated?.(session);
+		onSessionCreated?.({
+			steer: (message: string) => session.steer(message),
+		});
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 

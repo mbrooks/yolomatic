@@ -77,6 +77,7 @@ describe("PiAgentExecutor", () => {
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
+			steer: vi.fn(),
 			messages: [
 				{ role: "assistant", content },
 			],
@@ -431,7 +432,9 @@ describe("PiAgentExecutor", () => {
 
 		expect(result.status).toBe("complete");
 		expect(mockSession.prompt).toHaveBeenCalledWith("custom prompt");
-		expect(onSessionCreated).toHaveBeenCalledWith(mockSession);
+		expect(onSessionCreated).toHaveBeenCalledWith(expect.objectContaining({ steer: expect.any(Function) }));
+		await onSessionCreated.mock.calls[0][0].steer("please retry");
+		expect(mockSession.steer).toHaveBeenCalledWith("please retry");
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});
 

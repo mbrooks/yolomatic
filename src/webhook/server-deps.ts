@@ -16,7 +16,7 @@ import type { GitHubService } from "../ports/github-service.js";
 import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
-import type { PiAgentExecutor } from "../executor/index.js";
+import type { ExecutionService } from "../ports/execution-service.js";
 import { parseConfiguredRepositories, resolveConfiguredRepoDefaultBranch } from "../repos/configured-repositories.js";
 
 const fallbackTaskController = {
@@ -51,7 +51,7 @@ export function createWebhookServerDeps(
 	adminAssetsDir = resolve(process.cwd(), "dist/admin"),
 	githubService?: GitHubService,
 	settingsStore?: SettingsStore,
-	executor?: PiAgentExecutor,
+	executor?: ExecutionService,
 	prebuiltStartIssueSession?: StartIssueSession,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;

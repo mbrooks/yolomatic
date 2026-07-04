@@ -3,7 +3,7 @@ import "dotenv/config";
 import path from "node:path";
 import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
-import { PiAgentExecutor } from "./executor/index.js";
+import { DockerWorkerExecutor } from "./executor/docker-worker.js";
 import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
@@ -81,15 +81,15 @@ export async function main(): Promise<void> {
 			maxWorktrees: nextConfig.maxWorktrees,
 			evictionStrategy: nextConfig.evictionStrategy,
 		});
-		const executor = new PiAgentExecutor({
+		const executor = new DockerWorkerExecutor({
+			projectRoot: process.cwd(),
+			workspacesDir: nextConfig.workspacesDir,
+			workerImage: nextConfig.workerImage,
+			workerRuntimeDir: nextConfig.workerRuntimeDir,
+			workerWorkspaceMountSource: nextConfig.workerWorkspaceMountSource,
+			workerRuntimeMountSource: nextConfig.workerRuntimeMountSource,
+			workerOllamaHost: nextConfig.workerOllamaHost,
 			soulPath: nextConfig.soulPath,
-			modelConfig: () => {
-				const currentConfig = getConfig(settingsStore);
-				return {
-					model: currentConfig.piAgentModel,
-					provider: currentConfig.piAgentProvider,
-				};
-			},
 		});
 		const eventStore = new GitHubEventStore(path.join(nextConfig.memoryDir, "bot-state.sqlite"));
 		const handlers = new GitHubIssueHandlers({
