@@ -25,6 +25,11 @@ vi.mock("./config.js", () => ({
 		evictionStrategy: "lru",
 		githubEventMode: "webhook",
 		githubPollIntervalMs: 60000,
+		workerImage: "tars-worker:latest",
+		workerRuntimeDir: "/tmp/runtime",
+		workerWorkspaceMountSource: "/tmp/workspaces",
+		workerRuntimeMountSource: "/tmp/runtime",
+		workerOllamaHost: undefined,
 	})),
 	isBootstrapComplete: vi.fn(() => true),
 }));
@@ -69,8 +74,8 @@ vi.mock("./workspace/manager.js", () => ({
 	})),
 }));
 
-vi.mock("./executor/index.js", () => ({
-	PiAgentExecutor: vi.fn(() => ({
+vi.mock("./executor/docker-worker.js", () => ({
+	DockerWorkerExecutor: vi.fn(() => ({
 		execute: vi.fn(),
 	})),
 }));
@@ -214,6 +219,11 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "polling",
 			githubPollIntervalMs: 30000,
+			workerImage: "tars-worker:latest",
+			workerRuntimeDir: "/tmp/runtime",
+			workerWorkspaceMountSource: "/tmp/workspaces",
+			workerRuntimeMountSource: "/tmp/runtime",
+			workerOllamaHost: undefined,
 		});
 
 		await main();
@@ -300,6 +310,11 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "both",
 			githubPollIntervalMs: 45000,
+			workerImage: "tars-worker:latest",
+			workerRuntimeDir: "/tmp/runtime",
+			workerWorkspaceMountSource: "/tmp/workspaces",
+			workerRuntimeMountSource: "/tmp/runtime",
+			workerOllamaHost: undefined,
 		});
 
 		await main();
@@ -469,6 +484,11 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "webhook",
 			githubPollIntervalMs: 60000,
+			workerImage: "tars-worker:latest",
+			workerRuntimeDir: "/tmp/runtime",
+			workerWorkspaceMountSource: "/tmp/workspaces",
+			workerRuntimeMountSource: "/tmp/runtime",
+			workerOllamaHost: undefined,
 		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();

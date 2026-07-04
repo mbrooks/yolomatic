@@ -1,7 +1,6 @@
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
-import type { ExecutionService } from "../../ports/execution-service.js";
+import type { ExecutionService, LiveExecutionSession } from "../../ports/execution-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
@@ -83,8 +82,8 @@ export class ExecuteSession {
 		current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
 
 		const abortController = new AbortController();
-		let resolveSession: ((session: AgentSession) => void) | undefined;
-		const sessionPromise = new Promise<AgentSession>((resolve) => {
+		let resolveSession: ((session: LiveExecutionSession) => void) | undefined;
+		const sessionPromise = new Promise<LiveExecutionSession>((resolve) => {
 			resolveSession = resolve;
 		});
 
