@@ -91,6 +91,7 @@ describe("createWebhookServerDeps", () => {
 			getAll: vi.fn(async () => []),
 		};
 		const executor = { execute: vi.fn() };
+		const prebuiltStartIssueSession = { execute: vi.fn() } as never;
 
 		const deps = createWebhookServerDeps(
 			sessionStore,
@@ -104,6 +105,7 @@ describe("createWebhookServerDeps", () => {
 			githubService as never,
 			settingsStore as never,
 			executor as never,
+			prebuiltStartIssueSession,
 		);
 
 		const wrappedWorkspaceService = (deps.cleanupCommand as any).workspaces;
@@ -134,7 +136,7 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.adminPassword).toBe("secret");
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
 		expect(deps.settingsStore).toBe(settingsStore);
-		expect(deps.startIssueSession).toBeDefined();
+		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);
 	});
 
 	it("reuses a prebuilt StartIssueSession command when provided", () => {
