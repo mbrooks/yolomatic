@@ -8,6 +8,7 @@ import type {
 	PollPullRequest,
 } from "../ports/github-polling-service.js";
 import type { GitHubEvent, GitHubEventStateStore, GitHubPollSubject } from "./model.js";
+import { repoModeIncludesPolling, type RepoGitHubEventMode } from "../repos/configured-repositories.js";
 
 const POLL_OVERLAP_MS = 2 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,7 +23,12 @@ export interface GitHubPollingDeps {
 	githubUsername: string;
 	intervalMs: number;
 	shouldPollRepo?: (owner: string, repo: string) => boolean;
+	resolveGitHubEventMode?: (owner: string, repo: string) => RepoGitHubEventMode;
 	now?: () => Date;
+}
+
+function log(message: string): void {
+	process.stdout.write(`${message}\n`);
 }
 
 let pollIntervalId: NodeJS.Timeout | undefined;
@@ -228,10 +234,12 @@ export function normalizePolledPRReviewComment(owner: string, repo: string, comm
 
 export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> {
 	const now = deps.now?.() ?? new Date();
+	log(`[github-poll] tick started at ${now.toISOString()}`);
 	const lastReceivedAt = deps.eventStore.getLastEventReceivedAt();
 	if (!lastReceivedAt) {
 		deps.eventStore.initializeLastEventReceivedAt(now.toISOString());
-		process.stdout.write(`[github-poll] initialized last_event_received_at=${now.toISOString()}\n`);
+		log(`[github-poll] initialized last_event_received_at=${now.toISOString()}`);
+		log("[github-poll] tick completed: 0 events dispatched");
 		return;
 	}
 
@@ -243,6 +251,7 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 		if (deps.shouldPollRepo && !deps.shouldPollRepo(repo.owner, repo.repo)) {
 			continue;
 		}
+		log(`[github-poll] checking ${repo.owner}/${repo.repo} (lastEventReceivedAt=${lastReceivedAt}, since=${since})`);
 		try {
 			const [issues, issueEvents, comments, prs, reviews, reviewComments] = await Promise.all([
 				deps.github.listIssuesUpdatedSince(repo.owner, repo.repo, since),
@@ -269,13 +278,16 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 
 	events.push(...await collectDueSubjectEvents(deps, now));
 	events.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+	let dispatched = 0;
 	for (const event of events) {
 		try {
 			await deps.dispatch(event);
+			dispatched++;
 		} catch (error) {
 			process.stdout.write(`[github-poll] dispatch failed id=${event.id}: ${errorMessage(error)}\n`);
 		}
 	}
+	log(`[github-poll] tick completed: ${dispatched} events dispatched`);
 }
 
 async function collectDueSubjectEvents(deps: GitHubPollingDeps, now: Date): Promise<GitHubEvent[]> {
@@ -284,6 +296,8 @@ async function collectDueSubjectEvents(deps: GitHubPollingDeps, now: Date): Prom
 	const events: GitHubEvent[] = [];
 
 	for (const subject of dueSubjects) {
+		const effectiveIntervalMs = pollingSubjectCheckIntervalMs(subject, now, deps.intervalMs);
+		log(`[github-poll] checking subject ${subject.subjectKey} (effective interval=${effectiveIntervalMs}ms)`);
 		try {
 			const since = new Date(Math.max(0, Date.parse(subject.lastActivityAt) - POLL_OVERLAP_MS)).toISOString();
 			if (subject.subjectType === "issue") {
@@ -333,7 +347,8 @@ async function collectDueSubjectEvents(deps: GitHubPollingDeps, now: Date): Prom
 }
 
 export function startGitHubPolling(deps: GitHubPollingDeps): void {
-	process.stdout.write(`[github-poll] Starting GitHub polling (interval=${deps.intervalMs}ms)\n`);
+	log(`[github-poll] Starting GitHub polling (base interval=${deps.intervalMs}ms)`);
+	void logStartupRepositories(deps);
 	pollIntervalId = setInterval(() => {
 		if (pollRunning) return;
 		pollRunning = true;
@@ -346,6 +361,24 @@ export function startGitHubPolling(deps: GitHubPollingDeps): void {
 			});
 	}, deps.intervalMs);
 	pollIntervalId.unref?.();
+}
+
+async function logStartupRepositories(deps: GitHubPollingDeps): Promise<void> {
+	let repos;
+	try {
+		repos = await deps.github.listAccessibleRepositories();
+	} catch (error) {
+		log(`[github-poll] failed to enumerate repositories at startup: ${errorMessage(error)}`);
+		return;
+	}
+	for (const repo of repos) {
+		const mode = deps.resolveGitHubEventMode?.(repo.owner, repo.repo) ?? "polling";
+		if (repoModeIncludesPolling(mode)) {
+			log(`[github-poll] polling ${repo.owner}/${repo.repo} (mode=${mode}, base interval=${deps.intervalMs}ms)`);
+		} else {
+			log(`[github-poll] skipping ${repo.owner}/${repo.repo} (mode=${mode})`);
+		}
+	}
 }
 
 export function stopGitHubPolling(): void {
