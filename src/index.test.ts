@@ -99,6 +99,10 @@ vi.mock("./webhook/server.js", () => ({
 			if (typeof cb === "function") cb();
 			return { close: vi.fn() };
 		}),
+		close: vi.fn((cb) => {
+			if (typeof cb === "function") cb();
+			return undefined;
+		}),
 	})),
 	cleanupOldSessions: vi.fn(),
 }));
@@ -167,7 +171,7 @@ describe("main", () => {
 			}),
 			expect.any(Object),
 			expect.any(String),
-			undefined,
+			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
@@ -238,7 +242,7 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(String),
-			undefined,
+			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
@@ -321,7 +325,7 @@ describe("main", () => {
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(String),
-			undefined,
+			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
@@ -503,6 +507,71 @@ describe("main", () => {
 		const listener = settingsStoreMock.onChange.mock.calls[0][0];
 		listener();
 		expect(getConfig).toHaveBeenCalledTimes(2);
+	});
+
+	it("logs when settings change listener fails to sync env", async () => {
+		await main();
+		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+		const listener = settingsStoreMock.onChange.mock.calls[0][0];
+		vi.mocked(getConfig).mockImplementationOnce(() => {
+			throw new Error("sync fail");
+		});
+		expect(() => listener()).not.toThrow();
+	});
+
+	it("handles non-Error throws in the settings change listener", async () => {
+		await main();
+		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+		const listener = settingsStoreMock.onChange.mock.calls[0][0];
+		vi.mocked(getConfig).mockImplementationOnce(() => {
+			throw "string error";
+		});
+		expect(() => listener()).not.toThrow();
+	});
+
+	it("starts full runtime when onboarding completes", async () => {
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
+		await main();
+
+		const onboardingCall = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0];
+		const options = onboardingCall?.[9] as { onOnboardingComplete: () => Promise<void> };
+		expect(options.onOnboardingComplete).toBeTypeOf("function");
+
+		// Completing onboarding re-reads config and must see a complete config now.
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
+		await options.onOnboardingComplete();
+
+		// A second createWebhookServer call comes from startRuntime after onboarding.
+		expect(createWebhookServer).toHaveBeenCalledTimes(2);
+		const runtimeServer = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[1]?.value;
+		expect(runtimeServer.listen).toHaveBeenCalledWith(6767, expect.any(Function));
+	});
+
+	it("does not start runtime when onboarding complete fires before config is complete", async () => {
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
+		await main();
+		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[9] as {
+			onOnboardingComplete: () => Promise<void>;
+		};
+		const callsBefore = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length;
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
+		await options.onOnboardingComplete();
+		expect((createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+	});
+
+	it("does not start runtime twice if onboarding complete fires again", async () => {
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
+		await main();
+		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[9] as {
+			onOnboardingComplete: () => Promise<void>;
+		};
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
+		await options.onOnboardingComplete();
+		const callsAfterFirst = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length;
+		// Second fire should be a no-op (activated guard).
+		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
+		await options.onOnboardingComplete();
+		expect((createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
 	});
 });
 
