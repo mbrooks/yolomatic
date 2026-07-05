@@ -23,6 +23,8 @@ import {
 import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
 
 const execFileAsync = promisify(execFile);
+const WORKER_IMAGE_TRANSPORT_LABEL = "io.tars.worker.transport";
+const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 
 export interface DockerWorkerExecutorOptions {
 	projectRoot: string;
@@ -424,17 +426,46 @@ export class DockerWorkerExecutor implements ExecutionService {
 	private async ensureWorkerImage(): Promise<void> {
 		if (!this.imageReady) {
 			this.imageReady = (async () => {
+				let currentTransport: string | undefined;
 				try {
-					await execFileAsync("docker", ["image", "inspect", this.options.workerImage], {
-						cwd: this.options.projectRoot,
-					});
-				} catch {
-					await execFileAsync(
+					const { stdout } = await execFileAsync(
 						"docker",
-						["build", "--target", "worker", "-t", this.options.workerImage, this.options.projectRoot],
-						{ cwd: this.options.projectRoot },
+						[
+							"image",
+							"inspect",
+							"--format",
+							`{{ index .Config.Labels "${WORKER_IMAGE_TRANSPORT_LABEL}" }}`,
+							this.options.workerImage,
+						],
+						{
+							cwd: this.options.projectRoot,
+						},
 					);
+					currentTransport = stdout.trim();
+				} catch {
+					currentTransport = undefined;
 				}
+
+				if (currentTransport === WORKER_IMAGE_TRANSPORT_VERSION) {
+					return;
+				}
+
+				await execFileAsync(
+					"docker",
+					[
+						"build",
+						"--target",
+						"worker",
+						"--label",
+						`${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`,
+						"-t",
+						this.options.workerImage,
+						this.options.projectRoot,
+					],
+					{
+						cwd: this.options.projectRoot,
+					},
+				);
 			})();
 		}
 

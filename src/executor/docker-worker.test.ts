@@ -26,13 +26,15 @@ vi.mock("../logging/session-log-store.js", () => ({
 import { DockerWorkerExecutor } from "./docker-worker.js";
 
 describe("DockerWorkerExecutor", () => {
+	const currentWorkerTransport = "websocket-v1";
+
 	afterEach(() => {
 		vi.clearAllMocks();
 	});
 
 	it("launches a docker worker, streams logs, and exposes steering", async () => {
 		const harness = await createHarness(418);
-		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
 
 		spawnMock.mockImplementation((_cmd, args, options) => {
 			const child = makeChildProcess();
@@ -162,7 +164,83 @@ describe("DockerWorkerExecutor", () => {
 			expect(execFileMock).toHaveBeenNthCalledWith(
 				2,
 				"docker",
-				["build", "--target", "worker", "-t", "tars-worker:latest", "/repo"],
+				[
+					"build",
+					"--target",
+					"worker",
+					"--label",
+					"io.tars.worker.transport=websocket-v1",
+					"-t",
+					"tars-worker:latest",
+					"/repo",
+				],
+				expect.any(Object),
+				expect.any(Function),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("rebuilds the worker image when the transport label is stale", async () => {
+		const harness = await createHarness(424);
+		execFileMock
+			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "socket-v1", ""))
+			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/tars#424", "ack-rebuild", {
+							ackMessageId: message.messageId,
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/tars#424", "complete-rebuild", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "TARS_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.execute({
+				issueNumber: 424,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Rebuild stale worker image",
+				body: "Body",
+				status: "pending",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: harness.workspacePath,
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			});
+
+			expect(execFileMock).toHaveBeenNthCalledWith(
+				2,
+				"docker",
+				[
+					"build",
+					"--target",
+					"worker",
+					"--label",
+					"io.tars.worker.transport=websocket-v1",
+					"-t",
+					"tars-worker:latest",
+					harness.projectRoot,
+				],
 				expect.any(Object),
 				expect.any(Function),
 			);
@@ -245,7 +323,7 @@ describe("DockerWorkerExecutor", () => {
 
 	it("propagates worker errors", async () => {
 		const harness = await createHarness(420);
-		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
 
 		spawnMock.mockImplementation((_cmd, args, options) => {
 			const child = makeChildProcess();
@@ -293,7 +371,7 @@ describe("DockerWorkerExecutor", () => {
 
 	it("sends stop control when aborted", async () => {
 		const harness = await createHarness(421);
-		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
 
 		let sawStop = false;
 		spawnMock.mockImplementation((_cmd, _args, options) => {
@@ -360,7 +438,7 @@ describe("DockerWorkerExecutor", () => {
 
 	it("rejects connections with an unexpected session key", async () => {
 		const harness = await createHarness(422);
-		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
@@ -397,7 +475,7 @@ describe("DockerWorkerExecutor", () => {
 
 	it("rejects connections with an unsupported protocol version", async () => {
 		const harness = await createHarness(423);
-		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
@@ -436,6 +514,7 @@ describe("DockerWorkerExecutor", () => {
 
 async function createHarness(issueNumber: number): Promise<{
 	executor: DockerWorkerExecutor;
+	projectRoot: string;
 	workspacePath: string;
 	workerRpcServer: FakeWorkerRpcServer;
 	close: () => Promise<void>;
@@ -445,8 +524,9 @@ async function createHarness(issueNumber: number): Promise<{
 	await mkdir(workspacePath, { recursive: true });
 
 	const workerRpcServer = createFakeWorkerRpcServer();
+	const projectRoot = issueNumber === 419 ? "/repo" : workspacesRoot;
 	const executor = new DockerWorkerExecutor({
-		projectRoot: issueNumber === 419 ? "/repo" : workspacesRoot,
+		projectRoot,
 		workspacesDir: workspacesRoot,
 		workerImage: "tars-worker:latest",
 		workerWorkspaceMountSource: workspacesRoot,
@@ -457,6 +537,7 @@ async function createHarness(issueNumber: number): Promise<{
 
 	return {
 		executor,
+		projectRoot,
 		workspacePath,
 		workerRpcServer,
 		close: async () => {
