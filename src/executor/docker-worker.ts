@@ -1,6 +1,5 @@
-import { access, mkdir, rm } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
-import net from "node:net";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -10,7 +9,6 @@ import { recordSessionLog } from "../logging/session-log-store.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 import type { SessionState } from "../session/store.js";
-import { WorkerMessageParser, encodeWorkerMessage } from "../worker/framing.js";
 import {
 	WORKER_PROTOCOL_VERSION,
 	createWorkerMessage,
@@ -22,6 +20,7 @@ import {
 	type WorkerEventBatchPayload,
 	type WorkerProtocolMessage,
 } from "../worker/protocol.js";
+import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -29,9 +28,9 @@ export interface DockerWorkerExecutorOptions {
 	projectRoot: string;
 	workspacesDir: string;
 	workerImage: string;
-	workerRuntimeDir: string;
 	workerWorkspaceMountSource: string;
-	workerRuntimeMountSource: string;
+	workerControlBaseUrl: string;
+	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
 	soulPath: string;
 }
@@ -74,15 +73,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 		const sessionKey = buildSessionKey(state.owner, state.repo, state.issueNumber);
 		const containerName = this.buildContainerName(state);
-		const runtimeName = this.buildRuntimeName(state);
-		const runtimeDir = path.join(this.options.workerRuntimeDir, runtimeName);
-		const socketPath = path.join(runtimeDir, "session.sock");
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
-		const socketPathInWorker = path.posix.join("/tars-runtime", runtimeName, "session.sock");
+		const pendingConnection = this.options.workerRpcServer.createPendingConnection(sessionKey);
+		const workerSessionUrl = this.buildWorkerSessionUrl(sessionKey, pendingConnection.token);
 
 		await this.validateLaunch(state.workspacePath);
-		await rm(runtimeDir, { recursive: true, force: true });
-		await mkdir(runtimeDir, { recursive: true });
 
 		recordSessionLog(sessionKey, {
 			level: "info",
@@ -90,13 +85,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 			details: { type: "worker_launch", image: this.options.workerImage, containerName },
 		});
 
-		let socket: net.Socket | undefined;
-		let closeServer: (() => Promise<void>) | undefined;
+		let connection: WorkerRpcConnection | undefined;
 		let dockerStdout = "";
 		let dockerStderr = "";
 		let settled = false;
 		let abortTimer: NodeJS.Timeout | undefined;
-		const parser = new WorkerMessageParser();
 		const pendingAcks = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
 		const nextMessageId = this.createMessageIdFactory();
 
@@ -108,86 +101,27 @@ export class DockerWorkerExecutor implements ExecutionService {
 		};
 
 		const sendMessage = (message: WorkerProtocolMessage, expectAck = false): Promise<void> => {
-			if (!socket || socket.destroyed) {
-				return Promise.reject(new Error("Worker socket is not connected"));
+			if (!connection?.isOpen()) {
+				return Promise.reject(new Error("Worker RPC connection is not connected"));
 			}
-			socket.write(encodeWorkerMessage(message));
+
+			const sendPromise = connection.send(message);
 			if (!expectAck) {
-				return Promise.resolve();
+				return sendPromise;
 			}
+
 			return new Promise<void>((resolve, reject) => {
 				pendingAcks.set(message.messageId, { resolve, reject });
+				void sendPromise.catch((error) => {
+					pendingAcks.delete(message.messageId);
+					reject(error instanceof Error ? error : new Error(String(error)));
+				});
 			});
 		};
 
 		const sendControl = async (payload: WorkerControlPayload): Promise<void> => {
 			const message = createWorkerMessage("control", sessionKey, nextMessageId(), payload);
 			await sendMessage(message, true);
-		};
-
-		const server = net.createServer((connection) => {
-			socket = connection;
-			connection.on("data", (chunk) => {
-				for (const message of parser.push(chunk)) {
-					if (message.protocolVersion !== WORKER_PROTOCOL_VERSION) {
-						connection.destroy(new Error(`Unsupported worker protocol version ${message.protocolVersion}`));
-						return;
-					}
-					if (message.sessionKey !== sessionKey) {
-						connection.destroy(new Error(`Worker connected with unexpected session key ${message.sessionKey}`));
-						return;
-					}
-					void this.handleWorkerMessage(
-						message,
-						state,
-						prompt,
-						sessionKey,
-						workspacePathInWorker,
-						sendMessage,
-						nextMessageId,
-						pendingAcks,
-						onSessionCreated,
-						onActivity,
-						(result) => {
-							settled = true;
-							executionResolve(result);
-						},
-						(error) => {
-							settled = true;
-							executionReject(error);
-						},
-					).catch((error) => {
-						settled = true;
-						executionReject(error instanceof Error ? error : new Error(String(error)));
-					});
-				}
-			});
-			connection.on("close", () => {
-				socket = undefined;
-				if (!settled) {
-					const details = [dockerStderr.trim(), dockerStdout.trim()].filter(Boolean).join("\n");
-					executionReject(new Error(details ? `Worker connection closed unexpectedly.\n${details}` : "Worker connection closed unexpectedly."));
-				}
-			});
-			connection.on("error", (error) => {
-				if (!settled) {
-					executionReject(error);
-				}
-			});
-		});
-
-		const closeServerPromise = new Promise<void>((resolve, reject) => {
-			server.listen(socketPath, () => resolve());
-			server.on("error", reject);
-		});
-		await closeServerPromise;
-		closeServer = async () => {
-			await new Promise<void>((resolve, reject) => {
-				server.close((error) => {
-					if (error) reject(error);
-					else resolve();
-				});
-			});
 		};
 
 		let executionResolve!: (result: ExecutionResult) => void;
@@ -202,7 +136,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			env: {
 				...process.env,
 				TARS_SESSION_KEY: sessionKey,
-				TARS_SESSION_SOCKET_PATH: socketPathInWorker,
+				TARS_SESSION_WS_URL: workerSessionUrl,
 				TARS_SOUL_PATH: this.options.soulPath,
 				TARS_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
 			},
@@ -256,6 +190,53 @@ export class DockerWorkerExecutor implements ExecutionService {
 		abortSignal?.addEventListener("abort", onAbort);
 
 		try {
+			connection = await pendingConnection.waitForConnection();
+			connection.onMessage((message) => {
+				if (message.protocolVersion !== WORKER_PROTOCOL_VERSION) {
+					connection?.close(1002, `Unsupported worker protocol version ${message.protocolVersion}`);
+					return;
+				}
+				if (message.sessionKey !== sessionKey) {
+					connection?.close(1008, `Unexpected session key ${message.sessionKey}`);
+					return;
+				}
+				void this.handleWorkerMessage(
+					message,
+					state,
+					prompt,
+					sessionKey,
+					workspacePathInWorker,
+					sendMessage,
+					nextMessageId,
+					pendingAcks,
+					onSessionCreated,
+					onActivity,
+					(result) => {
+						settled = true;
+						executionResolve(result);
+					},
+					(error) => {
+						settled = true;
+						executionReject(error);
+					},
+				).catch((error) => {
+					settled = true;
+					executionReject(error instanceof Error ? error : new Error(String(error)));
+				});
+			});
+			connection.onClose(() => {
+				connection = undefined;
+				if (!settled) {
+					const details = [dockerStderr.trim(), dockerStdout.trim()].filter(Boolean).join("\n");
+					executionReject(new Error(details ? `Worker connection closed unexpectedly.\n${details}` : "Worker connection closed unexpectedly."));
+				}
+			});
+			connection.onError((error) => {
+				if (!settled) {
+					executionReject(error);
+				}
+			});
+
 			return await Promise.race([executionPromise, dockerExitPromise.then(() => executionPromise)]);
 		} finally {
 			abortSignal?.removeEventListener("abort", onAbort);
@@ -263,9 +244,8 @@ export class DockerWorkerExecutor implements ExecutionService {
 				clearTimeout(abortTimer);
 			}
 			cleanupPendingAcks(new Error("Worker session ended before acknowledgement"));
-			socket?.destroy();
-			await closeServer?.().catch(() => undefined);
-			await rm(runtimeDir, { recursive: true, force: true }).catch(() => undefined);
+			connection?.close();
+			pendingConnection.dispose();
 		}
 	}
 
@@ -369,8 +349,6 @@ export class DockerWorkerExecutor implements ExecutionService {
 			"host.docker.internal:host-gateway",
 			"--mount",
 			this.buildMountSpec(this.options.workerWorkspaceMountSource, "/workspaces"),
-			"--mount",
-			this.buildMountSpec(this.options.workerRuntimeMountSource, "/tars-runtime"),
 		];
 
 		if (process.env.PI_AGENT_PROVIDER?.trim()) {
@@ -388,7 +366,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			"-e",
 			"TARS_SESSION_KEY",
 			"-e",
-			"TARS_SESSION_SOCKET_PATH",
+			"TARS_SESSION_WS_URL",
 			"-e",
 			"TARS_SOUL_PATH",
 			this.options.workerImage,
@@ -399,6 +377,16 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private buildMountSpec(source: string, target: string): string {
 		return `type=${path.isAbsolute(source) ? "bind" : "volume"},src=${source},dst=${target}`;
+	}
+
+	private buildWorkerSessionUrl(sessionKey: string, token: string): string {
+		const url = new URL(this.options.workerControlBaseUrl);
+		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+		url.pathname = WORKER_RPC_PATH;
+		url.search = "";
+		url.searchParams.set("sessionKey", sessionKey);
+		url.searchParams.set("token", token);
+		return url.toString();
 	}
 
 	private resolveWorkerWorkspacePath(workspacePath: string): string {
@@ -455,10 +443,6 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private buildContainerName(state: SessionState): string {
 		return `tars-session-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
-	}
-
-	private buildRuntimeName(state: SessionState): string {
-		return `github-${state.owner}-${state.repo}-issue-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
 	}
 
 	private createMessageIdFactory(): () => string {

@@ -1,37 +1,26 @@
 import { mkdtemp, rm } from "node:fs/promises";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+
+import WebSocket, { type RawData } from "ws";
 
 import { PiAgentExecutor } from "../executor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
-import { WorkerMessageParser, encodeWorkerMessage } from "./framing.js";
-import {
-	WORKER_PROTOCOL_VERSION,
-	createWorkerMessage,
-	type WorkerAckPayload,
-	type WorkerProtocolMessage,
-} from "./protocol.js";
+import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
+import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
 
 export interface WorkerRuntimeOptions {
-	socketPath: string;
+	wsUrl: string;
 	sessionKey: string;
 	soulPath: string;
 	workerVersion?: string;
 }
 
 export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<void> {
-	const parser = new WorkerMessageParser();
-	const socket = net.createConnection(options.socketPath);
+	const ws = new WebSocket(options.wsUrl);
 	const nextMessageId = createMessageIdFactory();
-const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
-		new Promise((resolve, reject) => {
-			socket.write(encodeWorkerMessage(message), (error) => {
-				if (error) reject(error);
-				else resolve();
-			});
-		});
+	const sendMessage = (message: WorkerProtocolMessage): Promise<void> => sendWorkerWebSocketMessage(ws, message);
 
 	const abortController = new AbortController();
 	let liveSession: { steer(message: string): Promise<void> } | undefined;
@@ -63,7 +52,11 @@ const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
 	const cleanup = async () => {
 		stopHeartbeat();
 		logListenerCleanup?.();
-		socket.destroy();
+		if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+			ws.close();
+		} else {
+			ws.terminate();
+		}
 		if (tempDir) {
 			await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
 		}
@@ -71,8 +64,8 @@ const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
 
 	try {
 		await new Promise<void>((resolve, reject) => {
-			socket.once("connect", resolve);
-			socket.once("error", reject);
+			ws.once("open", () => resolve());
+			ws.once("error", reject);
 		});
 
 		await sendMessage(
@@ -82,7 +75,7 @@ const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
 			}),
 		);
 
-		const launchConfig = await waitForLaunchConfig(socket, parser, options.sessionKey);
+		const launchConfig = await waitForLaunchConfig(ws, options.sessionKey);
 		await sendMessage(
 			createWorkerMessage("ack", options.sessionKey, nextMessageId(), {
 				ackMessageId: launchConfig.messageId,
@@ -103,28 +96,27 @@ const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
 		tempDir = await mkdtemp(path.join(os.tmpdir(), "tars-worker-"));
 		const executor = new PiAgentExecutor({ soulPath: options.soulPath });
 
-		socket.on("data", (chunk) => {
-			for (const message of parser.push(chunk)) {
-				if (message.type !== "control") continue;
-				void handleControlMessage(
-					message as WorkerProtocolMessage<"control">,
-					options.sessionKey,
-					nextMessageId,
-					sendMessage,
-					abortController,
-					() => liveSession,
-				).catch(
-					async (error) => {
-						const err = error instanceof Error ? error : new Error(String(error));
-						await sendMessage(
-							createWorkerMessage("error", options.sessionKey, nextMessageId(), {
-								message: err.message,
-								stack: err.stack,
-							}),
-						).catch(() => undefined);
-					},
-				);
-			}
+		ws.on("message", (raw) => {
+			const message = decodeWorkerWebSocketMessage(raw);
+			if (message.type !== "control") return;
+			void handleControlMessage(
+				message as WorkerProtocolMessage<"control">,
+				options.sessionKey,
+				nextMessageId,
+				sendMessage,
+				abortController,
+				() => liveSession,
+			).catch(
+				async (error) => {
+					const err = error instanceof Error ? error : new Error(String(error));
+					await sendMessage(
+						createWorkerMessage("error", options.sessionKey, nextMessageId(), {
+							message: err.message,
+							stack: err.stack,
+						}),
+					).catch(() => undefined);
+				},
+			);
 		});
 
 		startHeartbeat();
@@ -169,13 +161,13 @@ const sendMessage = (message: WorkerProtocolMessage): Promise<void> =>
 }
 
 async function waitForLaunchConfig(
-	socket: net.Socket,
-	parser: WorkerMessageParser,
+	ws: WebSocket,
 	sessionKey: string,
 ): Promise<WorkerProtocolMessage<"launch_config">> {
 	return new Promise((resolve, reject) => {
-		const onData = (chunk: Buffer) => {
-			for (const message of parser.push(chunk)) {
+		const onMessage = (raw: RawData) => {
+			try {
+				const message = decodeWorkerWebSocketMessage(raw);
 				if (message.protocolVersion !== WORKER_PROTOCOL_VERSION) {
 					reject(new Error(`Unsupported protocol version ${message.protocolVersion}`));
 					return;
@@ -185,15 +177,17 @@ async function waitForLaunchConfig(
 					return;
 				}
 				if (message.type === "launch_config") {
-					socket.off("data", onData);
+					ws.off("message", onMessage);
 					resolve(message as WorkerProtocolMessage<"launch_config">);
-					return;
 				}
+			} catch (error) {
+				reject(error instanceof Error ? error : new Error(String(error)));
 			}
 		};
 
-		socket.on("data", onData);
-		socket.once("error", reject);
+		ws.on("message", onMessage);
+		ws.once("error", reject);
+		ws.once("close", () => reject(new Error("Worker RPC connection closed before launch config arrived")));
 	});
 }
 

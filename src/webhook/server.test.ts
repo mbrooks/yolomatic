@@ -358,6 +358,8 @@ describe("createWebhookServer", () => {
 	it("cleans up the websocket server and log subscription on close", async () => {
 		const stopLogEvents = vi.fn();
 		const wsClose = vi.fn(async () => {});
+		const workerRpcClose = vi.fn(async () => {});
+		const workerRpcAttach = vi.fn();
 		onSessionLogEvent.mockReturnValue(stopLogEvents);
 		createAdminWebSocketServer.mockReturnValue({
 			broadcastLog: vi.fn(),
@@ -366,13 +368,33 @@ describe("createWebhookServer", () => {
 		});
 
 		const { createWebhookServer } = await import("./server.js");
-		const server = createWebhookServer("secret", {} as never, {} as never);
+		const server = createWebhookServer(
+			"secret",
+			{} as never,
+			{} as never,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			{},
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			{ attach: workerRpcAttach, close: workerRpcClose } as never,
+		);
+
+		expect(workerRpcAttach).toHaveBeenCalledWith(fakeServer);
 
 		server.close();
 		expect(closeCallback).toBeTypeOf("function");
 		closeCallback?.();
 		await vi.waitFor(() => {
 			expect(wsClose).toHaveBeenCalled();
+			expect(workerRpcClose).toHaveBeenCalled();
 		});
 
 		expect(stopLogEvents).toHaveBeenCalled();

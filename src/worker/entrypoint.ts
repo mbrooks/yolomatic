@@ -1,19 +1,19 @@
 import { runWorkerRuntime } from "./runtime.js";
 
 export async function main(): Promise<void> {
-	const socketPath = process.env.TARS_SESSION_SOCKET_PATH?.trim();
+	const wsUrl = process.env.TARS_SESSION_WS_URL?.trim();
 	const sessionKey = process.env.TARS_SESSION_KEY?.trim();
 	const soulPath = process.env.TARS_SOUL_PATH?.trim() || "/app/SOUL.md";
 
-	if (!socketPath) {
-		throw new Error("TARS_SESSION_SOCKET_PATH is required");
+	if (!wsUrl) {
+		throw new Error("TARS_SESSION_WS_URL is required");
 	}
 	if (!sessionKey) {
 		throw new Error("TARS_SESSION_KEY is required");
 	}
 
 	await runWorkerRuntime({
-		socketPath,
+		wsUrl,
 		sessionKey,
 		soulPath,
 		workerVersion: process.env.npm_package_version,

@@ -21,7 +21,7 @@ describe("worker entrypoint", () => {
 	it("passes required env into the worker runtime", async () => {
 		process.env = {
 			...originalEnv,
-			TARS_SESSION_SOCKET_PATH: "/tmp/session.sock",
+			TARS_SESSION_WS_URL: "ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23418&token=test",
 			TARS_SESSION_KEY: "mbrooks/tars#418",
 			TARS_SOUL_PATH: "/app/SOUL.md",
 			npm_package_version: "1.2.3",
@@ -30,7 +30,7 @@ describe("worker entrypoint", () => {
 		await main();
 
 		expect(runWorkerRuntime).toHaveBeenCalledWith({
-			socketPath: "/tmp/session.sock",
+			wsUrl: "ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23418&token=test",
 			sessionKey: "mbrooks/tars#418",
 			soulPath: "/app/SOUL.md",
 			workerVersion: "1.2.3",
@@ -40,7 +40,7 @@ describe("worker entrypoint", () => {
 	it("defaults the soul path when none is provided", async () => {
 		process.env = {
 			...originalEnv,
-			TARS_SESSION_SOCKET_PATH: "/tmp/session.sock",
+			TARS_SESSION_WS_URL: "ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23419&token=test",
 			TARS_SESSION_KEY: "mbrooks/tars#419",
 		};
 
@@ -53,11 +53,11 @@ describe("worker entrypoint", () => {
 
 	it("throws when required env vars are missing", async () => {
 		process.env = { ...originalEnv };
-		await expect(main()).rejects.toThrow("TARS_SESSION_SOCKET_PATH is required");
+		await expect(main()).rejects.toThrow("TARS_SESSION_WS_URL is required");
 
 		process.env = {
 			...originalEnv,
-			TARS_SESSION_SOCKET_PATH: "/tmp/session.sock",
+			TARS_SESSION_WS_URL: "ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23420&token=test",
 		};
 		await expect(main()).rejects.toThrow("TARS_SESSION_KEY is required");
 	});
