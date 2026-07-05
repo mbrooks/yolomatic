@@ -5,6 +5,7 @@ import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { ExecutionResult } from "../../executor/index.js";
+import { isExecutionEnvironmentBlocker } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { SelfEvolutionEngine } from "../../self-evolution/index.js";
@@ -183,6 +184,13 @@ export class ExecuteSession {
 			throw error;
 		} finally {
 			this.deps.tasks.unregister(key);
+		}
+
+		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
+			result = {
+				...result,
+				status: "failed",
+			};
 		}
 
 		const postExecState = await this.deps.sessions.get(owner, repo, issueNumber);
