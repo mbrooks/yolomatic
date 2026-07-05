@@ -447,6 +447,43 @@ describe("ExecuteSession", () => {
 		);
 	});
 
+	it("marks execution-environment blocker responses as failed instead of leaving them working", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({
+					status: "working" as const,
+					summary:
+						"The bash tool won't execute because the configured working directory (/workspaces/x) doesn't exist on this filesystem. Without a valid cwd, I can't run any bash commands.",
+					rawResponse: "",
+				})),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.postComment).not.toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			1,
+			expect.stringContaining("TARS is still working on this issue."),
+		);
+	});
+
 	it("marks seeded when session is not seeded and there is no comment", async () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, seeded: false });

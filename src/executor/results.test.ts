@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractText, getLastAssistantText, isRateLimitError, parseExecutionResult } from "./results.js";
+import { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult } from "./results.js";
 
 describe("parseExecutionResult", () => {
 	it("parses working status", () => {
@@ -82,6 +82,20 @@ describe("isRateLimitError", () => {
 	it("returns false for unrelated errors", () => {
 		expect(isRateLimitError("something went wrong")).toBe(false);
 		expect(isRateLimitError("500 internal server error")).toBe(false);
+	});
+});
+
+describe("isExecutionEnvironmentBlocker", () => {
+	it("returns true for missing cwd bootstrap failures", () => {
+		expect(
+			isExecutionEnvironmentBlocker(
+				"The bash tool won't execute because the configured working directory (/workspaces/x) doesn't exist on this filesystem. Without a valid cwd, I can't run any bash commands.",
+			),
+		).toBe(true);
+	});
+
+	it("returns false for ordinary progress updates", () => {
+		expect(isExecutionEnvironmentBlocker("Still working through the issue.")).toBe(false);
 	});
 });
 

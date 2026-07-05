@@ -29,6 +29,11 @@ export interface AppConfig {
 	logResponses: boolean;
 	githubEventMode: "webhook" | "polling" | "both";
 	githubPollIntervalMs: number;
+	workerImage: string;
+	workerWorkspaceMountSource: string;
+	workerControlBaseUrl: string;
+	workerDockerNetworkMode?: string;
+	workerOllamaHost?: string;
 }
 
 export function getConfig(store: SettingsStore): AppConfig {
@@ -72,6 +77,11 @@ export function getConfig(store: SettingsStore): AppConfig {
 		logResponses: store.getBoolean("log_responses", true),
 		githubEventMode,
 		githubPollIntervalMs: Math.max(1000, store.getNumber("github_poll_interval_ms", 60000)),
+		workerImage: store.get("worker_image") ?? "tars-worker:latest",
+		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
+		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
+		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,
+		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
 	};
 }
 

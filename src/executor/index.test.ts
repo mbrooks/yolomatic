@@ -77,6 +77,7 @@ describe("PiAgentExecutor", () => {
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
+			steer: vi.fn(),
 			messages: [
 				{ role: "assistant", content },
 			],
@@ -431,7 +432,9 @@ describe("PiAgentExecutor", () => {
 
 		expect(result.status).toBe("complete");
 		expect(mockSession.prompt).toHaveBeenCalledWith("custom prompt");
-		expect(onSessionCreated).toHaveBeenCalledWith(mockSession);
+		expect(onSessionCreated).toHaveBeenCalledWith(expect.objectContaining({ steer: expect.any(Function) }));
+		await onSessionCreated.mock.calls[0][0].steer("please retry");
+		expect(mockSession.steer).toHaveBeenCalledWith("please retry");
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});
 
@@ -501,6 +504,30 @@ describe("PiAgentExecutor", () => {
 		const result = await executor.execute(makeState(12));
 
 		expect(result.status).toBe("working");
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
+	it("marks execution-environment blocker responses as failed", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{
+					role: "assistant",
+					content:
+						"The bash tool won't execute because the configured working directory (/workspaces/x) doesn't exist on this filesystem. Without a valid cwd, I can't run any bash commands.",
+				},
+			],
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(13));
+
+		expect(result.status).toBe("failed");
 		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
 });

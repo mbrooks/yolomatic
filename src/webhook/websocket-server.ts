@@ -38,22 +38,26 @@ export function createAdminWebSocketServer(
 	let statusInterval: ReturnType<typeof setInterval> | null = null;
 
 	const wss = new WebSocketServer({
-		server: httpServer,
-		path: "/tarsadmin/ws",
-		verifyClient: (info, callback) => {
-			const req = info.req as IncomingMessage;
-			const { username, password } = credentialProvider.getCredentials();
-			if (!username || !password) {
-				// Onboarding mode — allow connections without auth
-				callback(true);
-				return;
-			}
-			if (isAdminAuthorized(req, username, password)) {
-				callback(true);
-			} else {
-				callback(false, 401, "Unauthorized");
-			}
-		},
+		noServer: true,
+	});
+
+	httpServer.on("upgrade", (request, socket, head) => {
+		const url = request.url ? new URL(request.url, "http://localhost") : null;
+		if (!url || url.pathname !== "/tarsadmin/ws") {
+			return;
+		}
+
+		const req = request as IncomingMessage;
+		const { username, password } = credentialProvider.getCredentials();
+		if (username && password && !isAdminAuthorized(req, username, password)) {
+			socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+			socket.destroy();
+			return;
+		}
+
+		wss.handleUpgrade(request, socket, head, (ws) => {
+			wss.emit("connection", ws, request);
+		});
 	});
 
 	function hasStatusSubscribers(): boolean {
