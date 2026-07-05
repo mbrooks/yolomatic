@@ -36,6 +36,10 @@ export interface GitHubPollingDeps {
 let pollIntervalId: NodeJS.Timeout | undefined;
 let pollRunning = false;
 
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 function repoPayload(owner: string, repo: string) {
 	return { name: repo, owner: { login: owner } };
 }
@@ -267,15 +271,18 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 				...reviewComments.map((comment) => normalizePolledPRReviewComment(repo.owner, repo.repo, comment)),
 			);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[github-poll] failed ${repo.owner}/${repo.repo}: ${message}\n`);
+			process.stdout.write(`[github-poll] failed ${repo.owner}/${repo.repo}: ${errorMessage(error)}\n`);
 		}
 	}
 
 	events.push(...await collectDueSubjectEvents(deps, now));
 	events.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
 	for (const event of events) {
-		await deps.dispatch(event);
+		try {
+			await deps.dispatch(event);
+		} catch (error) {
+			process.stdout.write(`[github-poll] dispatch failed id=${event.id}: ${errorMessage(error)}\n`);
+		}
 	}
 }
 
@@ -324,8 +331,7 @@ async function collectDueSubjectEvents(deps: GitHubPollingDeps, now: Date): Prom
 				);
 			}
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[github-poll] failed subject ${subject.subjectKey}: ${message}\n`);
+			process.stdout.write(`[github-poll] failed subject ${subject.subjectKey}: ${errorMessage(error)}\n`);
 		} finally {
 			deps.eventStore.markPollingSubjectChecked?.(subject.subjectKey, now.toISOString());
 		}
@@ -339,9 +345,13 @@ export function startGitHubPolling(deps: GitHubPollingDeps): void {
 	pollIntervalId = setInterval(() => {
 		if (pollRunning) return;
 		pollRunning = true;
-		void tickGitHubPolling(deps).finally(() => {
-			pollRunning = false;
-		});
+		void tickGitHubPolling(deps)
+			.catch((error) => {
+				process.stdout.write(`[github-poll] tick failed: ${errorMessage(error)}\n`);
+			})
+			.finally(() => {
+				pollRunning = false;
+			});
 	}, deps.intervalMs);
 	pollIntervalId.unref?.();
 }

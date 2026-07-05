@@ -239,6 +239,57 @@ describe("tickGitHubPolling", () => {
 		expect(dispatchedTypes).toEqual(["issue_comment", "issue"]);
 	});
 
+	it("continues dispatching polled events after a dispatch failure", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		const github = makeGithub({
+			listIssuesUpdatedSince: vi.fn(async () => [{
+				number: 2,
+				title: "Later",
+				body: "",
+				state: "open",
+				created_at: "2026-06-01T12:02:00.000Z",
+				updated_at: "2026-06-01T12:02:00.000Z",
+				labels: [],
+				assignee: null,
+				assignees: [],
+				user: { login: "human" },
+			}]),
+			listIssueCommentsSince: vi.fn(async () => [{
+				id: 9,
+				body: "Earlier",
+				created_at: "2026-06-01T12:01:00.000Z",
+				updated_at: "2026-06-01T12:01:00.000Z",
+				user: { login: "human" },
+				issue: {
+					number: 1,
+					title: "Issue",
+					body: "",
+					state: "open",
+					created_at: "2026-06-01T12:00:00.000Z",
+					updated_at: "2026-06-01T12:00:00.000Z",
+					labels: [],
+					assignee: null,
+					assignees: [],
+					user: { login: "human" },
+				},
+			}]),
+		});
+		const dispatch = vi
+			.fn<(...args: unknown[]) => Promise<void>>()
+			.mockRejectedValueOnce(new Error("dispatch boom"))
+			.mockResolvedValueOnce();
+		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+
+		try {
+			await tickGitHubPolling({ github, eventStore: store, githubUsername: "tars-bot", intervalMs: 60000, dispatch });
+
+			expect(dispatch).toHaveBeenCalledTimes(2);
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] dispatch failed id="));
+		} finally {
+			writeSpy.mockRestore();
+		}
+	});
+
 	it("checks due issue subjects and marks them checked", async () => {
 		const subject: GitHubPollSubject = {
 			subjectKey: "mbrooks/tars:issue:1",
@@ -423,5 +474,34 @@ describe("tickGitHubPolling", () => {
 			dispatch: vi.fn(),
 		});
 		stopGitHubPolling();
+	});
+
+	it("logs interval tick failures instead of leaking rejected promises", async () => {
+		vi.useFakeTimers();
+		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+		const store = {
+			...makeStore("2026-06-01T12:00:00.000Z"),
+			getLastEventReceivedAt: vi.fn(() => {
+				throw new Error("tick boom");
+			}),
+		};
+
+		try {
+			startGitHubPolling({
+				github: makeGithub(),
+				eventStore: store,
+				githubUsername: "tars-bot",
+				intervalMs: 1000,
+				dispatch: vi.fn(),
+			});
+
+			await vi.advanceTimersByTimeAsync(1000);
+
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick failed: tick boom"));
+		} finally {
+			stopGitHubPolling();
+			writeSpy.mockRestore();
+			vi.useRealTimers();
+		}
 	});
 });
