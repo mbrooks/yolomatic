@@ -12,6 +12,15 @@ export function isRateLimitError(message: string): boolean {
 	);
 }
 
+export function isExecutionEnvironmentBlocker(message: string): boolean {
+	const lower = message.toLowerCase();
+	return (
+		(lower.includes("configured working directory") && lower.includes("doesn't exist on this filesystem")) ||
+		(lower.includes("the bash tool won't execute") && lower.includes("valid cwd")) ||
+		(lower.includes("without a valid cwd") && lower.includes("can't run any bash commands"))
+	);
+}
+
 export function extractText(content: unknown): string {
 	if (typeof content === "string") {
 		return content;

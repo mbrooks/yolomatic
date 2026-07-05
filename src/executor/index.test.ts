@@ -506,4 +506,28 @@ describe("PiAgentExecutor", () => {
 		expect(result.status).toBe("working");
 		expect(unsubscribe).toHaveBeenCalledOnce();
 	});
+
+	it("marks execution-environment blocker responses as failed", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [
+				{
+					role: "assistant",
+					content:
+						"The bash tool won't execute because the configured working directory (/workspaces/x) doesn't exist on this filesystem. Without a valid cwd, I can't run any bash commands.",
+				},
+			],
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(13));
+
+		expect(result.status).toBe("failed");
+		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
 });

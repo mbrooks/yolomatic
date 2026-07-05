@@ -26,6 +26,17 @@ const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.tars.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 
+async function execFileText(command: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+	const result = await execFileAsync(command, args, { cwd });
+	if (typeof result === "string") {
+		return { stdout: result, stderr: "" };
+	}
+	return {
+		stdout: String(result.stdout ?? ""),
+		stderr: String(result.stderr ?? ""),
+	};
+}
+
 export interface DockerWorkerExecutorOptions {
 	projectRoot: string;
 	workspacesDir: string;
@@ -40,6 +51,7 @@ export interface DockerWorkerExecutorOptions {
 
 export class DockerWorkerExecutor implements ExecutionService {
 	private imageReady?: Promise<void>;
+	private resolvedWorkerWorkspaceMountSource?: Promise<string>;
 
 	constructor(private readonly options: DockerWorkerExecutorOptions) {}
 
@@ -134,7 +146,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			executionReject = reject;
 		});
 
-		const docker = spawn("docker", this.buildDockerRunArgs(containerName), {
+		const docker = spawn("docker", await this.buildDockerRunArgs(containerName), {
 			cwd: this.options.projectRoot,
 			env: {
 				...process.env,
@@ -342,15 +354,16 @@ export class DockerWorkerExecutor implements ExecutionService {
 		}
 	}
 
-	private buildDockerRunArgs(containerName: string): string[] {
+	private async buildDockerRunArgs(containerName: string): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
+		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
 		const args = [
 			"run",
 			"--rm",
 			"--name",
 			containerName,
 			"--mount",
-			this.buildMountSpec(this.options.workerWorkspaceMountSource, "/workspaces"),
+			this.buildMountSpec(workspaceMountSource, "/workspaces"),
 		];
 
 		if (networkMode) {
@@ -386,6 +399,49 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private buildMountSpec(source: string, target: string): string {
 		return `type=${path.isAbsolute(source) ? "bind" : "volume"},src=${source},dst=${target}`;
+	}
+
+	private async resolveWorkerWorkspaceMountSource(): Promise<string> {
+		if (!this.resolvedWorkerWorkspaceMountSource) {
+			this.resolvedWorkerWorkspaceMountSource = (async () => {
+				const configuredSource = this.options.workerWorkspaceMountSource.trim();
+				if (path.isAbsolute(configuredSource)) {
+					return configuredSource;
+				}
+
+				const currentContainerRef = process.env.HOSTNAME?.trim();
+				if (!currentContainerRef) {
+					return configuredSource;
+				}
+
+				try {
+					const { stdout } = await execFileText(
+						"docker",
+						["inspect", "--format", "{{json .Mounts}}", currentContainerRef],
+						this.options.projectRoot,
+					);
+					const mounts = JSON.parse(stdout) as Array<{
+						Destination?: string;
+						Type?: string;
+						Name?: string;
+						Source?: string;
+					}>;
+					const workspaceMount = mounts.find((mount) => mount.Destination === this.options.workspacesDir);
+					if (workspaceMount?.Type === "volume" && workspaceMount.Name?.trim()) {
+						return workspaceMount.Name.trim();
+					}
+					if (workspaceMount?.Type === "bind" && workspaceMount.Source?.trim()) {
+						return workspaceMount.Source.trim();
+					}
+				} catch {
+					// Fall back to the configured source when self-inspection is unavailable.
+				}
+
+				return configuredSource;
+			})();
+		}
+
+		return this.resolvedWorkerWorkspaceMountSource;
 	}
 
 	private buildWorkerSessionUrl(sessionKey: string, token: string): string {
@@ -438,7 +494,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			this.imageReady = (async () => {
 				let currentTransport: string | undefined;
 				try {
-					const { stdout } = await execFileAsync(
+					const { stdout } = await execFileText(
 						"docker",
 						[
 							"image",
@@ -447,9 +503,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 							`{{ index .Config.Labels "${WORKER_IMAGE_TRANSPORT_LABEL}" }}`,
 							this.options.workerImage,
 						],
-						{
-							cwd: this.options.projectRoot,
-						},
+						this.options.projectRoot,
 					);
 					currentTransport = stdout.trim();
 				} catch {

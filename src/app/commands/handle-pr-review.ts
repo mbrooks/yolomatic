@@ -4,9 +4,10 @@ import type { ExecutionService } from "../../ports/execution-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import { classifyComments } from "../../pr-review/classifier.js";
+import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { extractIssueNumberFromBranch, validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import type { ExecutionResult } from "../../executor/index.js";
-import { ExecuteSessionReporter } from "./execute-session-reporter.js";
+import { isExecutionEnvironmentBlocker, isRateLimitError } from "../../executor/index.js";
 import { issueSessionKey, queueResumeOnBoot } from "./workflow-helpers.js";
 
 export interface PRReviewPayload {
@@ -25,7 +26,6 @@ export interface PRReviewPayload {
 
 export class HandlePRReview {
 	private inFlight = new Set<string>();
-	private readonly reporter: ExecuteSessionReporter;
 
 	constructor(
 		private readonly deps: {
@@ -36,14 +36,7 @@ export class HandlePRReview {
 			tasks: TaskControlService;
 			githubUsername: string;
 		},
-	) {
-		this.reporter = new ExecuteSessionReporter({
-			github: deps.github,
-			workspaces: deps.workspaces,
-			sessions: deps.sessions,
-			selfReportEnabled: false,
-		});
-	}
+	) {}
 
 	async execute(payload: PRReviewPayload): Promise<void> {
 		if (payload.action !== "created" && payload.action !== "submitted" && payload.action !== "edited") {
@@ -276,33 +269,135 @@ export class HandlePRReview {
 				await this.deps.github.postPRComment(owner, repo, prNumber, "Task cancelled by admin. TARS is idle.");
 				return;
 			}
-			await this.reporter.handleExecutionFailure({
-				owner,
-				repo,
-				sessionIssueNumber: issueNumber,
-				target: { kind: "pull_request", number: prNumber },
-				error,
-				context: "Processing PR review",
-			});
+			const message = error instanceof Error ? error.message : String(error);
+			if (isRateLimitError(message)) {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**Build failed**",
+						"",
+						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"",
+						`Error: ${message}`,
+					].join("\n"),
+				);
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
+				throw error;
+			}
+			await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
 		} finally {
 			this.deps.tasks.unregister(inFlightKey);
 		}
 
+		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
+			result = {
+				...result,
+				status: "failed",
+			};
+		}
+
 		await this.deps.sessions.incrementIterationCount(owner, repo, issueNumber);
-		await this.reporter.handleExecutionResult({
-			owner,
-			repo,
-			sessionIssueNumber: issueNumber,
-			target: { kind: "pull_request", number: prNumber },
-			result,
-			context: "Processing PR review",
-			state: {
-				...state,
-				workspacePath: worktreePath,
-				branch: branchName,
-			},
-		});
+
+		if (result.status === "cancelled") {
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "cancelled");
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"Task cancelled by admin.",
+					"",
+					result.summary || "TARS has stopped working on this review.",
+					"",
+					"TARS is idle and ready for the next task.",
+				].join("\n"),
+			);
+			return;
+		}
+
+		if (result.status === "complete") {
+			const pushed = await this.deps.workspaces.commitAndPushPath(
+				worktreePath,
+				branchName,
+				generateCommitMessage(state.labels, issueNumber, result.summary),
+			);
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
+			if (pushed) {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"Changes pushed to the PR branch.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			} else {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**TARS iteration complete.**",
+						"",
+						"No changes were needed.",
+						"",
+						"Summary:",
+						result.summary || "No summary provided.",
+					].join("\n"),
+				);
+			}
+		} else if (result.status === "waiting-feedback") {
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "waiting-feedback");
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"Need clarification:",
+					result.summary || "TARS needs more information before continuing.",
+				].join("\n\n"),
+			);
+		} else if (result.status === "failed") {
+			const message = result.summary;
+			if (isRateLimitError(message)) {
+				await this.deps.github.postPRComment(
+					owner,
+					repo,
+					prNumber,
+					[
+						"**Build failed**",
+						"",
+						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"",
+						`Error: ${message}`,
+					].join("\n"),
+				);
+			} else {
+				await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
+			}
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
+		} else {
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				[
+					"TARS is still working on the review feedback.",
+					"",
+					result.summary || "Execution is in progress.",
+				].join("\n"),
+			);
+		}
 	}
 
 	private async replyToPRReview(

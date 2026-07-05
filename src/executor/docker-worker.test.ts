@@ -317,12 +317,51 @@ describe("DockerWorkerExecutor", () => {
 				"ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%231&token=token-1",
 			);
 
-			const args = (executor as any).buildDockerRunArgs("worker-1");
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
 			expect(args).toContain("--network");
 			expect(args).toContain("container:tars");
 			expect(args).not.toContain("--add-host");
 		} finally {
 			delete process.env.OLLAMA_HOST;
+		}
+	});
+
+	it("resolves the mounted workspace volume name from the control-plane container", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/app/workspaces",
+			workerImage: "tars-worker:latest",
+			workerWorkspaceMountSource: "tars_workspaces",
+			workerControlBaseUrl: "http://127.0.0.1:6767",
+			workerDockerNetworkMode: "container:tars",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		const originalHostname = process.env.HOSTNAME;
+		process.env.HOSTNAME = "container-123";
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) =>
+			callback(
+				null,
+				JSON.stringify([
+					{ Destination: "/app/workspaces", Type: "volume", Name: "tars_tars_workspaces" },
+				]),
+				"",
+			),
+		);
+
+		try {
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("type=volume,src=tars_tars_workspaces,dst=/workspaces");
+			expect(execFileMock).toHaveBeenCalledWith(
+				"docker",
+				["inspect", "--format", "{{json .Mounts}}", "container-123"],
+				expect.any(Object),
+				expect.any(Function),
+			);
+		} finally {
+			process.env.HOSTNAME = originalHostname;
 		}
 	});
 
@@ -342,7 +381,7 @@ describe("DockerWorkerExecutor", () => {
 		process.env.PI_AGENT_MODEL = "glm-test";
 
 		try {
-			const args = (executor as any).buildDockerRunArgs("worker-1");
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
 			expect(args).toContain("PI_AGENT_PROVIDER=ollama");
 			expect(args).toContain("PI_AGENT_MODEL=glm-test");
 		} finally {
