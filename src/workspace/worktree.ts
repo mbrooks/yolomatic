@@ -95,11 +95,49 @@ export class WorktreeManager {
 		const bareRepoPath = this.bareRepos.getBareRepoPath(owner, repo);
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 
-		if (await this.worktreeExists(bareRepoPath, worktreePath)) {
+		if (!(await this.worktreeExists(bareRepoPath, worktreePath))) {
+			return;
+		}
+
+		const { stashed, forced } = await this.performSafeRemoval(
+			worktreePath,
+			bareRepoPath,
+			`TARS auto-stash before cleanup of issue-${issueNumber}`,
+		);
+
+		const changeSummary = stashed ? "stashed" : "none";
+		process.stdout.write(
+			`[workspace] Removed worktree ${worktreePath} for ${owner}/${repo}#${issueNumber}. ` +
+				`Uncommitted changes: ${changeSummary}${forced ? " (force-removed)" : ""}\n`,
+		);
+	}
+
+	private async performSafeRemoval(
+		worktreePath: string,
+		bareRepoPath: string,
+		stashMessage: string,
+	): Promise<{ stashed: boolean; forced: boolean }> {
+		const hasUncommitted = await this.git.hasAnyChanges(worktreePath);
+		if (hasUncommitted) {
+			await this.git.ensureGitIdentity(worktreePath);
+			await this.git.run("git", ["stash", "push", "-m", stashMessage, "-u"], {
+				cwd: worktreePath,
+			});
+		}
+
+		let forced = false;
+		try {
 			await this.git.run("git", ["worktree", "remove", worktreePath], {
 				cwd: bareRepoPath,
 			});
+		} catch {
+			await this.git.run("git", ["worktree", "remove", "--force", worktreePath], {
+				cwd: bareRepoPath,
+			});
+			forced = true;
 		}
+
+		return { stashed: hasUncommitted, forced };
 	}
 
 	private async getWorktreeList(bareRepoPath: string): Promise<Array<{ path: string; branch?: string }>> {
@@ -207,24 +245,8 @@ export class WorktreeManager {
 		owner: string,
 		repo: string,
 	): Promise<void> {
-		const hasUncommitted = await this.git.hasAnyChanges(worktreePath);
-		if (hasUncommitted) {
-			await this.git.ensureGitIdentity(worktreePath);
-			const stashMessage = `TARS auto-stash before eviction of ${path.basename(worktreePath)}`;
-			await this.git.run("git", ["stash", "push", "-m", stashMessage, "-u"], {
-				cwd: worktreePath,
-			});
-		}
-
-		try {
-			await this.git.run("git", ["worktree", "remove", worktreePath], {
-				cwd: bareRepoPath,
-			});
-		} catch {
-			await this.git.run("git", ["worktree", "remove", "--force", worktreePath], {
-				cwd: bareRepoPath,
-			});
-		}
+		const stashMessage = `TARS auto-stash before eviction of ${path.basename(worktreePath)}`;
+		const { stashed: hasUncommitted } = await this.performSafeRemoval(worktreePath, bareRepoPath, stashMessage);
 
 		const strategy = this.config.evictionStrategy ?? "lru";
 		const maxWorktrees = this.config.maxWorktrees ?? 10;
