@@ -51,7 +51,7 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					const launch = message as WorkerProtocolMessage<"launch_config">;
-					expect(launch.payload.session.workspacePath).toBe("/workspaces/mbrooks-tars/.worktrees/issue-418");
+					expect(launch.payload.session.workspacePath).toBe(harness.workspacePath);
 					await connection.send(
 						createWorkerMessage("ack", "mbrooks/tars#418", "ack-1", {
 							ackMessageId: launch.messageId,
@@ -353,7 +353,7 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("type=volume,src=tars_tars_workspaces,dst=/workspaces");
+			expect(args).toContain("type=volume,src=tars_tars_workspaces,dst=/app/workspaces");
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
 				["inspect", "--format", "{{json .Mounts}}", "container-123"],

@@ -34,8 +34,8 @@ Illustrative command:
 docker run --rm \
   --name tars-session-mbrooks-tars-395 \
   --network container:tars \
-  -v /app/workspaces:/workspaces \
-  -e TARS_PRIMARY_WORKTREE=/workspaces/mbrooks-tars/.worktrees/issue-395 \
+  -v /app/workspaces:/app/workspaces \
+  -e TARS_PRIMARY_WORKTREE=/app/workspaces/mbrooks-tars/.worktrees/issue-395 \
   -e TARS_SESSION_KEY=mbrooks/tars#395 \
   -e TARS_SESSION_WS_URL=ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
   -e PI_AGENT_PROVIDER=ollama \
@@ -52,6 +52,7 @@ Notes:
 - No long-lived LLM session directory is mounted into the worker.
 - The worker model is passed explicitly in the container env using `PI_AGENT_PROVIDER` and `PI_AGENT_MODEL`.
 - This does not hide secret files that already live under `/app/workspaces`; those remain visible through the single bind mount.
+- The worker mount target must match the control plane's `WORKSPACES_DIR` exactly so git worktree metadata resolves in both containers.
 
 ## Session URL
 
