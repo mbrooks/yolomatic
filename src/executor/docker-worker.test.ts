@@ -296,6 +296,36 @@ describe("DockerWorkerExecutor", () => {
 		delete process.env.OLLAMA_HOST;
 	});
 
+	it("uses shared container networking without rewriting loopback hosts", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "tars-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://127.0.0.1:6767",
+			workerDockerNetworkMode: "container:tars",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
+
+		try {
+			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
+			expect((executor as any).buildWorkerSessionUrl("mbrooks/tars#1", "token-1")).toBe(
+				"ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%231&token=token-1",
+			);
+
+			const args = (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("--network");
+			expect(args).toContain("container:tars");
+			expect(args).not.toContain("--add-host");
+		} finally {
+			delete process.env.OLLAMA_HOST;
+		}
+	});
+
 	it("includes explicit model env vars in docker args", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
@@ -531,6 +561,7 @@ async function createHarness(issueNumber: number): Promise<{
 		workerImage: "tars-worker:latest",
 		workerWorkspaceMountSource: workspacesRoot,
 		workerControlBaseUrl: "http://control-plane.test",
+		workerDockerNetworkMode: undefined,
 		workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 		soulPath: "/app/SOUL.md",
 	});

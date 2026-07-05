@@ -13,10 +13,12 @@ services:
       - .env
     environment:
       OLLAMA_HOST: http://127.0.0.1:11434
+      TARS_WORKER_CONTROL_BASE_URL: http://127.0.0.1:6767
+      TARS_WORKER_DOCKER_NETWORK_MODE: container:tars
       TARS_WORKER_RUNTIME_DIR: /app/runtime
       TARS_WORKER_RUNTIME_MOUNT_SOURCE: tars_runtime
       TARS_WORKER_WORKSPACE_MOUNT_SOURCE: tars_workspaces
-      TARS_WORKER_OLLAMA_HOST: http://host.docker.internal:11434
+      TARS_WORKER_OLLAMA_HOST: http://127.0.0.1:11434
     group_add:
       - "${DOCKER_GID:-999}"
     volumes:

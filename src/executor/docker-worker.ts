@@ -32,6 +32,7 @@ export interface DockerWorkerExecutorOptions {
 	workerImage: string;
 	workerWorkspaceMountSource: string;
 	workerControlBaseUrl: string;
+	workerDockerNetworkMode?: string;
 	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
 	soulPath: string;
@@ -342,16 +343,22 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private buildDockerRunArgs(containerName: string): string[] {
+		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const args = [
 			"run",
 			"--rm",
 			"--name",
 			containerName,
-			"--add-host",
-			"host.docker.internal:host-gateway",
 			"--mount",
 			this.buildMountSpec(this.options.workerWorkspaceMountSource, "/workspaces"),
 		];
+
+		if (networkMode) {
+			args.push("--network", networkMode);
+		}
+		if (!networkMode?.startsWith("container:")) {
+			args.push("--add-host", "host.docker.internal:host-gateway");
+		}
 
 		if (process.env.PI_AGENT_PROVIDER?.trim()) {
 			args.push("-e", `PI_AGENT_PROVIDER=${process.env.PI_AGENT_PROVIDER.trim()}`);
@@ -413,6 +420,9 @@ export class DockerWorkerExecutor implements ExecutionService {
 		try {
 			const url = new URL(raw);
 			if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+				if (this.options.workerDockerNetworkMode?.trim().startsWith("container:")) {
+					return url.toString();
+				}
 				url.hostname = "host.docker.internal";
 				return url.toString();
 			}

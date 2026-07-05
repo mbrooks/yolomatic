@@ -32,6 +32,7 @@ export interface AppConfig {
 	workerImage: string;
 	workerWorkspaceMountSource: string;
 	workerControlBaseUrl: string;
+	workerDockerNetworkMode?: string;
 	workerOllamaHost?: string;
 }
 
@@ -79,6 +80,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workerImage: store.get("worker_image") ?? "tars-worker:latest",
 		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
+		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,
 		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
 	};
 }

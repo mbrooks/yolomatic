@@ -192,6 +192,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "file-system",
 	},
 	{
+		key: "worker_docker_network_mode",
+		type: "string",
+		description: "Optional docker run --network mode for worker containers (for example container:tars)",
+		requiresRestart: true,
+		sensitive: false,
+		envVar: "TARS_WORKER_DOCKER_NETWORK_MODE",
+		category: "file-system",
+	},
+	{
 		key: "default_branch",
 		type: "string",
 		description: "Default git branch for new worktrees",

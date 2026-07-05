@@ -126,7 +126,9 @@ The worker does not need a runtime mount for RPC.
 
 Instead, TARS passes a session URL such as:
 
-- `ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+
+In the Docker Compose deployment, workers share the TARS container network namespace, so loopback is the correct control-plane address from the worker's perspective.
 
 ## Process Model
 
