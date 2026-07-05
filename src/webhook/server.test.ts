@@ -9,6 +9,8 @@ const verifySignature = vi.fn(() => true);
 const createWebhookServerDeps = vi.fn();
 const createAdminWebSocketServer = vi.fn();
 const onSessionLogEvent = vi.fn();
+const CleanupOldSessions = vi.fn();
+const SessionStoreRepositoryAdapter = vi.fn();
 
 function makeHandlers() {
 	return {
@@ -48,6 +50,24 @@ vi.mock("./http-utils.js", () => ({
 
 vi.mock("./server-deps.js", () => ({
 	createWebhookServerDeps,
+	fallbackWorkspaceService: {
+		createOrGetWorktree: async () => ({ path: "", branch: "" }),
+		removeWorktree: async () => undefined,
+		commitAndPush: async () => false,
+		commitAndPushPath: async () => false,
+		hasChanges: async () => false,
+		getWorktreePath: () => "",
+		getGitStatus: async () => "",
+		getGitDiff: async () => "",
+	},
+}));
+
+vi.mock("../adapters/persistence/session-store-repository-adapter.js", () => ({
+	SessionStoreRepositoryAdapter,
+}));
+
+vi.mock("../app/commands/cleanup-old-sessions.js", () => ({
+	CleanupOldSessions,
 }));
 
 vi.mock("./websocket-server.js", () => ({
@@ -421,16 +441,16 @@ describe("createWebhookServer", () => {
 });
 
 describe("cleanupOldSessions", () => {
-	it("delegates to the cleanup command", async () => {
-		createWebhookServerDeps.mockReturnValue({
-			cleanupCommand: {
-				execute: vi.fn(async () => ({ deleted: 2, failed: 1 })),
-			},
-		});
+	it("constructs a CleanupOldSessions command and delegates to it", async () => {
+		const execute = vi.fn(async () => ({ deleted: 2, failed: 1 }));
+		CleanupOldSessions.mockImplementation(() => ({ execute }));
 		const { cleanupOldSessions } = await import("./server.js");
 		await expect(cleanupOldSessions({} as never, undefined, 30)).resolves.toEqual({
 			deleted: 2,
 			failed: 1,
 		});
+		expect(SessionStoreRepositoryAdapter).toHaveBeenCalledWith({});
+		expect(CleanupOldSessions).toHaveBeenCalledWith(expect.anything(), expect.anything());
+		expect(execute).toHaveBeenCalledWith(30);
 	});
 });
