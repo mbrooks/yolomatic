@@ -357,13 +357,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 	private async buildDockerRunArgs(containerName: string): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
+		const workerWorkspacesDir = this.getWorkerWorkspacesDir();
 		const args = [
 			"run",
 			"--rm",
 			"--name",
 			containerName,
 			"--mount",
-			this.buildMountSpec(workspaceMountSource, "/workspaces"),
+			this.buildMountSpec(workspaceMountSource, workerWorkspacesDir),
 		];
 
 		if (networkMode) {
@@ -459,7 +460,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 		if (relative.startsWith("..") || path.isAbsolute(relative)) {
 			throw new Error(`Workspace path ${workspacePath} is outside configured WORKSPACES_DIR ${this.options.workspacesDir}`);
 		}
-		return path.posix.join("/workspaces", ...relative.split(path.sep));
+		return path.posix.join(this.getWorkerWorkspacesDir(), ...relative.split(path.sep));
+	}
+
+	private getWorkerWorkspacesDir(): string {
+		return this.options.workspacesDir.split(path.sep).join(path.posix.sep);
 	}
 
 	private async validateLaunch(workspacePath: string): Promise<void> {

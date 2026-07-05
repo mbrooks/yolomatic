@@ -114,13 +114,13 @@ Important caveat:
 The proposed worker mount model is:
 
 - host: `WORKSPACES_DIR`
-- container: `/workspaces`
+- container: `WORKSPACES_DIR` at the same absolute path used by TARS
 
 TARS passes the primary worktree path separately, for example:
 
-- `/workspaces/mbrooks-tars/.worktrees/issue-395`
+- `/app/workspaces/mbrooks-tars/.worktrees/issue-395`
 
-All other repos under `/workspaces` are available for reference and ad hoc local work. This intentionally favors simplicity over fine-grained isolation.
+All other repos under that shared workspace root are available for reference and ad hoc local work. This intentionally favors simplicity over fine-grained isolation.
 
 The worker does not need a runtime mount for RPC.
 

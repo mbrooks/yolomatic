@@ -21,6 +21,7 @@ This folder describes a proposed TARS runtime split where:
 - Run the agent in an isolated, disposable Debian worker container.
 - Support live steering and stop/pause semantics over one session connection.
 - In Docker Compose deployments, let workers share the TARS container network namespace so they reach TARS and Ollama over `127.0.0.1` instead of a host-published port.
+- Keep `WORKSPACES_DIR` identical in the control plane and worker so git worktree metadata stays valid without path rewriting.
 - Keep the first implementation simple:
   - one worker per issue session
   - one read-write mount for the full workspace tree

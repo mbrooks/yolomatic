@@ -89,7 +89,7 @@ TARS sends the authoritative launch payload after validating the session identit
       "owner": "mbrooks",
       "repo": "tars",
       "issueNumber": 395,
-      "workspacePath": "/workspaces/mbrooks-tars/.worktrees/issue-395",
+      "workspacePath": "/app/workspaces/mbrooks-tars/.worktrees/issue-395",
       "title": "Implement worker-based agent sessions",
       "body": "Design and build a new isolated worker runtime."
     },
