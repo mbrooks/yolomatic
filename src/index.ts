@@ -161,6 +161,7 @@ export async function main(): Promise<void> {
 				githubUsername: nextConfig.githubUsername,
 				intervalMs: nextConfig.githubPollIntervalMs,
 				shouldPollRepo: (owner, repo) => repoModeIncludesPolling(resolveGitHubEventMode(owner, repo)),
+				resolveGitHubEventMode,
 				dispatch: (event) => handlers.handleGitHubEvent(event),
 			});
 		}

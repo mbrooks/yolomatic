@@ -504,4 +504,172 @@ describe("tickGitHubPolling", () => {
 			vi.useRealTimers();
 		}
 	});
+
+	it("logs tick start, per-repo checks, and tick completion summary", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		const github = makeGithub({
+			listAccessibleRepositories: vi.fn(async () => [
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+			]),
+		});
+		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+		const now = new Date("2026-06-01T12:00:00.000Z");
+
+		try {
+			await tickGitHubPolling({
+				github,
+				eventStore: store,
+				githubUsername: "tars-bot",
+				intervalMs: 60000,
+				now: () => now,
+				dispatch: vi.fn(),
+			});
+
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick started at 2026-06-01T12:00:00.000Z\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking mbrooks/tars (lastEventReceivedAt=2026-06-01T12:00:00.000Z, since=2026-06-01T11:58:00.000Z)\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick completed: 0 events dispatched\n"));
+		} finally {
+			writeSpy.mockRestore();
+		}
+	});
+
+	it("logs initialization and completion when no last_event_received_at exists", async () => {
+		const store = makeStore(null);
+		const github = makeGithub();
+		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+
+		try {
+			await tickGitHubPolling({
+				github,
+				eventStore: store,
+				githubUsername: "tars-bot",
+				intervalMs: 60000,
+				now: () => new Date("2026-06-01T12:00:00.000Z"),
+				dispatch: vi.fn(),
+			});
+
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick started at 2026-06-01T12:00:00.000Z\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] initialized last_event_received_at=2026-06-01T12:00:00.000Z\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick completed: 0 events dispatched\n"));
+		} finally {
+			writeSpy.mockRestore();
+		}
+	});
+
+	it("logs effective interval when checking due polling subjects", async () => {
+		const subject: GitHubPollSubject = {
+			subjectKey: "mbrooks/tars:issue:1",
+			owner: "mbrooks",
+			repo: "tars",
+			subjectType: "issue",
+			number: 1,
+			lastActivityAt: "2026-06-01T12:00:00.000Z",
+			lastCheckedAt: "2026-06-02T12:00:00.000Z",
+			createdAt: "2026-06-01T12:00:00.000Z",
+		};
+		const store = makeStore("2026-06-04T12:00:00.000Z", [subject]);
+		const github = makeGithub({
+			listAccessibleRepositories: vi.fn(async () => []),
+			listIssuesUpdatedSince: vi.fn(async () => []),
+			listIssueEventsSince: vi.fn(async () => []),
+			listIssueCommentsSince: vi.fn(async () => []),
+		});
+		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+
+		try {
+			await tickGitHubPolling({
+				github,
+				eventStore: store,
+				githubUsername: "tars-bot",
+				intervalMs: 60000,
+				now: () => new Date("2026-06-04T12:00:00.000Z"),
+				dispatch: vi.fn(),
+			});
+
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking subject mbrooks/tars:issue:1 (effective interval=3600000ms)\n"));
+		} finally {
+			writeSpy.mockRestore();
+		}
+	});
+
+	describe("startGitHubPolling startup logging", () => {
+		it("logs polled and skipped repositories with their effective mode", async () => {
+			vi.useFakeTimers();
+			const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+			const github = makeGithub({
+				listAccessibleRepositories: vi.fn(async () => [
+					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+					{ owner: "mbrooks", repo: "webhook-only", fullName: "mbrooks/webhook-only", visibility: "private" },
+				] as AccessibleRepo[]),
+			});
+
+			try {
+				startGitHubPolling({
+					github,
+					eventStore: makeStore("2026-06-01T12:00:00.000Z"),
+					githubUsername: "tars-bot",
+					intervalMs: 60000,
+					resolveGitHubEventMode: (owner, repo) => (repo === "webhook-only" ? "webhook" : "both"),
+					dispatch: vi.fn(),
+				});
+				await vi.advanceTimersByTimeAsync(0);
+
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] Starting GitHub polling (base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/tars (mode=both, base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] skipping mbrooks/webhook-only (mode=webhook)\n"));
+			} finally {
+				stopGitHubPolling();
+				writeSpy.mockRestore();
+				vi.useRealTimers();
+			}
+		});
+
+		it("defaults to polling mode when no resolver is provided", async () => {
+			vi.useFakeTimers();
+			const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+
+			try {
+				startGitHubPolling({
+					github: makeGithub(),
+					eventStore: makeStore(null),
+					githubUsername: "tars-bot",
+					intervalMs: 60000,
+					dispatch: vi.fn(),
+				});
+				await vi.advanceTimersByTimeAsync(0);
+
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/tars (mode=polling, base interval=60000ms)\n"));
+			} finally {
+				stopGitHubPolling();
+				writeSpy.mockRestore();
+				vi.useRealTimers();
+			}
+		});
+
+		it("logs a startup failure when listing repositories throws", async () => {
+			vi.useFakeTimers();
+			const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+			const github = makeGithub({
+				listAccessibleRepositories: vi.fn(async () => { throw new Error("startup boom"); }),
+			});
+
+			try {
+				startGitHubPolling({
+					github,
+					eventStore: makeStore(null),
+					githubUsername: "tars-bot",
+					intervalMs: 60000,
+					resolveGitHubEventMode: () => "polling",
+					dispatch: vi.fn(),
+				});
+				await vi.advanceTimersByTimeAsync(0);
+
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] failed to enumerate repositories at startup: startup boom\n"));
+			} finally {
+				stopGitHubPolling();
+				writeSpy.mockRestore();
+				vi.useRealTimers();
+			}
+		});
+	});
 });
