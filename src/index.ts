@@ -13,7 +13,6 @@ import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { SkillStore } from "./skills/store.js";
 import { RepoSkillService } from "./skills/repo-skill-service.js";
 import { WorkspaceManager } from "./workspace/manager.js";
-import { GitHubPollingAdapter } from "./adapters/github/github-polling-adapter.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 import { GitHubEventStore } from "./github-events/store.js";
 import { startGitHubPolling } from "./github-events/polling.js";
@@ -24,11 +23,14 @@ import {
 	resolveConfiguredRepoDefaultBranch,
 	resolveConfiguredRepoGitHubEventMode,
 } from "./repos/configured-repositories.js";
-import { createStartIssueSession } from "./app/commands/start-issue-session.js";
-import { systemClock } from "./ports/clock.js";
+import { WorkerRpcServer } from "./worker/rpc-server.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
+	async handleIssueEvent() {},
+	async handleCommentEvent() {},
+	async handlePullRequestReviewCommentEvent() {},
+	async handlePullRequestReviewEvent() {},
 	isInFlight() { return false; },
 };
 
@@ -40,7 +42,7 @@ export async function main(): Promise<void> {
 
 	settingsStore.onChange(() => {
 		try {
-			syncLoggingConfigToEnv(getConfig(settingsStore));
+			syncConfigToEnv(getConfig(settingsStore));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[settings] failed to sync env after change: ${message}\n`);
@@ -54,8 +56,10 @@ export async function main(): Promise<void> {
 	let onboardingServer: ReturnType<typeof createWebhookServer> | undefined;
 	let activated = false;
 
-	function syncLoggingConfigToEnv(nextConfig: typeof config): void {
-		// Keep logger settings aligned for code paths that still read process.env.
+	function syncConfigToEnv(nextConfig: typeof config): void {
+		// Sync database settings to process.env so legacy code paths pick them up.
+		process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
+		process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
 		process.env.LOG_LEVEL = nextConfig.logLevel;
 		process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
 		process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
@@ -64,7 +68,7 @@ export async function main(): Promise<void> {
 	}
 
 	async function startRuntime(nextConfig: typeof config): Promise<void> {
-		syncLoggingConfigToEnv(nextConfig);
+		syncConfigToEnv(nextConfig);
 		const configuredRepositories = () => parseConfiguredRepositories(settingsStore.get("configured_repositories"));
 		const resolveDefaultBranch = (owner: string, repo: string) =>
 			resolveConfiguredRepoDefaultBranch(configuredRepositories(), owner, repo, nextConfig.defaultBranch);
@@ -81,13 +85,15 @@ export async function main(): Promise<void> {
 			maxWorktrees: nextConfig.maxWorktrees,
 			evictionStrategy: nextConfig.evictionStrategy,
 		});
+		const workerRpcServer = new WorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: process.cwd(),
 			workspacesDir: nextConfig.workspacesDir,
 			workerImage: nextConfig.workerImage,
-			workerRuntimeDir: nextConfig.workerRuntimeDir,
 			workerWorkspaceMountSource: nextConfig.workerWorkspaceMountSource,
-			workerRuntimeMountSource: nextConfig.workerRuntimeMountSource,
+			workerControlBaseUrl: nextConfig.workerControlBaseUrl,
+			workerDockerNetworkMode: nextConfig.workerDockerNetworkMode,
+			workerRpcServer,
 			workerOllamaHost: nextConfig.workerOllamaHost,
 			soulPath: nextConfig.soulPath,
 		});
@@ -122,22 +128,9 @@ export async function main(): Promise<void> {
 			defaultBranch: nextConfig.defaultBranch,
 		});
 		const github = new GitHubServiceAdapter({ githubToken: nextConfig.githubToken });
-		const githubPolling = new GitHubPollingAdapter({ githubToken: nextConfig.githubToken });
 		const repoModes = configuredRepositories().map((repo) =>
 			resolveConfiguredRepoGitHubEventMode([repo], repo.owner, repo.repo, nextConfig.githubEventMode),
 		);
-		const startIssueSession = createStartIssueSession({
-			sessions: sessionManager,
-			workspaces: workspaceManager,
-			github,
-			tasks: taskController,
-			executor,
-			clock: systemClock,
-			defaultBranch: nextConfig.defaultBranch,
-			resolveDefaultBranch,
-			githubUsername: nextConfig.githubUsername,
-			selfReportEnabled: nextConfig.selfReportEnabled,
-		});
 		const githubEventsEnabled = repoModeIncludesWebhook(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesWebhook(mode));
 		const pollingEnabled = repoModeIncludesPolling(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesPolling(mode));
 		const activeHandlers = githubEventsEnabled ? handlers : noOpHandlers;
@@ -157,7 +150,7 @@ export async function main(): Promise<void> {
 			skillStore,
 			repoSkillService,
 			executor,
-			startIssueSession,
+			workerRpcServer,
 		);
 		server.listen(nextConfig.port, () => {
 			process.stdout.write(`Webhook receiver listening on port ${nextConfig.port}\n`);
@@ -165,7 +158,7 @@ export async function main(): Promise<void> {
 
 		if (pollingEnabled) {
 			startGitHubPolling({
-				github: githubPolling,
+				github,
 				eventStore,
 				githubUsername: nextConfig.githubUsername,
 				intervalMs: nextConfig.githubPollIntervalMs,

@@ -30,9 +30,8 @@ export interface AppConfig {
 	githubEventMode: "webhook" | "polling" | "both";
 	githubPollIntervalMs: number;
 	workerImage: string;
-	workerRuntimeDir: string;
 	workerWorkspaceMountSource: string;
-	workerRuntimeMountSource: string;
+	workerControlBaseUrl: string;
 	workerOllamaHost?: string;
 }
 
@@ -40,7 +39,6 @@ export function getConfig(store: SettingsStore): AppConfig {
 	const sessionsDir = path.resolve(store.getString("sessions_dir", "./sessions"));
 	const rawArchiveDir = store.get("archive_dir");
 	const archiveDir = rawArchiveDir ? path.resolve(rawArchiveDir) : path.join(sessionsDir, "archive");
-	const workerRuntimeDir = path.resolve(store.get("worker_runtime_dir") ?? path.join(sessionsDir, "runtime"));
 	const rawCleanup = store.get("cleanup_retention_days");
 
 	const rawEventMode = store.getString("github_event_mode", "webhook").toLowerCase();
@@ -79,9 +77,8 @@ export function getConfig(store: SettingsStore): AppConfig {
 		githubEventMode,
 		githubPollIntervalMs: Math.max(1000, store.getNumber("github_poll_interval_ms", 60000)),
 		workerImage: store.get("worker_image") ?? "tars-worker:latest",
-		workerRuntimeDir,
 		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
-		workerRuntimeMountSource: store.get("worker_runtime_mount_source") ?? workerRuntimeDir,
+		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
 		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
 	};
 }

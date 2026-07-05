@@ -1,4 +1,3 @@
-import net from "node:net";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -6,8 +5,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WorkerMessageParser, encodeWorkerMessage } from "../worker/framing.js";
-import { createWorkerMessage, type WorkerProtocolMessage } from "../worker/protocol.js";
+import { createWorkerMessage, type AnyWorkerProtocolMessage, type WorkerProtocolMessage } from "../worker/protocol.js";
+import type { PendingWorkerRpcConnection, WorkerRpcConnection, WorkerRpcServer } from "../worker/rpc-server.js";
 
 const { execFileMock, spawnMock, recordSessionLogMock } = vi.hoisted(() => ({
 	execFileMock: vi.fn(),
@@ -32,99 +31,62 @@ describe("DockerWorkerExecutor", () => {
 	});
 
 	it("launches a docker worker, streams logs, and exposes steering", async () => {
-		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-ws-"));
-		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-418");
-		const runtimeDir = path.join("/tmp", `trt-${Date.now()}-418`);
-		await mkdir(workspacePath, { recursive: true });
-
+		const harness = await createHarness(418);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		spawnMock.mockImplementation((_cmd, args, options) => {
-			const child = new EventEmitter() as EventEmitter & {
-				stdout: EventEmitter;
-				stderr: EventEmitter;
-			};
-			child.stdout = new EventEmitter();
-			child.stderr = new EventEmitter();
+			const child = makeChildProcess();
 
 			expect(args).toContain("run");
 			expect(args).toContain("--mount");
 			expect(args).not.toContain("GITHUB_TOKEN");
 			expect(options.env.TARS_SESSION_KEY).toBe("mbrooks/tars#418");
+			expect(options.env.TARS_SESSION_WS_URL).toContain("sessionKey=mbrooks%2Ftars%23418");
 
-			setImmediate(() => {
-				const parser = new WorkerMessageParser();
-				const client = net.createConnection(path.join(runtimeDir, "github-mbrooks-tars-issue-418", "session.sock"));
-				client.on("data", (chunk) => {
-					for (const message of parser.push(chunk)) {
-						if (message.type === "launch_config") {
-							const launch = message as WorkerProtocolMessage<"launch_config">;
-							expect(launch.payload.session.workspacePath).toBe("/workspaces/mbrooks-tars/.worktrees/issue-418");
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("ack", "mbrooks/tars#418", "ack-1", {
-										ackMessageId: launch.messageId,
-									}),
-								),
-							);
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("event_batch", "mbrooks/tars#418", "events-1", {
-										events: [
-											{
-												type: "session_log",
-												entry: {
-													timestamp: new Date().toISOString(),
-													level: "info",
-													message: "Prompt sent",
-													details: { type: "prompt" },
-												},
-											},
-										],
-									}),
-								),
-							);
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("complete", "mbrooks/tars#418", "complete-1", {
-										result: {
-											status: "complete",
-											summary: "done",
-											rawResponse: "TARS_STATUS: complete\ndone",
-										},
-									}),
-								),
-							);
-						}
-					}
-				});
-				client.on("connect", () => {
-					client.write(
-						encodeWorkerMessage(
-							createWorkerMessage("hello", "mbrooks/tars#418", "hello-1", {
-								workerVersion: "test",
-								pid: 123,
-							}),
-						),
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					const launch = message as WorkerProtocolMessage<"launch_config">;
+					expect(launch.payload.session.workspacePath).toBe("/workspaces/mbrooks-tars/.worktrees/issue-418");
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/tars#418", "ack-1", {
+							ackMessageId: launch.messageId,
+						}),
 					);
-				});
-			});
+					await connection.send(
+						createWorkerMessage("event_batch", "mbrooks/tars#418", "events-1", {
+							events: [
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "info",
+										message: "Prompt sent",
+										details: { type: "prompt" },
+									},
+								},
+							],
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/tars#418", "complete-1", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "TARS_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
 
 			return child;
 		});
 
-		const executor = new DockerWorkerExecutor({
-			projectRoot: workspacesRoot,
-			workspacesDir: workspacesRoot,
-			workerImage: "tars-worker:latest",
-			workerRuntimeDir: runtimeDir,
-			workerWorkspaceMountSource: "tars_workspaces",
-			workerRuntimeMountSource: runtimeDir,
-			soulPath: "/app/SOUL.md",
-		});
-
 		try {
-			const result = await executor.execute({
+			const result = await harness.executor.execute({
 				issueNumber: 418,
 				repo: "tars",
 				owner: "mbrooks",
@@ -132,7 +94,7 @@ describe("DockerWorkerExecutor", () => {
 				body: "Body",
 				status: "pending",
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: workspacePath,
+				workspacePath: harness.workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			});
@@ -147,81 +109,44 @@ describe("DockerWorkerExecutor", () => {
 				expect.objectContaining({ message: "Prompt sent" }),
 			);
 		} finally {
-			await rm(workspacesRoot, { recursive: true, force: true });
-			await rm(runtimeDir, { recursive: true, force: true });
+			await harness.close();
 		}
 	});
 
 	it("builds the worker image when it is missing", async () => {
-		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-build-"));
-		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-419");
-		const runtimeDir = path.join("/tmp", `trt-${Date.now()}-419`);
-		await mkdir(workspacePath, { recursive: true });
-
+		const harness = await createHarness(419);
 		execFileMock
 			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(new Error("missing image")))
 			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
-			const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
-			child.stdout = new EventEmitter();
-			child.stderr = new EventEmitter();
-
-			setImmediate(() => {
-				const parser = new WorkerMessageParser();
-				const client = net.createConnection(path.join(runtimeDir, "github-mbrooks-tars-issue-419", "session.sock"));
-				client.on("data", (chunk) => {
-					for (const message of parser.push(chunk)) {
-						if (message.type === "launch_config") {
-							const launch = message as WorkerProtocolMessage<"launch_config">;
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("ack", "mbrooks/tars#419", "ack-build", {
-										ackMessageId: launch.messageId,
-									}),
-								),
-							);
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("complete", "mbrooks/tars#419", "complete-build", {
-										result: {
-											status: "complete",
-											summary: "done",
-											rawResponse: "TARS_STATUS: complete\ndone",
-										},
-									}),
-								),
-							);
-						}
-					}
-				});
-				client.on("connect", () => {
-					client.write(
-						encodeWorkerMessage(
-							createWorkerMessage("hello", "mbrooks/tars#419", "hello-build", {
-								workerVersion: "test",
-								pid: 456,
-							}),
-						),
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/tars#419", "ack-build", {
+							ackMessageId: message.messageId,
+						}),
 					);
-				});
-			});
-
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/tars#419", "complete-build", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "TARS_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
 			return child;
 		});
 
-		const executor = new DockerWorkerExecutor({
-			projectRoot: "/repo",
-			workspacesDir: workspacesRoot,
-			workerImage: "tars-worker:latest",
-			workerRuntimeDir: runtimeDir,
-			workerWorkspaceMountSource: workspacesRoot,
-			workerRuntimeMountSource: runtimeDir,
-			soulPath: "/app/SOUL.md",
-		});
-
 		try {
-			await executor.execute({
+			await harness.executor.execute({
 				issueNumber: 419,
 				repo: "tars",
 				owner: "mbrooks",
@@ -229,7 +154,7 @@ describe("DockerWorkerExecutor", () => {
 				body: "Body",
 				status: "pending",
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: workspacePath,
+				workspacePath: harness.workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			});
@@ -242,38 +167,42 @@ describe("DockerWorkerExecutor", () => {
 				expect.any(Function),
 			);
 		} finally {
-			await rm(workspacesRoot, { recursive: true, force: true });
-			await rm(runtimeDir, { recursive: true, force: true });
+			await harness.close();
 		}
 	});
 
-	it("normalizes helper values and rejects workspaces outside the mount root", () => {
+	it("normalizes helper values, builds worker URLs, and rejects workspaces outside the mount root", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
 			workerImage: "tars-worker:latest",
-			workerRuntimeDir: "/tmp/runtime",
 			workerWorkspaceMountSource: "named-volume",
-			workerRuntimeMountSource: "/tmp/runtime",
+			workerControlBaseUrl: "https://control.example.test/base",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			workerOllamaHost: "http://custom-host:11434",
 			soulPath: "/app/SOUL.md",
 		});
 
 		expect((executor as any).buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
-		expect((executor as any).buildMountSpec("/tmp/runtime", "/tars-runtime")).toContain("type=bind");
 		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
 		expect((executor as any).appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
+		expect((executor as any).buildWorkerSessionUrl("mbrooks/tars#1", "token-1")).toBe(
+			"wss://control.example.test/tars-worker/ws?sessionKey=mbrooks%2Ftars%231&token=token-1",
+		);
 		expect(() => (executor as any).resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
 	});
 
-	it("falls back to raw or missing OLLAMA_HOST values", () => {
+	it("falls back to raw or translated OLLAMA_HOST values", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
 			workerImage: "tars-worker:latest",
-			workerRuntimeDir: "/tmp/runtime",
 			workerWorkspaceMountSource: "named-volume",
-			workerRuntimeMountSource: "/tmp/runtime",
+			workerControlBaseUrl: "http://host.docker.internal:6767",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
 
@@ -282,94 +211,68 @@ describe("DockerWorkerExecutor", () => {
 
 		process.env.OLLAMA_HOST = "not-a-url";
 		expect((executor as any).resolveWorkerOllamaHost()).toBe("not-a-url");
+
+		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
+		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://host.docker.internal:11434/");
+
 		delete process.env.OLLAMA_HOST;
 	});
 
-	it("includes optional provider and model env when building docker args", () => {
+	it("includes explicit model env vars in docker args", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
 			workerImage: "tars-worker:latest",
-			workerRuntimeDir: "/tmp/runtime",
-			workerWorkspaceMountSource: "named-volume",
-			workerRuntimeMountSource: "/tmp/runtime",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
 
-		process.env.PI_AGENT_PROVIDER = " openai ";
-		process.env.PI_AGENT_MODEL = " gpt-5 ";
+		process.env.PI_AGENT_PROVIDER = "ollama";
+		process.env.PI_AGENT_MODEL = "glm-test";
 
 		try {
-			expect((executor as any).buildDockerRunArgs("worker-1")).toEqual(
-				expect.arrayContaining(["-e", "PI_AGENT_PROVIDER=openai", "-e", "PI_AGENT_MODEL=gpt-5"]),
-			);
+			const args = (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+			expect(args).toContain("PI_AGENT_MODEL=glm-test");
 		} finally {
 			delete process.env.PI_AGENT_PROVIDER;
 			delete process.env.PI_AGENT_MODEL;
 		}
 	});
 
-	it("translates localhost OLLAMA_HOST, supports comment prompts, and propagates worker errors", async () => {
-		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-comment-"));
-		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-420");
-		const runtimeDir = path.join("/tmp", `trt-${Date.now()}-420`);
-		await mkdir(workspacePath, { recursive: true });
-		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
+	it("propagates worker errors", async () => {
+		const harness = await createHarness(420);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		spawnMock.mockImplementation((_cmd, args, options) => {
-			const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
-			child.stdout = new EventEmitter();
-			child.stderr = new EventEmitter();
-
+			const child = makeChildProcess();
 			expect(args).toContain("-e");
 			expect(args).toContain("OLLAMA_HOST=http://host.docker.internal:11434/");
 
-			setImmediate(() => {
-				const parser = new WorkerMessageParser();
-				const client = net.createConnection(path.join(runtimeDir, "github-mbrooks-tars-issue-420", "session.sock"));
-				client.on("data", (chunk) => {
-					for (const message of parser.push(chunk)) {
-						if (message.type !== "launch_config") continue;
-						const launch = message as WorkerProtocolMessage<"launch_config">;
-						expect(launch.payload.prompt.kind).toBe("comment");
-						client.write(
-							encodeWorkerMessage(
-								createWorkerMessage("error", "mbrooks/tars#420", "error-1", {
-									message: "worker blew up",
-								}),
-							),
-						);
-					}
-				});
-				client.on("connect", () => {
-					client.write(
-						encodeWorkerMessage(
-							createWorkerMessage("hello", "mbrooks/tars#420", "hello-comment", {
-								workerVersion: "test",
-								pid: 88,
-							}),
-						),
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("error", "mbrooks/tars#420", "error-1", {
+							message: "worker blew up",
+						}),
 					);
-				});
-			});
+				},
+			);
 
 			return child;
 		});
 
-		const executor = new DockerWorkerExecutor({
-			projectRoot: workspacesRoot,
-			workspacesDir: workspacesRoot,
-			workerImage: "tars-worker:latest",
-			workerRuntimeDir: runtimeDir,
-			workerWorkspaceMountSource: workspacesRoot,
-			workerRuntimeMountSource: runtimeDir,
-			soulPath: "/app/SOUL.md",
-		});
+		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
 
 		try {
 			await expect(
-				executor.execute({
+				harness.executor.execute({
 					issueNumber: 420,
 					repo: "tars",
 					owner: "mbrooks",
@@ -377,99 +280,64 @@ describe("DockerWorkerExecutor", () => {
 					body: "Body",
 					status: "pending",
 					sessionPath: "/tmp/session.jsonl",
-					workspacePath: workspacePath,
+					workspacePath: harness.workspacePath,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				}, "Please retry."),
 			).rejects.toThrow("worker blew up");
-			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://host.docker.internal:11434/");
 		} finally {
 			delete process.env.OLLAMA_HOST;
-			await rm(workspacesRoot, { recursive: true, force: true });
-			await rm(runtimeDir, { recursive: true, force: true });
+			await harness.close();
 		}
 	});
 
 	it("sends stop control when aborted", async () => {
-		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-stop-"));
-		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-421");
-		const runtimeDir = path.join("/tmp", `trt-${Date.now()}-421`);
-		await mkdir(workspacePath, { recursive: true });
+		const harness = await createHarness(421);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		let sawStop = false;
-		spawnMock.mockImplementation((_cmd, _args, _options) => {
-			const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
-			child.stdout = new EventEmitter();
-			child.stderr = new EventEmitter();
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
 
-			setImmediate(() => {
-				const parser = new WorkerMessageParser();
-				const client = net.createConnection(path.join(runtimeDir, "github-mbrooks-tars-issue-421", "session.sock"));
-				client.on("data", (chunk) => {
-					for (const message of parser.push(chunk)) {
-						if (message.type === "launch_config") {
-							const launch = message as WorkerProtocolMessage<"launch_config">;
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("ack", "mbrooks/tars#421", "ack-stop-launch", {
-										ackMessageId: launch.messageId,
-									}),
-								),
-							);
-						}
-						if (message.type === "control") {
-							const control = message as WorkerProtocolMessage<"control">;
-							sawStop = control.payload.action === "stop";
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("ack", "mbrooks/tars#421", "ack-stop", {
-										ackMessageId: control.messageId,
-									}),
-								),
-							);
-							client.write(
-								encodeWorkerMessage(
-									createWorkerMessage("complete", "mbrooks/tars#421", "complete-stop", {
-										result: {
-											status: "cancelled",
-											summary: "stopped",
-											rawResponse: "",
-										},
-									}),
-								),
-							);
-						}
-					}
-				});
-				client.on("connect", () => {
-					client.write(
-						encodeWorkerMessage(
-							createWorkerMessage("hello", "mbrooks/tars#421", "hello-stop", {
-								workerVersion: "test",
-								pid: 99,
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type === "launch_config") {
+						await connection.send(
+							createWorkerMessage("ack", "mbrooks/tars#421", "ack-launch", {
+								ackMessageId: message.messageId,
 							}),
-						),
-					);
-				});
-			});
+						);
+						return;
+					}
+					if (message.type === "control") {
+						sawStop = message.payload.action === "stop";
+						await connection.send(
+							createWorkerMessage("ack", "mbrooks/tars#421", "ack-stop", {
+								ackMessageId: message.messageId,
+							}),
+						);
+						await connection.send(
+							createWorkerMessage("complete", "mbrooks/tars#421", "complete-stop", {
+								result: {
+									status: "cancelled",
+									summary: "stopped",
+									rawResponse: "",
+								},
+							}),
+						);
+					}
+				},
+			);
 
 			return child;
 		});
 
-		const executor = new DockerWorkerExecutor({
-			projectRoot: workspacesRoot,
-			workspacesDir: workspacesRoot,
-			workerImage: "tars-worker:latest",
-			workerRuntimeDir: runtimeDir,
-			workerWorkspaceMountSource: workspacesRoot,
-			workerRuntimeMountSource: runtimeDir,
-			soulPath: "/app/SOUL.md",
-		});
 		const abortController = new AbortController();
 
 		try {
-			const run = executor.execute({
+			const run = harness.executor.execute({
 				issueNumber: 421,
 				repo: "tars",
 				owner: "mbrooks",
@@ -477,7 +345,7 @@ describe("DockerWorkerExecutor", () => {
 				body: "Body",
 				status: "pending",
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: workspacePath,
+				workspacePath: harness.workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			}, undefined, abortController.signal);
@@ -486,69 +354,308 @@ describe("DockerWorkerExecutor", () => {
 			expect(result.status).toBe("cancelled");
 			expect(sawStop).toBe(true);
 		} finally {
-			await rm(workspacesRoot, { recursive: true, force: true });
-			await rm(runtimeDir, { recursive: true, force: true });
+			await harness.close();
 		}
 	});
 
-	it("rejects workers with bad protocol metadata", async () => {
-		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-bad-"));
-		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-422");
-		const runtimeDir = path.join("/tmp", `trt-${Date.now()}-422`);
-		await mkdir(workspacePath, { recursive: true });
+	it("rejects connections with an unexpected session key", async () => {
+		const harness = await createHarness(422);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
-		spawnMock.mockImplementation((_cmd, _args, _options) => {
-			const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
-			child.stdout = new EventEmitter();
-			child.stderr = new EventEmitter();
-
-			setImmediate(() => {
-				const client = net.createConnection(path.join(runtimeDir, "github-mbrooks-tars-issue-422", "session.sock"));
-				client.on("connect", () => {
-					client.write(
-						encodeWorkerMessage({
-							type: "hello",
-							protocolVersion: 99,
-							sessionKey: "wrong/session#1",
-							messageId: "bad-hello",
-							payload: { workerVersion: "test", pid: 1 },
-						} as WorkerProtocolMessage<"hello">),
-					);
-				});
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectWorkerSession(harness.workerRpcServer, options.env.TARS_SESSION_WS_URL as string).then(async (connection) => {
+				await connection.send(
+					createWorkerMessage("hello", "mbrooks/tars#999", "hello-wrong-session", {
+						workerVersion: "test",
+						pid: 321,
+					}),
+				);
 			});
-
 			return child;
-		});
-
-		const executor = new DockerWorkerExecutor({
-			projectRoot: workspacesRoot,
-			workspacesDir: workspacesRoot,
-			workerImage: "tars-worker:latest",
-			workerRuntimeDir: runtimeDir,
-			workerWorkspaceMountSource: workspacesRoot,
-			workerRuntimeMountSource: runtimeDir,
-			soulPath: "/app/SOUL.md",
 		});
 
 		try {
 			await expect(
-				executor.execute({
+				harness.executor.execute({
 					issueNumber: 422,
 					repo: "tars",
 					owner: "mbrooks",
-					title: "Bad worker",
+					title: "Wrong session key",
 					body: "Body",
 					status: "pending",
 					sessionPath: "/tmp/session.jsonl",
-					workspacePath: workspacePath,
+					workspacePath: harness.workspacePath,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				}),
-			).rejects.toThrow(/Unsupported worker protocol version|unexpected session key/);
+			).rejects.toThrow("Worker connection closed unexpectedly.");
 		} finally {
-			await rm(workspacesRoot, { recursive: true, force: true });
-			await rm(runtimeDir, { recursive: true, force: true });
+			await harness.close();
+		}
+	});
+
+	it("rejects connections with an unsupported protocol version", async () => {
+		const harness = await createHarness(423);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectWorkerSession(harness.workerRpcServer, options.env.TARS_SESSION_WS_URL as string).then(async (connection) => {
+				await connection.send({
+					...createWorkerMessage("hello", "mbrooks/tars#423", "hello-bad-version", {
+						workerVersion: "test",
+						pid: 321,
+					}),
+					protocolVersion: 99,
+				});
+			});
+			return child;
+		});
+
+		try {
+			await expect(
+				harness.executor.execute({
+					issueNumber: 423,
+					repo: "tars",
+					owner: "mbrooks",
+					title: "Bad protocol version",
+					body: "Body",
+					status: "pending",
+					sessionPath: "/tmp/session.jsonl",
+					workspacePath: harness.workspacePath,
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+				}),
+			).rejects.toThrow("Worker connection closed unexpectedly.");
+		} finally {
+			await harness.close();
 		}
 	});
 });
+
+async function createHarness(issueNumber: number): Promise<{
+	executor: DockerWorkerExecutor;
+	workspacePath: string;
+	workerRpcServer: FakeWorkerRpcServer;
+	close: () => Promise<void>;
+}> {
+	const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), `tars-docker-worker-${issueNumber}-`));
+	const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", `issue-${issueNumber}`);
+	await mkdir(workspacePath, { recursive: true });
+
+	const workerRpcServer = createFakeWorkerRpcServer();
+	const executor = new DockerWorkerExecutor({
+		projectRoot: issueNumber === 419 ? "/repo" : workspacesRoot,
+		workspacesDir: workspacesRoot,
+		workerImage: "tars-worker:latest",
+		workerWorkspaceMountSource: workspacesRoot,
+		workerControlBaseUrl: "http://control-plane.test",
+		workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+		soulPath: "/app/SOUL.md",
+	});
+
+	return {
+		executor,
+		workspacePath,
+		workerRpcServer,
+		close: async () => {
+			await workerRpcServer.close();
+			await rm(workspacesRoot, { recursive: true, force: true });
+		},
+	};
+}
+
+function makeChildProcess(): EventEmitter & { stdout: EventEmitter; stderr: EventEmitter } {
+	const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
+	child.stdout = new EventEmitter();
+	child.stderr = new EventEmitter();
+	return child;
+}
+
+async function connectMockWorker(
+	workerRpcServer: FakeWorkerRpcServer,
+	url: string,
+	onMessage: (connection: FakeWorkerRpcConnection, message: AnyWorkerProtocolMessage) => Promise<void>,
+): Promise<void> {
+	const connection = await connectWorkerSession(workerRpcServer, url);
+	connection.onMessage((message) => {
+		void onMessage(connection, message);
+	});
+
+	await connection.send(
+		createWorkerMessage("hello", new URL(url).searchParams.get("sessionKey") ?? "", "hello-1", {
+			workerVersion: "test",
+			pid: 123,
+		}),
+	);
+}
+
+async function connectWorkerSession(
+	workerRpcServer: FakeWorkerRpcServer,
+	url: string,
+): Promise<FakeWorkerRpcConnection> {
+	const parsedUrl = new URL(url);
+	const token = parsedUrl.searchParams.get("token");
+	const sessionKey = decodeURIComponent(parsedUrl.searchParams.get("sessionKey") ?? "");
+	if (!token) {
+		throw new Error("Missing worker RPC token");
+	}
+
+	return workerRpcServer.connectPending(token, sessionKey);
+}
+
+class FakeWorkerRpcConnection implements WorkerRpcConnection {
+	private readonly messageListeners = new Set<(message: AnyWorkerProtocolMessage) => void>();
+	private readonly closeListeners = new Set<() => void>();
+	private readonly errorListeners = new Set<(error: Error) => void>();
+	private readonly bufferedMessages: AnyWorkerProtocolMessage[] = [];
+	private open = true;
+	peer?: FakeWorkerRpcConnection;
+
+	send(message: WorkerProtocolMessage): Promise<void> {
+		return Promise.resolve().then(() => {
+			if (!this.open || !this.peer?.open) {
+				throw new Error("Worker RPC connection is not connected");
+			}
+			if (this.peer.messageListeners.size === 0) {
+				this.peer.bufferedMessages.push(message as AnyWorkerProtocolMessage);
+				return;
+			}
+			for (const listener of this.peer.messageListeners) {
+				listener(message as AnyWorkerProtocolMessage);
+			}
+		});
+	}
+
+	onMessage(listener: (message: AnyWorkerProtocolMessage) => void): () => void {
+		this.messageListeners.add(listener);
+		for (const message of this.bufferedMessages.splice(0)) {
+			listener(message);
+		}
+		return () => {
+			this.messageListeners.delete(listener);
+		};
+	}
+
+	onClose(listener: () => void): () => void {
+		this.closeListeners.add(listener);
+		return () => {
+			this.closeListeners.delete(listener);
+		};
+	}
+
+	onError(listener: (error: Error) => void): () => void {
+		this.errorListeners.add(listener);
+		return () => {
+			this.errorListeners.delete(listener);
+		};
+	}
+
+	isOpen(): boolean {
+		return this.open;
+	}
+
+	close(): void {
+		if (!this.open) return;
+		this.open = false;
+		queueMicrotask(() => {
+			for (const listener of this.closeListeners) {
+				listener();
+			}
+			if (this.peer?.open) {
+				this.peer.open = false;
+				for (const listener of this.peer.closeListeners) {
+					listener();
+				}
+			}
+		});
+	}
+
+	emitError(error: Error): void {
+		for (const listener of this.errorListeners) {
+			listener(error);
+		}
+	}
+}
+
+type FakePendingConnection = PendingWorkerRpcConnection & {
+	sessionKey: string;
+	serverConnection: FakeWorkerRpcConnection;
+	workerConnection: FakeWorkerRpcConnection;
+	resolveConnection: (connection: WorkerRpcConnection) => void;
+	rejectConnection: (error: Error) => void;
+	connected: boolean;
+};
+
+type FakeWorkerRpcServer = ReturnType<typeof createFakeWorkerRpcServer>;
+
+function createFakeWorkerRpcServer() {
+	let tokenCounter = 0;
+	const pendingConnections = new Map<string, FakePendingConnection>();
+	const activeConnections = new Set<FakeWorkerRpcConnection>();
+
+	return {
+		createPendingConnection(sessionKey: string): PendingWorkerRpcConnection {
+			const token = `token-${++tokenCounter}`;
+			const serverConnection = new FakeWorkerRpcConnection();
+			const workerConnection = new FakeWorkerRpcConnection();
+			serverConnection.peer = workerConnection;
+			workerConnection.peer = serverConnection;
+
+			let resolveConnection!: (connection: WorkerRpcConnection) => void;
+			let rejectConnection!: (error: Error) => void;
+			const connectionPromise = new Promise<WorkerRpcConnection>((resolve, reject) => {
+				resolveConnection = resolve;
+				rejectConnection = reject;
+			});
+
+			const pending: FakePendingConnection = {
+				token,
+				sessionKey,
+				serverConnection,
+				workerConnection,
+				resolveConnection,
+				rejectConnection,
+				connected: false,
+				waitForConnection: () => connectionPromise,
+				dispose: (error = new Error(`Worker RPC connection was not established for ${sessionKey}`)) => {
+					if (!pendingConnections.has(token)) return;
+					pendingConnections.delete(token);
+					if (!pending.connected) {
+						rejectConnection(error);
+					}
+				},
+			};
+
+			pendingConnections.set(token, pending);
+			return pending;
+		},
+
+		connectPending(token: string, sessionKey: string): FakeWorkerRpcConnection {
+			const pending = pendingConnections.get(token);
+			if (!pending || pending.sessionKey !== sessionKey) {
+				throw new Error(`Unknown pending worker session ${sessionKey}`);
+			}
+			pendingConnections.delete(token);
+			pending.connected = true;
+			activeConnections.add(pending.serverConnection);
+			activeConnections.add(pending.workerConnection);
+			pending.resolveConnection(pending.serverConnection);
+			return pending.workerConnection;
+		},
+
+		async close(): Promise<void> {
+			for (const [token, pending] of pendingConnections) {
+				pendingConnections.delete(token);
+				if (!pending.connected) {
+					pending.rejectConnection(new Error(`Worker RPC server closed before ${pending.sessionKey} connected`));
+				}
+			}
+			for (const connection of activeConnections) {
+				connection.close();
+			}
+			activeConnections.clear();
+		},
+	};
+}

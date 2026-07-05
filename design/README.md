@@ -6,13 +6,13 @@ This folder describes a proposed TARS runtime split where:
 - A fresh worker container runs the full LLM agent for each issue session.
 - The worker can read and write any repository under the shared workspace mount.
 - The worker has no GitHub credentials, no Docker socket, and no direct access to TARS state.
-- TARS and the worker communicate through a bidirectional session protocol over a Unix domain socket.
+- TARS and the worker communicate through a bidirectional session protocol over a WebSocket connection.
 
 ## Documents
 
 - [architecture.md](architecture.md): system overview, trust boundaries, and lifecycle
-- [protocol-launch.md](protocol-launch.md): how TARS starts a worker session and exposes the session socket
-- [protocol-socket-transport.md](protocol-socket-transport.md): transport, framing, session isolation, reconnect, and shutdown rules
+- [protocol-launch.md](protocol-launch.md): how TARS starts a worker session and exposes the worker session URL
+- [protocol-websocket-transport.md](protocol-websocket-transport.md): transport, session isolation, reconnect, and shutdown rules
 - [protocol-session-messages.md](protocol-session-messages.md): bidirectional message types for launch, events, heartbeat, steering, and completion
 
 ## Goals
@@ -24,7 +24,7 @@ This folder describes a proposed TARS runtime split where:
   - one worker per issue session
   - one read-write mount for the full workspace tree
   - internet access enabled
-  - one session-scoped Unix socket
+  - one session-scoped WebSocket connection
   - no MCP dependency
 
 ## Non-Goals For V1

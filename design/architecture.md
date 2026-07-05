@@ -4,7 +4,7 @@
 
 Today TARS runs the LLM agent inside the long-lived `tars` container. In the new design, TARS becomes a control plane that launches a separate worker container for each issue session. The worker owns agent execution and code changes. TARS owns everything deterministic before and after the run.
 
-The control plane and worker communicate through a bidirectional session protocol over a Unix domain socket. TARS hosts the server side. The worker is the client that connects to the session socket.
+The control plane and worker communicate through a bidirectional session protocol over a WebSocket connection. TARS hosts the server side on its existing control-plane HTTP server. The worker is the client that connects with a session-specific URL and token.
 
 ## Why This Shape
 
@@ -17,12 +17,12 @@ This problem needs:
 
 That makes this a bidirectional session protocol, not a resource API and not a one-way log stream.
 
-Using a plain Unix domain socket keeps the design honest:
+Using a dedicated WebSocket session keeps the design honest:
 
-- no web-layer terminology
-- no host TCP port exposure
 - no fake REST shape for command-oriented behavior
-- no WebSocket upgrade or HTTP framing overhead
+- no bind-mounted runtime socket path
+- no extra custom framing layer
+- one bidirectional control channel per worker session
 
 ## Control Plane Responsibilities
 
@@ -33,7 +33,7 @@ TARS remains responsible for:
 - persisting the canonical session transcript, logs, and checkpoints
 - creating or reusing the primary issue worktree
 - building the issue prompt from session state
-- creating a per-session socket endpoint
+- creating a per-session WebSocket reservation
 - launching the worker container
 - receiving worker session messages
 - sending control and steering messages to the worker
@@ -55,7 +55,7 @@ These responsibilities line up with the current flow in:
 The worker is responsible for:
 
 - booting the agent runtime
-- connecting to the TARS session socket
+- connecting to the TARS worker session URL
 - completing the hello and launch handshake
 - setting `cwd` to the primary worktree
 - loading the same TARS-authored prompt rules and status protocol
@@ -92,7 +92,7 @@ The worker gets:
 - internet access
 - a clean Debian-based filesystem per session
 - model credentials only
-- a runtime mount containing a Unix socket path
+- a session-specific WebSocket URL for the control-plane connection
 
 The worker does not get:
 
@@ -122,14 +122,11 @@ TARS passes the primary worktree path separately, for example:
 
 All other repos under `/workspaces` are available for reference and ad hoc local work. This intentionally favors simplicity over fine-grained isolation.
 
-The worker also gets a small runtime mount for the Unix socket:
+The worker does not need a runtime mount for RPC.
 
-- host: `/app/sessions/runtime/github-mbrooks-tars-issue-395`
-- container: `/tars-runtime`
+Instead, TARS passes a session URL such as:
 
-Example socket path:
-
-- `/tars-runtime/session.sock`
+- `ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
 
 ## Process Model
 
@@ -145,22 +142,22 @@ This keeps cleanup simple and prevents detached processes from surviving outside
 
 1. TARS receives or resumes an issue session.
 2. TARS prepares the primary worktree.
-3. TARS creates a per-session socket server bound to a Unix socket.
-4. TARS launches a fresh worker container with the workspace mount and runtime mount.
+3. TARS creates a per-session WebSocket reservation and token.
+4. TARS launches a fresh worker container with the workspace mount and session URL.
 5. The worker connects and sends `hello`.
-6. TARS verifies the session key matches the socket's assigned session and replies with `launch_config`.
+6. TARS verifies the session key matches the reserved session and replies with `launch_config`.
 7. The worker runs the agent against the primary worktree.
 8. The worker streams `event_batch` and `heartbeat` messages during execution.
 9. TARS may send `control` messages such as `pause`, `stop`, or `steer`.
 10. The worker sends one terminal `complete` message.
 11. TARS stores logs, updates session state, and handles delivery.
-12. TARS removes the worker container and runtime socket.
+12. TARS removes the worker container and clears the session reservation.
 
 ## Logging Model
 
 Central session logs stay in TARS.
 
-- The worker sends structured event messages over the session socket.
+- The worker sends structured event messages over the WebSocket session.
 - TARS maps them into the existing session log system and persists the canonical session record.
 - Worker stdout and stderr can still be captured by Docker for debugging, but they are not the authoritative control channel.
 
@@ -172,7 +169,7 @@ The worker should be treated as a stateless execution runtime.
 
 - TARS owns persisted transcript and session history.
 - The worker should not mount or write the long-lived LLM session directory used by TARS today.
-- Assistant responses, reasoning summaries, tool activity, steering inputs, and terminal results should be streamed back over the session socket.
+- Assistant responses, reasoning summaries, tool activity, steering inputs, and terminal results should be streamed back over the WebSocket session.
 
 If TARS later needs resumable execution, it should derive restart context from centrally persisted session history rather than a worker-owned on-disk session folder.
 
@@ -203,10 +200,10 @@ The current executor boundary should be refactored into two layers:
 
 - host-side session runner:
   - launches and supervises the worker container
-  - hosts the session socket server
+  - hosts the worker session WebSocket server
   - converts worker messages into `ExecutionResult`
 - worker-side agent runner:
   - reuses most of the current `PiAgentExecutor` logic
-  - acts as a socket client during execution
+  - acts as a WebSocket client during execution
 
 That keeps prompt construction and result parsing familiar while changing where the code runs.

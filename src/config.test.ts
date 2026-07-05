@@ -39,6 +39,7 @@ describe("getConfig", () => {
 		delete process.env.ADMIN_PASSWORD;
 		delete process.env.GITHUB_EVENT_MODE;
 		delete process.env.GITHUB_POLL_INTERVAL_MS;
+		delete process.env.TARS_WORKER_CONTROL_BASE_URL;
 	});
 
 	afterEach(() => {
@@ -66,6 +67,7 @@ describe("getConfig", () => {
 		expect(config.adminPassword).toBeUndefined();
 		expect(config.githubEventMode).toBe("webhook");
 		expect(config.githubPollIntervalMs).toBe(60000);
+		expect(config.workerControlBaseUrl).toBe("http://host.docker.internal:6767");
 	});
 
 	it("reads optional environment variables", () => {
@@ -95,6 +97,7 @@ describe("getConfig", () => {
 		process.env.ADMIN_PASSWORD = "secret";
 		process.env.GITHUB_EVENT_MODE = "both";
 		process.env.GITHUB_POLL_INTERVAL_MS = "30000";
+		process.env.TARS_WORKER_CONTROL_BASE_URL = "http://worker-control.internal:9999";
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
@@ -110,6 +113,7 @@ describe("getConfig", () => {
 		expect(config.adminPassword).toBe("secret");
 		expect(config.githubEventMode).toBe("both");
 		expect(config.githubPollIntervalMs).toBe(30000);
+		expect(config.workerControlBaseUrl).toBe("http://worker-control.internal:9999");
 	});
 
 	it("falls back to webhook mode for unknown GitHub event modes", () => {

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This protocol defines how TARS starts a worker container for one issue session and exposes the session socket endpoint.
+This protocol defines how TARS starts a worker container for one issue session and exposes the worker session URL.
 
 ## Design Choice
 
@@ -10,7 +10,7 @@ Keep launch input simple:
 
 - repository content is provided through a single bind mount
 - session metadata is not pushed through stdin
-- the worker receives launch configuration from TARS after opening the session socket
+- the worker receives launch configuration from TARS after opening the worker session WebSocket
 - cancellation is process-level: TARS stops the container
 
 This keeps the authoritative control surface in one place: the session server hosted by TARS.
@@ -35,10 +35,9 @@ docker run --rm \
   --name tars-session-mbrooks-tars-395 \
   --network bridge \
   -v /app/workspaces:/workspaces \
-  -v /app/sessions/runtime/github-mbrooks-tars-issue-395:/tars-runtime \
   -e TARS_PRIMARY_WORKTREE=/workspaces/mbrooks-tars/.worktrees/issue-395 \
   -e TARS_SESSION_KEY=mbrooks/tars#395 \
-  -e TARS_SESSION_SOCKET_PATH=/tars-runtime/session.sock \
+  -e TARS_SESSION_WS_URL=ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
   -e OLLAMA_HOST=http://host.docker.internal:11434 \
@@ -54,17 +53,15 @@ Notes:
 - The worker model is passed explicitly in the container env using `PI_AGENT_PROVIDER` and `PI_AGENT_MODEL`.
 - This does not hide secret files that already live under `/app/workspaces`; those remain visible through the single bind mount.
 
-## Runtime Mount
+## Session URL
 
-The runtime mount exists only to make the Unix socket available to the worker.
+The session URL exists only for the lifetime of one active worker run.
 
 Example:
 
-- host: `/app/sessions/runtime/github-mbrooks-tars-issue-395`
-- container: `/tars-runtime`
-- socket: `/tars-runtime/session.sock`
+- `ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
 
-TARS should create and remove this directory as part of session lifecycle management.
+TARS should create and remove the underlying pending reservation as part of session lifecycle management.
 
 ## Launch Validation
 
@@ -72,8 +69,7 @@ Before launching, TARS should validate:
 
 - the primary worktree exists
 - the primary worktree path is under the mounted workspace root
-- the runtime directory exists and is writable
-- the Unix socket path does not already exist
+- the worker control base URL is configured correctly for the worker's network perspective
 - the session is not already terminal
 - the container image exists or can be built
 
@@ -83,11 +79,10 @@ If validation fails, TARS should not start the worker and should handle the fail
 
 The launch handshake is:
 
-1. TARS allocates a dedicated per-session runtime directory and socket path.
-2. TARS binds the session server to the Unix socket.
-3. TARS launches the worker container with socket path and session key env vars.
+1. TARS allocates a dedicated per-session token and WebSocket reservation.
+2. TARS launches the worker container with session URL and session key env vars.
 4. The worker connects and sends `hello`.
-5. TARS validates that the session key matches the session assigned to that socket.
+5. TARS validates that the session key matches the reserved session.
 6. TARS replies with `launch_config`.
 7. The worker acknowledges and begins execution.
 
@@ -133,4 +128,4 @@ The control message path should be preferred first because it gives the worker a
 
 Resume is implemented as a new worker launch against the same session state.
 
-The worker container itself is always fresh. The next launch gets its own fresh per-session socket and repeats the handshake.
+The worker container itself is always fresh. The next launch gets its own fresh per-session WebSocket reservation and repeats the handshake.

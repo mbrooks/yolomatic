@@ -74,7 +74,7 @@ TARS -> worker
 
 ### Purpose
 
-TARS sends the authoritative launch payload after validating the session identity for that socket.
+TARS sends the authoritative launch payload after validating the session identity for that WebSocket connection.
 
 ### Example
 

@@ -59,7 +59,7 @@ RUN useradd --create-home --shell /bin/bash tars \
   && groupadd -g 999 docker \
   && usermod -aG docker tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
-  && mkdir -p /app/sessions /app/workspaces /app/memory /app/runtime \
+  && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
 
 USER tars

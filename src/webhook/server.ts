@@ -10,7 +10,7 @@ import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
 import type { ExecutionService } from "../ports/execution-service.js";
-import type { StartIssueSession } from "../app/commands/start-issue-session.js";
+import type { WorkerRpcServer } from "../worker/rpc-server.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
@@ -43,7 +43,7 @@ export function createWebhookServer(
 	skillStore?: SkillStore,
 	repoSkillService?: RepoSkillService,
 	executor?: ExecutionService,
-	startIssueSession?: StartIssueSession,
+	workerRpcServer?: WorkerRpcServer,
 ) {
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -57,7 +57,6 @@ export function createWebhookServer(
 		githubService,
 		settingsStore,
 		executor,
-		startIssueSession,
 	);
 
 	serverDeps.skillStore = skillStore;
@@ -128,6 +127,14 @@ export function createWebhookServer(
 				for (const githubEvent of normalized) {
 					await handlers.handleGitHubEvent(githubEvent);
 				}
+			} else if (event === "issues") {
+				await handlers.handleIssueEvent(payload);
+			} else if (event === "issue_comment") {
+				await handlers.handleCommentEvent(payload);
+			} else if (event === "pull_request_review_comment") {
+				await handlers.handlePullRequestReviewCommentEvent(payload);
+			} else if (event === "pull_request_review") {
+				await handlers.handlePullRequestReviewEvent(payload);
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -146,6 +153,7 @@ export function createWebhookServer(
 		statusProvider,
 		serverDeps.taskController,
 	);
+	workerRpcServer?.attach(server);
 
 	const stopLogEvents = onSessionLogEvent((sessionKey, entry) => {
 		wsServer.broadcastLog(sessionKey, entry);
@@ -155,7 +163,10 @@ export function createWebhookServer(
 	server.close = ((callback?: (err?: Error) => void) => {
 		stopLogEvents();
 		originalClose((err?: Error) => {
-			void wsServer.close().finally(() => {
+			void Promise.allSettled([
+				wsServer.close(),
+				workerRpcServer?.close() ?? Promise.resolve(),
+			]).finally(() => {
 				callback?.(err);
 			});
 		});

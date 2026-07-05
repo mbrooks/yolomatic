@@ -164,15 +164,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "file-system",
 	},
 	{
-		key: "worker_runtime_dir",
-		type: "string",
-		description: "Directory where TARS creates per-session worker socket paths",
-		requiresRestart: true,
-		sensitive: false,
-		envVar: "TARS_WORKER_RUNTIME_DIR",
-		category: "file-system",
-	},
-	{
 		key: "soul_path",
 		type: "string",
 		description: "Path to SOUL.md personality definition",
@@ -192,12 +183,12 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "file-system",
 	},
 	{
-		key: "worker_runtime_mount_source",
+		key: "worker_control_base_url",
 		type: "string",
-		description: "Docker bind path or volume name exposed to workers as /tars-runtime",
+		description: "Base HTTP URL workers use to open their WebSocket control-plane connection",
 		requiresRestart: true,
 		sensitive: false,
-		envVar: "TARS_WORKER_RUNTIME_MOUNT_SOURCE",
+		envVar: "TARS_WORKER_CONTROL_BASE_URL",
 		category: "file-system",
 	},
 	{
