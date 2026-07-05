@@ -514,6 +514,33 @@ describe("HandlePRReview", () => {
 		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
 	});
 
+	it("marks execution-environment blocker review responses as failed", async () => {
+		const { handler, sessions, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
+			status: "working",
+			summary:
+				"The bash tool won't execute because the configured working directory (/workspaces/x) doesn't exist on this filesystem. Without a valid cwd, I can't run any bash commands.",
+			rawResponse: "",
+		});
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
+		expect(github.postPRComment).not.toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("still working on the review feedback"),
+		);
+	});
+
 	it("posts failure comment when execution throws", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(makeSession());

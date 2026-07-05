@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MessageHandler = (raw: Buffer | ArrayBuffer | Buffer[]) => void;
+type UpgradeHandler = (request: { url?: string; headers?: Record<string, string> }, socket: FakeUpgradeSocket, head: Buffer) => void;
 
 class FakeSocket {
 	static OPEN = 1;
@@ -47,6 +48,29 @@ class FakeSocket {
 	}
 }
 
+class FakeUpgradeSocket {
+	writes: string[] = [];
+	destroyed = false;
+
+	write(payload: string): void {
+		this.writes.push(payload);
+	}
+
+	destroy(): void {
+		this.destroyed = true;
+	}
+}
+
+class FakeHttpServer {
+	upgradeHandler: UpgradeHandler | null = null;
+
+	on(event: "upgrade", handler: UpgradeHandler): void {
+		if (event === "upgrade") {
+			this.upgradeHandler = handler;
+		}
+	}
+}
+
 let capturedOptions: any;
 let connectionHandler: ((ws: FakeSocket) => void) | null = null;
 const closeSpy = vi.fn((callback: () => void) => callback());
@@ -63,6 +87,23 @@ class FakeWebSocketServer {
 	on(event: "connection", handler: (ws: FakeSocket) => void): void {
 		if (event === "connection") {
 			connectionHandler = handler;
+		}
+	}
+
+	handleUpgrade(
+		_request: unknown,
+		_socket: unknown,
+		_head: Buffer,
+		callback: (ws: FakeSocket) => void,
+	): void {
+		const ws = new FakeSocket();
+		this.clients.add(ws);
+		callback(ws);
+	}
+
+	emit(event: "connection", ws: FakeSocket): void {
+		if (event === "connection") {
+			connectionHandler?.(ws);
 		}
 	}
 
@@ -85,54 +126,68 @@ describe("createAdminWebSocketServer", () => {
 		vi.useRealTimers();
 	});
 
-	it("validates onboarding and basic-auth websocket connections", async () => {
+	it("registers a path-scoped noServer websocket listener", async () => {
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		createAdminWebSocketServer({} as never, { getCredentials: () => ({}) });
+		const httpServer = new FakeHttpServer();
+		createAdminWebSocketServer(httpServer as never, { getCredentials: () => ({}) });
 
-		const allow = vi.fn();
-		capturedOptions.verifyClient({ req: { headers: {} } }, allow);
-		expect(allow).toHaveBeenCalledWith(true);
+		expect(capturedOptions).toEqual({ noServer: true });
+		expect(httpServer.upgradeHandler).toBeTypeOf("function");
+	});
 
-		createAdminWebSocketServer({} as never, {
+	it("allows onboarding and authorized admin upgrades while rejecting invalid auth", async () => {
+		const { createAdminWebSocketServer } = await import("./websocket-server.js");
+
+		const onboardingServer = new FakeHttpServer();
+		createAdminWebSocketServer(onboardingServer as never, { getCredentials: () => ({}) });
+		const onboardingSocket = new FakeUpgradeSocket();
+		onboardingServer.upgradeHandler?.({ url: "/tarsadmin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
+		expect(onboardingSocket.writes).toEqual([]);
+		expect(onboardingSocket.destroyed).toBe(false);
+
+		const protectedServer = new FakeHttpServer();
+		createAdminWebSocketServer(protectedServer as never, {
 			getCredentials: () => ({ username: "admin", password: "secret" }),
 		});
 
-		const reject = vi.fn();
-		capturedOptions.verifyClient({ req: { headers: {} } }, reject);
-		expect(reject).toHaveBeenCalledWith(false, 401, "Unauthorized");
+		const rejectedSocket = new FakeUpgradeSocket();
+		protectedServer.upgradeHandler?.({ url: "/tarsadmin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
+		expect(rejectedSocket.writes).toEqual(["HTTP/1.1 401 Unauthorized\r\n\r\n"]);
+		expect(rejectedSocket.destroyed).toBe(true);
 
-		const accept = vi.fn();
-		capturedOptions.verifyClient(
+		const acceptedSocket = new FakeUpgradeSocket();
+		protectedServer.upgradeHandler?.(
 			{
-				req: {
-					headers: {
-						authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
-					},
+				url: "/tarsadmin/ws",
+				headers: {
+					authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
 				},
 			},
-			accept,
+			acceptedSocket,
+			Buffer.alloc(0),
 		);
-		expect(accept).toHaveBeenCalledWith(true);
+		expect(acceptedSocket.writes).toEqual([]);
+		expect(acceptedSocket.destroyed).toBe(false);
+	});
 
-		const mismatch = vi.fn();
-		capturedOptions.verifyClient(
-			{
-				req: {
-					headers: {
-						authorization: `Basic ${Buffer.from("admin:wrong").toString("base64")}`,
-					},
-				},
-			},
-			mismatch,
-		);
-		expect(mismatch).toHaveBeenCalledWith(false, 401, "Unauthorized");
+	it("ignores upgrade requests for other websocket paths", async () => {
+		const { createAdminWebSocketServer } = await import("./websocket-server.js");
+		const httpServer = new FakeHttpServer();
+		createAdminWebSocketServer(httpServer as never, {
+			getCredentials: () => ({ username: "admin", password: "secret" }),
+		});
+
+		const socket = new FakeUpgradeSocket();
+		httpServer.upgradeHandler?.({ url: "/tars-worker/ws?token=abc", headers: {} }, socket, Buffer.alloc(0));
+		expect(socket.writes).toEqual([]);
+		expect(socket.destroyed).toBe(false);
 	});
 
 	it("broadcasts subscribed logs and status updates", async () => {
 		const statusProvider = { getStatus: vi.fn(async () => ({ agent: "online" })) };
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
 		const server = createAdminWebSocketServer(
-			{} as never,
+			new FakeHttpServer() as never,
 			{ getCredentials: () => ({ username: "admin", password: "secret" }) },
 			statusProvider,
 		);
@@ -167,13 +222,9 @@ describe("createAdminWebSocketServer", () => {
 		);
 	});
 
-
-
-
-
 	it("stops sending log entries after unsubscribe", async () => {
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		const server = createAdminWebSocketServer({} as never, { getCredentials: () => ({}) });
+		const server = createAdminWebSocketServer(new FakeHttpServer() as never, { getCredentials: () => ({}) });
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
@@ -196,7 +247,7 @@ describe("createAdminWebSocketServer", () => {
 		vi.useFakeTimers();
 		const statusProvider = { getStatus: vi.fn(async () => ({ agent: "online" })) };
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		createAdminWebSocketServer({} as never, { getCredentials: () => ({}) }, statusProvider);
+		createAdminWebSocketServer(new FakeHttpServer() as never, { getCredentials: () => ({}) }, statusProvider);
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
@@ -226,7 +277,7 @@ describe("createAdminWebSocketServer", () => {
 
 	it("skips initial status delivery when no provider exists", async () => {
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		createAdminWebSocketServer({} as never, { getCredentials: () => ({}) });
+		createAdminWebSocketServer(new FakeHttpServer() as never, { getCredentials: () => ({}) });
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
@@ -236,10 +287,9 @@ describe("createAdminWebSocketServer", () => {
 		expect(socket.sent).toEqual([]);
 	});
 
-
 	it("ignores invalid websocket payloads", async () => {
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		createAdminWebSocketServer({} as never, { getCredentials: () => ({}) });
+		createAdminWebSocketServer(new FakeHttpServer() as never, { getCredentials: () => ({}) });
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
@@ -249,7 +299,7 @@ describe("createAdminWebSocketServer", () => {
 
 	it("terminates clients on close", async () => {
 		const { createAdminWebSocketServer } = await import("./websocket-server.js");
-		const server = createAdminWebSocketServer({} as never, { getCredentials: () => ({}) });
+		const server = createAdminWebSocketServer(new FakeHttpServer() as never, { getCredentials: () => ({}) });
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 		lastWebSocketServer?.clients.add(socket);

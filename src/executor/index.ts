@@ -15,13 +15,13 @@ import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
 import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-import { getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
+import { getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
-import type { ExecutionService } from "../ports/execution-service.js";
+import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
 export { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-export { extractText, getLastAssistantText, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
+export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
@@ -39,7 +39,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		comment?: string,
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity);
@@ -49,7 +49,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		prReview: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, undefined, prReview, abortSignal, onSessionCreated, undefined, onActivity);
@@ -59,7 +59,7 @@ export class PiAgentExecutor implements ExecutionService {
 		state: SessionState,
 		overridePrompt: string,
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, undefined, undefined, abortSignal, onSessionCreated, overridePrompt, onActivity);
@@ -70,7 +70,7 @@ export class PiAgentExecutor implements ExecutionService {
 		newComment?: string,
 		prReview?: { comments: PRReviewComment[]; reviewBody?: string },
 		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: AgentSession) => void,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
 		overridePrompt?: string,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
@@ -143,7 +143,9 @@ export class PiAgentExecutor implements ExecutionService {
 			modelRegistry,
 			model: configuredModel,
 		});
-		onSessionCreated?.(session);
+		onSessionCreated?.({
+			steer: (message: string) => session.steer(message),
+		});
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 
@@ -283,14 +285,21 @@ export class PiAgentExecutor implements ExecutionService {
 
 		const rawResponse = getLastAssistantText(session);
 		logger.logResponse(rawResponse);
+		let result = parseExecutionResult(rawResponse);
+		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
+			result = {
+				...result,
+				status: "failed",
+			};
+		}
 		recordSessionLog(key, {
 			level: "assistant",
 			message: rawResponse || "(no response)",
-			details: { type: "response", status: parseExecutionResult(rawResponse).status },
+			details: { type: "response", status: result.status },
 		});
 		notifyActivity();
 
-		return parseExecutionResult(rawResponse);
+		return result;
 	}
 
 	private getModelConfig(): ConfiguredModelOverride | undefined {
