@@ -33,6 +33,7 @@ export interface AppConfig {
 	workerRuntimeDir: string;
 	workerWorkspaceMountSource: string;
 	workerRuntimeMountSource: string;
+	workerNetworkMode?: string;
 	workerOllamaHost?: string;
 }
 
@@ -82,6 +83,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workerRuntimeDir,
 		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		workerRuntimeMountSource: store.get("worker_runtime_mount_source") ?? workerRuntimeDir,
+		workerNetworkMode: store.get("worker_network_mode") ?? undefined,
 		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
 	};
 }

@@ -113,6 +113,7 @@ describe("settings/model", () => {
       expect(getSettingDefinition("workspaces_dir")?.category).toBe("file-system");
       expect(getSettingDefinition("max_worktrees")?.category).toBe("git-worktrees");
       expect(getSettingDefinition("self_report_enabled")?.category).toBe("agent-behavior");
+      expect(getSettingDefinition("worker_network_mode")?.category).toBe("agent-behavior");
       expect(getSettingDefinition("pi_agent_model")?.category).toBe("ai-llm");
       expect(getSettingDefinition("log_level")?.category).toBe("logging");
     });

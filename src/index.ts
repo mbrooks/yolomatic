@@ -91,6 +91,7 @@ export async function main(): Promise<void> {
 			workerRuntimeDir: nextConfig.workerRuntimeDir,
 			workerWorkspaceMountSource: nextConfig.workerWorkspaceMountSource,
 			workerRuntimeMountSource: nextConfig.workerRuntimeMountSource,
+			workerNetworkMode: nextConfig.workerNetworkMode,
 			workerOllamaHost: nextConfig.workerOllamaHost,
 			soulPath: nextConfig.soulPath,
 		});

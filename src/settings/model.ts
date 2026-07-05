@@ -251,6 +251,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "agent-behavior",
 	},
 	{
+		key: "worker_network_mode",
+		type: "string",
+		description: "Optional docker network mode for worker containers (for example container:tars)",
+		requiresRestart: true,
+		sensitive: false,
+		envVar: "TARS_WORKER_NETWORK_MODE",
+		category: "agent-behavior",
+	},
+	{
 		key: "worker_ollama_host",
 		type: "string",
 		description: "Optional OLLAMA_HOST override passed into worker containers",

@@ -285,6 +285,23 @@ describe("DockerWorkerExecutor", () => {
 		delete process.env.OLLAMA_HOST;
 	});
 
+	it("supports container network mode for sidecar-backed workers", () => {
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "tars-worker:latest",
+			workerRuntimeDir: "/tmp/runtime",
+			workerWorkspaceMountSource: "named-volume",
+			workerRuntimeMountSource: "/tmp/runtime",
+			workerNetworkMode: "container:tars",
+			soulPath: "/app/SOUL.md",
+		});
+
+		const args = (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toEqual(expect.arrayContaining(["--network", "container:tars"]));
+		expect(args).not.toContain("host.docker.internal:host-gateway");
+	});
+
 	it("includes optional provider and model env when building docker args", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",

@@ -39,6 +39,7 @@ describe("getConfig", () => {
 		delete process.env.ADMIN_PASSWORD;
 		delete process.env.GITHUB_EVENT_MODE;
 		delete process.env.GITHUB_POLL_INTERVAL_MS;
+		delete process.env.TARS_WORKER_NETWORK_MODE;
 	});
 
 	afterEach(() => {
@@ -95,6 +96,7 @@ describe("getConfig", () => {
 		process.env.ADMIN_PASSWORD = "secret";
 		process.env.GITHUB_EVENT_MODE = "both";
 		process.env.GITHUB_POLL_INTERVAL_MS = "30000";
+		process.env.TARS_WORKER_NETWORK_MODE = "container:tars";
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
@@ -110,6 +112,7 @@ describe("getConfig", () => {
 		expect(config.adminPassword).toBe("secret");
 		expect(config.githubEventMode).toBe("both");
 		expect(config.githubPollIntervalMs).toBe(30000);
+		expect(config.workerNetworkMode).toBe("container:tars");
 	});
 
 	it("falls back to webhook mode for unknown GitHub event modes", () => {

@@ -32,6 +32,7 @@ export interface DockerWorkerExecutorOptions {
 	workerRuntimeDir: string;
 	workerWorkspaceMountSource: string;
 	workerRuntimeMountSource: string;
+	workerNetworkMode?: string;
 	workerOllamaHost?: string;
 	soulPath: string;
 }
@@ -360,18 +361,25 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private buildDockerRunArgs(containerName: string): string[] {
+		const networkMode = this.options.workerNetworkMode?.trim();
 		const args = [
 			"run",
 			"--rm",
 			"--name",
 			containerName,
-			"--add-host",
-			"host.docker.internal:host-gateway",
+		];
+		if (networkMode) {
+			args.push("--network", networkMode);
+		}
+		if (!networkMode?.startsWith("container:")) {
+			args.push("--add-host", "host.docker.internal:host-gateway");
+		}
+		args.push(
 			"--mount",
 			this.buildMountSpec(this.options.workerWorkspaceMountSource, "/workspaces"),
 			"--mount",
 			this.buildMountSpec(this.options.workerRuntimeMountSource, "/tars-runtime"),
-		];
+		);
 
 		if (process.env.PI_AGENT_PROVIDER?.trim()) {
 			args.push("-e", `PI_AGENT_PROVIDER=${process.env.PI_AGENT_PROVIDER.trim()}`);
