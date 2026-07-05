@@ -33,14 +33,14 @@ Illustrative command:
 ```bash
 docker run --rm \
   --name tars-session-mbrooks-tars-395 \
-  --network bridge \
+  --network container:tars \
   -v /app/workspaces:/workspaces \
   -e TARS_PRIMARY_WORKTREE=/workspaces/mbrooks-tars/.worktrees/issue-395 \
   -e TARS_SESSION_KEY=mbrooks/tars#395 \
-  -e TARS_SESSION_WS_URL=ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
+  -e TARS_SESSION_WS_URL=ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
-  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  -e OLLAMA_HOST=http://127.0.0.1:11434 \
   tars-worker:latest
 ```
 
@@ -59,7 +59,9 @@ The session URL exists only for the lifetime of one active worker run.
 
 Example:
 
-- `ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+
+For non-compose deployments, the base URL may instead point at `host.docker.internal` or another worker-reachable control-plane address. The key requirement is that the value matches the worker container's network perspective.
 
 TARS should create and remove the underlying pending reservation as part of session lifecycle management.
 

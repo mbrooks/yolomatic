@@ -96,6 +96,7 @@ NODE_ENV=production
 ```
 
 Compose also injects `OLLAMA_HOST=http://127.0.0.1:11434` so TARS talks to the Ollama sidecar over localhost inside the shared container network namespace.
+It also injects `TARS_WORKER_DOCKER_NETWORK_MODE=container:tars`, `TARS_WORKER_CONTROL_BASE_URL=http://127.0.0.1:6767`, and `TARS_WORKER_OLLAMA_HOST=http://127.0.0.1:11434` so disposable worker containers share TARS networking and do not depend on a host-exposed control-plane port.
 
 #### Docker Services
 
