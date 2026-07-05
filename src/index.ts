@@ -3,33 +3,18 @@ import "dotenv/config";
 import path from "node:path";
 import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
-import { DockerWorkerExecutor } from "./executor/docker-worker.js";
-import { SessionManager } from "./session/manager.js";
 import { SessionStore } from "./session/store.js";
-import { StaleSessionDetector } from "./session/stale-detector.js";
 import { TaskController } from "./task-controller.js";
-import { GitHubIssueHandlers, type WebhookHandlers } from "./webhook/handlers.js";
-import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
-import { SkillStore } from "./skills/store.js";
-import { RepoSkillService } from "./skills/repo-skill-service.js";
-import { WorkspaceManager } from "./workspace/manager.js";
-import { GitHubPollingAdapter } from "./adapters/github/github-polling-adapter.js";
-import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
-import { GitHubEventStore } from "./github-events/store.js";
-import { startGitHubPolling } from "./github-events/polling.js";
+import { createWebhookServer } from "./webhook/server.js";
 import {
-	parseConfiguredRepositories,
-	repoModeIncludesPolling,
-	repoModeIncludesWebhook,
-	resolveConfiguredRepoDefaultBranch,
-	resolveConfiguredRepoGitHubEventMode,
-} from "./repos/configured-repositories.js";
-import { WorkerRpcServer } from "./worker/rpc-server.js";
+	noOpHandlers,
+	startRuntime,
+	syncConfigToEnv,
+	type RuntimeGraph,
+} from "./app/bootstrap.js";
 
-export const noOpHandlers: WebhookHandlers = {
-	async handleGitHubEvent() {},
-	isInFlight() { return false; },
-};
+export { noOpHandlers } from "./app/bootstrap.js";
+export type { RuntimeGraph } from "./app/bootstrap.js";
 
 export async function main(): Promise<void> {
 	const memoryDir = path.resolve(process.env.MEMORY_DIR?.trim() || path.join(process.cwd(), "memory"));
@@ -50,177 +35,12 @@ export async function main(): Promise<void> {
 
 	const sessionStore = new SessionStore(config.sessionsDir);
 	const taskController = new TaskController();
-	let onboardingServer: ReturnType<typeof createWebhookServer> | undefined;
-	let activated = false;
-
-	function syncConfigToEnv(nextConfig: typeof config): void {
-		// Sync database settings to process.env so legacy code paths pick them up.
-		process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
-		process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
-		process.env.LOG_LEVEL = nextConfig.logLevel;
-		process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
-		process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
-		process.env.LOG_TOOLS = nextConfig.logTools ? "true" : "";
-		process.env.LOG_RESPONSES = nextConfig.logResponses ? "true" : "";
-	}
-
-	async function startRuntime(nextConfig: typeof config): Promise<void> {
-		syncConfigToEnv(nextConfig);
-		const configuredRepositories = () => parseConfiguredRepositories(settingsStore.get("configured_repositories"));
-		const resolveDefaultBranch = (owner: string, repo: string) =>
-			resolveConfiguredRepoDefaultBranch(configuredRepositories(), owner, repo, nextConfig.defaultBranch);
-		const resolveGitHubEventMode = (owner: string, repo: string) =>
-			resolveConfiguredRepoGitHubEventMode(configuredRepositories(), owner, repo, nextConfig.githubEventMode);
-
-		const sessionManager = new SessionManager(nextConfig.sessionsDir, sessionStore);
-		const workspaceManager = new WorkspaceManager({
-			workspacesDir: nextConfig.workspacesDir,
-			githubUsername: nextConfig.githubUsername,
-			githubToken: nextConfig.githubToken,
-			defaultBranch: nextConfig.defaultBranch,
-			resolveDefaultBranch,
-			maxWorktrees: nextConfig.maxWorktrees,
-			evictionStrategy: nextConfig.evictionStrategy,
-		});
-		const workerRpcServer = new WorkerRpcServer();
-		const executor = new DockerWorkerExecutor({
-			projectRoot: process.cwd(),
-			workspacesDir: nextConfig.workspacesDir,
-			workerImage: nextConfig.workerImage,
-			workerWorkspaceMountSource: nextConfig.workerWorkspaceMountSource,
-			workerControlBaseUrl: nextConfig.workerControlBaseUrl,
-			workerDockerNetworkMode: nextConfig.workerDockerNetworkMode,
-			workerRpcServer,
-			workerOllamaHost: nextConfig.workerOllamaHost,
-			soulPath: nextConfig.soulPath,
-		});
-		const eventStore = new GitHubEventStore(path.join(nextConfig.memoryDir, "bot-state.sqlite"));
-		const handlers = new GitHubIssueHandlers({
-			sessionManager,
-			workspaceManager,
-			executor,
-			githubToken: nextConfig.githubToken,
-			githubUsername: nextConfig.githubUsername,
-			resolveDefaultBranch,
-			resolveGitHubEventMode,
-			selfReportEnabled: nextConfig.selfReportEnabled,
-			taskController,
-			adminGithubUsername: nextConfig.adminGithubUsername,
-			eventStore,
-		});
-
-		const staleDetector = new StaleSessionDetector(
-			sessionStore,
-			workspaceManager,
-			nextConfig.githubToken,
-			(owner, repo, issueNumber) => handlers.isInFlight(owner, repo, issueNumber),
-			nextConfig.staleThresholdMs,
-		);
-
-		const skillStore = new SkillStore(path.join(nextConfig.memoryDir, "bot-state.sqlite"));
-		const repoSkillService = new RepoSkillService({
-			workspacesDir: nextConfig.workspacesDir,
-			githubUsername: nextConfig.githubUsername,
-			githubToken: nextConfig.githubToken,
-			defaultBranch: nextConfig.defaultBranch,
-		});
-		const github = new GitHubServiceAdapter({ githubToken: nextConfig.githubToken });
-		const githubPolling = new GitHubPollingAdapter({ githubToken: nextConfig.githubToken });
-		const repoModes = configuredRepositories().map((repo) =>
-			resolveConfiguredRepoGitHubEventMode([repo], repo.owner, repo.repo, nextConfig.githubEventMode),
-		);
-		const githubEventsEnabled = repoModeIncludesWebhook(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesWebhook(mode));
-		const pollingEnabled = repoModeIncludesPolling(nextConfig.githubEventMode) || repoModes.some((mode) => repoModeIncludesPolling(mode));
-		const activeHandlers = githubEventsEnabled ? handlers : noOpHandlers;
-		const server = createWebhookServer(
-			nextConfig.webhookSecret,
-			activeHandlers,
-			sessionStore,
-			nextConfig.adminUsername,
-			nextConfig.adminPassword,
-			taskController,
-			workspaceManager,
-			staleDetector,
-			nextConfig.archiveDir,
-			undefined,
-			github,
-			settingsStore,
-			skillStore,
-			repoSkillService,
-			executor,
-			workerRpcServer,
-		);
-		server.listen(nextConfig.port, () => {
-			process.stdout.write(`Webhook receiver listening on port ${nextConfig.port}\n`);
-		});
-
-		if (pollingEnabled) {
-			startGitHubPolling({
-				github: githubPolling,
-				eventStore,
-				githubUsername: nextConfig.githubUsername,
-				intervalMs: nextConfig.githubPollIntervalMs,
-				shouldPollRepo: (owner, repo) => repoModeIncludesPolling(resolveGitHubEventMode(owner, repo)),
-				resolveGitHubEventMode,
-				dispatch: (event) => handlers.handleGitHubEvent(event),
-			});
-		}
-
-		// Startup stale detection: conservatively mark very old working sessions.
-		try {
-			const staleInfos = await staleDetector.detectStaleSessions();
-			const veryOldThreshold = nextConfig.staleThresholdMs * 2;
-			for (const info of staleInfos) {
-				if (info.isStale && info.ageMs > veryOldThreshold && !info.session.staleDetectedAt) {
-					process.stdout.write(
-						`[startup] Marking stale session ${info.session.owner}/${info.session.repo}#${info.session.issueNumber} as interrupted_or_abandoned\n`,
-					);
-					await sessionManager.markFailed(
-						info.session.owner,
-						info.session.repo,
-						info.session.issueNumber,
-						"interrupted_or_abandoned",
-					);
-				}
-			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[startup] stale detection error: ${message}\n`);
-		}
-
-		// Resume any sessions that were interrupted by a restart.
-		try {
-			const sessions = await sessionStore.getAll();
-			const sessionsToResume = sessions.filter((s) => s.resumeOnBoot || s.status === "working");
-			if (sessionsToResume.length > 0) {
-				process.stdout.write(`[startup] Found ${sessionsToResume.length} session(s) to resume after restart\n`);
-				for (const session of sessionsToResume) {
-					try {
-						await handlers.resumeInterruptedSession(session.owner, session.repo, session.issueNumber);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						process.stdout.write(`[startup] failed to resume ${session.owner}/${session.repo}#${session.issueNumber}: ${message}\n`);
-					}
-				}
-			}
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[startup] resume error: ${message}\n`);
-		}
-
-		if (nextConfig.cleanupRetentionDays) {
-			process.stdout.write(`[cleanup] auto-cleanup enabled: ${nextConfig.cleanupRetentionDays} days\n`);
-			await cleanupOldSessions(sessionStore, workspaceManager, nextConfig.cleanupRetentionDays);
-			const cleanupIntervalMs = 24 * 60 * 60 * 1000;
-			const cleanupInterval = setInterval(() => {
-				void cleanupOldSessions(sessionStore, workspaceManager, nextConfig.cleanupRetentionDays!);
-			}, cleanupIntervalMs);
-			cleanupInterval.unref?.();
-		}
-	}
 
 	if (!isBootstrapComplete(config)) {
 		process.stdout.write("[onboarding] Required settings missing. Starting in onboarding mode.\n");
+
+		let onboardingServer: ReturnType<typeof createWebhookServer> | undefined;
+		let activated = false;
 
 		onboardingServer = createWebhookServer(
 			config.webhookSecret || "dummy-onboarding-secret",
@@ -247,7 +67,7 @@ export async function main(): Promise<void> {
 						});
 					}
 					process.stdout.write("[onboarding] Settings loaded. Starting full runtime.\n");
-					await startRuntime(nextConfig);
+					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController });
 				},
 			},
 			undefined,
@@ -260,7 +80,7 @@ export async function main(): Promise<void> {
 		return;
 	}
 
-	await startRuntime(config);
+	await startRuntime(config, { settingsStore, sessionStore, taskController });
 }
 
 /* v8 ignore start */

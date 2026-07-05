@@ -6,7 +6,7 @@ import { GetAdminStatus } from "../app/queries/get-admin-status.js";
 import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
 import { RunSessionCommand } from "../app/commands/run-session-command.js";
-import { createStartIssueSession, StartIssueSession } from "../app/commands/start-issue-session.js";
+import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
@@ -17,7 +17,6 @@ import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
-import { parseConfiguredRepositories, resolveConfiguredRepoDefaultBranch } from "../repos/configured-repositories.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -40,6 +39,8 @@ const fallbackWorkspaceService = {
 	getGitDiff: async () => "",
 };
 
+export { fallbackWorkspaceService };
+
 export function createWebhookServerDeps(
 	sessionStore: SessionStore,
 	adminUsername?: string,
@@ -61,40 +62,12 @@ export function createWebhookServerDeps(
 	const taskService = taskController ?? fallbackTaskController;
 	const staleService = staleDetector ?? { detectStaleSessions: async () => [] };
 
-	let startIssueSession = prebuiltStartIssueSession;
-	if (!startIssueSession && githubService && settingsStore && executor) {
-		const defaultBranch = settingsStore.getString("default_branch", "main");
-		const githubUsername = settingsStore.get("github_username") ?? "";
-		const selfReportEnabled = settingsStore.getBoolean("self_report_enabled", true);
-		const resolveDefaultBranch = (owner: string, repo: string) =>
-			resolveConfiguredRepoDefaultBranch(
-				parseConfiguredRepositories(settingsStore.get("configured_repositories")),
-				owner,
-				repo,
-				defaultBranch,
-			);
-		if (githubUsername) {
-			startIssueSession = createStartIssueSession({
-				sessions: sessionRepo,
-				workspaces: workspaceService,
-				github: githubService,
-				tasks: taskService,
-				executor,
-				clock: systemClock,
-				defaultBranch,
-				resolveDefaultBranch,
-				githubUsername,
-				selfReportEnabled,
-			});
-		}
-	}
-
 	return {
 		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, settingsStore),
 		getSession: new GetSession(sessionRepo),
 		getSessionLog: new GetSessionLog(sessionRepo),
 		runSessionCommand: new RunSessionCommand(sessionRepo, workspaceService, taskService, systemClock, archiveDir),
-		startIssueSession,
+		startIssueSession: prebuiltStartIssueSession,
 		taskController: taskService,
 		githubService,
 		adminUsername,

@@ -11,18 +11,22 @@ import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 import type { WorkerRpcServer } from "../worker/rpc-server.js";
+import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
-import { createWebhookServerDeps } from "./server-deps.js";
+import { createWebhookServerDeps, fallbackWorkspaceService } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
 import { createAdminWebSocketServer, type CredentialProvider, type StatusProvider } from "./websocket-server.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
+import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
+import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
 	onOnboardingComplete?: () => void | Promise<void>;
+	prebuiltStartIssueSession?: StartIssueSession;
 };
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -57,6 +61,7 @@ export function createWebhookServer(
 		githubService,
 		settingsStore,
 		executor,
+		options.prebuiltStartIssueSession,
 	);
 
 	serverDeps.skillStore = skillStore;
@@ -173,5 +178,8 @@ export async function cleanupOldSessions(
 	workspaceManager: WorkspaceManager | undefined,
 	retentionDays: number,
 ): Promise<{ deleted: number; failed: number }> {
-	return createWebhookServerDeps(sessionStore, undefined, undefined, undefined, workspaceManager).cleanupCommand.execute(retentionDays);
+	const sessionRepo = new SessionStoreRepositoryAdapter(sessionStore);
+	const workspaceService = workspaceManager ?? fallbackWorkspaceService;
+	const command = new CleanupOldSessions(sessionRepo, workspaceService);
+	return command.execute(retentionDays);
 }
