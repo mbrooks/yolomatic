@@ -88,10 +88,6 @@ vi.mock("./github-events/polling.js", () => ({
 vi.mock("./webhook/handlers.js", () => ({
 	GitHubIssueHandlers: vi.fn(() => ({
 		handleGitHubEvent: vi.fn(),
-		handleIssueEvent: vi.fn(),
-		handleCommentEvent: vi.fn(),
-		handlePullRequestReviewCommentEvent: vi.fn(),
-		handlePullRequestReviewEvent: vi.fn(),
 		isInFlight: vi.fn(() => false),
 		resumeInterruptedSession: vi.fn(),
 	})),
@@ -136,10 +132,6 @@ describe("main", () => {
 		vi.mocked(isBootstrapComplete).mockReturnValue(true);
 		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
 			handleGitHubEvent: vi.fn(),
-			handleIssueEvent: vi.fn(),
-			handleCommentEvent: vi.fn(),
-			handlePullRequestReviewCommentEvent: vi.fn(),
-			handlePullRequestReviewEvent: vi.fn(),
 			isInFlight: vi.fn(() => false),
 			resumeInterruptedSession: vi.fn(),
 		}));
@@ -158,10 +150,7 @@ describe("main", () => {
 		expect(createWebhookServer).toHaveBeenCalledWith(
 			"secret",
 			expect.objectContaining({
-				handleIssueEvent: expect.any(Function),
-				handleCommentEvent: expect.any(Function),
-				handlePullRequestReviewCommentEvent: expect.any(Function),
-				handlePullRequestReviewEvent: expect.any(Function),
+				handleGitHubEvent: expect.any(Function),
 			}),
 			expect.objectContaining({
 				get: expect.any(Function),
@@ -518,24 +507,8 @@ describe("main", () => {
 });
 
 describe("noOpHandlers", () => {
-	it("handleIssueEvent does nothing", async () => {
-		await expect(noOpHandlers.handleIssueEvent({})).resolves.toBeUndefined();
-	});
-
 	it("handleGitHubEvent does nothing", async () => {
 		await expect(noOpHandlers.handleGitHubEvent?.({} as never)).resolves.toBeUndefined();
-	});
-
-	it("handleCommentEvent does nothing", async () => {
-		await expect(noOpHandlers.handleCommentEvent({})).resolves.toBeUndefined();
-	});
-
-	it("handlePullRequestReviewCommentEvent does nothing", async () => {
-		await expect(noOpHandlers.handlePullRequestReviewCommentEvent({})).resolves.toBeUndefined();
-	});
-
-	it("handlePullRequestReviewEvent does nothing", async () => {
-		await expect(noOpHandlers.handlePullRequestReviewEvent({})).resolves.toBeUndefined();
 	});
 
 	it("isInFlight returns false", () => {

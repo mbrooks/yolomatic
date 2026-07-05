@@ -13,6 +13,7 @@ import { cleanupOldSessions, createWebhookServer } from "./webhook/server.js";
 import { SkillStore } from "./skills/store.js";
 import { RepoSkillService } from "./skills/repo-skill-service.js";
 import { WorkspaceManager } from "./workspace/manager.js";
+import { GitHubPollingAdapter } from "./adapters/github/github-polling-adapter.js";
 import { GitHubServiceAdapter } from "./adapters/github/github-service-adapter.js";
 import { GitHubEventStore } from "./github-events/store.js";
 import { startGitHubPolling } from "./github-events/polling.js";
@@ -27,10 +28,6 @@ import { WorkerRpcServer } from "./worker/rpc-server.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
-	async handleIssueEvent() {},
-	async handleCommentEvent() {},
-	async handlePullRequestReviewCommentEvent() {},
-	async handlePullRequestReviewEvent() {},
 	isInFlight() { return false; },
 };
 
@@ -128,6 +125,7 @@ export async function main(): Promise<void> {
 			defaultBranch: nextConfig.defaultBranch,
 		});
 		const github = new GitHubServiceAdapter({ githubToken: nextConfig.githubToken });
+		const githubPolling = new GitHubPollingAdapter({ githubToken: nextConfig.githubToken });
 		const repoModes = configuredRepositories().map((repo) =>
 			resolveConfiguredRepoGitHubEventMode([repo], repo.owner, repo.repo, nextConfig.githubEventMode),
 		);
@@ -158,7 +156,7 @@ export async function main(): Promise<void> {
 
 		if (pollingEnabled) {
 			startGitHubPolling({
-				github,
+				github: githubPolling,
 				eventStore,
 				githubUsername: nextConfig.githubUsername,
 				intervalMs: nextConfig.githubPollIntervalMs,

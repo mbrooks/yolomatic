@@ -127,14 +127,6 @@ export function createWebhookServer(
 				for (const githubEvent of normalized) {
 					await handlers.handleGitHubEvent(githubEvent);
 				}
-			} else if (event === "issues") {
-				await handlers.handleIssueEvent(payload);
-			} else if (event === "issue_comment") {
-				await handlers.handleCommentEvent(payload);
-			} else if (event === "pull_request_review_comment") {
-				await handlers.handlePullRequestReviewCommentEvent(payload);
-			} else if (event === "pull_request_review") {
-				await handlers.handlePullRequestReviewEvent(payload);
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
