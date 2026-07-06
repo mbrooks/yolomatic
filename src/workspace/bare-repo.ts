@@ -21,10 +21,19 @@ export class BareRepoManager {
 		if (await this.pathExists(bareRepoPath)) {
 			const isValid = await this.isValidGitRepo(bareRepoPath);
 			if (isValid) {
-				await this.git.run("git", ["fetch", "--all", "--prune"], { cwd: bareRepoPath });
-				return bareRepoPath;
+				try {
+					await this.updateDefaultBranch(bareRepoPath);
+					return bareRepoPath;
+				} catch (error) {
+					if (!this.isRecoverableRefreshError(error)) {
+						throw error;
+					}
+					await rm(bareRepoPath, { recursive: true, force: true });
+				}
 			}
-			await rm(bareRepoPath, { recursive: true, force: true });
+			else {
+				await rm(bareRepoPath, { recursive: true, force: true });
+			}
 		}
 
 		const encodedUsername = encodeURIComponent(this.config.githubUsername);
@@ -119,5 +128,14 @@ export class BareRepoManager {
 		} catch {
 			return false;
 		}
+	}
+
+	private isRecoverableRefreshError(error: unknown): boolean {
+		const message = error instanceof Error ? error.message : String(error);
+		return (
+			message.includes("cannot lock ref") ||
+			message.includes("could not remove reference") ||
+			message.includes("Permission denied")
+		);
 	}
 }

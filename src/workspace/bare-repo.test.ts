@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,128 @@ function createConfig(workspacesDir: string): WorkspaceConfig {
 }
 
 describe("BareRepoManager", () => {
+	it("clones a bare repo when no cached repo exists", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-clone-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "clone") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+			"git",
+			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
+			undefined,
+		]);
+	});
+
+	it("reclones when an existing path is not a valid git repository", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-invalid-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		await mkdir(bareRepoPath, { recursive: true });
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				throw new Error("not a git repository");
+			}
+			if (args[0] === "clone") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+			"git",
+			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
+			undefined,
+		]);
+	});
+
+	it("reclones an existing bare repo when refresh hits a lock-permission error", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-refresh-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		await mkdir(bareRepoPath, { recursive: true });
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: `${bareRepoPath}\n`, stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				throw new Error(
+					"Command failed: git fetch origin +refs/heads/*:refs/remotes/origin/* --prune\n" +
+						"error: cannot lock ref 'refs/remotes/origin/tars/issue-427': Permission denied\n" +
+						"error: could not remove reference refs/remotes/origin/tars/issue-427",
+				);
+			}
+			if (args[0] === "clone") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
+			{ cwd: bareRepoPath },
+		);
+		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+			"git",
+			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
+			undefined,
+		]);
+	});
+
+	it("rethrows non-recoverable refresh failures for an existing bare repo", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-refresh-fail-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		await mkdir(bareRepoPath, { recursive: true });
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: `${bareRepoPath}\n`, stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				throw new Error("fatal: repository 'origin' not found");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).rejects.toThrow("repository 'origin' not found");
+		expect(runCommand).not.toHaveBeenCalledWith(
+			"git",
+			expect.arrayContaining(["clone"]),
+			expect.anything(),
+		);
+	});
+
+	it("ignores remote set-head errors while updating the default branch", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-set-head-"));
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "remote") {
+				throw new Error("set-head failed");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await expect(bareRepos.updateDefaultBranch("/tmp/bare")).resolves.toBeUndefined();
+	});
+
 	it("resolves a single remote branch when origin HEAD is unavailable", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-repo-"));
 		const git = new GitCommandRunner(

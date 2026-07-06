@@ -68,9 +68,10 @@ describe("WorkspaceManager", () => {
 		await manager.initializeRepo("mbrooks", "tars");
 
 		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
-			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "--all",
+			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin",
 		);
 		expect(fetchCalls).toHaveLength(1);
+		expect(fetchCalls[0]?.[1]).toEqual(["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"]);
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "clone",
@@ -148,10 +149,10 @@ describe("WorkspaceManager", () => {
 		expect(worktree.branch).toBe("tars/issue-42");
 
 		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
-			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "--all",
+			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin",
 		);
-		expect(fetchCalls).toHaveLength(1);
-		expect(fetchCalls[0][1]).toContain("--prune");
+		expect(fetchCalls).toHaveLength(2);
+		expect(fetchCalls[0]?.[1]).toEqual(["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"]);
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "clone",
