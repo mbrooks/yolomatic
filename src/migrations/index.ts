@@ -132,11 +132,14 @@ export function runMigrations(db: DatabaseSync): void {
 	const applied = new Set(appliedRows.map((r) => r.id));
 
 	for (const migration of MIGRATIONS) {
-		if (applied.has(migration.id)) continue;
-
+		// Re-run bootstrap migrations even if the bookkeeping row exists.
+		// Every current migration is intentionally idempotent, and this lets
+		// startup repair databases where `_migrations` drifted from reality.
 		migration.up(db);
 
-		const insertStmt = db.prepare("INSERT INTO _migrations (id, name, applied_at) VALUES (?, ?, ?)");
-		insertStmt.run(migration.id, migration.name, new Date().toISOString());
+		if (!applied.has(migration.id)) {
+			const insertStmt = db.prepare("INSERT INTO _migrations (id, name, applied_at) VALUES (?, ?, ?)");
+			insertStmt.run(migration.id, migration.name, new Date().toISOString());
+		}
 	}
 }

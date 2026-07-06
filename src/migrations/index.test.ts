@@ -45,6 +45,8 @@ describe("migrations", () => {
 		expect(tableNames).toContain("github_event_state");
 		expect(tableNames).toContain("github_event_dedupe");
 		expect(tableNames).toContain("github_poll_subjects");
+		expect(tableNames).toContain("sessions");
+		expect(tableNames).toContain("session_logs");
 		expect(tableNames).toContain("_migrations");
 		db.close();
 	});
@@ -57,6 +59,30 @@ describe("migrations", () => {
 		const stmt = db.prepare("SELECT id FROM _migrations ORDER BY id");
 		const rows = stmt.all() as Array<{ id: number }>;
 		expect(rows.length).toBe(MIGRATIONS.length);
+		db.close();
+	});
+
+	it("repairs missing tables when migration bookkeeping is ahead of schema", () => {
+		const db = new DatabaseSync(dbPath);
+		db.exec(`
+			CREATE TABLE _migrations (
+				id INTEGER PRIMARY KEY,
+				name TEXT NOT NULL,
+				applied_at TEXT NOT NULL
+			)
+		`);
+		db.prepare("INSERT INTO _migrations (id, name, applied_at) VALUES (?, ?, ?)")
+			.run(5, "create_sessions_tables", new Date().toISOString());
+
+		runMigrations(db);
+
+		const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as Array<{ name: string }>;
+		const tableNames = tables.map((t) => t.name);
+		expect(tableNames).toContain("sessions");
+		expect(tableNames).toContain("session_logs");
+
+		const rows = db.prepare("SELECT id FROM _migrations WHERE id = 5").all() as Array<{ id: number }>;
+		expect(rows).toHaveLength(1);
 		db.close();
 	});
 });
