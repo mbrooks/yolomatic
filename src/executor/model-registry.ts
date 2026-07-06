@@ -1,5 +1,25 @@
 import { type AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
+function resolveOllamaBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+	const configuredHost = env.OLLAMA_HOST?.trim();
+	if (!configuredHost) {
+		return "http://127.0.0.1:11434/v1";
+	}
+
+	try {
+		const url = new URL(configuredHost);
+		const normalizedPath = url.pathname.replace(/\/+$/u, "");
+		if (normalizedPath === "/v1") {
+			return url.toString();
+		}
+		url.pathname = normalizedPath ? `${normalizedPath}/v1` : "/v1";
+		return url.toString();
+	} catch {
+		const trimmed = configuredHost.replace(/\/+$/u, "");
+		return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+	}
+}
+
 /**
  * Creates a TARS model registry with custom providers defined in code.
  * This replaces the previous models.json-based configuration.
@@ -8,7 +28,7 @@ export function createTarsModelRegistry(authStorage: AuthStorage): ModelRegistry
 	const registry = ModelRegistry.inMemory(authStorage);
 
 	registry.registerProvider("ollama", {
-		baseUrl: "http://127.0.0.1:11434/v1",
+		baseUrl: resolveOllamaBaseUrl(),
 		api: "openai-completions",
 		apiKey: "ollama",
 		models: [
@@ -43,3 +63,5 @@ export function createTarsModelRegistry(authStorage: AuthStorage): ModelRegistry
 
 	return registry;
 }
+
+export { resolveOllamaBaseUrl };

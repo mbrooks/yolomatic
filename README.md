@@ -51,7 +51,7 @@ For local testing, expose port `6767` with a tunnel such as `ngrok http 6767`, t
 | Webhook returns `401 Invalid signature` | The GitHub webhook secret must match the generated TARS secret exactly. |
 | No webhook deliveries arrive | Confirm the public payload URL ends in `/webhook` and reaches port `6767`. |
 | Repository initialization fails | Confirm the token can clone the repo and that the workspace directory is writable. |
-| Agent starts but cannot run model work | Check `PI_AGENT_PROVIDER`, `PI_AGENT_MODEL`, and the Ollama sidecar/container logs. |
+| Agent starts but cannot run model work | Check `PI_AGENT_PROVIDER`, `PI_AGENT_MODEL`, `OLLAMA_HOST`, and the Ollama sidecar/container logs. |
 
 ### Docker Deployment
 
@@ -96,6 +96,8 @@ NODE_ENV=production
 ```
 
 Compose also injects `OLLAMA_HOST=http://127.0.0.1:11434` so TARS talks to the Ollama sidecar over localhost inside the shared container network namespace.
+
+TARS appends `/v1` automatically when registering the built-in Ollama provider, so `OLLAMA_HOST` should point at the Ollama server root such as `http://127.0.0.1:11434`.
 
 #### Docker Services
 
