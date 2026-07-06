@@ -1,15 +1,45 @@
-import { access, mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { access, mkdtemp, writeFile, mkdir, readFile } from "node:fs/promises";
+import { unlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 import { SessionStore } from "./store.js";
 
-describe("SessionStore", () => {
+function dbPathFor(dir: string): string {
+	return path.join(dir, "sessions.sqlite");
+}
+
+describe("SessionStore (SQLite-backed)", () => {
+	let dir: string;
+	let dbPath: string;
+
+	beforeEach(async () => {
+		dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		dbPath = dbPathFor(dir);
+	});
+
+	afterEach(() => {
+		try {
+			unlinkSync(dbPath);
+		} catch {
+			// ignore
+		}
+		try {
+			unlinkSync(`${dbPath}-wal`);
+		} catch {
+			// ignore
+		}
+		try {
+			unlinkSync(`${dbPath}-shm`);
+		} catch {
+			// ignore
+		}
+	});
+
 	it("caches sessions in memory", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 1,
@@ -26,25 +56,22 @@ describe("SessionStore", () => {
 
 		await store.set(state);
 
-		// Second get should use cache
 		const first = await store.get("mbrooks", "tars", 1);
 		expect(first?.title).toBe("Test");
 
-		// Get again (from cache)
+		// Get again (served from cache, same object identity)
 		const second = await store.get("mbrooks", "tars", 1);
-		expect(second).toEqual(first);
+		expect(second).toBe(first);
 	});
 
 	it("returns null for non-existent session", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+		const store = new SessionStore(dbPath, dir);
 		const result = await store.get("mbrooks", "tars", 999);
 		expect(result).toBeNull();
 	});
 
-	it("persists and reads session from disk", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("persists and reads session across store instances", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 2,
@@ -61,16 +88,15 @@ describe("SessionStore", () => {
 
 		await store.set(state);
 
-		// Create a new store instance to force disk read
-		const store2 = new SessionStore(dir);
+		// New store instance sharing the same SQLite file should read it back.
+		const store2 = new SessionStore(dbPath, dir);
 		const result = await store2.get("mbrooks", "tars", 2);
 		expect(result?.title).toBe("Persisted");
 		expect(result?.seeded).toBe(true);
 	});
 
-	it("checks existence of session files", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("checks existence of sessions", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 3,
@@ -91,15 +117,14 @@ describe("SessionStore", () => {
 	});
 
 	it("computes correct paths", () => {
-		const store = new SessionStore("/tmp/sessions");
+		const store = new SessionStore(dbPath, "/tmp/sessions");
 		expect(store.getSessionKey("mbrooks", "tars", 1)).toBe("github-mbrooks-tars-issue-1");
 		expect(store.getSessionPath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.jsonl");
 		expect(store.getStatePath("mbrooks", "tars", 1)).toBe("/tmp/sessions/github-mbrooks-tars/issue-1.state.json");
 	});
 
-	it("getAll returns all sessions from disk", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("getAll returns all active sessions", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state1 = {
 			issueNumber: 1,
@@ -134,27 +159,36 @@ describe("SessionStore", () => {
 		expect(all.map((s) => s.issueNumber).sort()).toEqual([1, 2]);
 	});
 
-	it("getAll returns empty array when sessions dir is missing", async () => {
-		const dir = path.join(os.tmpdir(), "tars-store-missing-" + Date.now());
-		const store = new SessionStore(dir);
-		const all = await store.getAll();
-		expect(all).toEqual([]);
+	it("getAll excludes archived sessions", async () => {
+		const store = new SessionStore(dbPath, dir);
+
+		const state = {
+			issueNumber: 5,
+			repo: "tars",
+			owner: "mbrooks",
+			title: "Archived",
+			body: "Body",
+			status: "complete" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 5),
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+			archivedAt: new Date().toISOString(),
+		};
+
+		await store.set(state);
+		expect(await store.getAll()).toHaveLength(0);
+		expect(await store.get("mbrooks", "tars", 5)).toBeNull();
+		expect(await store.exists("mbrooks", "tars", 5)).toBe(false);
 	});
 
-	it("getAll skips invalid state files", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const repoDir = path.join(dir, "github-mbrooks-tars");
-		await mkdir(repoDir, { recursive: true });
-		await writeFile(path.join(repoDir, "issue-1.state.json"), "not json");
-
-		const store = new SessionStore(dir);
-		const all = await store.getAll();
-		expect(all).toEqual([]);
+	it("getAll returns empty array when no sessions", async () => {
+		const store = new SessionStore(dbPath, dir);
+		expect(await store.getAll()).toEqual([]);
 	});
 
-	it("deletes session state and log files", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("deletes session state, log files, and SQLite row", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 7,
@@ -170,7 +204,11 @@ describe("SessionStore", () => {
 		};
 
 		await store.set(state);
+		await mkdir(path.dirname(state.sessionPath), { recursive: true });
 		await writeFile(state.sessionPath, "log line\n");
+		// Simulate a legacy state file alongside the SQLite row.
+		await writeFile(store.getStatePath("mbrooks", "tars", 7), "{}\n");
+
 		expect(await store.exists("mbrooks", "tars", 7)).toBe(true);
 
 		await store.delete("mbrooks", "tars", 7);
@@ -182,7 +220,7 @@ describe("SessionStore", () => {
 	});
 
 	it("computes archive paths", () => {
-		const store = new SessionStore("/tmp/sessions");
+		const store = new SessionStore(dbPath, "/tmp/sessions");
 		expect(store.getArchivePath("/tmp/archive", "mbrooks", "tars", 1)).toBe(
 			"/tmp/archive/github-mbrooks-tars/issue-1.state.json",
 		);
@@ -191,9 +229,8 @@ describe("SessionStore", () => {
 		);
 	});
 
-	it("archives session files", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("archives session state and transcript, removes SQLite row", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 8,
@@ -209,6 +246,7 @@ describe("SessionStore", () => {
 		};
 
 		await store.set(state);
+		await mkdir(path.dirname(state.sessionPath), { recursive: true });
 		await writeFile(state.sessionPath, "log line\n");
 		expect(await store.exists("mbrooks", "tars", 8)).toBe(true);
 
@@ -219,37 +257,45 @@ describe("SessionStore", () => {
 		expect(await store.get("mbrooks", "tars", 8)).toBeNull();
 		await expect(access(store.getArchivePath(archiveDir, "mbrooks", "tars", 8))).resolves.toBeUndefined();
 		await expect(access(store.getSessionArchivePath(archiveDir, "mbrooks", "tars", 8))).resolves.toBeUndefined();
+
+		// Archived state file should contain the archived state JSON.
+		const archived = JSON.parse(
+			await readFile(store.getArchivePath(archiveDir, "mbrooks", "tars", 8), "utf8"),
+		) as { title: string };
+		expect(archived.title).toBe("Archive me");
 	});
 
-	it("getAll skips non-directory entries and non-state files", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("archive moves legacy on-disk state file when present", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
-			issueNumber: 9,
+			issueNumber: 11,
 			repo: "tars",
 			owner: "mbrooks",
-			title: "Filtered",
+			title: "Legacy",
 			body: "Body",
-			status: "pending" as const,
-			sessionPath: store.getSessionPath("mbrooks", "tars", 9),
+			status: "complete" as const,
+			sessionPath: store.getSessionPath("mbrooks", "tars", 11),
 			workspacePath: "/tmp/workspace",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};
-		await store.set(state);
-		await writeFile(path.join(dir, "not-a-dir.txt"), "ignore me");
-		const repoDir = path.join(dir, "github-mbrooks-tars");
-		await writeFile(path.join(repoDir, "issue-9.log"), "ignore me");
 
-		const all = await store.getAll();
-		expect(all.length).toBe(1);
-		expect(all[0].issueNumber).toBe(9);
+		// Write a legacy state file directly (no SQLite row yet) then archive.
+		await mkdir(path.dirname(store.getStatePath("mbrooks", "tars", 11)), { recursive: true });
+		await writeFile(store.getStatePath("mbrooks", "tars", 11), JSON.stringify(state, null, 2));
+		await writeFile(state.sessionPath, "log line\n");
+
+		const archiveDir = path.join(dir, "archive");
+		await store.archive(state, archiveDir);
+
+		// Legacy state file was moved (not copied) to the archive dir.
+		await expect(access(store.getStatePath("mbrooks", "tars", 11))).rejects.toThrow();
+		await expect(access(store.getArchivePath(archiveDir, "mbrooks", "tars", 11))).resolves.toBeUndefined();
 	});
 
-	it("archives is idempotent when files are missing", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+	it("archive is idempotent when files are missing", async () => {
+		const store = new SessionStore(dbPath, dir);
 
 		const state = {
 			issueNumber: 10,
@@ -271,8 +317,131 @@ describe("SessionStore", () => {
 	});
 
 	it("delete is idempotent for missing sessions", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
-		const store = new SessionStore(dir);
+		const store = new SessionStore(dbPath, dir);
 		await expect(store.delete("mbrooks", "tars", 999)).resolves.toBeUndefined();
+	});
+
+	describe("migrateFromFileStoreIfNeeded", () => {
+		it("imports existing file-backed sessions into SQLite", async () => {
+			const store = new SessionStore(dbPath, dir);
+
+			const state = {
+				issueNumber: 1,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Legacy",
+				body: "Body",
+				status: "working" as const,
+				sessionPath: store.getSessionPath("mbrooks", "tars", 1),
+				workspacePath: "/tmp/workspace",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			};
+			// Pre-existing file-backed session written directly to disk.
+			await mkdir(path.dirname(store.getStatePath("mbrooks", "tars", 1)), { recursive: true });
+			await writeFile(store.getStatePath("mbrooks", "tars", 1), JSON.stringify(state, null, 2));
+
+			const imported = await store.migrateFromFileStoreIfNeeded();
+			expect(imported).toBe(1);
+
+			// Readable via a fresh store instance (proves SQLite, not the file).
+			const store2 = new SessionStore(dbPath, dir);
+			const result = await store2.get("mbrooks", "tars", 1);
+			expect(result?.title).toBe("Legacy");
+			expect(result?.status).toBe("working");
+
+			// Original file is preserved (rollback path).
+			await expect(access(store.getStatePath("mbrooks", "tars", 1))).resolves.toBeUndefined();
+		});
+
+		it("is idempotent and skips already-imported sessions", async () => {
+			const store = new SessionStore(dbPath, dir);
+
+			const state = {
+				issueNumber: 2,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Legacy",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: store.getSessionPath("mbrooks", "tars", 2),
+				workspacePath: "/tmp/workspace",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			};
+			await mkdir(path.dirname(store.getStatePath("mbrooks", "tars", 2)), { recursive: true });
+			await writeFile(store.getStatePath("mbrooks", "tars", 2), JSON.stringify(state, null, 2));
+
+			expect(await store.migrateFromFileStoreIfNeeded()).toBe(1);
+			// Second invocation is a no-op even though the file still exists.
+			expect(await store.migrateFromFileStoreIfNeeded()).toBe(0);
+			expect(await store.getAll()).toHaveLength(1);
+		});
+
+		it("preserves archivedAt on imported sessions so they stay excluded", async () => {
+			const store = new SessionStore(dbPath, dir);
+
+			const state = {
+				issueNumber: 3,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Already archived",
+				body: "Body",
+				status: "complete" as const,
+				sessionPath: store.getSessionPath("mbrooks", "tars", 3),
+				workspacePath: "/tmp/workspace",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+				archivedAt: "2026-01-01T00:00:00.000Z",
+			};
+			await mkdir(path.dirname(store.getStatePath("mbrooks", "tars", 3)), { recursive: true });
+			await writeFile(store.getStatePath("mbrooks", "tars", 3), JSON.stringify(state, null, 2));
+
+			await store.migrateFromFileStoreIfNeeded();
+
+			expect(await store.getAll()).toHaveLength(0);
+			expect(await store.get("mbrooks", "tars", 3)).toBeNull();
+		});
+
+		it("skips invalid state files with a warning", async () => {
+			const store = new SessionStore(dbPath, dir);
+			const repoDir = path.join(dir, "github-mbrooks-tars");
+			await mkdir(repoDir, { recursive: true });
+			await writeFile(path.join(repoDir, "issue-1.state.json"), "not json");
+
+			expect(await store.migrateFromFileStoreIfNeeded()).toBe(0);
+			expect(await store.getAll()).toEqual([]);
+		});
+
+		it("returns 0 when sessions dir is missing", async () => {
+			const store = new SessionStore(dbPath, path.join(dir, "does-not-exist"));
+			expect(await store.migrateFromFileStoreIfNeeded()).toBe(0);
+		});
+
+		it("skips non-directory entries and non-state files", async () => {
+			const store = new SessionStore(dbPath, dir);
+
+			const state = {
+				issueNumber: 9,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Filtered",
+				body: "Body",
+				status: "pending" as const,
+				sessionPath: store.getSessionPath("mbrooks", "tars", 9),
+				workspacePath: "/tmp/workspace",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			};
+			await mkdir(path.dirname(store.getStatePath("mbrooks", "tars", 9)), { recursive: true });
+			await writeFile(store.getStatePath("mbrooks", "tars", 9), JSON.stringify(state, null, 2));
+			await writeFile(path.join(dir, "not-a-dir.txt"), "ignore me");
+			await writeFile(path.join(dir, "github-mbrooks-tars", "issue-9.log"), "ignore me");
+
+			await store.migrateFromFileStoreIfNeeded();
+			const all = await store.getAll();
+			expect(all.length).toBe(1);
+			expect(all[0].issueNumber).toBe(9);
+		});
 	});
 });
