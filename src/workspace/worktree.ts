@@ -196,13 +196,26 @@ export class WorktreeManager {
 		}
 
 		const sorted = await this.sortWorktreesForEviction(allWorktrees, bareRepoPath);
-		const victim = sorted[0];
-		if (!victim) {
-			return;
+		const failures: string[] = [];
+		for (const victim of sorted) {
+			const victimInfo = allWorktrees.find((worktree) => worktree.path === victim.path);
+			try {
+				await this.safeEvictWorktree(victim.path, victimInfo?.branch, bareRepoPath, owner, repo);
+				return;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				failures.push(`${victim.path}: ${message}`);
+				process.stdout.write(
+					`[workspace] Skipped eviction of ${victim.path} for ${owner}/${repo}: ${message}\n`,
+				);
+			}
 		}
 
-		const victimInfo = allWorktrees.find((worktree) => worktree.path === victim.path);
-		await this.safeEvictWorktree(victim.path, victimInfo?.branch, bareRepoPath, owner, repo);
+		throw new Error(
+			`[workspace] ERROR: Cannot evict any worktree for ${owner}/${repo}\n\n` +
+				`Tried ${sorted.length} candidate(s) but each cleanup failed.\n` +
+				failures.map((failure) => `- ${failure}`).join("\n"),
+		);
 	}
 
 	private async sortWorktreesForEviction(

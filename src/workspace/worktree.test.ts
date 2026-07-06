@@ -325,6 +325,51 @@ describe("WorktreeManager", () => {
 		writeSpy.mockRestore();
 	});
 
+	it("skips a permission-blocked eviction candidate and removes the next worktree", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-skip-blocked-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const blockedPath = path.join(bareRepoPath, ".worktrees", "issue-1");
+		const removablePath = path.join(bareRepoPath, ".worktrees", "issue-2");
+		const targetPath = path.join(bareRepoPath, ".worktrees", "issue-3");
+		await mkdir(blockedPath, { recursive: true });
+		await mkdir(removablePath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return {
+					stdout:
+						`worktree ${blockedPath}\nbranch refs/heads/tars/issue-1\n` +
+						`worktree ${removablePath}\nbranch refs/heads/tars/issue-2\n`,
+					stderr: "",
+				};
+			}
+			if (args[0] === "status" && args[1] === "--porcelain") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "remove" && args[args.length - 1] === blockedPath) {
+				throw new Error("EACCES: permission denied, unlink '/app/workspaces/mbrooks-tars/.worktrees/issue-1/coverage/base.css'");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root, { maxWorktrees: 2, evictionStrategy: "fifo" }), runCommand);
+		const bareRepos = makeBareRepos(bareRepoPath);
+		const worktrees = new WorktreeManager(
+			createConfig(root, { maxWorktrees: 2, evictionStrategy: "fifo" }),
+			git,
+			bareRepos,
+		);
+
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		const worktree = await worktrees.createOrGetWorktree("mbrooks", "tars", 3);
+
+		expect(worktree.path).toBe(targetPath);
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", blockedPath], { cwd: bareRepoPath });
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", removablePath], { cwd: bareRepoPath });
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining(`[workspace] Skipped eviction of ${blockedPath}`));
+		writeSpy.mockRestore();
+	});
+
 	it("uses default eviction strategy when config omits it", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-defaults-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
