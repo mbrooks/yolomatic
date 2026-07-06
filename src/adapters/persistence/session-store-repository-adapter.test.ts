@@ -12,7 +12,7 @@ describe("SessionStoreRepositoryAdapter", () => {
 
 	beforeEach(async () => {
 		tmpDir = await mkdtemp(path.join(os.tmpdir(), "session-repo-"));
-		store = new SessionStore(tmpDir);
+		store = new SessionStore(path.join(tmpDir, "sessions.sqlite"), tmpDir);
 		adapter = new SessionStoreRepositoryAdapter(store);
 	});
 

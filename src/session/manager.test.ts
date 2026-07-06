@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -10,7 +10,7 @@ import { SessionStore } from "./store.js";
 describe("SessionManager", () => {
 	it("creates 1:1 issue session paths with owner and repo", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const session = await manager.createSession(
@@ -25,16 +25,14 @@ describe("SessionManager", () => {
 		expect(session.sessionPath).toBe(path.join(sessionsDir, "github-mbrooks-casebot", "issue-17.jsonl"));
 		expect(session.status).toBe("pending");
 
-		const persisted = JSON.parse(
-			await readFile(path.join(sessionsDir, "github-mbrooks-casebot", "issue-17.state.json"), "utf8"),
-		) as { sessionPath: string; workspacePath: string };
-		expect(persisted.sessionPath).toBe(path.join(sessionsDir, "github-mbrooks-casebot", "issue-17.jsonl"));
-		expect(persisted.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
+		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "casebot", 17);
+		expect(persisted?.sessionPath).toBe(path.join(sessionsDir, "github-mbrooks-casebot", "issue-17.jsonl"));
+		expect(persisted?.workspacePath).toBe("/tmp/workspaces/mbrooks-casebot");
 	});
 
 	it("stores labels when provided", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const session = await manager.createSession(
@@ -48,15 +46,13 @@ describe("SessionManager", () => {
 		);
 
 		expect(session.labels).toEqual(["bug", "enhancement"]);
-		const persisted = JSON.parse(
-			await readFile(path.join(sessionsDir, "github-mbrooks-tars", "issue-99.state.json"), "utf8"),
-		) as { labels?: string[] };
-		expect(persisted.labels).toEqual(["bug", "enhancement"]);
+		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "tars", 99);
+		expect(persisted?.labels).toEqual(["bug", "enhancement"]);
 	});
 
 	it("enforces 1:1 mapping by returning existing session on duplicate create", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const first = await manager.createSession(
@@ -85,7 +81,7 @@ describe("SessionManager", () => {
 
 	it("isolates sessions across owners for the same repo name", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const first = await manager.createSession("mbrooks", "shared", 5, "One", "Body", "/tmp/workspaces/mbrooks-shared");
@@ -98,7 +94,7 @@ describe("SessionManager", () => {
 
 	it("resumes an existing session and updates status to working", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession(
@@ -118,7 +114,7 @@ describe("SessionManager", () => {
 
 	it("throws when resuming a non-existent session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.resumeSession("mbrooks", "tars", 999)).rejects.toThrow(
@@ -128,7 +124,7 @@ describe("SessionManager", () => {
 
 	it("gets an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 5, "Title", "Body", "/tmp/ws");
@@ -139,7 +135,7 @@ describe("SessionManager", () => {
 
 	it("returns null for missing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const session = await manager.getSession("mbrooks", "tars", 999);
@@ -148,7 +144,7 @@ describe("SessionManager", () => {
 
 	it("updates status and partial fields of an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 6, "Title", "Body", "/tmp/ws");
@@ -159,7 +155,7 @@ describe("SessionManager", () => {
 
 	it("throws when updating status of a non-existent session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.updateStatus("mbrooks", "tars", 999, "working")).rejects.toThrow(
@@ -169,7 +165,7 @@ describe("SessionManager", () => {
 
 	it("persists execution time fields through updateStatus", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 24, "Title", "Body", "/tmp/ws");
@@ -187,17 +183,15 @@ describe("SessionManager", () => {
 		expect(finished.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
 		expect(finished.totalExecutionTimeMs).toBe(60000);
 
-		const persisted = JSON.parse(
-			await readFile(path.join(sessionsDir, "github-mbrooks-tars", "issue-24.state.json"), "utf8"),
-		) as { taskStartedAt?: string; taskFinishedAt?: string; totalExecutionTimeMs?: number };
-		expect(persisted.taskStartedAt).toBe("2026-01-01T00:00:00Z");
-		expect(persisted.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
-		expect(persisted.totalExecutionTimeMs).toBe(60000);
+		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "tars", 24);
+		expect(persisted?.taskStartedAt).toBe("2026-01-01T00:00:00Z");
+		expect(persisted?.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
+		expect(persisted?.totalExecutionTimeMs).toBe(60000);
 	});
 
 	it("marks session as seeded", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 7, "Title", "Body", "/tmp/ws");
@@ -207,7 +201,7 @@ describe("SessionManager", () => {
 
 	it("throws when marking a non-existent session as seeded", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.markSeeded("mbrooks", "tars", 999)).rejects.toThrow(
@@ -217,7 +211,7 @@ describe("SessionManager", () => {
 
 	it("associates a PR with an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
@@ -228,7 +222,7 @@ describe("SessionManager", () => {
 
 	it("throws when associating PR with a non-existent session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.associatePR("mbrooks", "tars", 999, 1, "url")).rejects.toThrow(
@@ -238,7 +232,7 @@ describe("SessionManager", () => {
 
 	it("finds a session by associated PR number", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
@@ -251,7 +245,7 @@ describe("SessionManager", () => {
 
 	it("increments iteration count on an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 11, "Title", "Body", "/tmp/ws");
@@ -263,7 +257,7 @@ describe("SessionManager", () => {
 
 	it("throws when incrementing iteration count for a non-existent session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.incrementIterationCount("mbrooks", "tars", 999)).rejects.toThrow(
@@ -273,7 +267,7 @@ describe("SessionManager", () => {
 
 	it("cancels an existing session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 12, "Title", "Body", "/tmp/ws");
@@ -283,7 +277,7 @@ describe("SessionManager", () => {
 
 	it("restarts a failed session, resetting state and tracking audit", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const created = await manager.createSession("mbrooks", "tars", 13, "Title", "Body", "/tmp/ws", ["bug"]);
@@ -311,7 +305,7 @@ describe("SessionManager", () => {
 
 	it("restarts a cancelled session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 14, "Title", "Body", "/tmp/ws");
@@ -324,7 +318,7 @@ describe("SessionManager", () => {
 
 	it("increments restart count on multiple restarts", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 15, "Title", "Body", "/tmp/ws");
@@ -340,7 +334,7 @@ describe("SessionManager", () => {
 
 	it("throws when restarting a non-existent session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.restartSession("mbrooks", "tars", 999)).rejects.toThrow(
@@ -350,7 +344,7 @@ describe("SessionManager", () => {
 
 	it("throws when restarting a completed session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 16, "Title", "Body", "/tmp/ws");
@@ -362,7 +356,7 @@ describe("SessionManager", () => {
 
 	it("throws when restarting a working session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 17, "Title", "Body", "/tmp/ws");
@@ -374,7 +368,7 @@ describe("SessionManager", () => {
 
 	it("pauses a working session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 18, "Title", "Body", "/tmp/ws");
@@ -385,7 +379,7 @@ describe("SessionManager", () => {
 
 	it("pauses a pending session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 19, "Title", "Body", "/tmp/ws");
@@ -395,7 +389,7 @@ describe("SessionManager", () => {
 
 	it("throws when pausing an already paused session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 20, "Title", "Body", "/tmp/ws");
@@ -407,7 +401,7 @@ describe("SessionManager", () => {
 
 	it("throws when pausing a terminal session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 21, "Title", "Body", "/tmp/ws");
@@ -419,7 +413,7 @@ describe("SessionManager", () => {
 
 	it("unpauses a paused session and restores to pending", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 22, "Title", "Body", "/tmp/ws");
@@ -430,7 +424,7 @@ describe("SessionManager", () => {
 
 	it("throws when unpausing a non-paused session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 23, "Title", "Body", "/tmp/ws");
@@ -441,7 +435,7 @@ describe("SessionManager", () => {
 
 	it("exposes getSessionKey and getSessionPath helpers", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		expect(manager.getSessionKey("mbrooks", "tars", 30)).toContain("mbrooks");
@@ -450,7 +444,7 @@ describe("SessionManager", () => {
 
 	it("implements SessionRepository.get as an alias for getSession", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 31, "Title", "Body", "/tmp/ws");
@@ -461,7 +455,7 @@ describe("SessionManager", () => {
 
 	it("saves, lists, and deletes sessions", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const created = await manager.createSession("mbrooks", "tars", 32, "Title", "Body", "/tmp/ws");
@@ -479,7 +473,7 @@ describe("SessionManager", () => {
 	it("archives a session", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const archiveDir = path.join(sessionsDir, "archive");
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		const created = await manager.createSession("mbrooks", "tars", 33, "Title", "Body", "/tmp/ws");
@@ -490,7 +484,7 @@ describe("SessionManager", () => {
 	it("archives a session by owner/repo/issue number", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
 		const archiveDir = path.join(sessionsDir, "archive");
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 38, "Title", "Body", "/tmp/ws");
@@ -500,7 +494,7 @@ describe("SessionManager", () => {
 
 	it("marks a session complete", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 34, "Title", "Body", "/tmp/ws");
@@ -510,7 +504,7 @@ describe("SessionManager", () => {
 
 	it("marks a session failed with a reason", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 35, "Title", "Body", "/tmp/ws");
@@ -525,7 +519,7 @@ describe("SessionManager", () => {
 
 	it("preserves existing staleReason when markFailed has no reason", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 36, "Title", "Body", "/tmp/ws");
@@ -536,7 +530,7 @@ describe("SessionManager", () => {
 
 	it("marks a session stale", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await manager.createSession("mbrooks", "tars", 37, "Title", "Body", "/tmp/ws");
@@ -547,7 +541,7 @@ describe("SessionManager", () => {
 
 	it("throws for archive, complete, failed, stale and cancel on missing sessions", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "tars-sessions-"));
-		const store = new SessionStore(sessionsDir);
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
 		await expect(manager.markComplete("mbrooks", "tars", 999)).rejects.toThrow("No session");

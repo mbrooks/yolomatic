@@ -4,6 +4,7 @@ import path from "node:path";
 import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 import { SessionStore } from "./session/store.js";
+import { SessionLogStore, configureSessionLogPersistence, loadPersistedSessionLogs } from "./logging/session-log-store.js";
 import { TaskController } from "./task-controller.js";
 import { createWebhookServer } from "./webhook/server.js";
 import {
@@ -33,7 +34,10 @@ export async function main(): Promise<void> {
 
 	const config = getConfig(settingsStore);
 
-	const sessionStore = new SessionStore(config.sessionsDir);
+	const sessionStore = new SessionStore(path.join(memoryDir, "bot-state.sqlite"), config.sessionsDir);
+	await sessionStore.migrateFromFileStoreIfNeeded();
+	configureSessionLogPersistence(new SessionLogStore(path.join(memoryDir, "bot-state.sqlite")));
+	loadPersistedSessionLogs();
 	const taskController = new TaskController();
 
 	if (!isBootstrapComplete(config)) {

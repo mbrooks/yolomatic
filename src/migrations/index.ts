@@ -83,6 +83,39 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_github_poll_subjects_last_checked ON github_poll_subjects(last_checked_at)`);
 		},
 	},
+	{
+		id: 5,
+		name: "create_sessions_tables",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS sessions (
+					session_key TEXT PRIMARY KEY,
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					issue_number INTEGER NOT NULL,
+					status TEXT NOT NULL,
+					archived_at TEXT,
+					state_json TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_owner_repo ON sessions(owner, repo)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived_at)`);
+
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS session_logs (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					session_key TEXT NOT NULL,
+					timestamp TEXT NOT NULL,
+					level TEXT NOT NULL,
+					message TEXT NOT NULL,
+					details_json TEXT
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_logs_key_time ON session_logs(session_key, timestamp)`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {
