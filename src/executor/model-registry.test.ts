@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTarsModelRegistry } from "./model-registry.js";
+import { createTarsModelRegistry, resolveOllamaBaseUrl } from "./model-registry.js";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn(() => ({})) },
@@ -32,5 +32,29 @@ describe("createTarsModelRegistry", () => {
 			]),
 		}));
 		expect(registry).toBe(mockRegistry);
+	});
+});
+
+describe("resolveOllamaBaseUrl", () => {
+	it("defaults to localhost with /v1", () => {
+		expect(resolveOllamaBaseUrl({})).toBe("http://127.0.0.1:11434/v1");
+	});
+
+	it("appends /v1 to a configured host", () => {
+		expect(resolveOllamaBaseUrl({ OLLAMA_HOST: "http://ollama.internal:11434" })).toBe(
+			"http://ollama.internal:11434/v1",
+		);
+	});
+
+	it("preserves an explicit /v1 path", () => {
+		expect(resolveOllamaBaseUrl({ OLLAMA_HOST: "http://ollama.internal:11434/v1" })).toBe(
+			"http://ollama.internal:11434/v1",
+		);
+	});
+
+	it("preserves nested base paths when appending /v1", () => {
+		expect(resolveOllamaBaseUrl({ OLLAMA_HOST: "http://ollama.internal:11434/proxy/ollama/" })).toBe(
+			"http://ollama.internal:11434/proxy/ollama/v1",
+		);
 	});
 });
