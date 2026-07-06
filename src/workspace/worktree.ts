@@ -1,4 +1,4 @@
-import { stat, utimes } from "node:fs/promises";
+import { mkdir, rename, stat, utimes } from "node:fs/promises";
 import path from "node:path";
 
 import type { WorkspaceConfig } from "./config.js";
@@ -130,11 +130,19 @@ export class WorktreeManager {
 			await this.git.run("git", ["worktree", "remove", worktreePath], {
 				cwd: bareRepoPath,
 			});
-		} catch {
-			await this.git.run("git", ["worktree", "remove", "--force", worktreePath], {
-				cwd: bareRepoPath,
-			});
-			forced = true;
+		} catch (removeError) {
+			try {
+				await this.git.run("git", ["worktree", "remove", "--force", worktreePath], {
+					cwd: bareRepoPath,
+				});
+				forced = true;
+			} catch (forceError) {
+				const recovered = await this.recoverBlockedWorktreeRemoval(worktreePath, bareRepoPath, forceError);
+				if (!recovered) {
+					throw forceError instanceof Error ? forceError : removeError;
+				}
+				forced = true;
+			}
 		}
 
 		return { stashed: hasUncommitted, forced };
@@ -267,6 +275,39 @@ export class WorktreeManager {
 			`[workspace] Evicted worktree ${worktreePath}${branch ? ` (${branch})` : ""} for ${owner}/${repo}. ` +
 				`Strategy: ${strategy}, limit: ${maxWorktrees}. ` +
 				`Uncommitted changes: ${hasUncommitted ? "stashed" : "none"}\n`,
+		);
+	}
+
+	private async recoverBlockedWorktreeRemoval(
+		worktreePath: string,
+		bareRepoPath: string,
+		error: unknown,
+	): Promise<boolean> {
+		if (!this.isPermissionCleanupError(error)) {
+			return false;
+		}
+
+		const quarantineRoot = path.join(bareRepoPath, ".quarantined-worktrees");
+		const quarantinePath = path.join(
+			quarantineRoot,
+			`${path.basename(worktreePath)}-${Date.now()}`,
+		);
+		await mkdir(quarantineRoot, { recursive: true });
+		await rename(worktreePath, quarantinePath);
+		await this.pruneWorktrees(bareRepoPath);
+		process.stdout.write(
+			`[workspace] Quarantined blocked worktree ${worktreePath} to ${quarantinePath} after permission-denied cleanup.\n`,
+		);
+		return true;
+	}
+
+	private isPermissionCleanupError(error: unknown): boolean {
+		const message = error instanceof Error ? error.message : String(error);
+		return (
+			message.includes("EACCES") ||
+			message.includes("EPERM") ||
+			message.includes("permission denied") ||
+			message.includes("Permission denied")
 		);
 	}
 }

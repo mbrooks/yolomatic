@@ -212,6 +212,44 @@ describe("WorktreeManager", () => {
 		writeSpy.mockRestore();
 	});
 
+	it("quarantines a worktree when force removal fails with permission denied", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-quarantine-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+		await mkdir(worktreePath, { recursive: true });
+
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+			}
+			if (args[0] === "status" && args[1] === "--porcelain") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				throw new Error("EACCES: permission denied, unlink '/app/workspaces/mbrooks-tars/.worktrees/issue-42/coverage/base.css'");
+			}
+			if (args[0] === "worktree" && args[1] === "prune") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = { getBareRepoPath: vi.fn(() => bareRepoPath) } as unknown as BareRepoManager;
+		const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		await worktrees.removeWorktree("mbrooks", "tars", 42);
+
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", "--force", worktreePath], {
+			cwd: bareRepoPath,
+		});
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "prune"], { cwd: bareRepoPath });
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[workspace] Quarantined blocked worktree"));
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("force-removed"));
+		writeSpy.mockRestore();
+	});
+
 	it("returns the existing worktree without creating a new one", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-exists-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
@@ -325,7 +363,7 @@ describe("WorktreeManager", () => {
 		writeSpy.mockRestore();
 	});
 
-	it("skips a permission-blocked eviction candidate and removes the next worktree", async () => {
+	it("quarantines a permission-blocked eviction candidate and still creates the new worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-skip-blocked-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const blockedPath = path.join(bareRepoPath, ".worktrees", "issue-1");
@@ -365,8 +403,8 @@ describe("WorktreeManager", () => {
 
 		expect(worktree.path).toBe(targetPath);
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", blockedPath], { cwd: bareRepoPath });
-		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", removablePath], { cwd: bareRepoPath });
-		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining(`[workspace] Skipped eviction of ${blockedPath}`));
+		expect(runCommand).not.toHaveBeenCalledWith("git", ["worktree", "remove", removablePath], { cwd: bareRepoPath });
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[workspace] Quarantined blocked worktree"));
 		writeSpy.mockRestore();
 	});
 
