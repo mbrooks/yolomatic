@@ -29,10 +29,17 @@ COPY --from=build /app /app
 RUN cd /app/.pi/npm \
   && npm install @ollama/pi-web-search || true
 
+RUN useradd --create-home --shell /bin/bash tars \
+  && mkdir -p /home/tars/.pi/agent/sessions \
+  && mkdir -p /app/sessions /app/workspaces /app/memory \
+  && chown -R tars:tars /app /home/tars
+
 FROM base-runtime AS worker
 
-ENV HOME=/root
-ENV PI_CODING_AGENT_DIR=/root/.pi/agent
+ENV HOME=/home/tars
+ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
+
+USER tars
 
 CMD ["node", "./dist/worker/entrypoint.js"]
 
@@ -54,12 +61,9 @@ RUN apt-get update && apt-get install -y gnupg \
     && apt-get update && apt-get install -y gh docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user and docker group for socket access
-RUN useradd --create-home --shell /bin/bash tars \
-  && groupadd -g 999 docker \
+# Create docker group for socket access
+RUN groupadd -g 999 docker \
   && usermod -aG docker tars \
-  && mkdir -p /home/tars/.pi/agent/sessions \
-  && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
 
 USER tars
