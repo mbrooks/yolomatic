@@ -49,7 +49,22 @@ vi.mock("./session/store.js", () => ({
 		get: vi.fn(),
 		set: vi.fn(),
 		getAll: vi.fn(async () => []),
+		exists: vi.fn(async () => false),
+		delete: vi.fn(async () => {}),
+		archive: vi.fn(async () => {}),
+		migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+		getSessionPath: vi.fn(() => "/tmp/session.jsonl"),
+		getStatePath: vi.fn(() => "/tmp/state.json"),
+		getArchivePath: vi.fn(() => "/tmp/archive.json"),
+		getSessionArchivePath: vi.fn(() => "/tmp/archive.jsonl"),
+		getSessionKey: vi.fn((owner, repo, n) => `github-${owner}-${repo}-issue-${n}`),
 	})),
+}));
+
+vi.mock("./logging/session-log-store.js", () => ({
+	SessionLogStore: vi.fn(() => ({})),
+	configureSessionLogPersistence: vi.fn(),
+	loadPersistedSessionLogs: vi.fn(),
 }));
 
 vi.mock("./session/manager.js", () => ({
@@ -353,6 +368,7 @@ describe("main", () => {
 			get: vi.fn(),
 			set: vi.fn(),
 			getAll: mockGetAll,
+			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
 		}));
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
@@ -379,6 +395,7 @@ describe("main", () => {
 			get: vi.fn(),
 			set: vi.fn(),
 			getAll: mockGetAll,
+			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
 		}));
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
@@ -440,6 +457,7 @@ describe("main", () => {
 			get: vi.fn(),
 			set: vi.fn(),
 			getAll: mockGetAll,
+			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
 		}));
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		mockFn.mockImplementation(() => ({
@@ -495,6 +513,7 @@ describe("main", () => {
 			get: vi.fn(),
 			set: vi.fn(),
 			getAll: vi.fn(async () => { throw new Error("resume outer"); }),
+			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
 		}));
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
