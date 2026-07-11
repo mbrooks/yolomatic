@@ -239,34 +239,3 @@ export function checkAdminTextAllowOnboarding(
 	}
 	return requireAdminText(request, response, username, password);
 }
-
-export function mergeRepoAndServerSkills(
-	repoSkills: import("../../skills/model.js").RepoSkill[],
-	serverSkills: import("../../skills/model.js").ServerSkill[],
-): import("../../skills/model.js").RepoSkill[] {
-	const repoMap = new Map(repoSkills.map((skill) => [skill.name, skill]));
-	const merged: import("../../skills/model.js").RepoSkill[] = [];
-
-	for (const serverSkill of serverSkills) {
-		if (repoMap.has(serverSkill.name)) {
-			const repoSkill = repoMap.get(serverSkill.name)!;
-			merged.push({ ...repoSkill, source: "repo" });
-			continue;
-		}
-		merged.push({
-			name: serverSkill.name,
-			description: serverSkill.description,
-			content: serverSkill.content,
-			updatedAt: serverSkill.updatedAt,
-			source: "inherited",
-		});
-	}
-
-	for (const repoSkill of repoSkills) {
-		if (!serverSkills.some((skill) => skill.name === repoSkill.name)) {
-			merged.push({ ...repoSkill, source: "repo" });
-		}
-	}
-
-	return merged.sort((a, b) => a.name.localeCompare(b.name));
-}

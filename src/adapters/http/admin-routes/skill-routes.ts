@@ -4,9 +4,9 @@ import {
 	AdminRouteRegistry,
 	NotFoundError,
 	getRequiredDeps,
-	mergeRepoAndServerSkills,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
+import { mergeRepoAndServerSkills } from "../../../skills/merge-skills.js";
 
 const registry = new AdminRouteRegistry()
 	.route({
