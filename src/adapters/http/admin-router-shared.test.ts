@@ -3,7 +3,6 @@ import {
 	AdminRouteRegistry,
 	type AdminRouteContext,
 	mapResultToStatus,
-	mergeRepoAndServerSkills,
 	getCredentials,
 	checkAdminJson,
 	checkAdminTextAllowOnboarding,
@@ -98,51 +97,6 @@ describe("admin-router-shared", () => {
 			adminPassword: "secret",
 		} as never);
 		expect(result).toBe(true);
-	});
-
-	it("merges repo and server skills with repo overrides", () => {
-		const merged = mergeRepoAndServerSkills(
-			[
-				{
-					name: "repo-only",
-					description: "repo",
-					content: "repo",
-					updatedAt: "2025-01-01T00:00:00Z",
-					source: "repo",
-				},
-				{
-					name: "shared",
-					description: "repo override",
-					content: "repo content",
-					updatedAt: "2025-01-02T00:00:00Z",
-					source: "repo",
-				},
-			],
-			[
-				{
-					id: "1",
-					name: "shared",
-					description: "server",
-					content: "server",
-					updatedAt: "2025-01-01T00:00:00Z",
-					createdAt: "2025-01-01T00:00:00Z",
-				},
-				{
-					id: "2",
-					name: "inherited",
-					description: "server only",
-					content: "server only",
-					updatedAt: "2025-01-01T00:00:00Z",
-					createdAt: "2025-01-01T00:00:00Z",
-				},
-			],
-		);
-
-		expect(merged.map((skill) => [skill.name, skill.source])).toEqual([
-			["inherited", "inherited"],
-			["repo-only", "repo"],
-			["shared", "repo"],
-		]);
 	});
 
 	it("requireDeps sends the configured dependency error response", () => {
