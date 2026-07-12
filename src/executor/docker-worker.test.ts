@@ -115,11 +115,9 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
-	it("builds the worker image when it is missing", async () => {
+	it("builds the worker image before the first session", async () => {
 		const harness = await createHarness(419);
-		execFileMock
-			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(new Error("missing image")))
-			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
@@ -162,7 +160,7 @@ describe("DockerWorkerExecutor", () => {
 			});
 
 			expect(execFileMock).toHaveBeenNthCalledWith(
-				2,
+				1,
 				"docker",
 				[
 					"build",
@@ -182,11 +180,9 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
-	it("rebuilds the worker image when the transport label is stale", async () => {
+	it("rebuilds an existing worker image instead of trusting its transport label", async () => {
 		const harness = await createHarness(424);
-		execFileMock
-			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "socket-v1", ""))
-			.mockImplementationOnce((_cmd, _args, _options, callback) => callback(null, "", ""));
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
@@ -229,7 +225,7 @@ describe("DockerWorkerExecutor", () => {
 			});
 
 			expect(execFileMock).toHaveBeenNthCalledWith(
-				2,
+				1,
 				"docker",
 				[
 					"build",
