@@ -24,7 +24,9 @@ The worker image is a clean Debian-based image built for agent execution. It sho
 - git
 - common shell tools
 
-The worker starts as root so it can run `apt-get` during the session.
+The worker runs as the non-root `tars` user with `HOME=/home/tars` and `PI_CODING_AGENT_DIR=/home/tars/.pi/agent`. System package installation with `apt-get` is therefore not available during an ordinary worker session. Node packages and other user-writable tooling may still be installed when the workspace permits it.
+
+Before the first worker launch in each control-plane process, TARS builds the `worker` Dockerfile target and tags it with the current WebSocket transport label. Docker reuses unchanged build layers, and subsequent launches in the same process reuse that completed image-build promise.
 
 ## Docker Run Shape
 
@@ -34,10 +36,10 @@ Illustrative command:
 docker run --rm \
   --name tars-session-mbrooks-tars-395 \
   --network container:tars \
-  -v /app/workspaces:/app/workspaces \
-  -e TARS_PRIMARY_WORKTREE=/app/workspaces/mbrooks-tars/.worktrees/issue-395 \
+  --mount type=volume,src=tars_workspaces,dst=/app/workspaces \
   -e TARS_SESSION_KEY=mbrooks/tars#395 \
   -e TARS_SESSION_WS_URL=ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
+  -e TARS_SOUL_PATH=/app/SOUL.md \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
   -e OLLAMA_HOST=http://127.0.0.1:11434 \
@@ -50,6 +52,7 @@ Notes:
 - No Docker socket is mounted.
 - No session or memory volumes are mounted.
 - No long-lived LLM session directory is mounted into the worker.
+- The primary worktree is delivered in `launch_config`, not through a dedicated environment variable.
 - The worker model is passed explicitly in the container env using `PI_AGENT_PROVIDER` and `PI_AGENT_MODEL`.
 - This does not hide secret files that already live under `/app/workspaces`; those remain visible through the single bind mount.
 - The worker mount target must match the control plane's `WORKSPACES_DIR` exactly so git worktree metadata resolves in both containers.
@@ -68,12 +71,11 @@ TARS should create and remove the underlying pending reservation as part of sess
 
 ## Launch Validation
 
-Before launching, TARS should validate:
+Before launching, TARS validates:
 
 - the primary worktree exists
 - the primary worktree path is under the mounted workspace root
-- the worker control base URL is configured correctly for the worker's network perspective
-- the session is not already terminal
+- the worker control base URL can be converted to the session WebSocket URL
 - the container image exists or can be built
 
 If validation fails, TARS should not start the worker and should handle the failure through existing session reporting.
@@ -121,11 +123,10 @@ TARS may cancel a session in two ways:
 1. graceful:
    - send `control` with `action: "stop"`
    - wait for worker acknowledgement and terminal completion
-2. forced:
-   - send `docker stop`
-   - if needed, escalate to `docker kill`
+2. forced fallback:
+   - if the worker has not stopped after five seconds, send `docker stop`
 
-The control message path should be preferred first because it gives the worker a chance to stop the agent cleanly.
+The control message path is attempted first because it gives the worker a chance to stop the agent cleanly. `docker kill` escalation is not currently implemented.
 
 ## Resume
 

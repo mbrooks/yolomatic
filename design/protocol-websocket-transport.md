@@ -55,7 +55,7 @@ TARS should reject upgrades with:
 - unknown token
 - session key mismatch
 - protocol version mismatch after connect
-- unexpected second client for the same live session
+- a reused or unknown token, including an unexpected second client for the same live session
 
 ## Connection Lifecycle
 
@@ -114,11 +114,11 @@ The worker sends explicit `heartbeat` messages so TARS can update session activi
 
 When the session ends:
 
-1. TARS stops accepting non-terminal session messages.
-2. TARS closes the WebSocket connection.
-3. TARS removes the pending reservation and container.
+1. The worker sends `complete` and closes its WebSocket during cleanup.
+2. TARS closes any remaining connection and disposes the pending reservation.
+3. The `docker run --rm` process removes the stopped worker container.
 
-If the worker exits first, TARS should detect container exit and close the session cleanly.
+If the worker exits first, TARS rejects the execution and includes the captured Docker output tail when available.
 
 ## Observability
 

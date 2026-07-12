@@ -2,7 +2,7 @@
 
 ## Summary
 
-Today TARS runs the LLM agent inside the long-lived `tars` container. In the new design, TARS becomes a control plane that launches a separate worker container for each issue session. The worker owns agent execution and code changes. TARS owns everything deterministic before and after the run.
+TARS runs as a control plane and launches a separate worker container for each issue execution. The worker owns agent execution and code changes. TARS owns everything deterministic before and after the run.
 
 The control plane and worker communicate through a bidirectional session protocol over a WebSocket connection. TARS hosts the server side on its existing control-plane HTTP server. The worker is the client that connects with a session-specific URL and token.
 
@@ -111,7 +111,7 @@ Important caveat:
 
 ## Filesystem Layout
 
-The proposed worker mount model is:
+The worker mount model is:
 
 - host: `WORKSPACES_DIR`
 - container: `WORKSPACES_DIR` at the same absolute path used by TARS
@@ -196,16 +196,16 @@ This design reduces exposure to host state and infra, but it does not prevent co
 
 That is acceptable for V1 because the stated goal is to contain access to host state, secrets, and infra, not to solve egress control yet.
 
-## Suggested Code Split
+## Implemented Code Split
 
-The current executor boundary should be refactored into two layers:
+The executor boundary is implemented in two runtime layers:
 
-- host-side session runner:
+- host-side session runner (`src/executor/docker-worker.ts` and `src/worker/rpc-server.ts`):
   - launches and supervises the worker container
   - hosts the worker session WebSocket server
   - converts worker messages into `ExecutionResult`
-- worker-side agent runner:
-  - reuses most of the current `PiAgentExecutor` logic
+- worker-side agent runner (`src/worker/runtime.ts`):
+  - reuses `PiAgentExecutor`
   - acts as a WebSocket client during execution
 
-That keeps prompt construction and result parsing familiar while changing where the code runs.
+The host-side responsibilities are currently concentrated in `DockerWorkerExecutor`; separating Docker launch mechanics from session-protocol supervision remains an internal refactor opportunity, not a change to this architecture.
