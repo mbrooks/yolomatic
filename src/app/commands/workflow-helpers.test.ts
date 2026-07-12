@@ -10,6 +10,10 @@ import {
 	handleDrainingMode,
 	startIssueExecution,
 	handleAdminStop,
+	resolveIssueContext,
+	guardEvent,
+	prepareIssueSession,
+	routePRTimelineComment,
 } from "./workflow-helpers.js";
 import type { SessionState } from "../../session/store.js";
 import { EmptyRepositoryError } from "../../workspace/errors.js";
@@ -498,6 +502,336 @@ describe("workflow helpers", () => {
 			expect(tasks.cancel).toHaveBeenCalledWith("mbrooks/tars#56");
 			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Stopping TARS...");
 			expect(sessions.get).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("resolveIssueContext", () => {
+		it("extracts owner/repo/issue/key and resolves the default branch via resolver", () => {
+			const ctx = resolveIssueContext(
+				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+				() => "develop",
+			);
+
+			expect(ctx).toEqual({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+				key: "mbrooks/tars#42",
+				defaultBranch: "develop",
+			});
+		});
+
+		it("falls back to the static default branch when no resolver is provided", () => {
+			const ctx = resolveIssueContext(
+				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+				undefined,
+				"release",
+			);
+
+			expect(ctx.defaultBranch).toBe("release");
+			expect(ctx.key).toBe("mbrooks/tars#42");
+		});
+
+		it("falls back to main when neither resolver nor default branch is provided", () => {
+			const ctx = resolveIssueContext(
+				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+			);
+
+			expect(ctx.defaultBranch).toBe("main");
+		});
+	});
+
+	describe("guardEvent", () => {
+		it("skips issue events the policy helper says to ignore", () => {
+			const result = guardEvent(
+				"issues",
+				{
+					action: "opened",
+					issue: { assignee: null, assignees: [], labels: [{ name: "wontfix" }] },
+					sender: { login: "human" },
+				},
+				"tars-bot",
+				false,
+			);
+
+			expect(result).toEqual({ skip: true, reason: "issue marked do-not-work" });
+		});
+
+		it("passes issue events that should not be ignored", () => {
+			const result = guardEvent(
+				"issues",
+				{
+					action: "opened",
+					issue: { assignee: { login: "tars-bot" }, assignees: [{ login: "tars-bot" }], labels: [] },
+					sender: { login: "human" },
+				},
+				"tars-bot",
+				false,
+			);
+
+			expect(result).toEqual({ skip: false });
+		});
+
+		it("skips comment events the policy helper says to ignore", () => {
+			const result = guardEvent(
+				"issue_comment",
+				{
+					action: "edited",
+					comment: { body: "hi", user: { login: "human" } },
+					issue: { labels: [], assignee: { login: "tars-bot" }, assignees: [{ login: "tars-bot" }] },
+				},
+				"tars-bot",
+			);
+
+			expect(result).toEqual({ skip: true, reason: "action is edited" });
+		});
+
+		it("passes accepted comment events with mention/creator flags", () => {
+			const result = guardEvent(
+				"issue_comment",
+				{
+					action: "created",
+					comment: { body: "@tars-bot please help", user: { login: "human" } },
+					issue: { labels: [], assignee: { login: "tars-bot" }, assignees: [{ login: "tars-bot" }] },
+				},
+				"tars-bot",
+			);
+
+			expect(result).toEqual({ skip: false, isMentioned: true, isCreatedByTars: false });
+		});
+	});
+
+	describe("prepareIssueSession", () => {
+		function makeDeps(overrides?: {
+			sessions?: Record<string, ReturnType<typeof vi.fn>>;
+			isDraining?: boolean;
+		}) {
+			const sessions = {
+				get: vi.fn(async () => null),
+				createSession: vi.fn(async () => makeSession({ status: "pending" })),
+				updateStatus: vi.fn(),
+				...overrides?.sessions,
+			};
+			const workspaces = {
+				createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-56" })),
+			};
+			const github = {
+				initializeEmptyRepo: vi.fn(),
+				postComment: vi.fn(),
+				removeLabel: vi.fn(),
+				addLabels: vi.fn(),
+			};
+			const tasks = {
+				isDraining: vi.fn(() => overrides?.isDraining ?? false),
+			};
+			return { sessions, workspaces, github, tasks };
+		}
+
+		const ctx = {
+			owner: "mbrooks",
+			repo: "tars",
+			issueNumber: 56,
+			title: "Title",
+			body: "Body",
+			labels: ["tars"] as string[] | undefined,
+			defaultBranch: "main",
+		};
+
+		it("ensures a session exists and returns it when not draining", async () => {
+			const deps = makeDeps();
+			const result = await prepareIssueSession(deps as never, ctx, { requirePending: true });
+
+			expect(result).toEqual({ skip: false, session: expect.objectContaining({ status: "pending" }) });
+			expect(deps.tasks.isDraining).toHaveBeenCalled();
+		});
+
+		it("skips with a status reason when requirePending is set and session is not pending", async () => {
+			const deps = makeDeps({
+				sessions: { get: vi.fn(async () => makeSession({ status: "working" })) },
+			});
+			const result = await prepareIssueSession(deps as never, ctx, { requirePending: true });
+
+			expect(result).toEqual({ skip: true, kind: "status", status: "working" });
+			expect(deps.tasks.isDraining).not.toHaveBeenCalled();
+		});
+
+		it("skips with a draining reason when draining mode is active", async () => {
+			const deps = makeDeps({ isDraining: true });
+			const result = await prepareIssueSession(deps as never, ctx, { requirePending: true });
+
+			expect(result).toEqual({ skip: true, kind: "draining" });
+			expect(deps.github.postComment).toHaveBeenCalledWith(
+				"mbrooks",
+				"tars",
+				56,
+				"Deploy in progress. Task will resume after restart.",
+			);
+		});
+
+		it("does not require pending status for comment-style flows", async () => {
+			const deps = makeDeps({
+				sessions: { get: vi.fn(async () => makeSession({ status: "working" })) },
+			});
+			const result = await prepareIssueSession(deps as never, ctx, { commentBodies: ["hi"] });
+
+			expect(result).toEqual({ skip: false, session: expect.objectContaining({ status: "working" }) });
+		});
+
+		it("queues comment bodies and posts a draining message when draining with comments", async () => {
+			const deps = makeDeps({
+				isDraining: true,
+				sessions: {
+					get: vi.fn(async () => makeSession({ status: "working", queuedComments: ["existing"] })),
+					createSession: vi.fn(),
+					updateStatus: vi.fn(),
+				},
+			});
+			const result = await prepareIssueSession(deps as never, ctx, { commentBodies: ["new"] });
+
+			expect(result).toEqual({ skip: true, kind: "draining" });
+			expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
+				"mbrooks",
+				"tars",
+				56,
+				"working",
+				expect.objectContaining({ resumeOnBoot: true, queuedComments: ["existing", "new"] }),
+			);
+		});
+	});
+
+	describe("routePRTimelineComment", () => {
+		function makeDeps(overrides?: {
+			getPullRequest?: ReturnType<typeof vi.fn>;
+			findSessionByPR?: ReturnType<typeof vi.fn>;
+			prReview?: { execute: ReturnType<typeof vi.fn> };
+			adminGithubUsername?: string;
+		}) {
+			const sessions = {
+				findSessionByPR: overrides?.findSessionByPR ?? vi.fn(async () => null),
+			};
+			const tasks = {
+				cancel: vi.fn(() => false),
+			};
+			const github = {
+				getPullRequest:
+					overrides?.getPullRequest ??
+					vi.fn(async () => ({ head: { ref: "tars/issue-56" }, state: "open", merged: false })),
+				postComment: vi.fn(),
+				removeLabel: vi.fn(),
+				addLabels: vi.fn(),
+			};
+			return {
+				deps: {
+					github: github as never,
+					sessions: sessions as never,
+					tasks: tasks as never,
+					adminGithubUsername: overrides?.adminGithubUsername,
+					prReview: overrides?.prReview,
+				},
+				github,
+				sessions,
+				tasks,
+			};
+		}
+
+		const basePayload = {
+			action: "created",
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			comment: { id: 1, body: "please update", user: { login: "human" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "human" },
+		};
+
+		it("returns false for non-PR comments so the caller continues", async () => {
+			const { deps, github } = makeDeps();
+			const routed = await routePRTimelineComment(
+				deps,
+				{ ...basePayload, issue: { number: 99 } },
+				"mbrooks",
+				"tars",
+				99,
+			);
+
+			expect(routed).toBe(false);
+			expect(github.getPullRequest).not.toHaveBeenCalled();
+		});
+
+		it("logs and returns true when the PR cannot be fetched", async () => {
+			const { deps, github } = makeDeps({ getPullRequest: vi.fn(async () => null) });
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+
+			expect(routed).toBe(true);
+			expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		});
+
+		it("logs and returns true when the PR branch is not associated with a session", async () => {
+			const { deps, sessions } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "feature/x" }, state: "open", merged: false })),
+			});
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+
+			expect(routed).toBe(true);
+			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		});
+
+		it("routes an admin stop command to the mapped issue", async () => {
+			const stop = vi.fn(() => true);
+			const { deps, github, tasks } = makeDeps({
+				adminGithubUsername: "admin",
+				getPullRequest: vi.fn(async () => ({ head: { ref: "tars/issue-56" }, state: "open", merged: false })),
+			});
+			tasks.cancel = stop;
+			const routed = await routePRTimelineComment(
+				deps,
+				{ ...basePayload, comment: { id: 1, body: "/tars stop", user: { login: "admin" } }, sender: { login: "admin" } },
+				"mbrooks",
+				"tars",
+				99,
+			);
+
+			expect(routed).toBe(true);
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Stopping TARS...");
+			expect(stop).toHaveBeenCalledWith("mbrooks/tars#56");
+		});
+
+		it("forwards the comment to the PR review handler when mapped and not a stop command", async () => {
+			const execute = vi.fn(async () => undefined);
+			const { deps } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "tars/issue-56" }, state: "open", merged: false })),
+				prReview: { execute },
+			});
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+
+			expect(routed).toBe(true);
+			expect(execute).toHaveBeenCalledWith(
+				expect.objectContaining({
+					action: "created",
+					pull_request: expect.objectContaining({ number: 99, head: { ref: "tars/issue-56" } }),
+				}),
+			);
+		});
+
+		it("maps via stored PR mapping when the branch is not a TARS issue branch", async () => {
+			const execute = vi.fn(async () => undefined);
+			const { deps, sessions } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "custom-branch" }, state: "open", merged: false })),
+				findSessionByPR: vi.fn(async () => ({ issueNumber: 77 } as never)),
+				prReview: { execute },
+			});
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+
+			expect(routed).toBe(true);
+			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+			expect(execute).toHaveBeenCalled();
+		});
+
+		it("returns true without forwarding when no prReview handler is configured", async () => {
+			const { deps } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "tars/issue-56" }, state: "open", merged: false })),
+			});
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+
+			expect(routed).toBe(true);
 		});
 	});
 });
