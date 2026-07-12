@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y ca-certificates git curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app
+COPY scripts/container-entrypoint.sh /usr/local/bin/tars-container-entrypoint
 
 RUN cd /app/.pi/npm \
   && npm install @ollama/pi-web-search || true
@@ -33,6 +34,8 @@ RUN useradd --create-home --shell /bin/bash tars \
   && mkdir -p /home/tars/.pi/agent/sessions \
   && mkdir -p /app/sessions /app/workspaces /app/memory \
   && chown -R tars:tars /app /home/tars
+
+RUN chmod 0755 /usr/local/bin/tars-container-entrypoint
 
 FROM base-runtime AS worker
 
@@ -66,7 +69,7 @@ RUN groupadd -g 999 docker \
   && usermod -aG docker tars \
   && chown -R tars:tars /app /home/tars
 
-USER tars
+ENTRYPOINT ["tars-container-entrypoint"]
 
 EXPOSE 6767
 
