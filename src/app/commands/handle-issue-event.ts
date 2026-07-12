@@ -3,9 +3,16 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
-import { hasTarsVisibleLabel, isAssignedToTars, shouldIgnoreIssueEvent } from "../../domain/workflow/policy.js";
+import { hasTarsVisibleLabel, isAssignedToTars } from "../../domain/workflow/policy.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
-import { issueSessionKey, removeWorkflowLabels, ensureSessionExists, handleDrainingMode, startIssueExecution } from "./workflow-helpers.js";
+import {
+	issueSessionKey,
+	removeWorkflowLabels,
+	startIssueExecution,
+	resolveIssueContext,
+	guardEvent,
+	prepareIssueSession,
+} from "./workflow-helpers.js";
 
 export interface IssueEventPayload {
 	action: string;
@@ -50,11 +57,9 @@ export class HandleIssueEvent {
 	}
 
 	async execute(payload: IssueEventPayload): Promise<void> {
-		const owner = payload.repository.owner.login;
-		const repo = payload.repository.name;
+		const ctx = resolveIssueContext(payload, this.deps.resolveDefaultBranch, this.deps.defaultBranch);
+		const { owner, repo, key } = ctx;
 		const issue = payload.issue;
-		const key = issueSessionKey(owner, repo, issue.number);
-		const defaultBranch = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 
 		if (payload.sender.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
@@ -110,9 +115,9 @@ export class HandleIssueEvent {
 			return;
 		}
 
-		const check = shouldIgnoreIssueEvent(payload, this.deps.githubUsername, this.inFlight.has(key));
-		if (check.ignore) {
-			process.stdout.write(`[webhook] issues.${payload.action} ignored: ${check.reason}\n`);
+		const guard = guardEvent("issues", payload, this.deps.githubUsername, this.inFlight.has(key));
+		if (guard.skip) {
+			process.stdout.write(`[webhook] issues.${payload.action} ignored: ${guard.reason}\n`);
 			return;
 		}
 
@@ -126,26 +131,31 @@ export class HandleIssueEvent {
 		this.inFlight.add(key);
 
 		try {
-			const session = await ensureSessionExists(
-				this.deps.sessions,
-				this.deps.workspaces,
-				this.deps.github,
-				owner,
-				repo,
-				issue.number,
-				issue.title,
-				issue.body ?? "",
-				issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-				defaultBranch,
+			const prepared = await prepareIssueSession(
+				{
+					sessions: this.deps.sessions,
+					workspaces: this.deps.workspaces,
+					github: this.deps.github,
+					tasks: this.deps.tasks,
+				},
+				{
+					owner,
+					repo,
+					issueNumber: issue.number,
+					title: issue.title,
+					body: issue.body ?? "",
+					labels: issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
+					defaultBranch: ctx.defaultBranch,
+				},
+				{ requirePending: true },
 			);
 
-			if (session.status !== "pending") {
-				process.stdout.write(`[webhook] ${payload.action} ignored: ${key} session status is ${session.status}\n`);
-				return;
-			}
-
-			if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session)) {
-				process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
+			if (prepared.skip) {
+				if (prepared.kind === "status") {
+					process.stdout.write(`[webhook] ${payload.action} ignored: ${key} session status is ${prepared.status}\n`);
+				} else {
+					process.stdout.write(`[webhook] ${payload.action} ignored: draining mode for ${key}\n`);
+				}
 				return;
 			}
 
@@ -156,7 +166,7 @@ export class HandleIssueEvent {
 				owner,
 				repo,
 				issue.number,
-				session,
+				prepared.session,
 				"Picked up by TARS. Working on it...",
 			);
 		} finally {

@@ -2,10 +2,16 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { hasTarsVisibleLabel, isStopCommand, shouldIgnoreCommentEvent } from "../../domain/workflow/policy.js";
-import { issueSessionKey, ensureSessionExists, handleDrainingMode, startIssueExecution, handleAdminStop } from "./workflow-helpers.js";
-import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
-import type { HandlePRReview, PRReviewPayload } from "./handle-pr-review.js";
+import { hasTarsVisibleLabel, isStopCommand } from "../../domain/workflow/policy.js";
+import {
+	issueSessionKey,
+	startIssueExecution,
+	handleAdminStop,
+	resolveIssueContext,
+	guardEvent,
+	prepareIssueSession,
+	routePRTimelineComment,
+} from "./workflow-helpers.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 
 export interface CommentEventPayload {
@@ -39,7 +45,7 @@ export class HandleIssueComment {
 			githubUsername: string;
 			adminGithubUsername?: string;
 			executor: ExecuteSessionDeps;
-			prReview?: HandlePRReview;
+			prReview?: { execute: (payload: import("./handle-pr-review.js").PRReviewPayload) => Promise<void> };
 		},
 	) {
 		this.executor = new ExecuteSession(deps.executor);
@@ -51,11 +57,8 @@ export class HandleIssueComment {
 			return;
 		}
 
-		const owner = payload.repository.owner.login;
-		const repo = payload.repository.name;
-		const issueNumber = payload.issue.number;
-		const key = issueSessionKey(owner, repo, issueNumber);
-		const defaultBranch = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
+		const ctx = resolveIssueContext(payload, this.deps.resolveDefaultBranch, this.deps.defaultBranch);
+		const { owner, repo, issueNumber, key } = ctx;
 
 		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: comment from ${this.deps.githubUsername}\n`);
@@ -68,55 +71,19 @@ export class HandleIssueComment {
 		}
 
 		// PR timeline comments route through PR review handler
-		if (payload.issue.pull_request) {
-			const pr = await this.deps.github.getPullRequest(owner, repo, issueNumber);
-			if (!pr) {
-				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: could not fetch PR\n`);
-				return;
-			}
-			const branchIssueNumber = extractIssueNumberFromBranch(pr.head.ref);
-			const mappedSession = branchIssueNumber ? null : await this.deps.sessions.findSessionByPR(owner, repo, issueNumber);
-			const mappedIssueNumber = branchIssueNumber ?? mappedSession?.issueNumber;
-			if (!mappedIssueNumber) {
-				process.stdout.write(
-					`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: PR branch ${pr.head.ref} is not associated with a TARS session\n`,
-				);
-				return;
-			}
-
-			if (isStopCommand(payload.comment.body)) {
-				await handleAdminStop(
-					this.deps.github,
-					this.deps.tasks,
-					this.deps.sessions,
-					payload.sender.login,
-					this.deps.adminGithubUsername,
-					owner,
-					repo,
-					mappedIssueNumber,
-					issueNumber,
-				);
-				return;
-			}
-
-			if (this.deps.prReview) {
-				await this.deps.prReview.execute({
-					action: payload.action,
-					pull_request: {
-						number: issueNumber,
-						head: pr.head,
-						state: pr.state,
-						merged: pr.merged,
-					},
-					repository: payload.repository,
-					sender: payload.sender,
-					comment: {
-						id: payload.comment.id ?? 0,
-						body: payload.comment.body,
-						user: payload.comment.user,
-					},
-				} as PRReviewPayload);
-			}
+		if (await routePRTimelineComment(
+			{
+				github: this.deps.github,
+				sessions: this.deps.sessions,
+				tasks: this.deps.tasks,
+				adminGithubUsername: this.deps.adminGithubUsername,
+				prReview: this.deps.prReview,
+			},
+			payload,
+			owner,
+			repo,
+			issueNumber,
+		)) {
 			return;
 		}
 
@@ -144,15 +111,15 @@ export class HandleIssueComment {
 			return;
 		}
 
-		const check = shouldIgnoreCommentEvent(payload, this.deps.githubUsername);
-		if (check.ignore) {
-			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: ${check.reason}\n`);
+		const guard = guardEvent("issue_comment", payload, this.deps.githubUsername);
+		if (guard.skip) {
+			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: ${guard.reason}\n`);
 			return;
 		}
 
-		if (check.isMentioned) {
+		if (guard.isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
-		} else if (check.isCreatedByTars) {
+		} else if (guard.isCreatedByTars) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: created by ${this.deps.githubUsername}\n`);
 		} else {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has tars label\n`);
@@ -160,7 +127,7 @@ export class HandleIssueComment {
 
 		// Auto-label on mention so future comments pass via label gate
 		const hasTarsLabel = hasTarsVisibleLabel(payload.issue.labels);
-		if (check.isMentioned && !hasTarsLabel) {
+		if (guard.isMentioned && !hasTarsLabel) {
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars"]);
 			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
 		}
@@ -178,24 +145,31 @@ export class HandleIssueComment {
 			return;
 		}
 
-		let session = await ensureSessionExists(
-			this.deps.sessions,
-			this.deps.workspaces,
-			this.deps.github,
-			owner,
-			repo,
-			issueNumber,
-			payload.issue.title ?? "",
-			payload.issue.body ?? "",
-			payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
-			defaultBranch,
+		const prepared = await prepareIssueSession(
+			{
+				sessions: this.deps.sessions,
+				workspaces: this.deps.workspaces,
+				github: this.deps.github,
+				tasks: this.deps.tasks,
+			},
+			{
+				owner,
+				repo,
+				issueNumber,
+				title: payload.issue.title ?? "",
+				body: payload.issue.body ?? "",
+				labels: payload.issue.labels?.map((l) => l.name).filter((n): n is string => !!n),
+				defaultBranch: ctx.defaultBranch,
+			},
+			{ commentBodies: [payload.comment.body] },
 		);
 
-		if (await handleDrainingMode(this.deps.tasks, this.deps.sessions, this.deps.github, session, [payload.comment.body])) {
+		if (prepared.skip) {
 			process.stdout.write(`[webhook] comment ignored: draining mode for ${key}\n`);
 			return;
 		}
 
+		const session = prepared.session;
 		if (session.status === "paused") {
 			process.stdout.write(`[webhook] comment ignored: ${key} is paused\n`);
 			await this.deps.github.postComment(owner, repo, issueNumber, "TARS is paused on this issue. It will resume when unpaused.");
