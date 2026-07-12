@@ -5,7 +5,19 @@ import { HandleIssueComment } from "./handle-issue-comment.js";
 describe("HandleIssueComment", () => {
 	function createHandler() {
 		const sessions = {
-			get: vi.fn(async () => null),
+			get: vi.fn(async () => ({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+				title: "Issue",
+				body: "Body",
+				status: "pending",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				labels: [],
+			})),
 			getAll: vi.fn(),
 			save: vi.fn(),
 			delete: vi.fn(),
@@ -23,7 +35,19 @@ describe("HandleIssueComment", () => {
 				seeded: false,
 				labels: [],
 			})),
-			updateStatus: vi.fn(),
+			updateStatus: vi.fn(async () => ({
+				owner: "mbrooks",
+				repo: "tars",
+				issueNumber: 42,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				labels: [],
+			})),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
@@ -38,13 +62,13 @@ describe("HandleIssueComment", () => {
 		};
 		const workspaces = {
 			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "tars/issue-42" })),
-			removeWorktree: vi.fn(),
-			commitAndPush: vi.fn(),
-			commitAndPushPath: vi.fn(),
-			hasChanges: vi.fn(),
-			getWorktreePath: vi.fn(),
-			getGitStatus: vi.fn(),
-			getGitDiff: vi.fn(),
+			removeWorktree: vi.fn(async () => {}),
+			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
+			hasChanges: vi.fn(async () => false),
+			getWorktreePath: vi.fn(() => "/tmp/ws/issue-42"),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const tasks = {
 			cancel: vi.fn(() => false),
@@ -94,6 +118,7 @@ describe("HandleIssueComment", () => {
 			github: github as never,
 			defaultBranch: "main",
 			githubUsername: "tars-bot",
+			adminGithubUsername: "admin",
 			executor: {
 				sessions: sessions as never,
 				workspaces: workspaces as never,
@@ -103,7 +128,7 @@ describe("HandleIssueComment", () => {
 				defaultBranch: "main",
 				githubUsername: "tars-bot",
 				selfReportEnabled: false,
-				executor: { execute: vi.fn(), executePRReview: vi.fn() } as never,
+				executor: { execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." })), executePRReview: vi.fn() } as never,
 			},
 			prReview: prReview as never,
 		});
@@ -212,5 +237,179 @@ describe("HandleIssueComment", () => {
 			42,
 			"Deploy in progress. Feedback will be processed after restart.",
 		);
+	});
+
+	it("ignores non-created comment actions", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "edited",
+			issue: { number: 42 },
+			comment: { id: 1, body: "hi", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("ignores comments from the bot itself", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "hi", user: { login: "tars-bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "tars-bot" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("ignores comments from bot accounts", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "hi", user: { login: "other-bot", type: "Bot" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "other-bot" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("handles admin stop from a non-admin sender", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "/tars stop", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Only admins can stop TARS.");
+	});
+
+	it("handles admin stop from an admin with an active task", async () => {
+		const { handler, github, tasks } = createHandler();
+		tasks.cancel.mockReturnValue(true);
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "/tars stop", user: { login: "admin" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Stopping TARS...");
+	});
+
+	it("ignores comments that do not pass the policy gate", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [], assignee: null, assignees: [], user: { login: "someone" } },
+			comment: { id: 1, body: "hello world", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("auto-labels mentions and steers active executions", async () => {
+		const { handler, github, tasks } = createHandler();
+		tasks.isActive.mockReturnValue(true);
+		tasks.steer.mockResolvedValue(true);
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [], assignee: { login: "tars-bot" }, assignees: [{ login: "tars-bot" }] },
+			comment: { id: 1, body: "@tars-bot please help", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars"]);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Steering comment received.");
+	});
+
+	it("accepts comments on issues created by TARS", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [], assignee: null, assignees: [], user: { login: "tars-bot" } },
+			comment: { id: 1, body: "following up", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.addLabels).not.toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars"]);
+	});
+
+	it("posts a paused message when the session is paused", async () => {
+		const { handler, github, sessions } = createHandler();
+		sessions.get.mockResolvedValue({ status: "paused", owner: "mbrooks", repo: "tars", issueNumber: 42, workspacePath: "/tmp/ws/issue-42" } as never);
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "please update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			42,
+			"TARS is paused on this issue. It will resume when unpaused.",
+		);
+	});
+
+	it("starts execution for an accepted comment on a pending session", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, labels: [{ name: "tars" }], assignee: { login: "tars-bot" } },
+			comment: { id: 1, body: "please update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			42,
+			"Feedback received. Resuming work.",
+		);
+	});
+
+	it("returns early when a PR comment cannot fetch the PR", async () => {
+		const { handler, github, prReview } = createHandler();
+		github.getPullRequest.mockResolvedValue(null as never);
+		await handler.execute({
+			action: "created",
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			comment: { id: 1, body: "please update", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(prReview.execute).not.toHaveBeenCalled();
+	});
+
+	it("routes a PR timeline stop command to the mapped issue", async () => {
+		const { handler, github, tasks } = createHandler();
+		github.getPullRequest.mockResolvedValue({ head: { ref: "tars/issue-42" }, state: "open", merged: false } as never);
+		tasks.cancel.mockReturnValue(true);
+		await handler.execute({
+			action: "created",
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			comment: { id: 1, body: "/tars stop", user: { login: "admin" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Stopping TARS...");
 	});
 });
