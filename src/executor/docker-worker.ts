@@ -496,46 +496,24 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private async ensureWorkerImage(): Promise<void> {
 		if (!this.imageReady) {
-			this.imageReady = (async () => {
-				let currentTransport: string | undefined;
-				try {
-					const { stdout } = await execFileText(
-						"docker",
-						[
-							"image",
-							"inspect",
-							"--format",
-							`{{ index .Config.Labels "${WORKER_IMAGE_TRANSPORT_LABEL}" }}`,
-							this.options.workerImage,
-						],
-						this.options.projectRoot,
-					);
-					currentTransport = stdout.trim();
-				} catch {
-					currentTransport = undefined;
-				}
-
-				if (currentTransport === WORKER_IMAGE_TRANSPORT_VERSION) {
-					return;
-				}
-
-				await execFileAsync(
-					"docker",
-					[
-						"build",
-						"--target",
-						"worker",
-						"--label",
-						`${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`,
-						"-t",
-						this.options.workerImage,
-						this.options.projectRoot,
-					],
-					{
-						cwd: this.options.projectRoot,
-					},
-				);
-			})();
+			// Rebuild once per control-plane process so deployments cannot reuse a
+			// worker image built from older source. Docker caches unchanged layers.
+			this.imageReady = execFileAsync(
+				"docker",
+				[
+					"build",
+					"--target",
+					"worker",
+					"--label",
+					`${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`,
+					"-t",
+					this.options.workerImage,
+					this.options.projectRoot,
+				],
+				{
+					cwd: this.options.projectRoot,
+				},
+			).then(() => undefined);
 		}
 
 		await this.imageReady;
