@@ -149,21 +149,11 @@ The worker sends structured execution events to TARS in batches.
   "payload": {
     "events": [
       {
-        "timestamp": "2026-07-03T19:20:31.000Z",
-        "type": "log",
-        "payload": {
+        "type": "session_log",
+        "entry": {
+          "timestamp": "2026-07-03T19:20:31.000Z",
           "level": "info",
           "message": "Prompt sent"
-        }
-      },
-      {
-        "timestamp": "2026-07-03T19:20:32.000Z",
-        "type": "tool.start",
-        "payload": {
-          "toolName": "functions.exec_command",
-          "args": {
-            "cmd": "npm test"
-          }
         }
       }
     ]
@@ -173,19 +163,7 @@ The worker sends structured execution events to TARS in batches.
 
 ### Event Types
 
-Suggested event types:
-
-- `log`
-- `assistant.message`
-- `assistant.reasoning`
-- `tool.start`
-- `tool.end`
-- `status.update`
-- `session.error`
-
-TARS should map these into the existing session log system.
-
-TARS should treat these streamed events as the canonical persisted session record instead of relying on a worker-mounted LLM session directory.
+The implemented V1 event type is `session_log`, containing the existing `SessionLogEntry` shape. Assistant output, reasoning summaries, tool activity, and status changes are represented through that canonical log entry rather than separate wire-level event variants.
 
 ## `heartbeat`
 
@@ -231,7 +209,7 @@ TARS sends live control or steering instructions to the worker.
 
 ### `pause`
 
-Tells the worker to pause further agent progress as soon as it reaches a safe interruption point.
+Reserved for a future resumable pause. The current worker handles it like `stop` by aborting the active agent execution.
 
 ### `stop`
 
@@ -251,7 +229,7 @@ Tells the worker to inject a text message into the live agent session.
   "messageId": "msg-6",
   "payload": {
     "action": "steer",
-    "text": "Focus on the failing guardrail test before changing UI code."
+    "message": "Focus on the failing guardrail test before changing UI code."
   }
 }
 ```
@@ -291,11 +269,10 @@ The worker sends one terminal execution result to TARS.
   "sessionKey": "mbrooks/tars#395",
   "messageId": "msg-7",
   "payload": {
-    "status": "complete",
-    "summary": "Implement worker session launch and result handling.",
-    "rawResponse": "TARS_STATUS: complete\nImplement worker session launch and result handling.",
-    "metrics": {
-      "durationMs": 584233
+    "result": {
+      "status": "complete",
+      "summary": "Implement worker session launch and result handling.",
+      "rawResponse": "TARS_STATUS: complete\nImplement worker session launch and result handling."
     }
   }
 }
@@ -303,7 +280,7 @@ The worker sends one terminal execution result to TARS.
 
 ### Result Semantics
 
-Allowed `payload.status` values:
+The payload wraps the existing `ExecutionResult`. Allowed `payload.result.status` values are:
 
 - `working`
 - `waiting-feedback`
@@ -315,8 +292,8 @@ These should match the existing `ExecutionResult` shape used by TARS.
 
 ### Completion Rules
 
-- TARS should treat the first valid terminal completion as authoritative.
-- After accepting completion, TARS should reject further non-terminal messages for that session.
+- The worker sends one completion result and then closes its connection during cleanup.
+- TARS treats that result as the execution result returned to the existing reporting and delivery flow.
 - The worker must not push or create the PR itself.
 
 ## `error`
@@ -338,7 +315,6 @@ Reports a protocol-level or session-level error.
   "sessionKey": "mbrooks/tars#395",
   "messageId": "msg-8",
   "payload": {
-    "code": "steer_failed",
     "message": "Agent session could not accept a steering message."
   }
 }
@@ -346,31 +322,21 @@ Reports a protocol-level or session-level error.
 
 ## Host Mapping
 
-TARS should translate worker messages like this:
+TARS translates worker messages like this:
 
-- `event_batch` -> `recordSessionLog` and activity updates
+- `event_batch` -> `recordSessionLog` and activity updates for each `session_log` entry
 - `heartbeat` -> liveness tracking and activity updates
 - `complete` -> `ExecutionResult` handoff into the existing reporting and delivery flow
 
-The `event_batch` stream should carry the data TARS wants to persist centrally, including:
+The `event_batch` stream carries the data TARS persists centrally, including:
 
 - assistant responses
 - reasoning summaries
 - tool execution events
 - steering-related status updates
 
-TARS should also expose admin actions through outbound `control` messages.
+TARS exposes live steering and stop actions through outbound `control` messages.
 
 ## Missing Completion Handling
 
-If the container exits without a successful `complete` message, TARS should synthesize a failure result:
-
-```json
-{
-  "status": "failed",
-  "summary": "Worker exited without sending a terminal completion message.",
-  "rawResponse": ""
-}
-```
-
-This keeps the host-side contract compatible with existing `ExecuteSession` behavior.
+If the container exits or the WebSocket closes before a successful `complete` message, the host rejects the execution with an error containing the captured Docker stderr/stdout tail when available. Existing session reporting converts that execution failure into the normal failed-session behavior.
