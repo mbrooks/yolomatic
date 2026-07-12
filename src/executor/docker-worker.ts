@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { ExecutionResult } from "./results.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
+import type { LlmLoggerConfig } from "../logging/llm-logger.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 import type { SessionState } from "../session/store.js";
@@ -47,6 +48,7 @@ export interface DockerWorkerExecutorOptions {
 	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
 	soulPath: string;
+	llmLoggerConfig?: LlmLoggerConfig | (() => LlmLoggerConfig | undefined);
 }
 
 export class DockerWorkerExecutor implements ExecutionService {
@@ -292,6 +294,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 					},
 					prompt,
 					limits: { maxRuntimeSeconds: 7200 },
+					llmLoggerConfig: this.resolveLlmLoggerConfig(),
 				});
 				await sendMessage(launchConfig, true);
 				onSessionCreated?.({
@@ -469,6 +472,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private async validateLaunch(workspacePath: string): Promise<void> {
 		await access(workspacePath);
+	}
+
+	private resolveLlmLoggerConfig(): LlmLoggerConfig | undefined {
+		const provider = this.options.llmLoggerConfig;
+		if (typeof provider === "function") {
+			return provider();
+		}
+		return provider;
 	}
 
 	private resolveWorkerOllamaHost(): string | undefined {

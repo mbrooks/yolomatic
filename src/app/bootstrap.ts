@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import type { AppConfig } from "../config.js";
+import { getConfig as getAppConfig, type AppConfig } from "../config.js";
 import { SessionStore } from "../session/store.js";
 import { SessionManager } from "../session/manager.js";
 import { StaleSessionDetector } from "../session/stale-detector.js";
@@ -18,6 +18,7 @@ import { GitHubEventStore } from "../github-events/store.js";
 import { startGitHubPolling } from "../github-events/polling.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
 import { systemClock } from "../ports/clock.js";
+import type { LlmLoggerConfig } from "../logging/llm-logger.js";
 import { createStartIssueSession, type StartIssueSession } from "./commands/start-issue-session.js";
 import type { SettingsStore } from "../settings/store.js";
 import {
@@ -39,11 +40,6 @@ export function syncConfigToEnv(nextConfig: AppConfig): void {
 	// Sync database settings to process.env so legacy code paths pick them up.
 	process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
 	process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
-	process.env.LOG_LEVEL = nextConfig.logLevel;
-	process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
-	process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
-	process.env.LOG_TOOLS = nextConfig.logTools ? "true" : "";
-	process.env.LOG_RESPONSES = nextConfig.logResponses ? "true" : "";
 }
 
 export interface RuntimeDeps {
@@ -92,6 +88,16 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		evictionStrategy: config.evictionStrategy,
 	});
 	const workerRpcServer = new WorkerRpcServer();
+	const llmLoggerConfigProvider = (): LlmLoggerConfig => {
+		const live = getAppConfig(settingsStore);
+		return {
+			logLevel: live.logLevel,
+			logPrompts: live.logPrompts,
+			logThoughts: live.logThoughts,
+			logTools: live.logTools,
+			logResponses: live.logResponses,
+		};
+	};
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,
@@ -102,6 +108,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workerRpcServer,
 		workerOllamaHost: config.workerOllamaHost,
 		soulPath: config.soulPath,
+		llmLoggerConfig: llmLoggerConfigProvider,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const handlers = new GitHubIssueHandlers({

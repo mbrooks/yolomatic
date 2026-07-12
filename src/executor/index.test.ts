@@ -35,6 +35,7 @@ import { PiAgentExecutor } from "./index.js";
 
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "./model-registry.js";
+import { LlmLogger } from "../logging/llm-logger.js";
 
 describe("PiAgentExecutor", () => {
 	afterEach(() => {
@@ -529,5 +530,37 @@ describe("PiAgentExecutor", () => {
 
 		expect(result.status).toBe("failed");
 		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
+	it("passes the llmLoggerConfig provider result into LlmLogger at construction time", async () => {
+		const soulPath = await makeSoulPath();
+		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			messages: [{ role: "assistant", content: "TARS_STATUS: complete\nDone." }],
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		vi.mocked(LlmLogger).mockClear();
+		const executor = new PiAgentExecutor({
+			soulPath,
+			llmLoggerConfig: () => ({
+				logLevel: "warn",
+				logPrompts: false,
+				logThoughts: true,
+				logTools: true,
+				logResponses: true,
+			}),
+		});
+		await executor.execute(makeState(50));
+
+		expect(LlmLogger).toHaveBeenCalledWith(
+			"tars",
+			50,
+			undefined,
+			expect.objectContaining({ logLevel: "warn", logPrompts: false }),
+		);
 	});
 });

@@ -1,4 +1,37 @@
 /**
+ * Logging configuration for {@link LlmLogger}.
+ *
+ * Prefer passing an explicit config object at construction time. The
+ * `process.env`-derived defaults are kept only as an initial fallback for
+ * callers (e.g. tests, CLI entry points) that do not have a typed
+ * {@link AppConfig} available.
+ */
+export interface LlmLoggerConfig {
+	logLevel: string;
+	logPrompts: boolean;
+	logThoughts: boolean;
+	logTools: boolean;
+	logResponses: boolean;
+}
+
+/**
+ * Build a {@link LlmLoggerConfig} from `process.env`, applying the same
+ * defaults the legacy constructor used: log level `info` and every category
+ * enabled unless explicitly disabled via `=false`.
+ */
+export function defaultLlmLoggerConfigFromEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): LlmLoggerConfig {
+	return {
+		logLevel: env.LOG_LEVEL?.trim().toLowerCase() || "info",
+		logPrompts: env.LOG_PROMPTS !== "false",
+		logThoughts: env.LOG_THOUGHTS !== "false",
+		logTools: env.LOG_TOOLS !== "false",
+		logResponses: env.LOG_RESPONSES !== "false",
+	};
+}
+
+/**
  * Comprehensive LLM interaction logger.
  *
  * Logs all prompts, chain-of-thought reasoning, tool calls, tool results,
@@ -14,13 +47,14 @@ export class LlmLogger {
 	private readonly logResponses: boolean;
 	private readonly logLevel: string;
 
-	constructor(repo: string, issueNumber: number, sessionTag?: string) {
+	constructor(repo: string, issueNumber: number, sessionTag?: string, config?: LlmLoggerConfig) {
 		this.sessionTag = sessionTag ?? `${repo}-issue-${issueNumber}`;
-		this.logLevel = process.env.LOG_LEVEL?.trim().toLowerCase() ?? "info";
-		this.logPrompts = process.env.LOG_PROMPTS !== "false";
-		this.logThoughts = process.env.LOG_THOUGHTS !== "false";
-		this.logTools = process.env.LOG_TOOLS !== "false";
-		this.logResponses = process.env.LOG_RESPONSES !== "false";
+		const resolved = config ?? defaultLlmLoggerConfigFromEnv();
+		this.logLevel = resolved.logLevel;
+		this.logPrompts = resolved.logPrompts;
+		this.logThoughts = resolved.logThoughts;
+		this.logTools = resolved.logTools;
+		this.logResponses = resolved.logResponses;
 	}
 
 	logPrompt(prompt: string, tokens?: number): void {

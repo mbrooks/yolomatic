@@ -390,6 +390,82 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("includes llmLoggerConfig from the provider in the launch_config", async () => {
+		const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), "tars-docker-worker-cfg-"));
+		const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", "issue-425");
+		await mkdir(workspacePath, { recursive: true });
+
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: workspacesRoot,
+			workerImage: "tars-worker:latest",
+			workerWorkspaceMountSource: workspacesRoot,
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+			llmLoggerConfig: () => ({
+				logLevel: "warn",
+				logPrompts: false,
+				logThoughts: true,
+				logTools: true,
+				logResponses: true,
+			}),
+		});
+
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
+
+		let captured: WorkerProtocolMessage<"launch_config"> | undefined;
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					captured = message as WorkerProtocolMessage<"launch_config">;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/tars#425", "ack-1", {
+							ackMessageId: message.messageId,
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/tars#425", "complete-1", {
+							result: { status: "complete", summary: "done", rawResponse: "TARS_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await executor.execute({
+				issueNumber: 425,
+				repo: "tars",
+				owner: "mbrooks",
+				title: "Cfg",
+				body: "Body",
+				status: "pending",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath,
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			});
+
+			expect(captured?.payload.llmLoggerConfig).toEqual({
+				logLevel: "warn",
+				logPrompts: false,
+				logThoughts: true,
+				logTools: true,
+				logResponses: true,
+			});
+		} finally {
+			await workerRpcServer.close();
+			await rm(workspacesRoot, { recursive: true, force: true });
+		}
+	});
+
 	it("propagates worker errors", async () => {
 		const harness = await createHarness(420);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));

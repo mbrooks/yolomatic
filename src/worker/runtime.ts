@@ -7,6 +7,7 @@ import WebSocket, { type RawData } from "ws";
 import { PiAgentExecutor } from "../executor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
+import type { LlmLoggerConfig } from "../logging/llm-logger.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
 import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
 
@@ -15,6 +16,7 @@ export interface WorkerRuntimeOptions {
 	sessionKey: string;
 	soulPath: string;
 	workerVersion?: string;
+	llmLoggerConfig?: LlmLoggerConfig;
 }
 
 export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<void> {
@@ -94,7 +96,10 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 		});
 
 		tempDir = await mkdtemp(path.join(os.tmpdir(), "tars-worker-"));
-		const executor = new PiAgentExecutor({ soulPath: options.soulPath });
+		const executor = new PiAgentExecutor({
+			soulPath: options.soulPath,
+			llmLoggerConfig: launchConfig.payload.llmLoggerConfig ?? options.llmLoggerConfig,
+		});
 
 		ws.on("message", (raw) => {
 			const message = decodeWorkerWebSocketMessage(raw);

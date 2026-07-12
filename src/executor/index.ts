@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createTarsModelRegistry } from "./model-registry.js";
 
-import { LlmLogger } from "../logging/llm-logger.js";
+import { LlmLogger, type LlmLoggerConfig } from "../logging/llm-logger.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
@@ -25,14 +25,21 @@ export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRat
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
+type LlmLoggerConfigProvider = LlmLoggerConfig | (() => LlmLoggerConfig) | undefined;
 
 export class PiAgentExecutor implements ExecutionService {
 	private readonly soulPath: string;
 	private readonly modelConfig: ModelConfigProvider;
+	private readonly llmLoggerConfig: LlmLoggerConfigProvider;
 
-	constructor(options: { soulPath: string; modelConfig?: ModelConfigProvider }) {
+	constructor(options: {
+		soulPath: string;
+		modelConfig?: ModelConfigProvider;
+		llmLoggerConfig?: LlmLoggerConfigProvider;
+	}) {
 		this.soulPath = options.soulPath;
 		this.modelConfig = options.modelConfig;
+		this.llmLoggerConfig = options.llmLoggerConfig;
 	}
 
 	execute(
@@ -74,7 +81,7 @@ export class PiAgentExecutor implements ExecutionService {
 		overridePrompt?: string,
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
-		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
+		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag, this.getLlmLoggerConfig());
 		const notifyActivity = () => {
 			onActivity?.();
 		};
@@ -307,5 +314,12 @@ export class PiAgentExecutor implements ExecutionService {
 			return this.modelConfig();
 		}
 		return this.modelConfig;
+	}
+
+	private getLlmLoggerConfig(): LlmLoggerConfig | undefined {
+		if (typeof this.llmLoggerConfig === "function") {
+			return this.llmLoggerConfig();
+		}
+		return this.llmLoggerConfig;
 	}
 }

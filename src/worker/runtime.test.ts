@@ -163,6 +163,7 @@ vi.mock("../executor/index.js", () => ({
 }));
 
 import { runWorkerRuntime } from "./runtime.js";
+import { PiAgentExecutor } from "../executor/index.js";
 
 describe("runWorkerRuntime", () => {
 	afterEach(() => {
@@ -460,5 +461,56 @@ describe("runWorkerRuntime", () => {
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Worker RPC connection closed before launch config arrived");
+	});
+
+	it("forwards llmLoggerConfig from the launch config into the PiAgentExecutor", async () => {
+		const sessionKey = "mbrooks/tars#58";
+		executeWithOverride.mockImplementation(async () => ({
+			status: "complete",
+			summary: "done",
+			rawResponse: "TARS_STATUS: complete\ndone",
+		}));
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				if (message.type === "hello") {
+					await sendWorkerWebSocketMessage(
+						server as never,
+						createWorkerMessage("launch_config", sessionKey, "launch-cfg", {
+							session: {
+								owner: "mbrooks",
+								repo: "tars",
+								issueNumber: 58,
+								workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-58",
+								title: "Configured",
+								body: "Body",
+							},
+							prompt: { kind: "override", text: "custom prompt" },
+							llmLoggerConfig: {
+								logLevel: "error",
+								logPrompts: false,
+								logThoughts: false,
+								logTools: true,
+								logResponses: true,
+							},
+						}),
+					);
+				}
+			});
+		});
+
+		await runWorkerRuntime({
+			wsUrl: "ws://worker.test/session-58",
+			sessionKey,
+			soulPath: "/tmp/SOUL.md",
+		});
+
+		expect(PiAgentExecutor).toHaveBeenCalledWith(
+			expect.objectContaining({
+				soulPath: "/tmp/SOUL.md",
+				llmLoggerConfig: expect.objectContaining({ logLevel: "error", logPrompts: false }),
+			}),
+		);
 	});
 });

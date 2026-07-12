@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LlmLogger } from "./llm-logger.js";
+import { defaultLlmLoggerConfigFromEnv, LlmLogger, type LlmLoggerConfig } from "./llm-logger.js";
 
 describe("LlmLogger", () => {
 	beforeEach(() => {
@@ -176,5 +176,97 @@ describe("LlmLogger", () => {
 		const contentLines = lines.filter((l) => !l.includes("Prompt sent"));
 		const fullContent = contentLines.join("").replace(/\n/g, "");
 		expect(fullContent).toContain("a".repeat(3000));
+	});
+});
+
+describe("LlmLogger with explicit config", () => {
+	beforeEach(() => {
+		vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+	});
+
+	function getLines(): string[] {
+		return (process.stdout.write as unknown as { mock: { calls: [string][] } }).mock.calls.map(
+			(c) => c[0],
+		);
+	}
+
+	it("uses the provided config instead of process.env", () => {
+		process.env.LOG_LEVEL = "error";
+		process.env.LOG_PROMPTS = "false";
+		const config: LlmLoggerConfig = {
+			logLevel: "info",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+		};
+		const logger = new LlmLogger("tars", 42, undefined, config);
+		logger.logPrompt("Hello");
+
+		expect(getLines().some((l) => l.includes("[prompt]"))).toBe(true);
+	});
+
+	it("respects disabled categories from the config object", () => {
+		const logger = new LlmLogger("tars", 42, undefined, {
+			logLevel: "info",
+			logPrompts: false,
+			logThoughts: false,
+			logTools: false,
+			logResponses: false,
+		});
+		logger.logPrompt("Hello");
+		logger.logThought("Thinking");
+		logger.logToolCall("read", {});
+		logger.logToolResult("read", "content");
+		logger.logResponse("Done");
+
+		expect(process.stdout.write).not.toHaveBeenCalled();
+	});
+
+	it("respects logLevel=error from the config object", () => {
+		const logger = new LlmLogger("tars", 42, undefined, {
+			logLevel: "error",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+		});
+		logger.logPrompt("Hello");
+		logger.logThought("Thinking");
+		logger.logToolCall("read", {});
+		logger.logToolResult("read", "content");
+		logger.logResponse("Done");
+		logger.logError(new Error("Bad"), "Oops");
+
+		const lines = getLines();
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain("[error]");
+	});
+});
+
+describe("defaultLlmLoggerConfigFromEnv", () => {
+	it("applies info defaults when env is unset", () => {
+		const config = defaultLlmLoggerConfigFromEnv({});
+		expect(config).toEqual({
+			logLevel: "info",
+			logPrompts: true,
+			logThoughts: true,
+			logTools: true,
+			logResponses: true,
+		});
+	});
+
+	it("reads LOG_LEVEL case-insensitively", () => {
+		expect(defaultLlmLoggerConfigFromEnv({ LOG_LEVEL: "  ERROR " }).logLevel).toBe("error");
+	});
+
+	it("treats empty LOG_LEVEL as info", () => {
+		expect(defaultLlmLoggerConfigFromEnv({ LOG_LEVEL: "   " }).logLevel).toBe("info");
+	});
+
+	it("disables a category only when set to false", () => {
+		expect(defaultLlmLoggerConfigFromEnv({ LOG_PROMPTS: "false" }).logPrompts).toBe(false);
+		expect(defaultLlmLoggerConfigFromEnv({ LOG_PROMPTS: "true" }).logPrompts).toBe(true);
+		expect(defaultLlmLoggerConfigFromEnv({ LOG_PROMPTS: undefined }).logPrompts).toBe(true);
 	});
 });

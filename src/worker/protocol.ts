@@ -1,4 +1,5 @@
 import type { ExecutionResult } from "../executor/results.js";
+import type { LlmLoggerConfig } from "../logging/llm-logger.js";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
 
 export const WORKER_PROTOCOL_VERSION = 1;
@@ -24,6 +25,7 @@ export interface WorkerLaunchConfigPayload {
 	limits?: {
 		maxRuntimeSeconds?: number;
 	};
+	llmLoggerConfig?: LlmLoggerConfig;
 }
 
 export interface WorkerHelloPayload {

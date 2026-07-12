@@ -122,6 +122,7 @@ import { GitHubIssueHandlers } from "../webhook/handlers.js";
 import { getConfig } from "../config.js";
 import { startGitHubPolling } from "../github-events/polling.js";
 import { StaleSessionDetector } from "../session/stale-detector.js";
+import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 import type { AppConfig } from "../config.js";
 import type { RuntimeDeps } from "./bootstrap.js";
 
@@ -163,26 +164,28 @@ describe("syncConfigToEnv", () => {
 	afterEach(() => {
 		process.env.PI_AGENT_MODEL = "";
 		process.env.PI_AGENT_PROVIDER = "";
-		process.env.LOG_LEVEL = "";
-		process.env.LOG_PROMPTS = "";
-		process.env.LOG_THOUGHTS = "";
-		process.env.LOG_TOOLS = "";
-		process.env.LOG_RESPONSES = "";
+		delete process.env.LOG_LEVEL;
+		delete process.env.LOG_PROMPTS;
 	});
 
-	it("writes configured values into process.env", () => {
+	it("writes configured Pi agent values into process.env", () => {
 		syncConfigToEnv(baseConfig);
 		expect(process.env.PI_AGENT_MODEL).toBe("kimi");
 		expect(process.env.PI_AGENT_PROVIDER).toBe("ollama");
-		expect(process.env.LOG_LEVEL).toBe("debug");
-		expect(process.env.LOG_PROMPTS).toBe("true");
-		expect(process.env.LOG_TOOLS).toBe("true");
 	});
 
-	it("clears env vars when flags are disabled", () => {
-		syncConfigToEnv({ ...baseConfig, logPrompts: false, logThoughts: false, logTools: false, logResponses: false });
-		expect(process.env.LOG_PROMPTS).toBe("");
-		expect(process.env.LOG_TOOLS).toBe("");
+	it("clears Pi agent env vars when unset", () => {
+		syncConfigToEnv({ ...baseConfig, piAgentModel: undefined, piAgentProvider: undefined });
+		expect(process.env.PI_AGENT_MODEL).toBe("");
+		expect(process.env.PI_AGENT_PROVIDER).toBe("");
+	});
+
+	it("does not sync logging config into process.env", () => {
+		process.env.LOG_LEVEL = "pre-existing";
+		process.env.LOG_PROMPTS = "pre-existing";
+		syncConfigToEnv(baseConfig);
+		expect(process.env.LOG_LEVEL).toBe("pre-existing");
+		expect(process.env.LOG_PROMPTS).toBe("pre-existing");
 	});
 });
 
@@ -210,6 +213,25 @@ describe("buildRuntimeGraph", () => {
 		const graph = buildRuntimeGraph(baseConfig, makeDeps());
 		const callArgs = (createWebhookServerMock as ReturnType<typeof vi.fn>).mock.calls[0];
 		expect(callArgs?.[9]).toEqual({ prebuiltStartIssueSession: graph.startIssueSession });
+	});
+
+	it("wires a live llmLoggerConfig provider into the DockerWorkerExecutor", () => {
+		const deps = makeDeps();
+		buildRuntimeGraph(baseConfig, deps);
+		const executorOptions = (DockerWorkerExecutor as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
+			llmLoggerConfig?: () => { logLevel: string; logPrompts: boolean; logThoughts: boolean; logTools: boolean; logResponses: boolean };
+		};
+		expect(typeof executorOptions?.llmLoggerConfig).toBe("function");
+		// The provider reads from the live AppConfig (mocked here to return baseConfig),
+		// proving the executor does not capture a static snapshot at build time.
+		const resolved = executorOptions!.llmLoggerConfig!();
+		expect(resolved).toEqual({
+			logLevel: baseConfig.logLevel,
+			logPrompts: baseConfig.logPrompts,
+			logThoughts: baseConfig.logThoughts,
+			logTools: baseConfig.logTools,
+			logResponses: baseConfig.logResponses,
+		});
 	});
 
 	it("resolve helpers passed to handlers resolve default branch and event mode", () => {
