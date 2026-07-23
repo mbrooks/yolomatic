@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "server", label: "General" },
+	{ slug: "repositories", label: "Repositories" },
 	{ slug: "github-integration", label: "GitHub Integration" },
-	{ slug: "git-worktrees", label: "Git & Worktrees" },
 	{ slug: "agent-behavior", label: "Worker Behavior" },
 	{ slug: "ai-llm", label: "AI / LLM" },
 ] as const;
@@ -34,6 +34,9 @@ export function parseHash(hash: string): Route {
 		const slug = path[1];
 		if (slug === "skills" || slug === "invitations") {
 			return { screen: "settings", tab: slug };
+		}
+		if (slug === "git-worktrees") {
+			return { screen: "settings", tab: "repositories" };
 		}
 		if (slug && SETTINGS_TAB_SLUGS.includes(slug as SettingsCategoryTab)) {
 			return { screen: "settings", tab: slug as SettingsCategoryTab };

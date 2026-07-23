@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
@@ -10,11 +10,20 @@ import type { SettingsCategoryTab } from "../../app/routes.js";
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
 
 const GENERAL_SETTINGS_SECTIONS = [
-	{ category: "server", label: "General" },
+	{ category: "server", label: "Server" },
 	{ category: "authentication", label: "Authentication" },
 	{ category: "file-system", label: "File System" },
 	{ category: "logging", label: "Logging" },
 ] as const;
+
+const REPOSITORY_SETTINGS_SECTIONS = [
+	{ category: "repositories", label: "Repositories" },
+	{ category: "git-worktrees", label: "Git & Worktrees" },
+] as const;
+
+const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+	github_event_mode: ["webhook", "polling", "both"],
+};
 
 export function SettingsScreen({
 	onBack,
@@ -98,13 +107,17 @@ export function SettingsScreen({
 		}
 	}, [onRerunOnboarding]);
 
-	const filteredSettings = useMemo(() => {
-		if (tab === "skills" || tab === "invitations") return [];
-		const categories = tab === "server"
-			? new Set(GENERAL_SETTINGS_SECTIONS.map(({ category }) => category))
-			: new Set<string>([tab]);
-		return settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
-	}, [settings, tab]);
+	const settingsSections = tab === "server"
+		? GENERAL_SETTINGS_SECTIONS
+		: tab === "repositories"
+			? REPOSITORY_SETTINGS_SECTIONS
+			: null;
+	const categories = settingsSections
+		? new Set(settingsSections.map(({ category }) => category))
+		: new Set<string>([tab]);
+	const filteredSettings = tab === "skills" || tab === "invitations"
+		? []
+		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 
 	if (loading) {
 		return (
@@ -138,8 +151,8 @@ export function SettingsScreen({
 					{error && <div className="error-banner">{error}</div>}
 
 					<div className="settings-list">
-						{tab === "server" ? (
-							GENERAL_SETTINGS_SECTIONS.map(({ category, label }) => (
+						{settingsSections ? (
+							settingsSections.map(({ category, label }) => (
 								<SettingsSection
 									key={category}
 									title={label}
@@ -277,6 +290,7 @@ function SettingRow({
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
+	const options = SETTING_OPTIONS[setting.key];
 
 	return (
 		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}`}>
@@ -286,7 +300,17 @@ function SettingRow({
 				{setting.sensitive && <span className="sensitive-badge">sensitive</span>}
 			</label>
 			<p className="setting-description">{setting.description}</p>
-			{setting.type === "boolean" ? (
+			{options ? (
+				<select
+					id={`setting-${setting.key}`}
+					value={String(displayValue)}
+					onChange={(e) => onChange(setting.key, e.target.value)}
+				>
+					{options.map((option) => (
+						<option key={option} value={option}>{option}</option>
+					))}
+				</select>
+			) : setting.type === "boolean" ? (
 				<select
 					id={`setting-${setting.key}`}
 					value={displayValue === true ? "true" : "false"}
