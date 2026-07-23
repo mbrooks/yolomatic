@@ -1063,6 +1063,17 @@ a:hover {
 	scrollbar-color: var(--border) var(--surface);
 }
 
+.settings-section + .settings-section {
+	border-top: 1px solid var(--border);
+	margin-top: 1rem;
+	padding-top: 1rem;
+}
+
+.settings-section-title {
+	font-size: 1rem;
+	margin: 0 0 0.5rem;
+}
+
 .setting-row {
 	border-bottom: 1px solid var(--border);
 	display: flex;

@@ -9,6 +9,13 @@ import type { SettingsCategoryTab } from "../../app/routes.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
 
+const GENERAL_SETTINGS_SECTIONS = [
+	{ category: "server", label: "General" },
+	{ category: "authentication", label: "Authentication" },
+	{ category: "file-system", label: "File System" },
+	{ category: "logging", label: "Logging" },
+] as const;
+
 export function SettingsScreen({
 	onBack,
 	onRerunOnboarding,
@@ -93,7 +100,10 @@ export function SettingsScreen({
 
 	const filteredSettings = useMemo(() => {
 		if (tab === "skills" || tab === "invitations") return [];
-		return settings.filter((s) => s.category === tab && s.key !== "onboarding_complete");
+		const categories = tab === "server"
+			? new Set(GENERAL_SETTINGS_SECTIONS.map(({ category }) => category))
+			: new Set<string>([tab]);
+		return settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 	}, [settings, tab]);
 
 	if (loading) {
@@ -128,14 +138,25 @@ export function SettingsScreen({
 					{error && <div className="error-banner">{error}</div>}
 
 					<div className="settings-list">
-						{filteredSettings.map((setting) => (
-							<SettingRow
-								key={setting.key}
-								setting={setting}
-								editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
+						{tab === "server" ? (
+							GENERAL_SETTINGS_SECTIONS.map(({ category, label }) => (
+								<SettingsSection
+									key={category}
+									title={label}
+									settings={filteredSettings.filter((setting) => setting.category === category)}
+									edited={edited}
+									changedKeys={changedKeys}
+									onChange={handleChange}
+								/>
+							))
+						) : (
+							<SettingsRows
+								settings={filteredSettings}
+								edited={edited}
+								changedKeys={changedKeys}
 								onChange={handleChange}
 							/>
-						))}
+						)}
 					</div>
 
 					<div className="settings-actions">
@@ -165,6 +186,52 @@ export function SettingsScreen({
 				</>
 			)}
 		</div>
+	);
+}
+
+function SettingsSection({
+	title,
+	settings,
+	edited,
+	changedKeys,
+	onChange,
+}: {
+	title: string;
+	settings: SettingView[];
+	edited: Record<string, string | number | boolean>;
+	changedKeys: Set<string>;
+	onChange: (key: string, value: string | number | boolean) => void;
+}): React.ReactElement {
+	return (
+		<section className="settings-section">
+			<h3 className="settings-section-title">{title}</h3>
+			<SettingsRows settings={settings} edited={edited} changedKeys={changedKeys} onChange={onChange} />
+		</section>
+	);
+}
+
+function SettingsRows({
+	settings,
+	edited,
+	changedKeys,
+	onChange,
+}: {
+	settings: SettingView[];
+	edited: Record<string, string | number | boolean>;
+	changedKeys: Set<string>;
+	onChange: (key: string, value: string | number | boolean) => void;
+}): React.ReactElement {
+	return (
+		<>
+			{settings.map((setting) => (
+				<SettingRow
+					key={setting.key}
+					setting={setting}
+					editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
+					onChange={onChange}
+				/>
+			))}
+		</>
 	);
 }
 

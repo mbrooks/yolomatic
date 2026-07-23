@@ -59,6 +59,28 @@ const MOCK_SETTINGS = [
 		category: "server",
 	},
 	{
+		key: "sessions_dir",
+		value: "./sessions",
+		description: "Directory for session state files",
+		type: "string",
+		default: "./sessions",
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "file-system",
+	},
+	{
+		key: "log_level",
+		value: "info",
+		description: "Log level",
+		type: "string",
+		default: "info",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "logging",
+	},
+	{
 		key: "onboarding_complete",
 		value: true,
 		description: "Whether the onboarding wizard has been completed",
@@ -129,7 +151,7 @@ describe("SettingsScreen", () => {
 		expect(screen.queryByText("port")).toBeNull();
 	});
 
-	it("switches category tab and filters settings", async () => {
+	it("renames Agent Behavior to Worker Behavior and filters its settings", async () => {
 		mockSettingsFetch();
 		const { rerender } = render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
@@ -137,13 +159,14 @@ describe("SettingsScreen", () => {
 			expect(screen.getByText("github_token")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Authentication" }));
-		expect(window.location.hash).toBe("#/settings/authentication");
+		expect(screen.queryByRole("button", { name: "Agent Behavior" })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Worker Behavior" }));
+		expect(window.location.hash).toBe("#/settings/agent-behavior");
 
-		rerender(<SettingsScreen onBack={vi.fn()} tab="authentication" />);
+		rerender(<SettingsScreen onBack={vi.fn()} tab="agent-behavior" />);
 
 		await waitFor(() => {
-			expect(screen.getByText("admin_username")).not.toBeNull();
+			expect(screen.getByText("self_report_enabled")).not.toBeNull();
 		});
 		expect(screen.queryByText("github_token")).toBeNull();
 	});
@@ -199,7 +222,7 @@ describe("SettingsScreen", () => {
 		expect(defaultButton.className).toContain("active");
 	});
 
-	it("renders General first and hides the internal onboarding setting", async () => {
+	it("renders consolidated sections under General and hides their former tabs", async () => {
 		mockSettingsFetch();
 		render(<SettingsScreen onBack={vi.fn()} tab="server" />);
 
@@ -209,7 +232,19 @@ describe("SettingsScreen", () => {
 
 		const tabs = screen.getAllByRole("button").filter((button) => button.classList.contains("repo-tab"));
 		expect(tabs[0].textContent).toBe("General");
+		expect(screen.queryByRole("button", { name: "Authentication" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "File System" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Logging" })).toBeNull();
+
+		for (const section of ["General", "Authentication", "File System", "Logging"]) {
+			expect(screen.getByRole("heading", { name: section })).not.toBeNull();
+		}
+		expect(screen.getByText("admin_username")).not.toBeNull();
+		expect(screen.getByText("sessions_dir")).not.toBeNull();
+		expect(screen.getByText("log_level")).not.toBeNull();
 		expect(screen.queryByText("onboarding_complete")).toBeNull();
+		expect(screen.queryByText("github_token")).toBeNull();
+		expect(screen.queryByText("self_report_enabled")).toBeNull();
 	});
 
 	it("does not rerun onboarding when confirmation is declined", async () => {
