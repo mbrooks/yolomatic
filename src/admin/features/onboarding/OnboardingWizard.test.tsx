@@ -234,4 +234,38 @@ describe("OnboardingWizard", () => {
 
 		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
 	});
+
+	it("deselects and selects all repositories in step 4", () => {
+		localStorage.setItem(
+			"tars-onboarding-wizard",
+			JSON.stringify({
+				step: 4,
+				adminUsername: "admin",
+				adminPassword: "password",
+				githubToken: "ghp_test",
+				githubUsername: "octocat",
+				githubUsernameConfirmed: true,
+				webhookSecret: "webhook-secret",
+				webhookSecretConfirmed: true,
+				repositories: [
+					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", selected: true },
+					{ owner: "octocat", repo: "hello", fullName: "octocat/hello", selected: true },
+				],
+				error: null,
+			}),
+		);
+		render(<OnboardingWizard />);
+
+		const repositoryCheckboxes = [
+			screen.getByLabelText("mbrooks/tars") as HTMLInputElement,
+			screen.getByLabelText("octocat/hello") as HTMLInputElement,
+		];
+		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
+
+		fireEvent.click(screen.getByRole("button", { name: "Deselect All" }));
+		expect(repositoryCheckboxes.every((checkbox) => !checkbox.checked)).toBe(true);
+
+		fireEvent.click(screen.getByRole("button", { name: "Select All" }));
+		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
+	});
 });
