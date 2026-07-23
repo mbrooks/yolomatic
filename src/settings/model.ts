@@ -125,6 +125,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "server",
 	},
 	{
+		key: "onboarding_complete",
+		type: "boolean",
+		description: "Whether the onboarding wizard has been completed",
+		requiresRestart: true,
+		sensitive: false,
+		envVar: "ONBOARDING_COMPLETE",
+		category: "server",
+	},
+	{
 		key: "sessions_dir",
 		type: "string",
 		description: "Directory for session state files",

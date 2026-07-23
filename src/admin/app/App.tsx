@@ -13,7 +13,7 @@ import { RepoSettingsScreen } from "../features/repos/RepoSettingsScreen.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
-export function App(): React.ReactElement {
+export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = {}): React.ReactElement {
 	const [tick, setTick] = useState(0);
 	const serverState = useServerState(tick);
 	const route = useRoute();
@@ -132,10 +132,11 @@ export function App(): React.ReactElement {
 					onSelectSession={handleSelectSession}
 					onMutate={handleMutate}
 					onBack={handleBackToDashboard}
-					onSelectRepos={handleSelectReposList}
-					onSelectTab={handleSelectTab}
-					onSelectSettings={handleSelectSettings}
-				/>
+						onSelectRepos={handleSelectReposList}
+						onSelectTab={handleSelectTab}
+						onSelectSettings={handleSelectSettings}
+						onRerunOnboarding={onRerunOnboarding}
+					/>
 			)}
 
 			<div className="last-updated">{lastUpdated}</div>
@@ -186,6 +187,7 @@ function AppContent({
 	onSelectRepos,
 	onSelectTab,
 	onSelectSettings,
+	onRerunOnboarding,
 }: {
 	route: Route;
 	repos: RepoSummary[];
@@ -204,6 +206,7 @@ function AppContent({
 	onSelectRepos: () => void;
 	onSelectTab: (tab: "sessions" | "skills" | "issues" | "settings") => void;
 	onSelectSettings: () => void;
+	onRerunOnboarding?: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
 		return (
@@ -293,7 +296,13 @@ function AppContent({
 	}
 
 	if (route.screen === "settings") {
-		return <SettingsScreen onBack={onBack} tab={route.tab ?? DEFAULT_SETTINGS_TAB} />;
+		return (
+			<SettingsScreen
+				onBack={onBack}
+				onRerunOnboarding={onRerunOnboarding}
+				tab={route.tab ?? DEFAULT_SETTINGS_TAB}
+			/>
+		);
 	}
 
 	navigate({ screen: "dashboard" });

@@ -11,14 +11,17 @@ export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
 
 export function SettingsScreen({
 	onBack,
+	onRerunOnboarding,
 	tab = DEFAULT_SETTINGS_TAB,
 }: {
 	onBack: () => void;
+	onRerunOnboarding?: () => void;
 	tab?: SettingsTab;
 }): React.ReactElement {
 	const [settings, setSettings] = useState<SettingView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [rerunningOnboarding, setRerunningOnboarding] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [pendingRestart, setPendingRestart] = useState(false);
 	const [edited, setEdited] = useState<Record<string, string | number | boolean>>({});
@@ -70,9 +73,27 @@ export function SettingsScreen({
 		}
 	}, [changedKeys, edited]);
 
+	const handleRerunOnboarding = useCallback(async () => {
+		if (!window.confirm("Are you sure you want to rerun the on-boarding wizard?")) return;
+
+		setRerunningOnboarding(true);
+		setError(null);
+		try {
+			await updateSettings({ onboarding_complete: false });
+			if (onRerunOnboarding) {
+				onRerunOnboarding();
+			} else {
+				window.location.reload();
+			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : String(err));
+			setRerunningOnboarding(false);
+		}
+	}, [onRerunOnboarding]);
+
 	const filteredSettings = useMemo(() => {
 		if (tab === "skills" || tab === "invitations") return [];
-		return settings.filter((s) => s.category === tab);
+		return settings.filter((s) => s.category === tab && s.key !== "onboarding_complete");
 	}, [settings, tab]);
 
 	if (loading) {
@@ -127,6 +148,20 @@ export function SettingsScreen({
 							{saving ? "Saving..." : "Save Changes"}
 						</button>
 					</div>
+					{tab === "server" && (
+						<div className="settings-actions danger-zone">
+							<button
+								className="action-btn delete"
+								onClick={() => {
+									void handleRerunOnboarding();
+								}}
+								disabled={rerunningOnboarding}
+								type="button"
+							>
+								{rerunningOnboarding ? "Starting On-Boarding..." : "Rerun On-Boarding"}
+							</button>
+						</div>
+					)}
 				</>
 			)}
 		</div>

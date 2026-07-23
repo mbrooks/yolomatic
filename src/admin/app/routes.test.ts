@@ -130,6 +130,7 @@ describe("parseHash", () => {
 
 	it("parses settings view with default category tab", () => {
 		expect(parseHash("#/settings")).toEqual({ screen: "settings", tab: DEFAULT_SETTINGS_TAB });
+		expect(DEFAULT_SETTINGS_TAB).toBe("server");
 	});
 
 	it("parses settings view with category tab", () => {
