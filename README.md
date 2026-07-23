@@ -68,6 +68,16 @@ want it to start in onboarding-only mode:
 docker compose restart tars
 ```
 
+To dump every effective configuration value using the same
+database-over-environment-over-default precedence as TARS:
+
+```bash
+docker compose exec -T tars npm run config:dump
+```
+
+The output includes all values, including tokens, passwords, and webhook
+secrets. Treat it as secret material.
+
 ## Connect GitHub
 
 TARS can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
