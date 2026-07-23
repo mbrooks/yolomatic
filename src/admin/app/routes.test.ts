@@ -229,7 +229,7 @@ describe("buildHash", () => {
 	});
 
 	it("builds settings category tab view", () => {
-		expect(buildHash({ screen: "settings", tab: "logging" })).toBe("#/settings/logging");
+		expect(buildHash({ screen: "settings", tab: "agent-behavior" })).toBe("#/settings/agent-behavior");
 	});
 
 	it("round-trips skills tab", () => {
@@ -262,7 +262,13 @@ describe("buildHash", () => {
 	});
 
 	it("round-trips settings category tab", () => {
-		const hash = buildHash({ screen: "settings" as const, tab: "file-system" as const });
-		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "file-system" }));
+		const hash = buildHash({ screen: "settings" as const, tab: "agent-behavior" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "agent-behavior" }));
+	});
+
+	it("routes removed settings category tabs to General", () => {
+		for (const tab of ["authentication", "file-system", "logging"]) {
+			expect(parseHash(`#/settings/${tab}`)).toEqual({ screen: "settings", tab: "server" });
+		}
 	});
 });
