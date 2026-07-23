@@ -37,6 +37,17 @@ const MOCK_SETTINGS = [
 		category: "github-integration",
 	},
 	{
+		key: "github_event_mode",
+		value: "webhook",
+		description: "GitHub event ingestion mode",
+		type: "string",
+		default: "webhook",
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "github-integration",
+	},
+	{
 		key: "admin_username",
 		value: "admin",
 		description: "Admin UI username",
@@ -57,6 +68,50 @@ const MOCK_SETTINGS = [
 		sensitive: false,
 		updatedAt: "2026-06-15T00:00:00.000Z",
 		category: "server",
+	},
+	{
+		key: "sessions_dir",
+		value: "./sessions",
+		description: "Directory for session state files",
+		type: "string",
+		default: "./sessions",
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "file-system",
+	},
+	{
+		key: "log_level",
+		value: "info",
+		description: "Log level",
+		type: "string",
+		default: "info",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "logging",
+	},
+	{
+		key: "configured_repositories",
+		value: "[\"mbrooks/tars\"]",
+		description: "JSON list of repositories configured during onboarding",
+		type: "string",
+		default: "[]",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "repositories",
+	},
+	{
+		key: "default_branch",
+		value: "main",
+		description: "Default git branch for new worktrees",
+		type: "string",
+		default: "main",
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "git-worktrees",
 	},
 	{
 		key: "onboarding_complete",
@@ -129,7 +184,20 @@ describe("SettingsScreen", () => {
 		expect(screen.queryByText("port")).toBeNull();
 	});
 
-	it("switches category tab and filters settings", async () => {
+	it("renders github_event_mode as a dropdown with supported modes", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
+
+		const eventMode = await screen.findByRole("combobox", { name: /github_event_mode/ }) as HTMLSelectElement;
+		expect(eventMode.tagName).toBe("SELECT");
+		expect(Array.from(eventMode.options, (option) => option.value)).toEqual(["webhook", "polling", "both"]);
+
+		fireEvent.change(eventMode, { target: { value: "both" } });
+		expect(eventMode.value).toBe("both");
+		expect(eventMode.parentElement?.classList.contains("dirty")).toBe(true);
+	});
+
+	it("renames Agent Behavior to Worker Behavior and filters its settings", async () => {
 		mockSettingsFetch();
 		const { rerender } = render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
@@ -137,13 +205,14 @@ describe("SettingsScreen", () => {
 			expect(screen.getByText("github_token")).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Authentication" }));
-		expect(window.location.hash).toBe("#/settings/authentication");
+		expect(screen.queryByRole("button", { name: "Agent Behavior" })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Worker Behavior" }));
+		expect(window.location.hash).toBe("#/settings/agent-behavior");
 
-		rerender(<SettingsScreen onBack={vi.fn()} tab="authentication" />);
+		rerender(<SettingsScreen onBack={vi.fn()} tab="agent-behavior" />);
 
 		await waitFor(() => {
-			expect(screen.getByText("admin_username")).not.toBeNull();
+			expect(screen.getByText("self_report_enabled")).not.toBeNull();
 		});
 		expect(screen.queryByText("github_token")).toBeNull();
 	});
@@ -199,7 +268,7 @@ describe("SettingsScreen", () => {
 		expect(defaultButton.className).toContain("active");
 	});
 
-	it("renders General first and hides the internal onboarding setting", async () => {
+	it("renders consolidated sections under General and hides their former tabs", async () => {
 		mockSettingsFetch();
 		render(<SettingsScreen onBack={vi.fn()} tab="server" />);
 
@@ -208,8 +277,57 @@ describe("SettingsScreen", () => {
 		});
 
 		const tabs = screen.getAllByRole("button").filter((button) => button.classList.contains("repo-tab"));
-		expect(tabs[0].textContent).toBe("General");
+		expect(tabs.map((button) => button.textContent)).toEqual([
+			"General",
+			"GitHub Integration",
+			"Repositories",
+			"Git & Worktrees",
+			"Worker Behavior",
+			"AI / LLM",
+			"Skills",
+			"Invitations",
+			"Rerun On-Boarding",
+		]);
+		expect(screen.queryByRole("button", { name: "Authentication" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "File System" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Logging" })).toBeNull();
+
+		for (const section of ["Server", "Authentication", "File System", "Logging"]) {
+			expect(screen.getByRole("heading", { name: section })).not.toBeNull();
+		}
+		expect(screen.getByText("admin_username")).not.toBeNull();
+		expect(screen.getByText("sessions_dir")).not.toBeNull();
+		expect(screen.getByText("log_level")).not.toBeNull();
+		expect(screen.queryByText("configured_repositories")).toBeNull();
 		expect(screen.queryByText("onboarding_complete")).toBeNull();
+		expect(screen.queryByText("github_token")).toBeNull();
+		expect(screen.queryByText("self_report_enabled")).toBeNull();
+	});
+
+	it("keeps Git & Worktrees settings in their own tab", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="git-worktrees" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("default_branch")).not.toBeNull();
+		});
+
+		expect(screen.getByRole("button", { name: "Git & Worktrees" }).className).toContain("active");
+		expect(screen.queryByText("configured_repositories")).toBeNull();
+		expect(screen.queryByText("port")).toBeNull();
+	});
+
+	it("shows only configured_repositories in the Repositories tab", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="repositories" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("configured_repositories")).not.toBeNull();
+		});
+
+		expect(screen.getByRole("button", { name: "Repositories" }).className).toContain("active");
+		expect(screen.queryByText("default_branch")).toBeNull();
+		expect(screen.queryByText("port")).toBeNull();
 	});
 
 	it("does not rerun onboarding when confirmation is declined", async () => {
@@ -228,7 +346,8 @@ describe("SettingsScreen", () => {
 			expect(screen.getByRole("button", { name: "Rerun On-Boarding" })).not.toBeNull();
 		});
 		const button = screen.getByRole("button", { name: "Rerun On-Boarding" });
-		expect(button.className).toContain("delete");
+		expect(button.className).toContain("settings-rerun-onboarding");
+		expect(screen.getByRole("button", { name: "Invitations" }).nextElementSibling).toBe(button);
 		fireEvent.click(button);
 
 		expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to rerun the on-boarding wizard?");
