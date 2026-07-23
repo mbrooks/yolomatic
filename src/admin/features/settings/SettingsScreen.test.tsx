@@ -100,7 +100,7 @@ const MOCK_SETTINGS = [
 		requiresRestart: false,
 		sensitive: false,
 		updatedAt: "2026-07-23T00:00:00.000Z",
-		category: "server",
+		category: "repositories",
 	},
 	{
 		key: "default_branch",
@@ -280,6 +280,7 @@ describe("SettingsScreen", () => {
 		expect(tabs.map((button) => button.textContent)).toEqual([
 			"General",
 			"GitHub Integration",
+			"Repositories",
 			"Git & Worktrees",
 			"Worker Behavior",
 			"AI / LLM",
@@ -297,7 +298,7 @@ describe("SettingsScreen", () => {
 		expect(screen.getByText("admin_username")).not.toBeNull();
 		expect(screen.getByText("sessions_dir")).not.toBeNull();
 		expect(screen.getByText("log_level")).not.toBeNull();
-		expect(screen.getByText("configured_repositories")).not.toBeNull();
+		expect(screen.queryByText("configured_repositories")).toBeNull();
 		expect(screen.queryByText("onboarding_complete")).toBeNull();
 		expect(screen.queryByText("github_token")).toBeNull();
 		expect(screen.queryByText("self_report_enabled")).toBeNull();
@@ -313,6 +314,19 @@ describe("SettingsScreen", () => {
 
 		expect(screen.getByRole("button", { name: "Git & Worktrees" }).className).toContain("active");
 		expect(screen.queryByText("configured_repositories")).toBeNull();
+		expect(screen.queryByText("port")).toBeNull();
+	});
+
+	it("shows only configured_repositories in the Repositories tab", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="repositories" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("configured_repositories")).not.toBeNull();
+		});
+
+		expect(screen.getByRole("button", { name: "Repositories" }).className).toContain("active");
+		expect(screen.queryByText("default_branch")).toBeNull();
 		expect(screen.queryByText("port")).toBeNull();
 	});
 

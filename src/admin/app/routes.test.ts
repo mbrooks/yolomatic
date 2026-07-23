@@ -266,6 +266,11 @@ describe("buildHash", () => {
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "git-worktrees" }));
 	});
 
+	it("round-trips repositories settings tab", () => {
+		const hash = buildHash({ screen: "settings" as const, tab: "repositories" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "repositories" }));
+	});
+
 	it("routes removed settings category tabs to General", () => {
 		for (const tab of ["authentication", "file-system", "logging"]) {
 			expect(parseHash(`#/settings/${tab}`)).toEqual({ screen: "settings", tab: "server" });

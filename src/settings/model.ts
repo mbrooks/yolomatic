@@ -122,7 +122,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		requiresRestart: false,
 		sensitive: false,
 		envVar: "CONFIGURED_REPOSITORIES",
-		category: "server",
+		category: "repositories",
 	},
 	{
 		key: "onboarding_complete",
