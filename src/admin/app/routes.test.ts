@@ -229,7 +229,7 @@ describe("buildHash", () => {
 	});
 
 	it("builds settings category tab view", () => {
-		expect(buildHash({ screen: "settings", tab: "repositories" })).toBe("#/settings/repositories");
+		expect(buildHash({ screen: "settings", tab: "git-worktrees" })).toBe("#/settings/git-worktrees");
 	});
 
 	it("round-trips skills tab", () => {
@@ -262,8 +262,8 @@ describe("buildHash", () => {
 	});
 
 	it("round-trips settings category tab", () => {
-		const hash = buildHash({ screen: "settings" as const, tab: "repositories" as const });
-		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "repositories" }));
+		const hash = buildHash({ screen: "settings" as const, tab: "git-worktrees" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "git-worktrees" }));
 	});
 
 	it("routes removed settings category tabs to General", () => {
@@ -272,7 +272,4 @@ describe("buildHash", () => {
 		}
 	});
 
-	it("routes the former Git & Worktrees tab to Repositories", () => {
-		expect(parseHash("#/settings/git-worktrees")).toEqual({ screen: "settings", tab: "repositories" });
-	});
 });

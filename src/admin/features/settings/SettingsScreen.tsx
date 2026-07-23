@@ -16,11 +16,6 @@ const GENERAL_SETTINGS_SECTIONS = [
 	{ category: "logging", label: "Logging" },
 ] as const;
 
-const REPOSITORY_SETTINGS_SECTIONS = [
-	{ category: "repositories", label: "Repositories" },
-	{ category: "git-worktrees", label: "Git & Worktrees" },
-] as const;
-
 const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
 };
@@ -107,11 +102,7 @@ export function SettingsScreen({
 		}
 	}, [onRerunOnboarding]);
 
-	const settingsSections = tab === "server"
-		? GENERAL_SETTINGS_SECTIONS
-		: tab === "repositories"
-			? REPOSITORY_SETTINGS_SECTIONS
-			: null;
+	const settingsSections = tab === "server" ? GENERAL_SETTINGS_SECTIONS : null;
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
