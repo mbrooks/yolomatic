@@ -14,7 +14,6 @@ describe("dump-config script", () => {
 				GITHUB_USERNAME: "env-user",
 				PORT: "7777",
 			},
-			false,
 		);
 
 		expect(values.github_username).toBe("stored-user");
@@ -24,19 +23,16 @@ describe("dump-config script", () => {
 		expect(values.admin_username).toBeNull();
 	});
 
-	it("redacts configured secrets unless explicitly requested", () => {
+	it("includes configured sensitive values", () => {
 		const env = {
 			GITHUB_TOKEN: "github-secret",
 			WEBHOOK_SECRET: "webhook-secret",
 		};
 		const store = { get: () => undefined };
 
-		const redacted = getEffectiveSettings(store, env, false);
-		const revealed = getEffectiveSettings(store, env, true);
+		const values = getEffectiveSettings(store, env);
 
-		expect(redacted.github_token).toBe("<redacted>");
-		expect(redacted.webhook_secret).toBe("<redacted>");
-		expect(revealed.github_token).toBe("github-secret");
-		expect(revealed.webhook_secret).toBe("webhook-secret");
+		expect(values.github_token).toBe("github-secret");
+		expect(values.webhook_secret).toBe("webhook-secret");
 	});
 });

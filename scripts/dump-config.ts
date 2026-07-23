@@ -18,7 +18,6 @@ type DumpValue = string | number | boolean | null;
 export function getEffectiveSettings(
 	store: SettingReader,
 	env: NodeJS.ProcessEnv,
-	showSensitive: boolean,
 ): Record<string, DumpValue> {
 	const values: Record<string, DumpValue> = {};
 
@@ -32,8 +31,6 @@ export function getEffectiveSettings(
 
 		if (raw === undefined) {
 			values[definition.key] = null;
-		} else if (definition.sensitive && !showSensitive) {
-			values[definition.key] = "<redacted>";
 		} else {
 			values[definition.key] = parseSettingValue(definition, raw);
 		}
@@ -43,9 +40,7 @@ export function getEffectiveSettings(
 }
 
 function main(): void {
-	const args = process.argv.slice(2);
-	const showSensitive = args.includes("--show-sensitive");
-	const explicitDbPath = args.find((arg) => arg !== "--show-sensitive");
+	const explicitDbPath = process.argv[2];
 	const memoryDir = path.resolve(process.env.MEMORY_DIR?.trim() || path.join(process.cwd(), "memory"));
 	const dbPath = path.resolve(explicitDbPath || path.join(memoryDir, "bot-state.sqlite"));
 
@@ -56,7 +51,7 @@ function main(): void {
 	const store = new SettingsStore(dbPath);
 	const dump = {
 		settingsDatabase: dbPath,
-		settings: getEffectiveSettings(store, process.env, showSensitive),
+		settings: getEffectiveSettings(store, process.env),
 	};
 	process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
 }

@@ -75,19 +75,8 @@ database-over-environment-over-default precedence as TARS:
 docker compose exec -T tars npm run config:dump
 ```
 
-Sensitive values are included as `<redacted>` by default. To print the complete
-configuration, including tokens, passwords, and webhook secrets:
-
-```bash
-docker compose exec -T tars npm run config:dump -- --show-sensitive
-```
-
-Treat unredacted output as secret material. You can also pass a database path
-after `--` when running outside Docker:
-
-```bash
-npm run config:dump -- /path/to/bot-state.sqlite
-```
+The output includes all values, including tokens, passwords, and webhook
+secrets. Treat it as secret material.
 
 ## Connect GitHub
 
