@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "server", label: "General" },
 	{ slug: "github-integration", label: "GitHub Integration" },
+	{ slug: "repositories", label: "Repositories" },
 	{ slug: "git-worktrees", label: "Git & Worktrees" },
 	{ slug: "agent-behavior", label: "Worker Behavior" },
 	{ slug: "ai-llm", label: "AI / LLM" },

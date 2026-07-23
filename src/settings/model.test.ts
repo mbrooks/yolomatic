@@ -110,7 +110,7 @@ describe("settings/model", () => {
       expect(getSettingDefinition("github_token")?.category).toBe("github-integration");
       expect(getSettingDefinition("admin_username")?.category).toBe("authentication");
       expect(getSettingDefinition("port")?.category).toBe("server");
-      expect(getSettingDefinition("configured_repositories")?.category).toBe("server");
+      expect(getSettingDefinition("configured_repositories")?.category).toBe("repositories");
       expect(getSettingDefinition("workspaces_dir")?.category).toBe("file-system");
       expect(getSettingDefinition("max_worktrees")?.category).toBe("git-worktrees");
       expect(getSettingDefinition("self_report_enabled")?.category).toBe("agent-behavior");
