@@ -88,13 +88,33 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.missing.length).toBeGreaterThan(0);
 		});
 
-		it("returns complete true when all required settings are present", async () => {
+		it("returns complete false when required settings are present but onboarding flag is unset", async () => {
 			const store = await tmpStore();
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
 			store.set("admin_username", "admin");
 			store.set("admin_password", "pass");
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.complete).toBe(false);
+			expect(body.missing).toEqual(["onboarding_complete"]);
+		});
+
+		it("returns complete true when required settings and onboarding flag are present", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "tok");
+			store.set("github_username", "user");
+			store.set("webhook_secret", "shh");
+			store.set("admin_username", "admin");
+			store.set("admin_password", "pass");
+			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
 			const res = mockResponse();
 
@@ -293,6 +313,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body).toEqual({ success: true, activated: true, requiresRestart: [] });
+			expect(store.get("onboarding_complete")).toBe("true");
 			await new Promise<void>((resolve) => setImmediate(resolve));
 			expect(onOnboardingComplete).toHaveBeenCalledTimes(1);
 		});

@@ -14,6 +14,7 @@ export interface AppConfig {
 	selfReportEnabled: boolean;
 	adminUsername: string | undefined;
 	adminPassword: string | undefined;
+	onboardingComplete: boolean;
 	adminGithubUsername: string | undefined;
 	memoryDir: string;
 	cleanupRetentionDays: number | undefined;
@@ -59,6 +60,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 		selfReportEnabled: store.getBoolean("self_report_enabled", true),
 		adminUsername: store.get("admin_username"),
 		adminPassword: store.get("admin_password"),
+		onboardingComplete: store.getBoolean("onboarding_complete"),
 		adminGithubUsername: store.get("admin_github_username") ?? store.get("admin_username") ?? undefined,
 		cleanupRetentionDays: (() => {
 			if (!rawCleanup) return undefined;
@@ -91,7 +93,8 @@ export function isBootstrapComplete(config: AppConfig): boolean {
 		config.githubToken !== "" &&
 		config.githubUsername !== "" &&
 		!!config.adminUsername &&
-		!!config.adminPassword
+		!!config.adminPassword &&
+		config.onboardingComplete
 	);
 }
 
@@ -102,5 +105,6 @@ export function getBootstrapMissingFields(config: AppConfig): string[] {
 	if (!config.githubUsername) missing.push("github_username");
 	if (!config.adminUsername) missing.push("admin_username");
 	if (!config.adminPassword) missing.push("admin_password");
+	if (!config.onboardingComplete) missing.push("onboarding_complete");
 	return missing;
 }
