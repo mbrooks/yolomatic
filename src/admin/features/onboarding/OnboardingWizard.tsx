@@ -148,6 +148,13 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 		});
 	}, []);
 
+	const setAllReposSelected = useCallback((selected: boolean) => {
+		setState((prev) => ({
+			...prev,
+			repositories: prev.repositories.map((repo) => ({ ...repo, selected })),
+		}));
+	}, []);
+
 	const handleFinish = useCallback(async () => {
 		setLoading(true);
 		setError(null);
@@ -270,9 +277,9 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 				{state.step === 4 && (
 					<StepFourWorkspaceInit
 						state={state}
-						updateField={updateField}
 						onFetchRepos={handleFetchRepos}
 						onToggleRepo={toggleRepo}
+						onSetAllReposSelected={setAllReposSelected}
 						onFinish={handleFinish}
 						loading={loading}
 					/>
@@ -554,13 +561,14 @@ function StepFourWorkspaceInit({
 	state,
 	onFetchRepos,
 	onToggleRepo,
+	onSetAllReposSelected,
 	onFinish,
 	loading,
 }: {
 	state: WizardState;
-	updateField: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
 	onFetchRepos: () => Promise<void>;
 	onToggleRepo: (index: number) => void;
+	onSetAllReposSelected: (selected: boolean) => void;
 	onFinish: () => Promise<void>;
 	loading: boolean;
 }): React.ReactElement {
@@ -590,48 +598,27 @@ function StepFourWorkspaceInit({
 						border: "1px solid var(--border)",
 						borderRadius: "6px",
 						padding: "1rem",
-						maxHeight: "16rem",
-						overflowY: "auto",
-					}}
-				>
-					<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-						<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-							<input
-								type="checkbox"
-								checked={state.repositories.every((r) => r.selected)}
-								onChange={() => {
-									const allSelected = state.repositories.every((r) => r.selected);
-									state.repositories.forEach((_, i) => {
-										// Handled by the button below.
-									});
-								}}
-								style={{ display: "none" }}
-							/>
-							<button
-								type="button"
-								className="action-btn"
-								style={{
-									background: "var(--surface)",
-									border: "1px solid var(--border)",
-									color: "var(--text)",
-									fontSize: "0.75rem",
-									padding: "0.25rem 0.5rem",
-								}}
-								onClick={() => {
-									const allSelected = state.repositories.every((r) => r.selected);
-									state.repositories.forEach((_, i) => {
-										if (allSelected || !state.repositories[i].selected) {
-											onToggleRepo(i);
-										}
-									});
-									if (allSelected) {
-										state.repositories.forEach((_, i) => onToggleRepo(i));
-									}
-								}}
-							>
-								{state.repositories.every((r) => r.selected) ? "Deselect All" : "Select All"}
-							</button>
-						</div>
+							maxHeight: "16rem",
+							overflowY: "auto",
+						}}
+					>
+						<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+							<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+								<button
+									type="button"
+									className="action-btn"
+									style={{
+										background: "var(--surface)",
+										border: "1px solid var(--border)",
+										color: "var(--text)",
+										fontSize: "0.75rem",
+										padding: "0.25rem 0.5rem",
+									}}
+									onClick={() => onSetAllReposSelected(!state.repositories.every((r) => r.selected))}
+								>
+									{state.repositories.every((r) => r.selected) ? "Deselect All" : "Select All"}
+								</button>
+							</div>
 						{state.repositories.map((repo, i) => (
 							<label
 								key={repo.fullName}
