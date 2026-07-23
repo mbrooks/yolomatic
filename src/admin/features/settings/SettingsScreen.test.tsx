@@ -59,6 +59,17 @@ const MOCK_SETTINGS = [
 		category: "server",
 	},
 	{
+		key: "onboarding_complete",
+		value: true,
+		description: "Whether the onboarding wizard has been completed",
+		type: "boolean",
+		default: undefined,
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "server",
+	},
+	{
 		key: "self_report_enabled",
 		value: true,
 		description: "Enable self-monitoring reports",
@@ -183,9 +194,70 @@ describe("SettingsScreen", () => {
 		vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise(() => {}));
 		render(<SettingsScreen onBack={vi.fn()} />);
 
-		const defaultButton = screen.getByRole("button", { name: "GitHub Integration" });
+		const defaultButton = screen.getByRole("button", { name: "General" });
 		expect(defaultButton).not.toBeNull();
 		expect(defaultButton.className).toContain("active");
+	});
+
+	it("renders General first and hides the internal onboarding setting", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="server" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("port")).not.toBeNull();
+		});
+
+		const tabs = screen.getAllByRole("button").filter((button) => button.classList.contains("repo-tab"));
+		expect(tabs[0].textContent).toBe("General");
+		expect(screen.queryByText("onboarding_complete")).toBeNull();
+	});
+
+	it("does not rerun onboarding when confirmation is declined", async () => {
+		const fetchSpy = mockFetchWithSave();
+		const onRerunOnboarding = vi.fn();
+		vi.spyOn(window, "confirm").mockReturnValue(false);
+		render(
+			<SettingsScreen
+				onBack={vi.fn()}
+				onRerunOnboarding={onRerunOnboarding}
+				tab="server"
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Rerun On-Boarding" })).not.toBeNull();
+		});
+		const button = screen.getByRole("button", { name: "Rerun On-Boarding" });
+		expect(button.className).toContain("delete");
+		fireEvent.click(button);
+
+		expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to rerun the on-boarding wizard?");
+		expect(onRerunOnboarding).not.toHaveBeenCalled();
+		expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+	});
+
+	it("marks onboarding incomplete and opens the wizard after confirmation", async () => {
+		const fetchSpy = mockFetchWithSave({ updated: ["onboarding_complete"], requiresRestart: ["onboarding_complete"] });
+		const onRerunOnboarding = vi.fn();
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+		render(
+			<SettingsScreen
+				onBack={vi.fn()}
+				onRerunOnboarding={onRerunOnboarding}
+				tab="server"
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Rerun On-Boarding" })).not.toBeNull();
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Rerun On-Boarding" }));
+
+		await waitFor(() => {
+			expect(onRerunOnboarding).toHaveBeenCalledTimes(1);
+		});
+		const patchCall = fetchSpy.mock.calls.find(([, init]) => init?.method === "PATCH");
+		expect(JSON.parse(patchCall?.[1]?.body as string)).toEqual({ onboarding_complete: false });
 	});
 
 	it("calls onBack when back button is clicked", () => {

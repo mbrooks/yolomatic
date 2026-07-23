@@ -24,6 +24,7 @@ const REQUIRED_ONBOARDING_SETTINGS = [
 	"admin_username",
 	"admin_password",
 ];
+const ONBOARDING_COMPLETE_SETTING = "onboarding_complete";
 
 function storeConfiguredRepositories(
 	deps: AdminRouterDeps,
@@ -42,10 +43,14 @@ function storeConfiguredRepositories(
 }
 
 function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
-	return REQUIRED_ONBOARDING_SETTINGS.filter((key) => {
+	const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => {
 		const value = deps.settingsStore!.get(key);
 		return value === undefined || value === "";
 	});
+	if (deps.settingsStore!.get(ONBOARDING_COMPLETE_SETTING) !== "true") {
+		missing.push(ONBOARDING_COMPLETE_SETTING);
+	}
+	return missing;
 }
 
 const registry = new AdminRouteRegistry()
@@ -182,6 +187,7 @@ const registry = new AdminRouteRegistry()
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
 				settingsStore.set(key, body[key].trim());
 			}
+			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({
 				...ctx.deps,
 				settingsStore,

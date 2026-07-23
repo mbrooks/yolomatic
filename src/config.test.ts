@@ -37,6 +37,7 @@ describe("getConfig", () => {
 		delete process.env.CLEANUP_RETENTION_DAYS;
 		delete process.env.ADMIN_USERNAME;
 		delete process.env.ADMIN_PASSWORD;
+		delete process.env.ONBOARDING_COMPLETE;
 		delete process.env.GITHUB_EVENT_MODE;
 		delete process.env.GITHUB_POLL_INTERVAL_MS;
 		delete process.env.TARS_WORKER_CONTROL_BASE_URL;
@@ -66,6 +67,7 @@ describe("getConfig", () => {
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.adminUsername).toBeUndefined();
 		expect(config.adminPassword).toBeUndefined();
+		expect(config.onboardingComplete).toBe(false);
 		expect(config.githubEventMode).toBe("webhook");
 		expect(config.githubPollIntervalMs).toBe(60000);
 		expect(config.workerControlBaseUrl).toBe("http://host.docker.internal:6767");
@@ -97,6 +99,7 @@ describe("getConfig", () => {
 		process.env.SOUL_PATH = "/tmp/SOUL.md";
 		process.env.ADMIN_USERNAME = "admin";
 		process.env.ADMIN_PASSWORD = "secret";
+		process.env.ONBOARDING_COMPLETE = "true";
 		process.env.GITHUB_EVENT_MODE = "both";
 		process.env.GITHUB_POLL_INTERVAL_MS = "30000";
 		process.env.TARS_WORKER_CONTROL_BASE_URL = "http://worker-control.internal:9999";
@@ -114,6 +117,7 @@ describe("getConfig", () => {
 		expect(config.selfReportEnabled).toBe(true);
 		expect(config.adminUsername).toBe("admin");
 		expect(config.adminPassword).toBe("secret");
+		expect(config.onboardingComplete).toBe(true);
 		expect(config.githubEventMode).toBe("both");
 		expect(config.githubPollIntervalMs).toBe(30000);
 		expect(config.workerControlBaseUrl).toBe("http://worker-control.internal:9999");
@@ -163,16 +167,29 @@ describe("isBootstrapComplete", () => {
 			githubUsername: "",
 			adminUsername: undefined,
 			adminPassword: undefined,
+			onboardingComplete: false,
 		} as unknown as import("./config.js").AppConfig)).toBe(false);
 	});
 
-	it("returns true when all required fields are present", () => {
+	it("returns false when required fields are present but onboarding is incomplete", () => {
 		expect(isBootstrapComplete({
 			webhookSecret: "secret",
 			githubToken: "token",
 			githubUsername: "user",
 			adminUsername: "admin",
 			adminPassword: "pass",
+			onboardingComplete: false,
+		} as unknown as import("./config.js").AppConfig)).toBe(false);
+	});
+
+	it("returns true when all required fields are present and onboarding is complete", () => {
+		expect(isBootstrapComplete({
+			webhookSecret: "secret",
+			githubToken: "token",
+			githubUsername: "user",
+			adminUsername: "admin",
+			adminPassword: "pass",
+			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig)).toBe(true);
 	});
 });
@@ -185,12 +202,14 @@ describe("getBootstrapMissingFields", () => {
 			githubUsername: "",
 			adminUsername: undefined,
 			adminPassword: "pass",
+			onboardingComplete: false,
 		} as unknown as import("./config.js").AppConfig);
 		expect(missing).toContain("webhook_secret");
 		expect(missing).toContain("github_username");
 		expect(missing).toContain("admin_username");
 		expect(missing).not.toContain("github_token");
 		expect(missing).not.toContain("admin_password");
+		expect(missing).toContain("onboarding_complete");
 	});
 
 	it("returns empty when all fields are present", () => {
@@ -200,6 +219,7 @@ describe("getBootstrapMissingFields", () => {
 			githubUsername: "user",
 			adminUsername: "admin",
 			adminPassword: "pass",
+			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig);
 		expect(missing).toHaveLength(0);
 	});

@@ -22,7 +22,7 @@ function Root(): React.ReactElement {
 		return <OnboardingWizard onComplete={() => setOnboarding({ complete: true, missing: [] })} />;
 	}
 
-	return <App />;
+	return <App onRerunOnboarding={() => setOnboarding({ complete: false, missing: ["onboarding_complete"] })} />;
 }
 
 const rootEl = typeof document !== "undefined" ? document.getElementById("root") : null;
