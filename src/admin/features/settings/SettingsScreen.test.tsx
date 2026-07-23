@@ -326,7 +326,8 @@ describe("SettingsScreen", () => {
 			expect(screen.getByRole("button", { name: "Rerun On-Boarding" })).not.toBeNull();
 		});
 		const button = screen.getByRole("button", { name: "Rerun On-Boarding" });
-		expect(button.className).toContain("delete");
+		expect(button.className).toContain("settings-rerun-onboarding");
+		expect(screen.getByRole("button", { name: "Invitations" }).nextElementSibling).toBe(button);
 		fireEvent.click(button);
 
 		expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to rerun the on-boarding wizard?");

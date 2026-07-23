@@ -126,7 +126,11 @@ export function SettingsScreen({
 					<button onClick={onBack} type="button">← Back</button>
 					<h2>Settings</h2>
 				</header>
-				<SettingsTabs activeTab={tab} />
+				<SettingsTabs
+					activeTab={tab}
+					onRerunOnboarding={handleRerunOnboarding}
+					rerunningOnboarding={rerunningOnboarding}
+				/>
 				<div className="empty">Loading settings...</div>
 			</div>
 		);
@@ -138,7 +142,12 @@ export function SettingsScreen({
 				<button onClick={onBack} type="button">← Back</button>
 				<h2>Settings</h2>
 			</header>
-			<SettingsTabs activeTab={tab} />
+			<SettingsTabs
+				activeTab={tab}
+				onRerunOnboarding={handleRerunOnboarding}
+				rerunningOnboarding={rerunningOnboarding}
+			/>
+			{error && <div className="error-banner">{error}</div>}
 			{tab === "skills" ? (
 				<ServerSkillsScreen showBreadcrumb={false} />
 			) : tab === "invitations" ? (
@@ -148,8 +157,6 @@ export function SettingsScreen({
 					{pendingRestart && (
 						<RestartBanner>A restart is required for some changes to take full effect.</RestartBanner>
 					)}
-					{error && <div className="error-banner">{error}</div>}
-
 					<div className="settings-list">
 						{settingsSections ? (
 							settingsSections.map(({ category, label }) => (
@@ -182,20 +189,6 @@ export function SettingsScreen({
 							{saving ? "Saving..." : "Save Changes"}
 						</button>
 					</div>
-					{tab === "server" && (
-						<div className="settings-actions danger-zone">
-							<button
-								className="action-btn delete"
-								onClick={() => {
-									void handleRerunOnboarding();
-								}}
-								disabled={rerunningOnboarding}
-								type="button"
-							>
-								{rerunningOnboarding ? "Starting On-Boarding..." : "Rerun On-Boarding"}
-							</button>
-						</div>
-					)}
 				</>
 			)}
 		</div>
@@ -248,7 +241,15 @@ function SettingsRows({
 	);
 }
 
-function SettingsTabs({ activeTab }: { activeTab: SettingsTab }): React.ReactElement {
+function SettingsTabs({
+	activeTab,
+	onRerunOnboarding,
+	rerunningOnboarding,
+}: {
+	activeTab: SettingsTab;
+	onRerunOnboarding: () => Promise<void>;
+	rerunningOnboarding: boolean;
+}): React.ReactElement {
 	return (
 		<div className="repo-tabs">
 			{SETTINGS_CATEGORY_TABS.map(({ slug, label }) => (
@@ -274,6 +275,16 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTab }): React.ReactEle
 				type="button"
 			>
 				Invitations
+			</button>
+			<button
+				className="repo-tab settings-rerun-onboarding"
+				onClick={() => {
+					void onRerunOnboarding();
+				}}
+				disabled={rerunningOnboarding}
+				type="button"
+			>
+				{rerunningOnboarding ? "Starting On-Boarding..." : "Rerun On-Boarding"}
 			</button>
 		</div>
 	);
