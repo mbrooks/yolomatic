@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
@@ -8,6 +8,17 @@ import { InvitationsSection } from "./InvitationsSection.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
+
+const GENERAL_SETTINGS_SECTIONS = [
+	{ category: "server", label: "Server" },
+	{ category: "authentication", label: "Authentication" },
+	{ category: "file-system", label: "File System" },
+	{ category: "logging", label: "Logging" },
+] as const;
+
+const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+	github_event_mode: ["webhook", "polling", "both"],
+};
 
 export function SettingsScreen({
 	onBack,
@@ -91,10 +102,13 @@ export function SettingsScreen({
 		}
 	}, [onRerunOnboarding]);
 
-	const filteredSettings = useMemo(() => {
-		if (tab === "skills" || tab === "invitations") return [];
-		return settings.filter((s) => s.category === tab && s.key !== "onboarding_complete");
-	}, [settings, tab]);
+	const settingsSections = tab === "server" ? GENERAL_SETTINGS_SECTIONS : null;
+	const categories = settingsSections
+		? new Set(settingsSections.map(({ category }) => category))
+		: new Set<string>([tab]);
+	const filteredSettings = tab === "skills" || tab === "invitations"
+		? []
+		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 
 	if (loading) {
 		return (
@@ -103,7 +117,11 @@ export function SettingsScreen({
 					<button onClick={onBack} type="button">← Back</button>
 					<h2>Settings</h2>
 				</header>
-				<SettingsTabs activeTab={tab} />
+				<SettingsTabs
+					activeTab={tab}
+					onRerunOnboarding={handleRerunOnboarding}
+					rerunningOnboarding={rerunningOnboarding}
+				/>
 				<div className="empty">Loading settings...</div>
 			</div>
 		);
@@ -115,7 +133,12 @@ export function SettingsScreen({
 				<button onClick={onBack} type="button">← Back</button>
 				<h2>Settings</h2>
 			</header>
-			<SettingsTabs activeTab={tab} />
+			<SettingsTabs
+				activeTab={tab}
+				onRerunOnboarding={handleRerunOnboarding}
+				rerunningOnboarding={rerunningOnboarding}
+			/>
+			{error && <div className="error-banner">{error}</div>}
 			{tab === "skills" ? (
 				<ServerSkillsScreen showBreadcrumb={false} />
 			) : tab === "invitations" ? (
@@ -125,17 +148,26 @@ export function SettingsScreen({
 					{pendingRestart && (
 						<RestartBanner>A restart is required for some changes to take full effect.</RestartBanner>
 					)}
-					{error && <div className="error-banner">{error}</div>}
-
 					<div className="settings-list">
-						{filteredSettings.map((setting) => (
-							<SettingRow
-								key={setting.key}
-								setting={setting}
-								editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
+						{settingsSections ? (
+							settingsSections.map(({ category, label }) => (
+								<SettingsSection
+									key={category}
+									title={label}
+									settings={filteredSettings.filter((setting) => setting.category === category)}
+									edited={edited}
+									changedKeys={changedKeys}
+									onChange={handleChange}
+								/>
+							))
+						) : (
+							<SettingsRows
+								settings={filteredSettings}
+								edited={edited}
+								changedKeys={changedKeys}
 								onChange={handleChange}
 							/>
-						))}
+						)}
 					</div>
 
 					<div className="settings-actions">
@@ -148,27 +180,67 @@ export function SettingsScreen({
 							{saving ? "Saving..." : "Save Changes"}
 						</button>
 					</div>
-					{tab === "server" && (
-						<div className="settings-actions danger-zone">
-							<button
-								className="action-btn delete"
-								onClick={() => {
-									void handleRerunOnboarding();
-								}}
-								disabled={rerunningOnboarding}
-								type="button"
-							>
-								{rerunningOnboarding ? "Starting On-Boarding..." : "Rerun On-Boarding"}
-							</button>
-						</div>
-					)}
 				</>
 			)}
 		</div>
 	);
 }
 
-function SettingsTabs({ activeTab }: { activeTab: SettingsTab }): React.ReactElement {
+function SettingsSection({
+	title,
+	settings,
+	edited,
+	changedKeys,
+	onChange,
+}: {
+	title: string;
+	settings: SettingView[];
+	edited: Record<string, string | number | boolean>;
+	changedKeys: Set<string>;
+	onChange: (key: string, value: string | number | boolean) => void;
+}): React.ReactElement {
+	return (
+		<section className="settings-section">
+			<h3 className="settings-section-title">{title}</h3>
+			<SettingsRows settings={settings} edited={edited} changedKeys={changedKeys} onChange={onChange} />
+		</section>
+	);
+}
+
+function SettingsRows({
+	settings,
+	edited,
+	changedKeys,
+	onChange,
+}: {
+	settings: SettingView[];
+	edited: Record<string, string | number | boolean>;
+	changedKeys: Set<string>;
+	onChange: (key: string, value: string | number | boolean) => void;
+}): React.ReactElement {
+	return (
+		<>
+			{settings.map((setting) => (
+				<SettingRow
+					key={setting.key}
+					setting={setting}
+					editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
+					onChange={onChange}
+				/>
+			))}
+		</>
+	);
+}
+
+function SettingsTabs({
+	activeTab,
+	onRerunOnboarding,
+	rerunningOnboarding,
+}: {
+	activeTab: SettingsTab;
+	onRerunOnboarding: () => Promise<void>;
+	rerunningOnboarding: boolean;
+}): React.ReactElement {
 	return (
 		<div className="repo-tabs">
 			{SETTINGS_CATEGORY_TABS.map(({ slug, label }) => (
@@ -195,6 +267,16 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTab }): React.ReactEle
 			>
 				Invitations
 			</button>
+			<button
+				className="repo-tab settings-rerun-onboarding"
+				onClick={() => {
+					void onRerunOnboarding();
+				}}
+				disabled={rerunningOnboarding}
+				type="button"
+			>
+				{rerunningOnboarding ? "Starting On-Boarding..." : "Rerun On-Boarding"}
+			</button>
 		</div>
 	);
 }
@@ -210,6 +292,7 @@ function SettingRow({
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
+	const options = SETTING_OPTIONS[setting.key];
 
 	return (
 		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}`}>
@@ -219,7 +302,17 @@ function SettingRow({
 				{setting.sensitive && <span className="sensitive-badge">sensitive</span>}
 			</label>
 			<p className="setting-description">{setting.description}</p>
-			{setting.type === "boolean" ? (
+			{options ? (
+				<select
+					id={`setting-${setting.key}`}
+					value={String(displayValue)}
+					onChange={(e) => onChange(setting.key, e.target.value)}
+				>
+					{options.map((option) => (
+						<option key={option} value={option}>{option}</option>
+					))}
+				</select>
+			) : setting.type === "boolean" ? (
 				<select
 					id={`setting-${setting.key}`}
 					value={displayValue === true ? "true" : "false"}

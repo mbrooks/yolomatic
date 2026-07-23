@@ -3,12 +3,10 @@ import { useEffect, useState } from "react";
 export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "server", label: "General" },
 	{ slug: "github-integration", label: "GitHub Integration" },
-	{ slug: "authentication", label: "Authentication" },
-	{ slug: "file-system", label: "File System" },
+	{ slug: "repositories", label: "Repositories" },
 	{ slug: "git-worktrees", label: "Git & Worktrees" },
-	{ slug: "agent-behavior", label: "Agent Behavior" },
+	{ slug: "agent-behavior", label: "Worker Behavior" },
 	{ slug: "ai-llm", label: "AI / LLM" },
-	{ slug: "logging", label: "Logging" },
 ] as const;
 
 export type SettingsCategoryTab = typeof SETTINGS_CATEGORY_TABS[number]["slug"];
