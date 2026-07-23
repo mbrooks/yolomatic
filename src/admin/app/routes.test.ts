@@ -229,7 +229,7 @@ describe("buildHash", () => {
 	});
 
 	it("builds settings category tab view", () => {
-		expect(buildHash({ screen: "settings", tab: "agent-behavior" })).toBe("#/settings/agent-behavior");
+		expect(buildHash({ screen: "settings", tab: "repositories" })).toBe("#/settings/repositories");
 	});
 
 	it("round-trips skills tab", () => {
@@ -262,13 +262,17 @@ describe("buildHash", () => {
 	});
 
 	it("round-trips settings category tab", () => {
-		const hash = buildHash({ screen: "settings" as const, tab: "agent-behavior" as const });
-		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "agent-behavior" }));
+		const hash = buildHash({ screen: "settings" as const, tab: "repositories" as const });
+		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "repositories" }));
 	});
 
 	it("routes removed settings category tabs to General", () => {
 		for (const tab of ["authentication", "file-system", "logging"]) {
 			expect(parseHash(`#/settings/${tab}`)).toEqual({ screen: "settings", tab: "server" });
 		}
+	});
+
+	it("routes the former Git & Worktrees tab to Repositories", () => {
+		expect(parseHash("#/settings/git-worktrees")).toEqual({ screen: "settings", tab: "repositories" });
 	});
 });
