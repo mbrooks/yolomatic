@@ -742,6 +742,7 @@ describe.sequential("handleAdminRoute", () => {
 		store.set("webhook_secret", "shh");
 		store.set("admin_username", "admin");
 		store.set("admin_password", "pass");
+		store.set("onboarding_complete", "true");
 
 		const req = mockRequest({
 			url: "/api/onboarding/status",

@@ -51,6 +51,23 @@ docker compose down
 
 TARS persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
 
+To rerun the onboarding wizard without deleting existing settings, open
+**Settings → General**, click the red **Rerun On-Boarding** button, and confirm
+the action.
+
+To force the wizard to run from the command line instead:
+
+```bash
+docker compose exec -T tars npm run onboarding:reset
+```
+
+Refresh `/tarsadmin` after the command completes. Restart TARS as well if you
+want it to start in onboarding-only mode:
+
+```bash
+docker compose restart tars
+```
+
 ## Connect GitHub
 
 TARS can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
