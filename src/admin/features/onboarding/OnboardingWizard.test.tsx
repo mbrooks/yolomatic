@@ -128,9 +128,9 @@ describe("OnboardingWizard", () => {
 			await advanceThroughGitHubIntegration();
 
 			expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
-			expect(screen.getByLabelText("Webhook")).not.toBeNull();
-			expect(screen.getByLabelText("Polling")).not.toBeNull();
-			expect(screen.getByLabelText("Both")).not.toBeNull();
+			const select = screen.getByLabelText("GitHub Event Mode") as HTMLSelectElement;
+			const optionValues = Array.from(select.options).map((o) => o.value);
+			expect(optionValues).toEqual(["", "webhook", "polling", "both"]);
 		});
 
 		it("disables Next until an event mode is selected", async () => {
@@ -145,7 +145,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Webhook"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 			expect(screen.queryByLabelText("Polling Interval (ms)")).toBeNull();
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 		});
@@ -154,7 +154,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Polling"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
 			expect(screen.queryByLabelText("Polling Interval (ms)")).not.toBeNull();
 		});
 
@@ -162,7 +162,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Polling"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
 			const intervalInput = screen.getByLabelText("Polling Interval (ms)") as HTMLInputElement;
 			expect(intervalInput.value).toBe("60000");
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
@@ -172,7 +172,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Polling"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
 			fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "999" } });
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
 		});
@@ -181,7 +181,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Both"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "both" } });
 			fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "abc" } });
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
 		});
@@ -190,10 +190,18 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			fireEvent.click(screen.getByLabelText("Polling"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
 			expect(screen.queryByLabelText("Polling Interval (ms)")).not.toBeNull();
-			fireEvent.click(screen.getByLabelText("Webhook"));
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 			expect(screen.queryByLabelText("Polling Interval (ms)")).toBeNull();
+		});
+
+		it("indicates that the event mode is a default setting overridable per project", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			expect(screen.queryByText(/These are the default settings for all projects/u)).not.toBeNull();
+			expect(screen.queryByText(/Each project can override them later/u)).not.toBeNull();
 		});
 	});
 
@@ -211,7 +219,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
-		fireEvent.click(screen.getByLabelText("Webhook"));
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
@@ -250,7 +258,7 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 		fireEvent.click(screen.getByText("Next"));
 
-		fireEvent.click(screen.getByLabelText("Polling"));
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
 		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
 		fireEvent.click(screen.getByText("Next"));
 
@@ -319,7 +327,7 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
 
-		fireEvent.click(screen.getByLabelText("Webhook"));
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
@@ -341,7 +349,7 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
 
-		fireEvent.click(screen.getByLabelText("Webhook"));
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
