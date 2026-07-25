@@ -216,6 +216,7 @@ describe.sequential("handleAdminRoute", () => {
 				webhook_secret: "shh",
 				admin_username: "admin",
 				admin_password: "pass",
+				github_event_mode: "webhook",
 			}),
 		});
 		const res = mockResponse();
@@ -742,6 +743,7 @@ describe.sequential("handleAdminRoute", () => {
 		store.set("webhook_secret", "shh");
 		store.set("admin_username", "admin");
 		store.set("admin_password", "pass");
+		store.set("github_event_mode", "webhook");
 		store.set("onboarding_complete", "true");
 
 		const req = mockRequest({

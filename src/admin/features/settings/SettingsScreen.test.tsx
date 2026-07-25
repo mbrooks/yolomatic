@@ -2,9 +2,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { SettingsScreen } from "./SettingsScreen.js";
 import { DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const STYLES_PATH = path.resolve(__dirname, "../../styles.css");
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -425,5 +431,26 @@ describe("SettingsScreen", () => {
 		expect(patchCall).toBeDefined();
 		const body = JSON.parse(patchCall![1].body as string);
 		expect(body).toEqual({ github_username: "new-bot" });
+	});
+
+	it("styles the Rerun On-Boarding tab like the other neutral settings tabs", async () => {
+		const css = await readFile(STYLES_PATH, "utf-8");
+
+		// No rule targeting .settings-rerun-onboarding may reintroduce the red
+		// tab styling; the rerun action should inherit the neutral .repo-tab look.
+		const rerunBlocks = [
+			...css.matchAll(/\.repo-tab\.settings-rerun-onboarding[^{]*\{[^}]*\}/gu),
+		].map((match) => match[0]);
+		for (const block of rerunBlocks) {
+			expect(block).not.toContain("var(--red)");
+			expect(block).not.toContain("#fff");
+			expect(block).not.toMatch(/background\s*:/u);
+			expect(block).not.toMatch(/color\s*:/u);
+		}
+
+		// The base .repo-tab rule should still define the neutral styling.
+		const baseBlock = css.match(/\.repo-tab\s*\{[^}]*\}/u);
+		expect(baseBlock, "expected a base .repo-tab rule to exist").not.toBeNull();
+		expect(baseBlock![0]).toContain("background: var(--surface)");
 	});
 });

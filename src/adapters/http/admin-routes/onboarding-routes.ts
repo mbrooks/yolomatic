@@ -23,8 +23,28 @@ const REQUIRED_ONBOARDING_SETTINGS = [
 	"webhook_secret",
 	"admin_username",
 	"admin_password",
+	"github_event_mode",
 ];
 const ONBOARDING_COMPLETE_SETTING = "onboarding_complete";
+
+export const VALID_EVENT_MODES: readonly string[] = ["webhook", "polling", "both"];
+export const MIN_POLL_INTERVAL_MS = 1000;
+
+export function isValidEventMode(mode: string | undefined): boolean {
+	return typeof mode === "string" && VALID_EVENT_MODES.includes(mode);
+}
+
+export function isPollingMode(mode: string | undefined): boolean {
+	return mode === "polling" || mode === "both";
+}
+
+export function isValidPollIntervalMs(raw: string | undefined): boolean {
+	if (raw === undefined) return false;
+	const trimmed = raw.trim();
+	if (!/^[0-9]+$/.test(trimmed)) return false;
+	const value = Number.parseInt(trimmed, 10);
+	return Number.isInteger(value) && value >= MIN_POLL_INTERVAL_MS;
+}
 
 function storeConfiguredRepositories(
 	deps: AdminRouterDeps,
@@ -47,6 +67,13 @@ function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 		const value = deps.settingsStore!.get(key);
 		return value === undefined || value === "";
 	});
+	const modeRaw = deps.settingsStore!.get("github_event_mode")?.trim().toLowerCase();
+	if (modeRaw && !isValidEventMode(modeRaw) && !missing.includes("github_event_mode")) {
+		missing.push("github_event_mode");
+	}
+	if (isPollingMode(modeRaw) && !isValidPollIntervalMs(deps.settingsStore!.get("github_poll_interval_ms"))) {
+		missing.push("github_poll_interval_ms");
+	}
 	if (deps.settingsStore!.get(ONBOARDING_COMPLETE_SETTING) !== "true") {
 		missing.push(ONBOARDING_COMPLETE_SETTING);
 	}
@@ -184,8 +211,26 @@ const registry = new AdminRouteRegistry()
 				});
 				return;
 			}
+			const eventMode = body.github_event_mode.trim().toLowerCase();
+			if (!isValidEventMode(eventMode)) {
+				sendJson(ctx.response, 400, {
+					error: `github_event_mode must be one of: ${VALID_EVENT_MODES.join(", ")}`,
+				});
+				return;
+			}
+			if (isPollingMode(eventMode)) {
+				if (!isValidPollIntervalMs(body.github_poll_interval_ms)) {
+					sendJson(ctx.response, 400, {
+						error: `github_poll_interval_ms must be a whole number of at least ${MIN_POLL_INTERVAL_MS}`,
+					});
+					return;
+				}
+			}
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
-				settingsStore.set(key, body[key].trim());
+				settingsStore.set(key, key === "github_event_mode" ? eventMode : body[key].trim());
+			}
+			if (isPollingMode(eventMode)) {
+				settingsStore.set("github_poll_interval_ms", String(Number.parseInt(body.github_poll_interval_ms.trim(), 10)));
 			}
 			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({
