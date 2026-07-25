@@ -393,6 +393,81 @@ describe("handleOnboardingRoutes", () => {
 		});
 	});
 
+	describe("GET /api/onboarding/config", () => {
+		it("returns empty defaults when nothing is configured", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/config");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.admin_username).toBe("");
+			expect(body.github_username).toBe("");
+			expect(body.github_event_mode).toBe("");
+			expect(body.github_poll_interval_ms).toBe("");
+			expect(body.admin_password).toEqual({ configured: false });
+			expect(body.github_token).toEqual({ configured: false });
+			expect(body.webhook_secret).toEqual({ configured: false });
+		});
+
+		it("returns configured non-sensitive values as strings", async () => {
+			const store = await tmpStore();
+			store.set("admin_username", "alice");
+			store.set("github_username", "alice-gh");
+			store.set("github_event_mode", "polling");
+			store.set("github_poll_interval_ms", "15000");
+			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/config");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.admin_username).toBe("alice");
+			expect(body.github_username).toBe("alice-gh");
+			expect(body.github_event_mode).toBe("polling");
+			expect(body.github_poll_interval_ms).toBe("15000");
+		});
+
+		it("reports configured secrets as configured without exposing the value", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "ghp_secret_value");
+			store.set("admin_password", "super-secret");
+			store.set("webhook_secret", "wh-secret");
+			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/config");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.github_token).toEqual({ configured: true });
+			expect(body.admin_password).toEqual({ configured: true });
+			expect(body.webhook_secret).toEqual({ configured: true });
+			const raw = String(res.body);
+			expect(raw).not.toContain("ghp_secret_value");
+			expect(raw).not.toContain("super-secret");
+			expect(raw).not.toContain("wh-secret");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/api/onboarding/config");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Settings store not configured");
+		});
+	});
+
 	describe("POST /api/onboarding", () => {
 		it("returns success when all fields provided", async () => {
 			const store = await tmpStore();
@@ -657,6 +732,134 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(400);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBeDefined();
+		});
+
+		it("preserves an existing github_token when submitted empty", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "existing-ghp-token");
+			store.set("admin_password", "existing-admin-pass");
+			store.set("webhook_secret", "existing-wh-secret");
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "new-pass",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("github_token")).toBe("existing-ghp-token");
+			expect(store.get("admin_password")).toBe("new-pass");
+			expect(store.get("webhook_secret")).toBe("shh");
+			expect(store.get("onboarding_complete")).toBe("true");
+		});
+
+		it("preserves an existing admin_password when submitted empty", async () => {
+			const store = await tmpStore();
+			store.set("admin_password", "kept-admin-pass");
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("admin_password")).toBe("kept-admin-pass");
+		});
+
+		it("preserves an existing webhook_secret in webhook mode when submitted empty", async () => {
+			const store = await tmpStore();
+			store.set("webhook_secret", "kept-wh-secret");
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("webhook_secret")).toBe("kept-wh-secret");
+		});
+
+		it("reports github_token missing when empty and not configured", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Missing required fields");
+			expect(body.error).toContain("github_token");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+		});
+
+		it("reports webhook_secret missing in webhook mode when empty and not configured", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("webhook_secret");
+			expect(store.get("onboarding_complete")).toBeUndefined();
 		});
 	});
 

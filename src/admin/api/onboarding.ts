@@ -5,6 +5,22 @@ export interface OnboardingStatus {
 	missing: string[];
 }
 
+export interface OnboardingSecretField {
+	configured: boolean;
+}
+
+/**
+ * Effective onboarding configuration returned by GET /api/onboarding/config.
+ * Non-sensitive settings are returned as plain strings (empty when unset);
+ * sensitive settings are reported as `{ configured }` so the stored secret is
+ * never exposed to the client.
+ */
+export type OnboardingConfig = Record<string, string | OnboardingSecretField>;
+
+export function isSecretField(value: string | OnboardingSecretField): value is OnboardingSecretField {
+	return typeof value === "object" && value !== null && typeof value.configured === "boolean";
+}
+
 export interface VerifyTokenResponse {
 	username: string;
 }
@@ -35,6 +51,10 @@ export interface InitWorkspacesResponse {
 
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
 	return apiGet<OnboardingStatus>("/api/onboarding/status");
+}
+
+export function fetchOnboardingConfig(): Promise<OnboardingConfig> {
+	return apiGet<OnboardingConfig>("/api/onboarding/config");
 }
 
 export function verifyGitHubToken(token: string): Promise<VerifyTokenResponse> {

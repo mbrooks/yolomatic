@@ -26,6 +26,67 @@ const REQUIRED_ONBOARDING_SETTINGS = [
 ];
 const ONBOARDING_COMPLETE_SETTING = "onboarding_complete";
 
+/**
+ * Onboarding-related settings exposed to the wizard for pre-population.
+ * Sensitive settings are reported as `{ configured }` so the stored secret
+ * is never sent to the client; the wizard submits an empty value to preserve
+ * the existing secret when the operator does not replace it.
+ */
+export const ONBOARDING_CONFIG_KEYS = [
+	"admin_username",
+	"admin_password",
+	"github_token",
+	"github_username",
+	"github_event_mode",
+	"github_poll_interval_ms",
+	"webhook_secret",
+] as const;
+
+export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
+	"github_token",
+	"admin_password",
+	"webhook_secret",
+]);
+
+export interface OnboardingConfigField {
+	configured: boolean;
+}
+
+export type OnboardingConfigResponse = Record<string, string | OnboardingConfigField>;
+
+export function buildOnboardingConfig(
+	get: (key: string) => string | undefined,
+): OnboardingConfigResponse {
+	const result: OnboardingConfigResponse = {};
+	for (const key of ONBOARDING_CONFIG_KEYS) {
+		const value = get(key);
+		if (SENSITIVE_ONBOARDING_KEYS.has(key)) {
+			result[key] = { configured: value !== undefined && value !== "" };
+		} else {
+			result[key] = value ?? "";
+		}
+	}
+	return result;
+}
+
+/**
+ * Resolves the effective value for a sensitive onboarding setting: the
+ * submitted value when provided, otherwise the currently configured value.
+ * Returns undefined when neither is available so the caller can report it
+ * as missing.
+ */
+export function resolveSecretSetting(
+	get: (key: string) => string | undefined,
+	key: string,
+	submitted: string | undefined,
+): string | undefined {
+	const trimmed = submitted?.trim();
+	if (trimmed) return trimmed;
+	const existing = get(key);
+	if (existing !== undefined && existing !== "") return existing;
+	return undefined;
+}
+
 export const VALID_EVENT_MODES: readonly string[] = ["webhook", "polling", "both"];
 export const MIN_POLL_INTERVAL_MS = 1000;
 
@@ -99,6 +160,16 @@ const registry = new AdminRouteRegistry()
 			};
 			const missing = getMissingOnboardingSettings(settingsDeps);
 			return { status: 200, body: { complete: missing.length === 0, missing } };
+		},
+	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/onboarding\/config$/u,
+		auth: false,
+		requiresDeps: ["settingsStore"],
+		handler: async (ctx) => {
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
+			return { status: 200, body: buildOnboardingConfig((key) => settingsStore.get(key)) };
 		},
 	})
 	.route<{ token?: string }>({
@@ -210,7 +281,21 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as Record<string, string>;
-			const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => !body[key]?.trim());
+			const resolveSecret = (key: string): string | undefined =>
+				resolveSecretSetting((k) => settingsStore.get(k), key, body[key]);
+			const githubToken = resolveSecret("github_token");
+			const adminPassword = resolveSecret("admin_password");
+			const webhookSecret = resolveSecret("webhook_secret");
+			const missing: string[] = [];
+			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
+				if (key === "github_token") {
+					if (!githubToken) missing.push(key);
+				} else if (key === "admin_password") {
+					if (!adminPassword) missing.push(key);
+				} else if (!body[key]?.trim()) {
+					missing.push(key);
+				}
+			}
 			if (missing.length > 0) {
 				sendJson(ctx.response, 400, {
 					error: `Missing required fields: ${missing.join(", ")}`,
@@ -224,7 +309,7 @@ const registry = new AdminRouteRegistry()
 				});
 				return;
 			}
-			if (isWebhookMode(eventMode) && !body.webhook_secret?.trim()) {
+			if (isWebhookMode(eventMode) && !webhookSecret) {
 				sendJson(ctx.response, 400, {
 					error: "Missing required fields: webhook_secret",
 				});
@@ -238,11 +323,13 @@ const registry = new AdminRouteRegistry()
 					return;
 				}
 			}
-			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
-				settingsStore.set(key, key === "github_event_mode" ? eventMode : body[key].trim());
-			}
+			settingsStore.set("github_token", githubToken!);
+			settingsStore.set("github_username", body.github_username.trim());
+			settingsStore.set("admin_username", body.admin_username.trim());
+			settingsStore.set("admin_password", adminPassword!);
+			settingsStore.set("github_event_mode", eventMode);
 			if (isWebhookMode(eventMode)) {
-				settingsStore.set("webhook_secret", body.webhook_secret.trim());
+				settingsStore.set("webhook_secret", webhookSecret!);
 			}
 			if (isPollingMode(eventMode)) {
 				settingsStore.set("github_poll_interval_ms", String(Number.parseInt(body.github_poll_interval_ms.trim(), 10)));
