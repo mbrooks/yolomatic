@@ -95,6 +95,7 @@ describe("handleOnboardingRoutes", () => {
 			store.set("webhook_secret", "shh");
 			store.set("admin_username", "admin");
 			store.set("admin_password", "pass");
+			store.set("github_event_mode", "webhook");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
 			const res = mockResponse();
 
@@ -114,6 +115,71 @@ describe("handleOnboardingRoutes", () => {
 			store.set("webhook_secret", "shh");
 			store.set("admin_username", "admin");
 			store.set("admin_password", "pass");
+			store.set("github_event_mode", "webhook");
+			store.set("onboarding_complete", "true");
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.complete).toBe(true);
+			expect(body.missing).toEqual([]);
+		});
+
+		it("reports incomplete when github_event_mode is invalid", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "tok");
+			store.set("github_username", "user");
+			store.set("webhook_secret", "shh");
+			store.set("admin_username", "admin");
+			store.set("admin_password", "pass");
+			store.set("github_event_mode", "bogus");
+			store.set("onboarding_complete", "true");
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.complete).toBe(false);
+			expect(body.missing).toContain("github_event_mode");
+		});
+
+		it("reports incomplete when polling mode lacks a valid interval", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "tok");
+			store.set("github_username", "user");
+			store.set("webhook_secret", "shh");
+			store.set("admin_username", "admin");
+			store.set("admin_password", "pass");
+			store.set("github_event_mode", "polling");
+			store.set("onboarding_complete", "true");
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.complete).toBe(false);
+			expect(body.missing).toContain("github_poll_interval_ms");
+		});
+
+		it("reports complete when polling mode has a valid interval", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "tok");
+			store.set("github_username", "user");
+			store.set("webhook_secret", "shh");
+			store.set("admin_username", "admin");
+			store.set("admin_password", "pass");
+			store.set("github_event_mode", "polling");
+			store.set("github_poll_interval_ms", "15000");
 			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
 			const res = mockResponse();
@@ -303,6 +369,7 @@ describe("handleOnboardingRoutes", () => {
 					webhook_secret: "shh",
 					admin_username: "admin",
 					admin_password: "pass",
+					github_event_mode: "webhook",
 				}),
 			});
 			const res = mockResponse();
@@ -314,6 +381,8 @@ describe("handleOnboardingRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body).toEqual({ success: true, activated: true, requiresRestart: [] });
 			expect(store.get("onboarding_complete")).toBe("true");
+			expect(store.get("github_event_mode")).toBe("webhook");
+			expect(store.get("github_poll_interval_ms")).toBeUndefined();
 			await new Promise<void>((resolve) => setImmediate(resolve));
 			expect(onOnboardingComplete).toHaveBeenCalledTimes(1);
 		});
@@ -333,6 +402,132 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(400);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toContain("Missing required fields");
+			expect(body.error).toContain("github_event_mode");
+		});
+
+		it("rejects an invalid github_event_mode", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "invalid",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("github_event_mode must be one of");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+		});
+
+		it("rejects polling mode without a polling interval", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "polling",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("github_poll_interval_ms");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+		});
+
+		it("rejects polling mode with an interval below the minimum", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "polling",
+					github_poll_interval_ms: "999",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("github_poll_interval_ms");
+		});
+
+		it("persists github_event_mode and github_poll_interval_ms for polling mode", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "polling",
+					github_poll_interval_ms: "5000",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("github_event_mode")).toBe("polling");
+			expect(store.get("github_poll_interval_ms")).toBe("5000");
+			expect(store.get("onboarding_complete")).toBe("true");
+		});
+
+		it("does not require a polling interval for webhook mode", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					github_poll_interval_ms: "",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("github_poll_interval_ms")).toBeUndefined();
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {

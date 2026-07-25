@@ -28,11 +28,27 @@ vi.mock("../../api/onboarding.js", async () => {
 	};
 });
 
+/** Advances the wizard from step 1 through step 2 (GitHub integration). */
+async function advanceThroughGitHubIntegration(): Promise<void> {
+	fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+	fireEvent.click(screen.getByText("Next"));
+	fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+	fireEvent.click(screen.getByText("Verify"));
+	await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+	fireEvent.click(screen.getByText("Next"));
+}
+
 describe("OnboardingWizard", () => {
 	let fetchSpy: any;
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		localStorage.clear();
+		const onboarding = await import("../../api/onboarding.js");
+		Object.values(onboarding).forEach((fn) => {
+			if (typeof fn === "function" && "mockClear" in fn) {
+				(fn as ReturnType<typeof vi.fn>).mockClear();
+			}
+		});
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockOkResponse({ success: true });
 		});
@@ -46,7 +62,7 @@ describe("OnboardingWizard", () => {
 	it("renders step 1 by default", () => {
 		render(<OnboardingWizard />);
 		expect(screen.queryByText("Welcome to TARS")).not.toBeNull();
-		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 1 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
 	});
@@ -84,7 +100,7 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("GitHub PAT (Personal Access Token)")).not.toBeNull();
 	});
 
@@ -106,7 +122,82 @@ describe("OnboardingWizard", () => {
 		});
 	});
 
-	it("navigates through all steps and submits", async () => {
+	describe("step 3 - GitHub event mode", () => {
+		it("offers webhook, polling, and both options", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
+			expect(screen.getByLabelText("Webhook")).not.toBeNull();
+			expect(screen.getByLabelText("Polling")).not.toBeNull();
+			expect(screen.getByLabelText("Both")).not.toBeNull();
+		});
+
+		it("disables Next until an event mode is selected", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			const nextButton = screen.getByText("Next") as HTMLButtonElement;
+			expect(nextButton.disabled).toBe(true);
+		});
+
+		it("does not show or require a polling interval for webhook mode", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Webhook"));
+			expect(screen.queryByLabelText("Polling Interval (ms)")).toBeNull();
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+		});
+
+		it("shows and requires a polling interval for polling mode", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Polling"));
+			expect(screen.queryByLabelText("Polling Interval (ms)")).not.toBeNull();
+		});
+
+		it("prefills the default polling interval when a polling mode is first selected", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Polling"));
+			const intervalInput = screen.getByLabelText("Polling Interval (ms)") as HTMLInputElement;
+			expect(intervalInput.value).toBe("60000");
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+		});
+
+		it("disables Next when the polling interval is below the minimum", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Polling"));
+			fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "999" } });
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+		});
+
+		it("disables Next when the polling interval is not a whole number", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Both"));
+			fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "abc" } });
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+		});
+
+		it("hides the polling interval when switching back to webhook mode", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+
+			fireEvent.click(screen.getByLabelText("Polling"));
+			expect(screen.queryByLabelText("Polling Interval (ms)")).not.toBeNull();
+			fireEvent.click(screen.getByLabelText("Webhook"));
+			expect(screen.queryByLabelText("Polling Interval (ms)")).toBeNull();
+		});
+	});
+
+	it("navigates through all steps and submits with webhook event mode", async () => {
 		const { submitOnboarding, initializeWorkspaces } = await import("../../api/onboarding.js");
 		const onComplete = vi.fn();
 		render(<OnboardingWizard onComplete={onComplete} />);
@@ -119,7 +210,12 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 		fireEvent.click(screen.getByText("Next"));
 
+		expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
+		fireEvent.click(screen.getByLabelText("Webhook"));
+		fireEvent.click(screen.getByText("Next"));
+
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+		expect(screen.queryByText("Step 4 of 5")).not.toBeNull();
 		const secretInput = screen.getByLabelText("Webhook Secret") as HTMLInputElement;
 		expect(secretInput.value.length).toBeGreaterThan(0);
 		expect(screen.getByText("Regenerate")).not.toBeNull();
@@ -136,8 +232,41 @@ describe("OnboardingWizard", () => {
 		expect(screen.queryByText("Your settings have been saved and TARS is loading them now.")).not.toBeNull();
 		expect(screen.queryByText(/Restart TARS/u)).toBeNull();
 		expect(onComplete).toHaveBeenCalledTimes(1);
-		expect(submitOnboarding).toHaveBeenCalled();
 		expect(initializeWorkspaces).toHaveBeenCalled();
+		expect(submitOnboarding).toHaveBeenCalled();
+		const body = (submitOnboarding as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<string, string>;
+		expect(body.github_event_mode).toBe("webhook");
+		expect(body.github_poll_interval_ms).toBeUndefined();
+	});
+
+	it("submits a polling interval when a polling event mode is selected", async () => {
+		const { submitOnboarding } = await import("../../api/onboarding.js");
+		render(<OnboardingWizard />);
+
+		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
+		fireEvent.click(screen.getByText("Next"));
+		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
+		fireEvent.click(screen.getByText("Verify"));
+		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByText("Next"));
+
+		fireEvent.click(screen.getByLabelText("Polling"));
+		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
+		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
+		fireEvent.click(screen.getByText("Next"));
+
+		fireEvent.click(screen.getByText("Fetch Repositories"));
+		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+
+		fireEvent.click(screen.getByText("Initialize & Finish"));
+		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
+
+		const body = (submitOnboarding as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<string, string>;
+		expect(body.github_event_mode).toBe("polling");
+		expect(body.github_poll_interval_ms).toBe("15000");
 	});
 
 	it("preserves state in localStorage", () => {
@@ -156,6 +285,8 @@ describe("OnboardingWizard", () => {
 				githubToken: "",
 				githubUsername: "",
 				githubUsernameConfirmed: false,
+				githubEventMode: "",
+				githubPollIntervalMs: "",
 				webhookSecret: "",
 				webhookSecretConfirmed: false,
 				repositories: [],
@@ -163,7 +294,7 @@ describe("OnboardingWizard", () => {
 			}),
 		);
 		render(<OnboardingWizard />);
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).toBeNull();
 	});
 
@@ -171,10 +302,10 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 
 		fireEvent.click(screen.getByText("Back"));
-		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 1 of 5")).not.toBeNull();
 	});
 
 	it("disables next when step 1 fields are empty", () => {
@@ -184,14 +315,11 @@ describe("OnboardingWizard", () => {
 		expect(nextButton.disabled).toBe(true);
 	});
 
-	it("auto-generates webhook secret and toggles visibility in step 3", async () => {
+	it("auto-generates webhook secret and toggles visibility in step 4", async () => {
 		render(<OnboardingWizard />);
-		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
-		fireEvent.click(screen.getByText("Next"));
+		await advanceThroughGitHubIntegration();
 
-		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
-		fireEvent.click(screen.getByText("Verify"));
-		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByLabelText("Webhook"));
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
@@ -209,14 +337,11 @@ describe("OnboardingWizard", () => {
 		expect(showCheckbox.checked).toBe(true);
 	});
 
-	it("allows manually configuring a shorter webhook secret and proceeding to step 4", async () => {
+	it("allows manually configuring a shorter webhook secret and proceeding to step 5", async () => {
 		render(<OnboardingWizard />);
-		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
-		fireEvent.click(screen.getByText("Next"));
+		await advanceThroughGitHubIntegration();
 
-		fireEvent.change(screen.getByLabelText("GitHub PAT (Personal Access Token)"), { target: { value: "ghp_test" } });
-		fireEvent.click(screen.getByText("Verify"));
-		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
+		fireEvent.click(screen.getByLabelText("Webhook"));
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("How to configure this secret in GitHub:")).not.toBeNull());
@@ -232,19 +357,21 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("I have configured the webhook secret in my GitHub repository settings."));
 		fireEvent.click(screen.getByText("Next"));
 
-		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 5 of 5")).not.toBeNull();
 	});
 
-	it("deselects and selects all repositories in step 4", () => {
+	it("deselects and selects all repositories in step 5", () => {
 		localStorage.setItem(
 			"tars-onboarding-wizard",
 			JSON.stringify({
-				step: 4,
+				step: 5,
 				adminUsername: "admin",
 				adminPassword: "password",
 				githubToken: "ghp_test",
 				githubUsername: "octocat",
 				githubUsernameConfirmed: true,
+				githubEventMode: "webhook",
+				githubPollIntervalMs: "",
 				webhookSecret: "webhook-secret",
 				webhookSecretConfirmed: true,
 				repositories: [
