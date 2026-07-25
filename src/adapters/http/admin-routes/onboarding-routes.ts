@@ -20,7 +20,6 @@ import { WorkspaceManager } from "../../../workspace/manager.js";
 const REQUIRED_ONBOARDING_SETTINGS = [
 	"github_token",
 	"github_username",
-	"webhook_secret",
 	"admin_username",
 	"admin_password",
 	"github_event_mode",
@@ -36,6 +35,10 @@ export function isValidEventMode(mode: string | undefined): boolean {
 
 export function isPollingMode(mode: string | undefined): boolean {
 	return mode === "polling" || mode === "both";
+}
+
+export function isWebhookMode(mode: string | undefined): boolean {
+	return mode === "webhook" || mode === "both";
 }
 
 export function isValidPollIntervalMs(raw: string | undefined): boolean {
@@ -73,6 +76,9 @@ function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	}
 	if (isPollingMode(modeRaw) && !isValidPollIntervalMs(deps.settingsStore!.get("github_poll_interval_ms"))) {
 		missing.push("github_poll_interval_ms");
+	}
+	if (isWebhookMode(modeRaw) && (deps.settingsStore!.get("webhook_secret") === undefined || deps.settingsStore!.get("webhook_secret") === "")) {
+		missing.push("webhook_secret");
 	}
 	if (deps.settingsStore!.get(ONBOARDING_COMPLETE_SETTING) !== "true") {
 		missing.push(ONBOARDING_COMPLETE_SETTING);
@@ -218,6 +224,12 @@ const registry = new AdminRouteRegistry()
 				});
 				return;
 			}
+			if (isWebhookMode(eventMode) && !body.webhook_secret?.trim()) {
+				sendJson(ctx.response, 400, {
+					error: "Missing required fields: webhook_secret",
+				});
+				return;
+			}
 			if (isPollingMode(eventMode)) {
 				if (!isValidPollIntervalMs(body.github_poll_interval_ms)) {
 					sendJson(ctx.response, 400, {
@@ -228,6 +240,9 @@ const registry = new AdminRouteRegistry()
 			}
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
 				settingsStore.set(key, key === "github_event_mode" ? eventMode : body[key].trim());
+			}
+			if (isWebhookMode(eventMode)) {
+				settingsStore.set("webhook_secret", body.webhook_secret.trim());
 			}
 			if (isPollingMode(eventMode)) {
 				settingsStore.set("github_poll_interval_ms", String(Number.parseInt(body.github_poll_interval_ms.trim(), 10)));
