@@ -181,6 +181,23 @@ describe("shouldIgnoreCommentEvent", () => {
 		expect(result.ignore).toBe(true);
 	});
 
+	it("ignores comments on closed issues", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "@tars-bot please continue", user: { login: "user" } },
+				issue: {
+					state: "closed",
+					labels: [{ name: "tars" }],
+					assignees: [{ login: "tars-bot" }],
+					user: { login: "tars-bot" },
+				},
+			},
+			"tars-bot",
+		);
+		expect(result).toEqual({ ignore: true, reason: "issue is closed" });
+	});
+
 	it("ignores comments from the bot", () => {
 		const result = shouldIgnoreCommentEvent(
 			{

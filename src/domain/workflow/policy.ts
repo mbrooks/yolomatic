@@ -84,6 +84,7 @@ export function shouldIgnoreCommentEvent(
 		action: string;
 		comment: { body: string; user: { login: string; type?: string } };
 		issue: {
+			state?: string;
 			labels?: IssueLabel[];
 			assignee?: { login: string } | null;
 			assignees?: { login: string }[];
@@ -94,6 +95,10 @@ export function shouldIgnoreCommentEvent(
 ): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isCreatedByTars: boolean } {
 	if (payload.action !== "created") {
 		return { ignore: true, reason: `action is ${payload.action}` };
+	}
+
+	if (payload.issue.state === "closed") {
+		return { ignore: true, reason: "issue is closed" };
 	}
 
 	if (payload.comment.user.login === githubUsername) {

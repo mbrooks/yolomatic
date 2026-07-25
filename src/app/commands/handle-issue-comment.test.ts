@@ -318,6 +318,28 @@ describe("HandleIssueComment", () => {
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
 
+	it("ignores comments on closed issues before preparing a session", async () => {
+		const { handler, github, sessions } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				state: "closed",
+				labels: [{ name: "tars" }],
+				assignee: { login: "tars-bot" },
+				assignees: [{ login: "tars-bot" }],
+				user: { login: "tars-bot" },
+			},
+			comment: { id: 1, body: "@tars-bot please continue", user: { login: "user" } },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessions.get).not.toHaveBeenCalled();
+		expect(github.addLabels).not.toHaveBeenCalled();
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
 	it("auto-labels mentions and steers active executions", async () => {
 		const { handler, github, tasks } = createHandler();
 		tasks.isActive.mockReturnValue(true);
