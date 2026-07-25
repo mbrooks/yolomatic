@@ -1180,6 +1180,76 @@ a:hover {
 	padding: 0.6rem 0.75rem;
 }
 
+.success-banner {
+	background: rgba(63, 185, 80, 0.15);
+	border: 1px solid #3fb950;
+	border-radius: 6px;
+	color: #3fb950;
+	font-size: 0.875rem;
+	padding: 0.6rem 0.75rem;
+}
+
+/* Settings: Repositories tab */
+.settings-repositories {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.settings-repositories-list {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 1rem;
+}
+
+.settings-repositories-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+.settings-repositories-count {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.settings-repositories-items {
+	display: flex;
+	flex-direction: column;
+	max-height: 24rem;
+	overflow-y: auto;
+}
+
+.settings-repository-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+	padding: 0.4rem 0;
+	border-bottom: 1px solid var(--border);
+	font-size: 0.875rem;
+}
+
+.settings-repository-row.selected {
+	font-weight: 600;
+}
+
+.settings-repository-name {
+	flex: 1;
+}
+
+.settings-repository-badge.new {
+	background: var(--blue);
+	color: #000;
+	border-radius: 999px;
+	font-size: 0.65rem;
+	font-weight: 700;
+	padding: 0.05rem 0.4rem;
+	text-transform: uppercase;
+}
+
 /* Onboarding wizard */
 .onboarding-screen {
 	display: flex;

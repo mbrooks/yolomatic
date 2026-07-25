@@ -1,4 +1,4 @@
-import { apiDelete, apiPost } from "./client.js";
+import { apiDelete, apiGet, apiPost } from "./client.js";
 
 export interface AddRepoRequest {
 	owner: string;
@@ -30,8 +30,17 @@ export interface RemoveRepoResponse {
 	removed: boolean;
 }
 
+export interface AccessibleReposResponse {
+	repositories: AccessibleRepo[];
+	configured: Array<{ owner: string; repo: string }>;
+}
+
 export async function addRepo(owner: string, repo: string): Promise<AddRepoResponse> {
 	return apiPost<AddRepoResponse>("/api/repos", { owner, repo });
+}
+
+export async function listAccessibleRepos(): Promise<AccessibleReposResponse> {
+	return apiGet<AccessibleReposResponse>("/api/repos/accessible");
 }
 
 export async function scanRepos(): Promise<ScanReposResponse> {

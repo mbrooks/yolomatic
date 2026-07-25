@@ -1220,6 +1220,113 @@ describe("handleRepoRoutes", () => {
 		});
 	});
 
+	describe("GET /api/repos/accessible", () => {
+		it("returns accessible repositories and currently configured repos without mutating state", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn((key: string) => {
+					if (key === "configured_repositories") {
+						return JSON.stringify([{ owner: "mbrooks", repo: "tars" }]);
+					}
+					return undefined;
+				}),
+				getString: vi.fn((key: string, fallback?: string) => fallback ?? ""),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/accessible", "GET"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/accessible",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.repositories).toHaveLength(2);
+			expect(body.repositories[0].fullName).toBe("mbrooks/tars");
+			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "tars" }]);
+			expect(store.set).not.toHaveBeenCalled();
+		});
+
+		it("returns 500 when githubService is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/accessible", "GET"),
+				res,
+				makeDeps({ githubService: undefined }),
+				"/api/repos/accessible",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub service not configured");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/accessible", "GET"),
+				res,
+				makeDeps({ settingsStore: undefined }),
+				"/api/repos/accessible",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("Settings store not configured");
+		});
+
+		it("returns 500 when token is invalid", async () => {
+			const res = response();
+			githubService.getAuthenticatedUser.mockResolvedValue(null);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/accessible", "GET"),
+				res,
+				makeDeps(),
+				"/api/repos/accessible",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("GitHub token is invalid or not configured");
+		});
+
+		it("handles malformed configured_repositories as empty", async () => {
+			const res = response();
+			const store = {
+				get: vi.fn(() => "not-json"),
+				getString: vi.fn((_: string, fallback?: string) => fallback ?? ""),
+				set: vi.fn(),
+			};
+			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
+			githubService.listAccessibleRepositories.mockResolvedValue([]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/accessible", "GET"),
+				res,
+				makeDeps({ settingsStore: store as unknown as AdminRouterDeps["settingsStore"] }),
+				"/api/repos/accessible",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.repositories).toEqual([]);
+			expect(body.configured).toEqual([]);
+		});
+	});
+
 	describe("POST /api/repos/:owner/:repo/issues/:number/close", () => {
 		it("closes the issue", async () => {
 			const res = response();
