@@ -1,14 +1,25 @@
-import type { TaskControlService } from "./ports/task-control-service.js";
+import type { TaskControlService, TaskRegistration } from "./ports/task-control-service.js";
 
 export class TaskController implements TaskControlService {
-	private readonly active = new Map<string, { abort: () => void; steer?: (msg: string) => Promise<void> }>();
+	private readonly active = new Map<
+		string,
+		{ registration: TaskRegistration; abort: () => void; steer?: (msg: string) => Promise<void> }
+	>();
 	private draining = false;
 
-	register(key: string, abort: () => void, steer?: (msg: string) => Promise<void>): void {
-		this.active.set(key, { abort, steer });
+	register(key: string, abort: () => void, steer?: (msg: string) => Promise<void>): TaskRegistration | null {
+		if (this.active.has(key)) {
+			return null;
+		}
+		const registration = Symbol(key);
+		this.active.set(key, { registration, abort, steer });
+		return registration;
 	}
 
-	unregister(key: string): void {
+	unregister(key: string, registration?: TaskRegistration): void {
+		if (registration && this.active.get(key)?.registration !== registration) {
+			return;
+		}
 		this.active.delete(key);
 	}
 

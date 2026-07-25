@@ -51,44 +51,12 @@ export class ExecuteSession {
 	async run(state: SessionState, comment?: string): Promise<void> {
 		const { owner, repo, issueNumber } = state;
 		const key = issueSessionKey(owner, repo, issueNumber);
-
-		await this.deps.workspaces.createOrGetWorktree(owner, repo, issueNumber);
-
-		let current = await this.deps.sessions.get(owner, repo, issueNumber);
-		if (!current) {
-			throw new Error(`No session for ${key}`);
-		}
-
-		const preflightError = await this.validateSessionBeforeExecution(current);
-		if (preflightError) {
-			process.stdout.write(`[execute] execution blocked for ${key}: ${preflightError}\n`);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: preflightError });
-			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
-			await this.deps.github.postComment(
-				owner,
-				repo,
-				issueNumber,
-				[
-					"**TARS stopped before execution.**",
-					"",
-					preflightError,
-					"",
-					"This protects the task from being handled by the wrong issue worktree.",
-				].join("\n"),
-			);
-			return;
-		}
-
-		current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
-
 		const abortController = new AbortController();
 		let resolveSession: ((session: LiveExecutionSession) => void) | undefined;
 		const sessionPromise = new Promise<LiveExecutionSession>((resolve) => {
 			resolveSession = resolve;
 		});
-
-		this.deps.tasks.register(
+		const registration = this.deps.tasks.register(
 			key,
 			() => abortController.abort(),
 			async (msg) => {
@@ -100,134 +68,174 @@ export class ExecuteSession {
 			},
 		);
 
-		const sessionStatus = current.status;
-		const onActivity = () => {
-			void this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
-				lastActivity: new Date().toISOString(),
-			});
-		};
+		if (registration === null) {
+			const steered = comment ? await this.deps.tasks.steer(key, comment) : false;
+			process.stdout.write(
+				`[execute] duplicate execution ignored for ${key}${steered ? "; feedback steered to active task" : ""}\n`,
+			);
+			return;
+		}
 
-		let result: ExecutionResult;
 		try {
-			current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
-				taskStartedAt: new Date().toISOString(),
-				taskFinishedAt: undefined,
-			});
-			const taskStartedAt = new Date(current.taskStartedAt!).getTime();
-			const priorExecutionTimeMs = current.totalExecutionTimeMs ?? 0;
-			try {
-				result = await this.deps.executor.execute(
-					current,
-					comment,
-					abortController.signal,
-					(session) => {
-						resolveSession?.(session);
-					},
-					onActivity,
-				);
-			} finally {
-				const durationMs = Date.now() - taskStartedAt;
-				current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
-					taskFinishedAt: new Date().toISOString(),
-					totalExecutionTimeMs: priorExecutionTimeMs + durationMs,
-				});
-			}
-		} catch (error) {
-			if (abortController.signal.aborted) {
-				process.stdout.write(`[execute] execution aborted for ${key}\n`);
-				await this.deps.sessions.cancelSession(owner, repo, issueNumber);
-				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
-				await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
-				return;
+			await this.deps.workspaces.createOrGetWorktree(owner, repo, issueNumber);
+
+			let current = await this.deps.sessions.get(owner, repo, issueNumber);
+			if (!current) {
+				throw new Error(`No session for ${key}`);
 			}
 
-			if (error instanceof FatalSystemError && this.deps.selfReportEnabled) {
-				const issueUrl = await this.fileSelfReport(error);
+			const preflightError = await this.validateSessionBeforeExecution(current);
+			if (preflightError) {
+				process.stdout.write(`[execute] execution blocked for ${key}: ${preflightError}\n`);
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: preflightError });
+				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
 				await this.deps.github.postComment(
 					owner,
 					repo,
 					issueNumber,
-					`⛔ TARS stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+					[
+						"**TARS stopped before execution.**",
+						"",
+						preflightError,
+						"",
+						"This protects the task from being handled by the wrong issue worktree.",
+					].join("\n"),
 				);
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
-				process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 				return;
 			}
 
-			if (process.env.TARS_SELF_EVOLUTION_ENABLED === "true") {
+			current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
+
+			const sessionStatus = current.status;
+			const onActivity = () => {
+				void this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
+					lastActivity: new Date().toISOString(),
+				});
+			};
+
+			let result: ExecutionResult;
+			try {
+				current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
+					taskStartedAt: new Date().toISOString(),
+					taskFinishedAt: undefined,
+				});
+				const taskStartedAt = new Date(current.taskStartedAt!).getTime();
+				const priorExecutionTimeMs = current.totalExecutionTimeMs ?? 0;
 				try {
-					const engine = new SelfEvolutionEngine({
-						github: this.deps.github,
-						repoPath: process.cwd(),
-						selfReportRepo: { owner: "mbrooks", repo: "tars" },
-					});
-					await engine.handleError(error as Error);
-				} catch (seError) {
-					process.stdout.write(
-						`[execute] self-evolution error: ${seError instanceof Error ? seError.message : String(seError)}\n`,
+					result = await this.deps.executor.execute(
+						current,
+						comment,
+						abortController.signal,
+						(session) => {
+							resolveSession?.(session);
+						},
+						onActivity,
 					);
+				} finally {
+					const durationMs = Date.now() - taskStartedAt;
+					current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
+						taskFinishedAt: new Date().toISOString(),
+						totalExecutionTimeMs: priorExecutionTimeMs + durationMs,
+					});
 				}
+			} catch (error) {
+				if (abortController.signal.aborted) {
+					process.stdout.write(`[execute] execution aborted for ${key}\n`);
+					await this.deps.sessions.cancelSession(owner, repo, issueNumber);
+					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
+					await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
+					return;
+				}
+
+				if (error instanceof FatalSystemError && this.deps.selfReportEnabled) {
+					const issueUrl = await this.fileSelfReport(error);
+					await this.deps.github.postComment(
+						owner,
+						repo,
+						issueNumber,
+						`⛔ TARS stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+					);
+					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
+					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+					process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
+					return;
+				}
+
+				if (process.env.TARS_SELF_EVOLUTION_ENABLED === "true") {
+					try {
+						const engine = new SelfEvolutionEngine({
+							github: this.deps.github,
+							repoPath: process.cwd(),
+							selfReportRepo: { owner: "mbrooks", repo: "tars" },
+						});
+						await engine.handleError(error as Error);
+					} catch (seError) {
+						process.stdout.write(
+							`[execute] self-evolution error: ${seError instanceof Error ? seError.message : String(seError)}\n`,
+						);
+					}
+				}
+
+				const context = comment ? "Resuming from comment" : "Processing issue";
+				await this.reporter.handleExecutionFailure({
+					owner,
+					repo,
+					sessionIssueNumber: issueNumber,
+					target: { kind: "issue", number: issueNumber },
+					error,
+					context,
+				});
+				throw error;
 			}
 
-			const context = comment ? "Resuming from comment" : "Processing issue";
-			await this.reporter.handleExecutionFailure({
+			if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
+				result = {
+					...result,
+					status: "failed",
+				};
+			}
+
+			const postExecState = await this.deps.sessions.get(owner, repo, issueNumber);
+			if (postExecState?.status === "paused") {
+				process.stdout.write(`[execute] ${key} paused during execution; suppressing result transitions\n`);
+				return;
+			}
+
+			process.stdout.write(`[execute] result repo=${repo} issue=#${issueNumber} status=${result.status}\n`);
+
+			if (!current.seeded && !comment) {
+				await this.deps.sessions.markSeeded(owner, repo, issueNumber);
+			}
+
+			if (result.status === "complete") {
+				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+				await this.delivery.deliverCompletion(current, result);
+				return;
+			}
+
+			if (result.status === "waiting-feedback") {
+				process.stdout.write(`[execute] waiting for feedback on ${repo}#${issueNumber}\n`);
+			} else if (result.status === "cancelled") {
+				process.stdout.write(`[execute] marked cancelled ${repo}#${issueNumber}\n`);
+			} else if (result.status === "working") {
+				process.stdout.write(`[execute] left in working state ${repo}#${issueNumber}\n`);
+			}
+
+			await this.reporter.handleExecutionResult({
 				owner,
 				repo,
 				sessionIssueNumber: issueNumber,
 				target: { kind: "issue", number: issueNumber },
-				error,
-				context,
+				result,
+				context: comment ? "Resuming from comment" : "Processing issue",
+				state: current,
 			});
-			throw error;
 		} finally {
-			this.deps.tasks.unregister(key);
+			this.deps.tasks.unregister(key, registration);
 		}
-
-		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
-			result = {
-				...result,
-				status: "failed",
-			};
-		}
-
-		const postExecState = await this.deps.sessions.get(owner, repo, issueNumber);
-		if (postExecState?.status === "paused") {
-			process.stdout.write(`[execute] ${key} paused during execution; suppressing result transitions\n`);
-			return;
-		}
-
-		process.stdout.write(`[execute] result repo=${repo} issue=#${issueNumber} status=${result.status}\n`);
-
-		if (!current.seeded && !comment) {
-			await this.deps.sessions.markSeeded(owner, repo, issueNumber);
-		}
-
-		if (result.status === "complete") {
-			await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-			await this.delivery.deliverCompletion(current, result);
-			return;
-		}
-
-		if (result.status === "waiting-feedback") {
-			process.stdout.write(`[execute] waiting for feedback on ${repo}#${issueNumber}\n`);
-		} else if (result.status === "cancelled") {
-			process.stdout.write(`[execute] marked cancelled ${repo}#${issueNumber}\n`);
-		} else if (result.status === "working") {
-			process.stdout.write(`[execute] left in working state ${repo}#${issueNumber}\n`);
-		}
-
-		await this.reporter.handleExecutionResult({
-			owner,
-			repo,
-			sessionIssueNumber: issueNumber,
-			target: { kind: "issue", number: issueNumber },
-			result,
-			context: comment ? "Resuming from comment" : "Processing issue",
-			state: current,
-		});
 	}
 
 	private async validateSessionBeforeExecution(state: SessionState): Promise<string | null> {

@@ -32,6 +32,30 @@ describe("GitCommandRunner", () => {
 		);
 	});
 
+	it("passes GitHub authentication only through the git subprocess environment", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-git-auth-"));
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+
+		await git.runAuthenticated(["fetch", "origin"], { cwd: "/tmp/worktree" });
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["fetch", "origin"],
+			expect.objectContaining({
+				cwd: "/tmp/worktree",
+				env: expect.objectContaining({
+					GIT_CONFIG_COUNT: "2",
+					GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+					GIT_CONFIG_VALUE_0: `Authorization: Basic ${Buffer.from("mbrooks:secret").toString("base64")}`,
+					GIT_CONFIG_KEY_1: "core.hooksPath",
+					GIT_CONFIG_VALUE_1: "/dev/null",
+				}),
+			}),
+		);
+		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls[0]?.[1].join(" ")).not.toContain("secret");
+	});
+
 	it("checks commit distance against the configured default branch", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-git-ahead-"));
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {

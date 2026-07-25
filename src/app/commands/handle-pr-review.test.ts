@@ -77,11 +77,12 @@ describe("HandlePRReview", () => {
 			fileSelfReport: vi.fn(),
 			listReviewComments: vi.fn(async () => []),
 		};
+		const registerTask = vi.fn((..._args: unknown[]): symbol | null => Symbol("test-task"));
 		const tasks = {
 			cancel: vi.fn(() => false),
 			isActive: vi.fn(() => false),
 			steer: vi.fn(),
-			register: vi.fn(),
+			register: registerTask,
 			unregister: vi.fn(),
 			isDraining: vi.fn(() => false),
 			setDraining: vi.fn(),
@@ -109,6 +110,54 @@ describe("HandlePRReview", () => {
 			comment: { id: 1, body: "Fix this", user: { login: "tars-bot" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
+	});
+
+	it("steers review feedback instead of starting a second execution for an active session", async () => {
+		const { handler, sessions, executor, github, tasks } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		tasks.register.mockReturnValue(null);
+		tasks.steer.mockResolvedValue(true);
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(tasks.steer).toHaveBeenCalledWith("mbrooks/tars#56", "Fix this");
+		expect(executor.executePRReview).not.toHaveBeenCalled();
+		expect(tasks.unregister).not.toHaveBeenCalled();
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			"Review feedback was steered to the active TARS task.",
+		);
+	});
+
+	it("reports busy when duplicate review feedback cannot be steered", async () => {
+		const { handler, sessions, executor, github, tasks } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		tasks.register.mockReturnValue(null);
+		tasks.steer.mockResolvedValue(false);
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Fix this", user: { login: "user" } },
+		});
+
+		expect(executor.executePRReview).not.toHaveBeenCalled();
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			"TARS is busy. Review feedback could not be steered.",
+		);
 	});
 
 	it("ignores non-TARS branches", async () => {
@@ -151,8 +200,8 @@ describe("HandlePRReview", () => {
 			"tars/custom-branch-123",
 			"TARS: Fix the typo",
 		);
-		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
-		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function), expect.any(Function));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Symbol));
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -256,7 +305,7 @@ describe("HandlePRReview", () => {
 				reviewBody: undefined,
 			},
 			expect.any(AbortSignal),
-			undefined,
+			expect.any(Function),
 			expect.any(Function),
 		);
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
@@ -265,8 +314,8 @@ describe("HandlePRReview", () => {
 			"TARS: Fix the typo",
 		);
 		expect(sessions.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "tars", 56);
-		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function));
-		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56");
+		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function), expect.any(Function));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Symbol));
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -387,7 +436,7 @@ describe("HandlePRReview", () => {
 				reviewBody: "Please add more tests.",
 			},
 			expect.any(AbortSignal),
-			undefined,
+			expect.any(Function),
 			expect.any(Function),
 		);
 	});

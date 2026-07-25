@@ -17,11 +17,13 @@ export class BareRepoManager {
 
 	async ensureBareRepo(owner: string, repo: string): Promise<string> {
 		const bareRepoPath = this.getBareRepoPath(owner, repo);
+		const remoteUrl = this.buildRemoteUrl(owner, repo);
 
 		if (await this.pathExists(bareRepoPath)) {
 			const isValid = await this.isValidGitRepo(bareRepoPath);
 			if (isValid) {
 				try {
+					await this.git.run("git", ["remote", "set-url", "origin", remoteUrl], { cwd: bareRepoPath });
 					await this.updateDefaultBranch(bareRepoPath);
 					return bareRepoPath;
 				} catch (error) {
@@ -36,11 +38,7 @@ export class BareRepoManager {
 			}
 		}
 
-		const encodedUsername = encodeURIComponent(this.config.githubUsername);
-		const encodedToken = encodeURIComponent(this.config.githubToken);
-		const url = `https://${encodedUsername}:${encodedToken}@github.com/${owner}/${repo}.git`;
-
-		await this.git.run("git", ["clone", "--bare", url, bareRepoPath]);
+		await this.git.runAuthenticated(["clone", "--bare", remoteUrl, bareRepoPath]);
 		return bareRepoPath;
 	}
 
@@ -56,12 +54,12 @@ export class BareRepoManager {
 	}
 
 	async updateDefaultBranch(bareRepoPath: string): Promise<void> {
-		await this.git.run("git", ["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"], {
+		await this.git.runAuthenticated(["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"], {
 			cwd: bareRepoPath,
 		});
 
 		try {
-			await this.git.run("git", ["remote", "set-head", "origin", "-a"], { cwd: bareRepoPath });
+			await this.git.runAuthenticated(["remote", "set-head", "origin", "-a"], { cwd: bareRepoPath });
 		} catch {
 			// Some repositories or older bare clones may not have enough remote
 			// metadata for origin/HEAD. resolveBaseRef() has fallbacks.
@@ -137,5 +135,9 @@ export class BareRepoManager {
 			message.includes("could not remove reference") ||
 			message.includes("Permission denied")
 		);
+	}
+
+	private buildRemoteUrl(owner: string, repo: string): string {
+		return `https://github.com/${owner}/${repo}.git`;
 	}
 }
