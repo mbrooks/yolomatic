@@ -25,13 +25,39 @@ describe("TaskController", () => {
 	it("unregisters a task without invoking abort", () => {
 		const controller = new TaskController();
 		let aborted = false;
-		controller.register("key1", () => {
+		const registration = controller.register("key1", () => {
 			aborted = true;
 		});
-		controller.unregister("key1");
+		expect(registration).not.toBeNull();
+		controller.unregister("key1", registration!);
 		expect(controller.isActive("key1")).toBe(false);
 		expect(controller.cancel("key1")).toBe(false);
 		expect(aborted).toBe(false);
+	});
+
+	it("refuses to overwrite an active task", () => {
+		const controller = new TaskController();
+		const first = controller.register("key1", () => {});
+		const second = controller.register("key1", () => {});
+
+		expect(first).not.toBeNull();
+		expect(second).toBeNull();
+		expect(controller.isActive("key1")).toBe(true);
+	});
+
+	it("does not let an old registration unregister a replacement", () => {
+		const controller = new TaskController();
+		const first = controller.register("key1", () => {});
+		expect(first).not.toBeNull();
+		expect(controller.cancel("key1")).toBe(true);
+
+		const replacement = controller.register("key1", () => {});
+		expect(replacement).not.toBeNull();
+		controller.unregister("key1", first!);
+
+		expect(controller.isActive("key1")).toBe(true);
+		controller.unregister("key1", replacement!);
+		expect(controller.isActive("key1")).toBe(false);
 	});
 
 	it("tracks multiple tasks independently", () => {

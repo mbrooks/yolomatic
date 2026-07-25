@@ -1,6 +1,6 @@
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
-import type { ExecutionService } from "../../ports/execution-service.js";
+import type { ExecutionService, LiveExecutionSession } from "../../ports/execution-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import { classifyComments } from "../../pr-review/classifier.js";
@@ -226,22 +226,46 @@ export class HandlePRReview {
 		comments: Array<{ id: number; body: string; user: string; path?: string; line?: number | null }>,
 		reviewBody?: string,
 	): Promise<void> {
-		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
-		const worktreePath = state.workspacePath;
-		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
-		await this.deps.github.postPRComment(
-			owner,
-			repo,
-			prNumber,
-			`Picked up review feedback. Iteration ${(state.iterationCount ?? 0) + 1}.`,
-		);
-
 		const inFlightKey = issueSessionKey(owner, repo, issueNumber);
 		const abortController = new AbortController();
-		this.deps.tasks.register(inFlightKey, () => abortController.abort());
+		let resolveSession: ((session: LiveExecutionSession) => void) | undefined;
+		const sessionPromise = new Promise<LiveExecutionSession>((resolve) => {
+			resolveSession = resolve;
+		});
+		const registration = this.deps.tasks.register(
+			inFlightKey,
+			() => abortController.abort(),
+			async (message) => {
+				const session = await Promise.race([
+					sessionPromise,
+					new Promise<never>((_, reject) => setTimeout(() => reject(new Error("steer timeout")), 5000)),
+				]);
+				await session.steer(message);
+			},
+		);
+		if (registration === null) {
+			const feedback = [...(reviewBody ? [reviewBody] : []), ...comments.map((comment) => comment.body)].join("\n\n");
+			const steered = feedback ? await this.deps.tasks.steer(inFlightKey, feedback) : false;
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				steered ? "Review feedback was steered to the active TARS task." : "TARS is busy. Review feedback could not be steered.",
+			);
+			return;
+		}
 
+		const worktreePath = state.workspacePath;
+		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
 		let result: ExecutionResult;
 		try {
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
+			await this.deps.github.postPRComment(
+				owner,
+				repo,
+				prNumber,
+				`Picked up review feedback. Iteration ${(state.iterationCount ?? 0) + 1}.`,
+			);
 			const onActivity = () => {
 				void this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
 					lastActivity: new Date().toISOString(),
@@ -259,7 +283,9 @@ export class HandlePRReview {
 					reviewBody,
 				},
 				abortController.signal,
-				undefined,
+				(session) => {
+					resolveSession?.(session);
+				},
 				onActivity,
 			);
 		} catch (error) {
@@ -290,7 +316,7 @@ export class HandlePRReview {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
 		} finally {
-			this.deps.tasks.unregister(inFlightKey);
+			this.deps.tasks.unregister(inFlightKey, registration);
 		}
 
 		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
