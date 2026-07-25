@@ -575,6 +575,181 @@ describe("DockerWorkerExecutor", () => {
 			await harness.close();
 		}
 	});
+
+	it("removes a stopped conflicting container and retries the worker launch", async () => {
+		const harness = await createHarness(425);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(null, "exited\n", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+
+		spawnMock
+			.mockImplementationOnce(() => makeConflictingChildProcess(425))
+			.mockImplementationOnce((_cmd, _args, options) => {
+				const child = makeChildProcess();
+				void connectMockWorker(
+					harness.workerRpcServer,
+					options.env.TARS_SESSION_WS_URL as string,
+					async (connection, message) => {
+						if (message.type !== "launch_config") return;
+						await connection.send(
+							createWorkerMessage("ack", "mbrooks/tars#425", "ack-retry", {
+								ackMessageId: message.messageId,
+							}),
+						);
+						await connection.send(
+							createWorkerMessage("complete", "mbrooks/tars#425", "complete-retry", {
+								result: {
+									status: "complete",
+									summary: "recovered",
+									rawResponse: "TARS_STATUS: complete\nrecovered",
+								},
+							}),
+						);
+					},
+				);
+				return child;
+			});
+
+		try {
+			const result = await harness.executor.execute(makeSessionState(425, harness.workspacePath));
+
+			expect(result.status).toBe("complete");
+			expect(spawnMock).toHaveBeenCalledTimes(2);
+			expect(execFileMock).toHaveBeenCalledWith(
+				"docker",
+				["inspect", "--format", "{{.State.Status}}", "tars-session-mbrooks-tars-425"],
+				expect.any(Object),
+				expect.any(Function),
+			);
+			expect(execFileMock).toHaveBeenCalledWith(
+				"docker",
+				["rm", "tars-session-mbrooks-tars-425"],
+				expect.any(Object),
+				expect.any(Function),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"mbrooks/tars#425",
+				expect.objectContaining({
+					message: "Removed stopped conflicting worker container tars-session-mbrooks-tars-425; retrying launch",
+				}),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("does not remove or retry a conflicting container that is still running", async () => {
+		const harness = await createHarness(426);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(null, "running\n", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+		spawnMock.mockImplementation(() => makeConflictingChildProcess(426));
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(426, harness.workspacePath))).rejects.toThrow(
+				'The container name "/tars-session-mbrooks-tars-426" is already in use',
+			);
+			expect(spawnMock).toHaveBeenCalledTimes(1);
+			expect(execFileMock).not.toHaveBeenCalledWith(
+				"docker",
+				["rm", "tars-session-mbrooks-tars-426"],
+				expect.any(Object),
+				expect.any(Function),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("does not retry when the conflicting container cannot be inspected", async () => {
+		const harness = await createHarness(428);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(new Error("inspect failed"), "", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+		spawnMock.mockImplementation(() => makeConflictingChildProcess(428));
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(428, harness.workspacePath))).rejects.toThrow(
+				'The container name "/tars-session-mbrooks-tars-428" is already in use',
+			);
+			expect(spawnMock).toHaveBeenCalledTimes(1);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"mbrooks/tars#428",
+				expect.objectContaining({
+					message: "Could not inspect conflicting worker container tars-session-mbrooks-tars-428",
+				}),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("does not retry when the stopped conflicting container cannot be removed", async () => {
+		const harness = await createHarness(429);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(null, "exited\n", "");
+				return;
+			}
+			if (args[0] === "rm") {
+				callback(new Error("remove failed"), "", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+		spawnMock.mockImplementation(() => makeConflictingChildProcess(429));
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(429, harness.workspacePath))).rejects.toThrow(
+				'The container name "/tars-session-mbrooks-tars-429" is already in use',
+			);
+			expect(spawnMock).toHaveBeenCalledTimes(1);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"mbrooks/tars#429",
+				expect.objectContaining({
+					message: "Could not remove stopped conflicting worker container tars-session-mbrooks-tars-429",
+				}),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("stops retrying after three recovered name-conflict retries", async () => {
+		const harness = await createHarness(427);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(null, "exited\n", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+		spawnMock.mockImplementation(() => makeConflictingChildProcess(427));
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(427, harness.workspacePath))).rejects.toThrow(
+				"Worker container launch failed after 4 attempts (3 retries).",
+			);
+			expect(spawnMock).toHaveBeenCalledTimes(4);
+			expect(
+				execFileMock.mock.calls.filter((call) => call[1][0] === "rm"),
+			).toHaveLength(3);
+		} finally {
+			await harness.close();
+		}
+	});
 });
 
 async function createHarness(issueNumber: number): Promise<{
@@ -618,6 +793,35 @@ function makeChildProcess(): EventEmitter & { stdout: EventEmitter; stderr: Even
 	child.stdout = new EventEmitter();
 	child.stderr = new EventEmitter();
 	return child;
+}
+
+function makeConflictingChildProcess(issueNumber: number): EventEmitter & { stdout: EventEmitter; stderr: EventEmitter } {
+	const child = makeChildProcess();
+	queueMicrotask(() => {
+		child.stderr.emit(
+			"data",
+			Buffer.from(
+				`docker: Error response from daemon: Conflict. The container name "/tars-session-mbrooks-tars-${issueNumber}" is already in use by container "existing".`,
+			),
+		);
+		child.emit("exit", 125, null);
+	});
+	return child;
+}
+
+function makeSessionState(issueNumber: number, workspacePath: string) {
+	return {
+		issueNumber,
+		repo: "tars",
+		owner: "mbrooks",
+		title: "Recover a conflicting worker container",
+		body: "Body",
+		status: "pending" as const,
+		sessionPath: "/tmp/session.jsonl",
+		workspacePath,
+		lastActivity: new Date().toISOString(),
+		seeded: false,
+	};
 }
 
 async function connectMockWorker(
