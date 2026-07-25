@@ -126,17 +126,66 @@ Sessions can also be paused, resumed, restarted, archived, or deleted from the a
 
 ## How It Works
 
-TARS is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate worker container that edits the shared issue worktree and streams its activity back to TARS.
+TARS is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to TARS over a WebSocket session.
 
-```text
-GitHub event
-    ↓
-TARS control plane
-    ↓
-Issue worktree + disposable worker
-    ↓
-Commit, push, and pull request
+The diagram below shows the high-level request and event flow. The **TARS control plane** owns everything deterministic — event intake, session and workspace state, delivery — while **worker execution** is isolated in a disposable container with no GitHub credentials and no Docker socket access.
+
+```mermaid
+flowchart TD
+    subgraph External["GitHub & users"]
+        User["Issue / PR author"]
+        Admin["Admin user"]
+        GH["GitHub repository"]
+    end
+
+    subgraph ControlPlane["TARS control plane — tars container"]
+        direction TB
+        WebUI["Admin dashboard<br/>port 6767"]
+        Webhook["Webhook endpoint<br/>/webhook"]
+        Poll["GitHub polling adapter"]
+        Session["Session & workspace manager"]
+        DB[("SQLite state & logs")]
+        Delivery["Delivery — commit, push, PR"]
+    end
+
+    subgraph WorkerExec["Worker execution — disposable container"]
+        Worker["Agent runtime (pi)"]
+        WS["WebSocket session"]
+        Provider["Configured LLM provider"]
+    end
+
+    subgraph Storage["Repositories & worktrees"]
+        Bare[("Bare repo")]
+        WT["Per-issue worktree"]
+    end
+
+    User -->|"assign / comment / review"| GH
+    Admin -->|"start / steer / stop"| WebUI
+    GH -->|"issues, comments, reviews"| Webhook
+    GH -.->|"poll (fallback)"| Poll
+    Webhook --> Session
+    Poll --> Session
+    WebUI --> Session
+    Session --> DB
+    Session -->|"create / reuse"| Bare
+    Bare -->|"git worktree add"| WT
+    Session -->|"launch + session token"| Worker
+    Worker -->|"connect"| WS
+    WS <-->|"events / steering / stop"| Session
+    Worker -->|"read / write code"| WT
+    Worker -->|"tool calls"| Provider
+    Provider -->|"responses"| Worker
+    Session --> Delivery
+    Delivery -->|"commit / push branch"| Bare
+    Delivery -->|"create / update PR, labels, comments"| GH
+    GH -->|"notifications"| User
 ```
+
+Legend:
+
+- **Solid arrows** are primary flows; **dotted arrows** are optional fallbacks (polling).
+- The control plane handles event intake, session and worktree lifecycle, and GitHub delivery. It owns GitHub credentials and persistent state.
+- The worker handles agent execution only — it edits the issue worktree, calls the configured LLM provider, and streams activity back over a single session-scoped WebSocket connection. It has no GitHub credentials and no Docker socket access.
 
 See [design/README.md](design/README.md) for the worker architecture and protocol.
 
