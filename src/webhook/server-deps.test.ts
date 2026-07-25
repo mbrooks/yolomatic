@@ -23,7 +23,7 @@ describe("createWebhookServerDeps", () => {
 		expect(fallbackTaskController.cancel("mbrooks/tars#1")).toBe(false);
 		expect(fallbackTaskController.isActive("mbrooks/tars#1")).toBe(false);
 		await expect(fallbackTaskController.steer("mbrooks/tars#1", "comment")).resolves.toBe(false);
-		expect(fallbackTaskController.register("mbrooks/tars#1", vi.fn())).toBeUndefined();
+		expect(fallbackTaskController.register("mbrooks/tars#1", vi.fn())).not.toBeNull();
 		expect(fallbackTaskController.unregister("mbrooks/tars#1")).toBeUndefined();
 		expect(fallbackTaskController.isDraining()).toBe(false);
 		expect(fallbackTaskController.setDraining(true)).toBeUndefined();

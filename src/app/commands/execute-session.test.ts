@@ -85,7 +85,7 @@ function makeDeps(overrides?: {
 		cancel: vi.fn(() => false),
 		isActive: vi.fn(() => false),
 		steer: vi.fn(async () => false),
-		register: vi.fn(),
+		register: vi.fn(() => Symbol("test-task")),
 		unregister: vi.fn(),
 		isDraining: vi.fn(() => false),
 		setDraining: vi.fn(),
@@ -110,6 +110,30 @@ const state: SessionState = {
 };
 
 describe("ExecuteSession", () => {
+	it("atomically rejects a duplicate execution and steers its feedback to the active task", async () => {
+		const deps = makeDeps();
+		(deps.tasks.register as ReturnType<typeof vi.fn>).mockReturnValue(null);
+		(deps.tasks.steer as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state, "Please retry");
+
+		expect(deps.tasks.steer).toHaveBeenCalledWith("mbrooks/tars#1", "Please retry");
+		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+		expect(deps.tasks.unregister).not.toHaveBeenCalled();
+	});
+
 	it("classifies PAT scope missing error correctly", async () => {
 		const deps = makeDeps({
 			commitAndPush: vi.fn(async () => {
