@@ -25,6 +25,8 @@ import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from 
 const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.tars.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
+const MAX_WORKER_LAUNCH_RETRIES = 3;
+const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
 
 async function execFileText(command: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
 	const result = await execFileAsync(command, args, { cwd });
@@ -89,10 +91,52 @@ export class DockerWorkerExecutor implements ExecutionService {
 		const sessionKey = buildSessionKey(state.owner, state.repo, state.issueNumber);
 		const containerName = this.buildContainerName(state);
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
+		await this.validateLaunch(state.workspacePath);
+
+		for (let retryCount = 0; ; retryCount += 1) {
+			try {
+				return await this.runWorkerAttempt(
+					state,
+					prompt,
+					sessionKey,
+					containerName,
+					workspacePathInWorker,
+					abortSignal,
+					onSessionCreated,
+					onActivity,
+				);
+			} catch (error) {
+				const launchError = error instanceof Error ? error : new Error(String(error));
+				if (!this.isContainerNameConflict(launchError)) {
+					throw launchError;
+				}
+
+				if (retryCount >= MAX_WORKER_LAUNCH_RETRIES) {
+					throw new Error(
+						`Worker container launch failed after ${retryCount + 1} attempts (${MAX_WORKER_LAUNCH_RETRIES} retries).\n${launchError.message}`,
+						{ cause: launchError },
+					);
+				}
+				const recovered = await this.removeStoppedConflictingContainer(containerName, sessionKey);
+				if (!recovered) {
+					throw launchError;
+				}
+			}
+		}
+	}
+
+	private async runWorkerAttempt(
+		state: SessionState,
+		prompt: { kind: "issue" | "comment" | "pr-review"; text: string },
+		sessionKey: string,
+		containerName: string,
+		workspacePathInWorker: string,
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
+		onActivity?: () => void,
+	): Promise<ExecutionResult> {
 		const pendingConnection = this.options.workerRpcServer.createPendingConnection(sessionKey);
 		const workerSessionUrl = this.buildWorkerSessionUrl(sessionKey, pendingConnection.token);
-
-		await this.validateLaunch(state.workspacePath);
 
 		recordSessionLog(sessionKey, {
 			level: "info",
@@ -165,11 +209,10 @@ export class DockerWorkerExecutor implements ExecutionService {
 			dockerStderr = this.appendOutput(dockerStderr, chunk.toString("utf8"));
 		});
 
-		const dockerExitPromise = new Promise<void>((resolve, reject) => {
+		const dockerExitPromise = new Promise<never>((_resolve, reject) => {
 			docker.on("error", (error) => reject(error));
 			docker.on("exit", (code, signal) => {
 				if (settled) {
-					resolve();
 					return;
 				}
 				const tail = [dockerStderr.trim(), dockerStdout.trim()].filter(Boolean).join("\n");
@@ -205,7 +248,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		abortSignal?.addEventListener("abort", onAbort);
 
 		try {
-			connection = await pendingConnection.waitForConnection();
+			connection = await Promise.race([pendingConnection.waitForConnection(), dockerExitPromise]);
 			connection.onMessage((message) => {
 				if (message.protocolVersion !== WORKER_PROTOCOL_VERSION) {
 					connection?.close(1002, `Unsupported worker protocol version ${message.protocolVersion}`);
@@ -252,7 +295,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 				}
 			});
 
-			return await Promise.race([executionPromise, dockerExitPromise.then(() => executionPromise)]);
+			return await Promise.race([executionPromise, dockerExitPromise]);
 		} finally {
 			abortSignal?.removeEventListener("abort", onAbort);
 			if (abortTimer) {
@@ -261,6 +304,64 @@ export class DockerWorkerExecutor implements ExecutionService {
 			cleanupPendingAcks(new Error("Worker session ended before acknowledgement"));
 			connection?.close();
 			pendingConnection.dispose();
+		}
+	}
+
+	private isContainerNameConflict(error: Error): boolean {
+		return error.message.includes("Conflict. The container name") && error.message.includes("is already in use by container");
+	}
+
+	private async removeStoppedConflictingContainer(containerName: string, sessionKey: string): Promise<boolean> {
+		let status: string;
+		try {
+			const result = await execFileText(
+				"docker",
+				["inspect", "--format", "{{.State.Status}}", containerName],
+				this.options.projectRoot,
+			);
+			status = result.stdout.trim().toLowerCase();
+		} catch (error) {
+			recordSessionLog(sessionKey, {
+				level: "error",
+				message: `Could not inspect conflicting worker container ${containerName}`,
+				details: {
+					type: "worker_launch_recovery",
+					containerName,
+					error: error instanceof Error ? error.message : String(error),
+				},
+			});
+			return false;
+		}
+
+		if (!STOPPED_CONTAINER_STATES.has(status)) {
+			recordSessionLog(sessionKey, {
+				level: "error",
+				message: `Conflicting worker container ${containerName} is ${status || "in an unknown state"}; refusing to remove it`,
+				details: { type: "worker_launch_recovery", containerName, status },
+			});
+			return false;
+		}
+
+		try {
+			await execFileText("docker", ["rm", containerName], this.options.projectRoot);
+			recordSessionLog(sessionKey, {
+				level: "warn",
+				message: `Removed stopped conflicting worker container ${containerName}; retrying launch`,
+				details: { type: "worker_launch_recovery", containerName, status },
+			});
+			return true;
+		} catch (error) {
+			recordSessionLog(sessionKey, {
+				level: "error",
+				message: `Could not remove stopped conflicting worker container ${containerName}`,
+				details: {
+					type: "worker_launch_recovery",
+					containerName,
+					status,
+					error: error instanceof Error ? error.message : String(error),
+				},
+			});
+			return false;
 		}
 	}
 
