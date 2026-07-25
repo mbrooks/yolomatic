@@ -18,6 +18,7 @@ export interface CommentEventPayload {
 	action: string;
 	issue: {
 		number: number;
+		state?: string;
 		title?: string;
 		body?: string | null;
 		pull_request?: { url: string };

@@ -66,6 +66,7 @@ interface CommentGuardPayload {
 	action: string;
 	comment: { body: string; user: { login: string; type?: string } };
 	issue: {
+		state?: string;
 		labels?: Array<{ name?: string }>;
 		assignee?: { login: string } | null;
 		assignees?: { login: string }[];
