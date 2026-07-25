@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { addRepo, removeRepo, scanRepos } from "./repos.js";
+import { addRepo, listAccessibleRepos, removeRepo, scanRepos } from "./repos.js";
 
 global.fetch = vi.fn();
 
@@ -32,6 +32,48 @@ describe("addRepo", () => {
 		} as Response);
 
 		await expect(addRepo("unknown", "missing")).rejects.toThrow("Repository not found or not accessible");
+	});
+});
+
+describe("listAccessibleRepos", () => {
+	it("returns accessible and configured repos on success", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				repositories: [
+					{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
+				],
+				configured: [{ owner: "octocat", repo: "hello-world" }],
+			}),
+		} as Response);
+
+		const result = await listAccessibleRepos();
+		expect(result.repositories).toHaveLength(1);
+		expect(result.configured).toEqual([{ owner: "octocat", repo: "hello-world" }]);
+		expect(mockedFetch).toHaveBeenCalledWith("/api/repos/accessible");
+	});
+
+	it("throws when response is not ok", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: false,
+			status: 500,
+			statusText: "Internal Server Error",
+			json: async () => ({ error: "GitHub service not configured" }),
+		} as Response);
+
+		await expect(listAccessibleRepos()).rejects.toThrow("HTTP 500");
+	});
+
+	it("falls back to statusText when error body has no error field", async () => {
+		mockedFetch.mockResolvedValue({
+			ok: false,
+			status: 500,
+			statusText: "Internal Server Error",
+			json: async () => ({}),
+		} as Response);
+
+		await expect(listAccessibleRepos()).rejects.toThrow("HTTP 500");
 	});
 });
 
