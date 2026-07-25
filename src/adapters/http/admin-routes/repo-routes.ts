@@ -161,6 +161,27 @@ const registry = new AdminRouteRegistry()
 	})
 	.route({
 		method: "GET",
+		pattern: /^\/api\/repos\/accessible$/u,
+		requiresDeps: ["githubService", "settingsStore"],
+		handler: async (ctx) => {
+			const { githubService, settingsStore } = getRequiredDeps(ctx.deps, [
+				"githubService",
+				"settingsStore",
+			]);
+			const user = await githubService.getAuthenticatedUser();
+			if (!user) {
+				sendJson(ctx.response, 500, { error: "GitHub token is invalid or not configured" });
+				return;
+			}
+			const repositories = await githubService.listAccessibleRepositories();
+			const configured = parseConfiguredRepositories(
+				settingsStore.get("configured_repositories") ?? "[]",
+			).map((repo) => ({ owner: repo.owner, repo: repo.repo }));
+			return { status: 200, body: { repositories, configured } };
+		},
+	})
+	.route({
+		method: "GET",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/settings$/u,
 		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {

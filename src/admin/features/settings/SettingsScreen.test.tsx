@@ -317,15 +317,30 @@ describe("SettingsScreen", () => {
 		expect(screen.queryByText("port")).toBeNull();
 	});
 
-	it("shows only configured_repositories in the Repositories tab", async () => {
-		mockSettingsFetch();
+	it("renders the selectable Repositories tab and hides other settings", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/repos/accessible") {
+				return Promise.resolve(jsonResponse({
+					repositories: [
+						{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+					],
+					configured: [{ owner: "mbrooks", repo: "tars" }],
+				}));
+			}
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: MOCK_SETTINGS }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
 		render(<SettingsScreen onBack={vi.fn()} tab="repositories" />);
 
 		await waitFor(() => {
-			expect(screen.getByText("configured_repositories")).not.toBeNull();
+			expect(screen.getByText("mbrooks/tars")).not.toBeNull();
 		});
 
 		expect(screen.getByRole("button", { name: "Repositories" }).className).toContain("active");
+		expect(screen.getByRole("button", { name: "Deselect All" })).not.toBeNull();
 		expect(screen.queryByText("default_branch")).toBeNull();
 		expect(screen.queryByText("port")).toBeNull();
 	});

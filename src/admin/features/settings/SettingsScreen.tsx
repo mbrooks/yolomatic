@@ -5,6 +5,7 @@ import type { SettingView } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
+import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
@@ -106,7 +107,7 @@ export function SettingsScreen({
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
-	const filteredSettings = tab === "skills" || tab === "invitations"
+	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories"
 		? []
 		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 
@@ -122,7 +123,11 @@ export function SettingsScreen({
 					onRerunOnboarding={handleRerunOnboarding}
 					rerunningOnboarding={rerunningOnboarding}
 				/>
-				<div className="empty">Loading settings...</div>
+				{tab === "repositories" ? (
+					<RepositoriesSettingsSection />
+				) : (
+					<div className="empty">Loading settings...</div>
+				)}
 			</div>
 		);
 	}
@@ -143,6 +148,8 @@ export function SettingsScreen({
 				<ServerSkillsScreen showBreadcrumb={false} />
 			) : tab === "invitations" ? (
 				<InvitationsSection />
+			) : tab === "repositories" ? (
+				<RepositoriesSettingsSection />
 			) : (
 				<>
 					{pendingRestart && (
