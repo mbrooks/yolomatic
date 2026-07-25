@@ -76,7 +76,7 @@ export class WorkspaceManager implements WorkspaceService {
 			return false;
 		}
 
-		await this.git.run("git", ["push", "origin", branchName], { cwd: worktreePath });
+		await this.git.runAuthenticated(["push", "origin", branchName], { cwd: worktreePath });
 		return true;
 	}
 

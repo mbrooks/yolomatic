@@ -32,11 +32,11 @@ describe("BareRepoManager", () => {
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
 		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
-		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
-			undefined,
-		]);
+			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			expect.objectContaining({ env: expect.any(Object) }),
+		);
 	});
 
 	it("reclones when an existing path is not a valid git repository", async () => {
@@ -56,11 +56,11 @@ describe("BareRepoManager", () => {
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
 		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
-		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
-			undefined,
-		]);
+			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			expect.objectContaining({ env: expect.any(Object) }),
+		);
 	});
 
 	it("reclones an existing bare repo when refresh hits a lock-permission error", async () => {
@@ -71,7 +71,7 @@ describe("BareRepoManager", () => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
 				return { stdout: `${bareRepoPath}\n`, stderr: "" };
 			}
-			if (args[0] === "fetch") {
+			if (args.includes("fetch")) {
 				throw new Error(
 					"Command failed: git fetch origin +refs/heads/*:refs/remotes/origin/* --prune\n" +
 						"error: cannot lock ref 'refs/remotes/origin/tars/issue-427': Permission denied\n" +
@@ -91,13 +91,13 @@ describe("BareRepoManager", () => {
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
-			{ cwd: bareRepoPath },
+			expect.objectContaining({ cwd: bareRepoPath, env: expect.any(Object) }),
 		);
-		expect((runCommand as ReturnType<typeof vi.fn>).mock.calls).toContainEqual([
+		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://mbrooks:secret@github.com/mbrooks/tars.git", bareRepoPath],
-			undefined,
-		]);
+			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			expect.objectContaining({ env: expect.any(Object) }),
+		);
 	});
 
 	it("rethrows non-recoverable refresh failures for an existing bare repo", async () => {
@@ -122,6 +122,33 @@ describe("BareRepoManager", () => {
 			expect.arrayContaining(["clone"]),
 			expect.anything(),
 		);
+	});
+
+	it("replaces legacy credential-bearing remotes before fetching", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-bare-sanitize-"));
+		const bareRepoPath = path.join(root, "mbrooks-tars");
+		await mkdir(bareRepoPath, { recursive: true });
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: `${bareRepoPath}\n`, stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = new BareRepoManager(createConfig(root), git);
+
+		await bareRepos.ensureBareRepo("mbrooks", "tars");
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["remote", "set-url", "origin", "https://github.com/mbrooks/tars.git"],
+			{ cwd: bareRepoPath },
+		);
+		const remoteUpdateIndex = (runCommand as ReturnType<typeof vi.fn>).mock.calls.findIndex(
+			(call) => call[1][0] === "remote" && call[1][1] === "set-url",
+		);
+		const fetchIndex = (runCommand as ReturnType<typeof vi.fn>).mock.calls.findIndex((call) => call[1][0] === "fetch");
+		expect(remoteUpdateIndex).toBeLessThan(fetchIndex);
 	});
 
 	it("ignores remote set-head errors while updating the default branch", async () => {

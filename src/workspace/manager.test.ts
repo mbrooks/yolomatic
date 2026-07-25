@@ -324,7 +324,7 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["push", "origin", "tars/issue-42"],
-			{ cwd: worktreePath },
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
@@ -355,7 +355,7 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["push", "origin", "tars/custom-test"],
-			{ cwd: worktreePath },
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
@@ -460,7 +460,7 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["push", "origin", "tars/issue-42"],
-			{ cwd: worktreePath },
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
@@ -626,7 +626,7 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
-			{ cwd: bareRepoPath },
+			expect.objectContaining({ cwd: bareRepoPath, env: expect.any(Object) }),
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
