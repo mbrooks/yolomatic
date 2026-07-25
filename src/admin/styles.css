@@ -942,19 +942,6 @@ a:hover {
 	color: var(--blue);
 }
 
-.repo-tab.settings-rerun-onboarding {
-	background: var(--red);
-	border-color: var(--red);
-	color: #fff;
-}
-
-.repo-tab.settings-rerun-onboarding:hover {
-	background: var(--red);
-	border-color: var(--red);
-	color: #fff;
-	filter: brightness(1.1);
-}
-
 .repo-tab.settings-rerun-onboarding:disabled {
 	cursor: wait;
 	opacity: 0.65;
