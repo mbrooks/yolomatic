@@ -89,7 +89,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 
 export function isBootstrapComplete(config: AppConfig): boolean {
 	return (
-		config.webhookSecret !== "" &&
+		(config.githubEventMode === "polling" || config.webhookSecret !== "") &&
 		config.githubToken !== "" &&
 		config.githubUsername !== "" &&
 		!!config.adminUsername &&
@@ -100,7 +100,7 @@ export function isBootstrapComplete(config: AppConfig): boolean {
 
 export function getBootstrapMissingFields(config: AppConfig): string[] {
 	const missing: string[] = [];
-	if (!config.webhookSecret) missing.push("webhook_secret");
+	if (config.githubEventMode !== "polling" && !config.webhookSecret) missing.push("webhook_secret");
 	if (!config.githubToken) missing.push("github_token");
 	if (!config.githubUsername) missing.push("github_username");
 	if (!config.adminUsername) missing.push("admin_username");
