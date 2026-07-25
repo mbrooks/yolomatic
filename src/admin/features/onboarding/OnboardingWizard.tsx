@@ -400,7 +400,7 @@ function getStepSubtitle(step: number): string {
 		case 2:
 			return "Connect your GitHub account with a Personal Access Token.";
 		case 3:
-			return "Choose how TARS receives GitHub events.";
+			return "Choose how TARS receives GitHub events by default.";
 		case 4:
 			return "Secure your webhook with a high-entropy secret.";
 		case 5:
@@ -551,29 +551,27 @@ function StepThreeEventMode({
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
-				<span className="setting-description">Choose how TARS discovers GitHub events.</span>
-				<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+				<label htmlFor="github_event_mode">GitHub Event Mode</label>
+				<select
+					id="github_event_mode"
+					value={mode}
+					onChange={(e) => {
+						const next = e.target.value;
+						updateField("githubEventMode", next);
+						if (isPollingMode(next) && !state.githubPollIntervalMs.trim()) {
+							updateField("githubPollIntervalMs", String(DEFAULT_POLL_INTERVAL_MS));
+						}
+					}}
+				>
+					<option value="" disabled>Select an option…</option>
 					{EVENT_MODE_OPTIONS.map((option) => (
-						<label
-							key={option}
-							style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.95rem" }}
-						>
-							<input
-								type="radio"
-								name="github_event_mode"
-								value={option}
-								checked={mode === option}
-								onChange={() => {
-									updateField("githubEventMode", option);
-									if (isPollingMode(option) && !state.githubPollIntervalMs.trim()) {
-										updateField("githubPollIntervalMs", String(DEFAULT_POLL_INTERVAL_MS));
-									}
-								}}
-							/>
-							<span>{option === "webhook" ? "Webhook" : option === "polling" ? "Polling" : "Both"}</span>
-						</label>
+						<option key={option} value={option}>
+							{option === "webhook" ? "Webhook" : option === "polling" ? "Polling" : "Both"}
+						</option>
 					))}
-				</div>
+				</select>
+				<span className="setting-description">Choose how TARS discovers GitHub events.</span>
+				<span className="setting-description">These are the default settings for all projects. Each project can override them later.</span>
 			</div>
 
 			{showPollInterval && (
