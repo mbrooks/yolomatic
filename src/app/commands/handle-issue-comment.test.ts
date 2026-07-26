@@ -356,17 +356,25 @@ describe("HandleIssueComment", () => {
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Steering comment received.");
 	});
 
-	it("accepts comments on issues created by TARS", async () => {
-		const { handler, github } = createHandler();
+	it("ignores comments on issues created by TARS when TARS is not assigned", async () => {
+		const { handler, github, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [], assignee: null, assignees: [], user: { login: "tars-bot" } },
-			comment: { id: 1, body: "following up", user: { login: "user" } },
+			issue: {
+				number: 42,
+				labels: [{ name: "tars" }],
+				assignee: { login: "other-user" },
+				assignees: [{ login: "other-user" }],
+				user: { login: "tars-bot" },
+			},
+			comment: { id: 1, body: "@tars-bot following up", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.addLabels).not.toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars"]);
+		expect(sessions.get).not.toHaveBeenCalled();
+		expect(github.addLabels).not.toHaveBeenCalled();
+		expect(github.postComment).not.toHaveBeenCalled();
 	});
 
 	it("posts a paused message when the session is paused", async () => {
