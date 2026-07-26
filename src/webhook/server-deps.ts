@@ -76,6 +76,7 @@ export function createWebhookServerDeps(
 		adminPassword,
 		adminAssetsDir,
 		settingsStore,
+		repositoryStore,
 		cleanupCommand: new CleanupOldSessions(sessionRepo, workspaceService),
 	};
 }
