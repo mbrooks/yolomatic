@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export const SETTINGS_CATEGORY_TABS = [
-	{ slug: "server", label: "General" },
+	{ slug: "server", label: "Server" },
 	{ slug: "github-integration", label: "GitHub Integration" },
 	{ slug: "repositories", label: "Repositories" },
 	{ slug: "git-worktrees", label: "Git & Worktrees" },

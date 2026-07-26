@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import { handleOnboardingRoutes } from "./onboarding-routes.js";
 import { SettingsStore } from "../../../settings/store.js";
+import { WorkspaceManager } from "../../../workspace/manager.js";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -60,6 +61,10 @@ function makeDeps(store?: SettingsStore) {
 		},
 	} as never;
 }
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe("handleOnboardingRoutes", () => {
 	it("returns false for unrelated paths", async () => {
@@ -355,6 +360,7 @@ describe("handleOnboardingRoutes", () => {
 		});
 
 		it("attempts to initialize provided repos", async () => {
+			const initializeRepo = vi.spyOn(WorkspaceManager.prototype, "initializeRepo").mockResolvedValue();
 			const store = await tmpStore();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
@@ -372,7 +378,8 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(Array.isArray(body.initialized)).toBe(true);
+			expect(body.initialized).toEqual(["mbrooks/tars"]);
+			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "tars");
 			expect(store.get("configured_repositories")).toBe(JSON.stringify([{ owner: "mbrooks", repo: "tars" }]));
 		});
 

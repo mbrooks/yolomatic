@@ -269,12 +269,12 @@ describe("SettingsScreen", () => {
 		vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise(() => {}));
 		render(<SettingsScreen onBack={vi.fn()} />);
 
-		const defaultButton = screen.getByRole("button", { name: "General" });
+		const defaultButton = screen.getByRole("button", { name: "Server" });
 		expect(defaultButton).not.toBeNull();
 		expect(defaultButton.className).toContain("active");
 	});
 
-	it("renders consolidated sections under General and hides their former tabs", async () => {
+	it("renders consolidated sections under Server and hides their former tabs", async () => {
 		mockSettingsFetch();
 		render(<SettingsScreen onBack={vi.fn()} tab="server" />);
 
@@ -284,7 +284,7 @@ describe("SettingsScreen", () => {
 
 		const tabs = screen.getAllByRole("button").filter((button) => button.classList.contains("repo-tab"));
 		expect(tabs.map((button) => button.textContent)).toEqual([
-			"General",
+			"Server",
 			"GitHub Integration",
 			"Repositories",
 			"Git & Worktrees",
