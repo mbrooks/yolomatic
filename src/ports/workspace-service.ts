@@ -1,5 +1,6 @@
 export interface WorkspaceService {
 	createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<{ path: string; branch: string }>;
+	syncWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
 	removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
 	commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean>;
 	commitAndPushPath(worktreePath: string, branchName: string, message?: string, baseBranch?: string): Promise<boolean>;

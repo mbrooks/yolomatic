@@ -229,9 +229,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(store.getString("github_token")).toBe("tok");
 	});
 
-	it("GET /tarsadmin returns HTML when credentials configured", async () => {
+	it("GET /tars/admin returns HTML when credentials configured", async () => {
 		const req = mockRequest({
-			url: "/tarsadmin",
+			url: "/tars/admin",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -243,9 +243,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(String(res.body)).toContain("<html>");
 	});
 
-	it("GET /tarsadmin/assets/main.js serves asset", async () => {
+	it("GET /tars/admin/assets/main.js serves asset", async () => {
 		const req = mockRequest({
-			url: "/tarsadmin/assets/main.js",
+			url: "/tars/admin/assets/main.js",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -683,10 +683,10 @@ describe.sequential("handleAdminRoute", () => {
 		expect(body.error).toBe("Settings store not configured");
 	});
 
-	it("GET /tarsadmin allows access without auth during onboarding", async () => {
+	it("GET /tars/admin allows access without auth during onboarding", async () => {
 		const onboardingDeps = { ...deps, adminUsername: undefined, adminPassword: undefined };
 		const req = mockRequest({
-			url: "/tarsadmin",
+			url: "/tars/admin",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -913,12 +913,12 @@ describe.sequential("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(404);
 	});
 
-	it("GET /tarsadmin uses credentials from settingsStore when deps credentials missing", async () => {
+	it("GET /tars/admin uses credentials from settingsStore when deps credentials missing", async () => {
 		store.set("admin_username", "store-admin");
 		store.set("admin_password", "store-secret");
 		const credsDeps = { ...deps, adminUsername: undefined, adminPassword: undefined };
 		const req = mockRequest({
-			url: "/tarsadmin",
+			url: "/tars/admin",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("store-admin", "store-secret") },
 		});

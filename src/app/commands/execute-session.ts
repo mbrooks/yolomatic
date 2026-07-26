@@ -10,6 +10,7 @@ import type { SessionState } from "../../session/store.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { SelfEvolutionEngine } from "../../self-evolution/index.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
+import { WorktreeBranchDivergedError } from "../../workspace/errors.js";
 import { issueSessionKey, removeWorkflowLabels } from "./workflow-helpers.js";
 import { ExecuteSessionDelivery } from "./execute-session-delivery.js";
 import { ExecuteSessionReporter } from "./execute-session-reporter.js";
@@ -86,22 +87,13 @@ export class ExecuteSession {
 
 			const preflightError = await this.validateSessionBeforeExecution(current);
 			if (preflightError) {
-				process.stdout.write(`[execute] execution blocked for ${key}: ${preflightError}\n`);
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: preflightError });
-				await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-				await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
-				await this.deps.github.postComment(
-					owner,
-					repo,
-					issueNumber,
-					[
-						"**TARS stopped before execution.**",
-						"",
-						preflightError,
-						"",
-						"This protects the task from being handled by the wrong issue worktree.",
-					].join("\n"),
-				);
+				await this.failBeforeExecution(current, key, preflightError);
+				return;
+			}
+
+			const syncError = await this.syncWorkspace(current);
+			if (syncError) {
+				await this.failBeforeExecution(current, key, syncError);
 				return;
 			}
 
@@ -253,6 +245,83 @@ export class ExecuteSession {
 			return null;
 		}
 		return validatePRSessionMapping(state, state.prNumber, pr.head.ref);
+	}
+
+	/**
+	 * Refresh the worktree from origin and ensure no credentials leak into the
+	 * worker. Returns an error string when the session must not launch, or
+	 * null when the workspace is ready for the worker.
+	 */
+	private async syncWorkspace(state: SessionState): Promise<string | null> {
+		const { owner, repo, issueNumber } = state;
+		const attempt = async (): Promise<string | null> => {
+			try {
+				await this.deps.workspaces.syncWorktree(owner, repo, issueNumber);
+				return null;
+			} catch (error) {
+				if (error instanceof WorktreeBranchDivergedError) {
+					return "diverged";
+				}
+				return error instanceof Error ? error.message : String(error);
+			}
+		};
+
+		const firstError = await attempt();
+		if (firstError === null) {
+			return null;
+		}
+		if (firstError !== "diverged") {
+			return this.formatSyncError(firstError);
+		}
+
+		if (state.prNumber === undefined) {
+			return this.formatSyncError(
+				`Branch tars/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
+			);
+		}
+
+		try {
+			await this.deps.github.updatePullRequestBranch(owner, repo, state.prNumber);
+		} catch (error) {
+			return this.formatSyncError(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+
+		const retryError = await attempt();
+		if (retryError === null) {
+			return null;
+		}
+		return this.formatSyncError(retryError === "diverged" ? "Branch still diverged after update-branch." : retryError);
+	}
+
+	private formatSyncError(message: string): string {
+		return [
+			"Control-plane workspace sync failed for this session.",
+			message,
+			"",
+			"TARS will not launch a worker on a stale or credential-bearing workspace.",
+		].join("\n");
+	}
+
+	private async failBeforeExecution(state: SessionState, key: string, message: string): Promise<void> {
+		const { owner, repo, issueNumber } = state;
+		process.stdout.write(`[execute] execution blocked for ${key}: ${message}\n`);
+		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: message });
+		await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+		await this.deps.github.postComment(
+			owner,
+			repo,
+			issueNumber,
+			[
+				"**TARS stopped before execution.**",
+				"",
+				message,
+				"",
+				"This protects the task from being handled by the wrong issue worktree.",
+			].join("\n"),
+		);
 	}
 
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {

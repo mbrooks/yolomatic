@@ -76,6 +76,8 @@ export async function main(): Promise<void> {
 					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController, repositoryStore });
 				},
 				repositoryStore,
+				adminPath: config.adminPath,
+				adminDefaultPage: config.adminDefaultPage,
 			},
 			undefined,
 			settingsStore,

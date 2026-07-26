@@ -54,15 +54,33 @@ export class BareRepoManager {
 	}
 
 	async updateDefaultBranch(bareRepoPath: string): Promise<void> {
-		await this.git.runAuthenticated(["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"], {
-			cwd: bareRepoPath,
-		});
+		await this.fetchOrigin(bareRepoPath);
 
 		try {
 			await this.git.runAuthenticated(["remote", "set-head", "origin", "-a"], { cwd: bareRepoPath });
 		} catch {
 			// Some repositories or older bare clones may not have enough remote
 			// metadata for origin/HEAD. resolveBaseRef() has fallbacks.
+		}
+	}
+
+	/**
+	 * Fetch all branches from origin into the bare repo's remote-tracking refs.
+	 * Authentication is injected per-command via git config, never via the URL.
+	 */
+	async fetchOrigin(bareRepoPath: string): Promise<void> {
+		await this.git.runAuthenticated(["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"], {
+			cwd: bareRepoPath,
+		});
+	}
+
+	/** Returns true when `origin/${branchName}` exists in the bare repo. */
+	async remoteBranchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
+		try {
+			await this.git.run("git", ["rev-parse", "--verify", `origin/${branchName}`], { cwd: bareRepoPath });
+			return true;
+		} catch {
+			return false;
 		}
 	}
 

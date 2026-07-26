@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { unlinkSync } from "node:fs";
 
-import { getConfig, isBootstrapComplete, getBootstrapMissingFields } from "./config.js";
+import { getConfig, isBootstrapComplete, getBootstrapMissingFields, normalizeAdminPath, adminWebSocketPath, DEFAULT_ADMIN_PATH, DEFAULT_ADMIN_DEFAULT_PAGE } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 
 const TEST_DB = "/tmp/tars-config-test.sqlite";
@@ -215,6 +215,75 @@ describe("isBootstrapComplete", () => {
 			adminPassword: "pass",
 			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig)).toBe(false);
+	});
+});
+
+describe("normalizeAdminPath", () => {
+	it("returns the default when the value is empty", () => {
+		expect(normalizeAdminPath(undefined)).toBe(DEFAULT_ADMIN_PATH);
+		expect(normalizeAdminPath("")).toBe(DEFAULT_ADMIN_PATH);
+		expect(normalizeAdminPath("   ")).toBe(DEFAULT_ADMIN_PATH);
+	});
+
+	it("ensures the path starts with a slash", () => {
+		expect(normalizeAdminPath("custom/admin")).toBe("/custom/admin");
+	});
+
+	it("strips trailing slashes except for root", () => {
+		expect(normalizeAdminPath("/tars/admin/")).toBe("/tars/admin");
+		expect(normalizeAdminPath("/tars/admin///")).toBe("/tars/admin");
+	});
+
+	it("preserves the root path", () => {
+		expect(normalizeAdminPath("/")).toBe("/");
+	});
+});
+
+describe("adminWebSocketPath", () => {
+	it("appends /ws to a non-root admin path", () => {
+		expect(adminWebSocketPath("/tars/admin")).toBe("/tars/admin/ws");
+	});
+
+	it("returns /ws for the root admin path", () => {
+		expect(adminWebSocketPath("/")).toBe("/ws");
+	});
+});
+
+describe("admin config settings", () => {
+	it("exposes default admin path and default page", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+
+		const config = getConfig(createStore());
+		expect(config.adminPath).toBe(DEFAULT_ADMIN_PATH);
+		expect(config.adminDefaultPage).toBe(DEFAULT_ADMIN_DEFAULT_PAGE);
+	});
+
+	it("reads admin_path and admin_default_page from settings", () => {
+		const store = createStore();
+		store.set("admin_path", "/custom/admin/");
+		store.set("admin_default_page", "#/repos");
+
+		const config = getConfig(store);
+		expect(config.adminPath).toBe("/custom/admin");
+		expect(config.adminDefaultPage).toBe("#/repos");
+	});
+
+	it("normalizes an admin_path missing the leading slash", () => {
+		const store = createStore();
+		store.set("admin_path", "custom/admin");
+
+		const config = getConfig(store);
+		expect(config.adminPath).toBe("/custom/admin");
+	});
+
+	it("falls back to the default admin_default_page when blank", () => {
+		const store = createStore();
+		store.set("admin_default_page", "   ");
+
+		const config = getConfig(store);
+		expect(config.adminDefaultPage).toBe(DEFAULT_ADMIN_DEFAULT_PAGE);
 	});
 });
 

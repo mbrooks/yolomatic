@@ -51,6 +51,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		}));
 		const octokit = {
 			issues: {
@@ -128,6 +130,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				repo: "tars",
 				issueNumber: 56,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			commitAndPushPath: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
@@ -251,6 +254,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		});
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
@@ -471,7 +476,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
 
-	it("does not create a fallback session from PR timeline comments", async () => {
+	it("silently ignores PR timeline comments without a stored PR session", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue(null as never);
 		const handlers = new GitHubIssueHandlers({
@@ -503,12 +508,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(executor.execute).not.toHaveBeenCalled();
-		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({
-				issue_number: 99,
-				body: expect.stringContaining("will not create a new session from a PR comment"),
-			}),
-		);
+		expect(octokit.issues.createComment).not.toHaveBeenCalled();
 	});
 
 	it("blocks issue execution when stored PR head maps to a different issue branch", async () => {

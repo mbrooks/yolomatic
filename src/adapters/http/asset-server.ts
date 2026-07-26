@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
 import { extname, join, relative, resolve } from "node:path";
 import { sendHtml, sendText } from "./response-helpers.js";
+import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../../config.js";
 
 function contentTypeFor(path: string): string {
 	const extension = extname(path);
@@ -32,9 +33,34 @@ function fallbackAdminHtml(): string {
 </html>`;
 }
 
-export async function adminHtml(adminAssetsDir: string): Promise<string> {
+/**
+ * Inject runtime admin configuration into the served index.html so the SPA
+ * can resolve the configured admin path prefix and default landing page
+ * without rebuilding the bundle.
+ */
+export function injectAdminConfig(
+	html: string,
+	adminPath: string = DEFAULT_ADMIN_PATH,
+	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
+): string {
+	const script = `<script>window.__TARS_ADMIN_PATH__ = ${JSON.stringify(adminPath)}; window.__TARS_ADMIN_DEFAULT_PAGE__ = ${JSON.stringify(adminDefaultPage)};</script>`;
+	if (html.includes("</head>")) {
+		return html.replace("</head>", `${script}</head>`);
+	}
+	if (html.includes("<body>")) {
+		return html.replace("<body>", `<body>${script}`);
+	}
+	return `${script}${html}`;
+}
+
+export async function adminHtml(
+	adminAssetsDir: string,
+	adminPath: string = DEFAULT_ADMIN_PATH,
+	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
+): Promise<string> {
 	try {
-		return await readFile(join(adminAssetsDir, "index.html"), "utf8");
+		const html = await readFile(join(adminAssetsDir, "index.html"), "utf8");
+		return injectAdminConfig(html, adminPath, adminDefaultPage);
 	} catch {
 		return fallbackAdminHtml();
 	}
