@@ -45,6 +45,26 @@ export class GitHubServiceAdapter implements GitHubService {
 		}
 	}
 
+	async updatePullRequestBranch(owner: string, repo: string, prNumber: number, expectedHeadSha?: string): Promise<void> {
+		try {
+			await this.octokit.pulls.updateBranch({
+				owner,
+				repo,
+				pull_number: prNumber,
+				...(expectedHeadSha ? { expected_head_sha: expectedHeadSha } : {}),
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (/(merge conflict|422|409|cannot be merged|non-fast-forward|unresolvable)/i.test(message)) {
+				throw new Error(
+					`[github] update-branch failed for ${owner}/${repo}#${prNumber}: ${message}. ` +
+						`Resolve the conflict manually before relaunching the worker.`,
+				);
+			}
+			throw error;
+		}
+	}
+
 	async createPullRequest(
 		owner: string,
 		repo: string,

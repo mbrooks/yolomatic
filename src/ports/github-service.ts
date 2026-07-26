@@ -76,6 +76,7 @@ export interface GitHubService {
 	addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void>;
 	removeLabel(owner: string, repo: string, issueNumber: number, label: string): Promise<void>;
 	getPullRequest(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null>;
+	updatePullRequestBranch(owner: string, repo: string, prNumber: number, expectedHeadSha?: string): Promise<void>;
 	createPullRequest(
 		owner: string,
 		repo: string,

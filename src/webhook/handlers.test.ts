@@ -130,6 +130,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				repo: "tars",
 				issueNumber: 56,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			commitAndPushPath: vi.fn(async () => true),
 			removeWorktree: vi.fn(),

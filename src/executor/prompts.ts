@@ -54,8 +54,10 @@ export function buildPRReviewPrompt(state: SessionState, comments: PRReviewComme
 		"  TARS_STATUS: working",
 		"  TARS_STATUS: waiting-feedback",
 		"  TARS_STATUS: complete",
-		"- If complete, commit all changes and push to the branch:",
-		`- git add -A && git commit -m "TARS: Address PR review feedback" && git push origin tars/issue-${state.issueNumber}`,
+		"- When complete, stage and commit changes locally only:",
+		`- git add -A && git commit -m "TARS: Address PR review feedback"`,
+		"- Do NOT push, force-push, or run any credential-bearing git command.",
+		"- The control plane owns delivery and will publish the branch after the run.",
 		"- Do NOT force-push. Append commits to the existing PR branch.",
 		"",
 	];
