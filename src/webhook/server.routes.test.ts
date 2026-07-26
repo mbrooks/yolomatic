@@ -2297,13 +2297,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 200 for /tarsadmin when credentials are not configured", async () => {
+	it("returns 200 for /tars/admin when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/tarsadmin" });
+		const response = await makeRequest(port, { method: "GET", path: "/tars/admin" });
 		expect(response.statusCode).toBe(200);
 
 		server.close();
@@ -2321,13 +2321,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 401 for /tarsadmin without auth header when credentials are configured", async () => {
+	it("returns 401 for /tars/admin without auth header when credentials are configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/tarsadmin" });
+		const response = await makeRequest(port, { method: "GET", path: "/tars/admin" });
 		expect(response.statusCode).toBe(401);
 		expect(response.body).toBe("Unauthorized");
 
@@ -2353,12 +2353,12 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns HTML for /tarsadmin with valid credentials", async () => {
+	it("returns HTML for /tars/admin with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
 		await writeFile(
 			join(adminAssetsDir, "index.html"),
-			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div><script type="module" src="/tarsadmin/assets/main.js"></script></body></html>',
+			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div><script type="module" src="/tars/admin/assets/main.js"></script></body></html>',
 		);
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2367,7 +2367,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/tarsadmin",
+				path: "/tars/admin",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -2376,14 +2376,14 @@ describe("createWebhookServer", () => {
 			expect(response.headers["content-type"]).toContain("text/html");
 			expect(response.body).toContain("TARS Admin");
 			expect(response.body).toContain('id="root"');
-			expect(response.body).toContain("/tarsadmin/assets/main.js");
+			expect(response.body).toContain("/tars/admin/assets/main.js");
 		} finally {
 			server.close();
 			await rm(adminAssetsDir, { force: true, recursive: true });
 		}
 	});
 
-	it("serves /tarsadmin bundled assets with valid credentials", async () => {
+	it("serves /tars/admin bundled assets with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
@@ -2395,7 +2395,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/tarsadmin/assets/main.js",
+				path: "/tars/admin/assets/main.js",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -2409,7 +2409,7 @@ describe("createWebhookServer", () => {
 		}
 	});
 
-	it("requires auth for /tarsadmin bundled assets", async () => {
+	it("requires auth for /tars/admin bundled assets", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
@@ -2419,7 +2419,7 @@ describe("createWebhookServer", () => {
 		const port = (server.address() as { port: number }).port;
 
 		try {
-			const response = await makeRequest(port, { method: "GET", path: "/tarsadmin/assets/main.js" });
+			const response = await makeRequest(port, { method: "GET", path: "/tars/admin/assets/main.js" });
 			expect(response.statusCode).toBe(401);
 			expect(response.body).toBe("Unauthorized");
 		} finally {
@@ -4061,7 +4061,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -4084,7 +4084,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/tarsadmin",
+			path: "/tars/admin",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -4095,7 +4095,7 @@ describe("createWebhookServer", () => {
 		expect(cookieHeader).toBeTruthy();
 		const cookie = Array.isArray(cookieHeader) ? cookieHeader[0].split(";")[0] : String(cookieHeader).split(";")[0];
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`, {
 			headers: {
 				Cookie: cookie,
 			},
@@ -4116,7 +4116,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tarsadmin/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`);
 
 		await new Promise<void>((resolve, reject) => {
 			client.once("open", resolve);
@@ -4125,6 +4125,38 @@ describe("createWebhookServer", () => {
 
 		client.close();
 		server.close();
+	});
+
+	it("serves the admin UI and websocket under a custom configured admin path", async () => {
+		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-custom-"));
+		await writeFile(
+			join(adminAssetsDir, "index.html"),
+			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div></body></html>',
+		);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, undefined, undefined, { adminAssetsDir, adminPath: "/custom/admin", adminDefaultPage: "#/repos" });
+		await new Promise<void>((resolve) => server.listen(0, resolve));
+		const port = (server.address() as { port: number }).port;
+
+		try {
+			const legacyResponse = await makeRequest(port, { method: "GET", path: "/tars/admin" });
+			expect(legacyResponse.statusCode).toBe(404);
+
+			const customResponse = await makeRequest(port, { method: "GET", path: "/custom/admin" });
+			expect(customResponse.statusCode).toBe(200);
+			expect(customResponse.body).toContain('window.__TARS_ADMIN_PATH__ = "/custom/admin"');
+			expect(customResponse.body).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+
+			const client = new WebSocket(`ws://127.0.0.1:${port}/custom/admin/ws`);
+			await new Promise<void>((resolve, reject) => {
+				client.once("open", resolve);
+				client.once("error", reject);
+			});
+			client.close();
+		} finally {
+			server.close();
+			await rm(adminAssetsDir, { force: true, recursive: true });
+		}
 	});
 
 	it("handles issue_comment webhook through server", async () => {

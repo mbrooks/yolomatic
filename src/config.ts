@@ -1,6 +1,34 @@
 import path from "node:path";
 import type { SettingsStore } from "./settings/store.js";
 
+export const DEFAULT_ADMIN_PATH = "/tars/admin";
+export const DEFAULT_ADMIN_DEFAULT_PAGE = "#/dashboard";
+
+/**
+ * Normalize a configured admin HTTP path prefix.
+ *
+ * Ensures the path starts with "/" and does not end with "/" (except for
+ * the root path "/" itself). Empty/blank values fall back to the default.
+ */
+export function normalizeAdminPath(raw: string | undefined): string {
+	const value = (raw ?? "").trim() || DEFAULT_ADMIN_PATH;
+	let normalized = value;
+	if (!normalized.startsWith("/")) {
+		normalized = `/${normalized}`;
+	}
+	if (normalized.length > 1) {
+		normalized = normalized.replace(/\/+$/u, "");
+	}
+	return normalized || "/";
+}
+
+/**
+ * Build the WebSocket upgrade path for the configured admin path prefix.
+ */
+export function adminWebSocketPath(adminPath: string): string {
+	return adminPath === "/" ? "/ws" : `${adminPath}/ws`;
+}
+
 export interface AppConfig {
 	port: number;
 	webhookSecret: string;
@@ -35,6 +63,8 @@ export interface AppConfig {
 	workerControlBaseUrl: string;
 	workerDockerNetworkMode?: string;
 	workerOllamaHost?: string;
+	adminPath: string;
+	adminDefaultPage: string;
 }
 
 export function getConfig(store: SettingsStore): AppConfig {
@@ -84,6 +114,11 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
 		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,
 		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
+		adminPath: normalizeAdminPath(store.get("admin_path")),
+		adminDefaultPage: (() => {
+			const raw = store.get("admin_default_page")?.trim();
+			return raw || DEFAULT_ADMIN_DEFAULT_PAGE;
+		})(),
 	};
 }
 

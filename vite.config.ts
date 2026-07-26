@@ -7,8 +7,13 @@ import { defineConfig } from "vite";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
+function resolveAdminBase(): string {
+	const raw = (process.env.TARS_ADMIN_BASE_URL ?? "/tars/admin/").trim() || "/tars/admin/";
+	return raw.endsWith("/") ? raw : `${raw}/`;
+}
+
 export default defineConfig({
-	base: "/tarsadmin/",
+	base: resolveAdminBase(),
 	root: resolve(rootDir, "src/admin"),
 	plugins: [react(), tailwindcss()],
 	build: {

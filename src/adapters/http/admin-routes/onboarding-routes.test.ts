@@ -3,7 +3,7 @@ import http from "node:http";
 import { handleOnboardingRoutes } from "./onboarding-routes.js";
 import { SettingsStore } from "../../../settings/store.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -46,6 +46,8 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 function makeDeps(store?: SettingsStore) {
 	return {
 		adminAssetsDir: "/tmp/admin-assets",
+		adminPath: "/tars/admin",
+		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
 		getAdminStatus: { execute: vi.fn() },
 		getSession: {} as never,
@@ -943,15 +945,61 @@ describe("handleOnboardingRoutes", () => {
 		});
 	});
 
-	describe("GET /tarsadmin", () => {
+	describe("GET /tars/admin", () => {
 		it("returns HTML", async () => {
+			const req = mockRequest({ url: "/tars/admin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tars/admin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+		});
+
+		it("serves assets under the configured admin path", async () => {
+			const req = mockRequest({ url: "/tars/admin/assets/main.js", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tars/admin/assets/main.js");
+
+			expect(handled).toBe(true);
+		});
+
+		it("injects the configured admin path and default page into the served HTML", async () => {
+			const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-html-"));
+			await writeFile(
+				path.join(dir, "index.html"),
+				'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div></body></html>',
+			);
+			try {
+				const req = mockRequest({ url: "/custom/admin", method: "GET" });
+				const res = mockResponse();
+				const deps = {
+					...(makeDeps() as object),
+					adminAssetsDir: dir,
+					adminPath: "/custom/admin",
+					adminDefaultPage: "#/repos",
+				} as never;
+
+				const handled = await handleOnboardingRoutes(req, res, deps, "/custom/admin");
+
+				expect(handled).toBe(true);
+				expect(res.statusCode).toBe(200);
+				const body = String(res.body);
+				expect(body).toContain('window.__TARS_ADMIN_PATH__ = "/custom/admin"');
+				expect(body).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+			} finally {
+				await rm(dir, { force: true, recursive: true });
+			}
+		});
+
+		it("returns false for the legacy /tarsadmin path when not configured", async () => {
 			const req = mockRequest({ url: "/tarsadmin", method: "GET" });
 			const res = mockResponse();
 
 			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tarsadmin");
 
-			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(200);
+			expect(handled).toBe(false);
 		});
-		});
+	});
 });

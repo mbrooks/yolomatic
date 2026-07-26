@@ -1,7 +1,45 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { parseHash, buildHash, navigate, useRoute, DEFAULT_SETTINGS_TAB } from "./routes.js";
+import { parseHash, buildHash, navigate, useRoute, DEFAULT_SETTINGS_TAB, getDefaultAdminPage } from "./routes.js";
+
+describe("getDefaultAdminPage", () => {
+	afterEach(() => {
+		delete (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__?: string }).__TARS_ADMIN_DEFAULT_PAGE__;
+		window.location.hash = "";
+	});
+
+	it("returns #/dashboard when no override is configured", () => {
+		expect(getDefaultAdminPage()).toBe("#/dashboard");
+	});
+
+	it("returns the configured override", () => {
+		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos";
+		expect(getDefaultAdminPage()).toBe("#/repos");
+	});
+
+	it("falls back to #/dashboard for an empty override", () => {
+		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "";
+		expect(getDefaultAdminPage()).toBe("#/dashboard");
+	});
+});
+
+describe("useRoute default page", () => {
+	afterEach(() => {
+		delete (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__?: string }).__TARS_ADMIN_DEFAULT_PAGE__;
+		window.location.hash = "";
+	});
+
+	it("navigates to the configured default page when the hash is empty", async () => {
+		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos";
+		window.location.hash = "";
+		const { unmount } = renderHook(() => useRoute());
+		await new Promise((r) => setTimeout(r, 0));
+		expect(window.location.hash).toBe("#/repos");
+		expect(parseHash(window.location.hash)).toEqual({ screen: "repos" });
+		unmount();
+	});
+});
 
 describe("navigate", () => {
 	beforeEach(() => {

@@ -135,6 +135,8 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.adminUsername).toBe("admin");
 		expect(deps.adminPassword).toBe("secret");
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
+		expect(deps.adminPath).toBe("/tars/admin");
+		expect(deps.adminDefaultPage).toBe("#/dashboard");
 		expect(deps.settingsStore).toBe(settingsStore);
 		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);
 	});
@@ -160,5 +162,27 @@ describe("createWebhookServerDeps", () => {
 		);
 
 		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);
+	});
+
+	it("threads the configured admin path and default page into the deps", () => {
+		const deps = createWebhookServerDeps(
+			createSessionStore(),
+			"admin",
+			"secret",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"/custom/admin",
+			"#/repos",
+		);
+
+		expect(deps.adminPath).toBe("/custom/admin");
+		expect(deps.adminDefaultPage).toBe("#/repos");
 	});
 });
