@@ -12,11 +12,6 @@ import {
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
-import {
-	parseConfiguredRepositories,
-	stringifyConfiguredRepositories,
-	upsertConfiguredRepository,
-} from "../../../repos/configured-repositories.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
@@ -115,17 +110,18 @@ export function isValidPollIntervalMs(raw: string | undefined): boolean {
 function storeConfiguredRepositories(
 	deps: AdminRouterDeps,
 	repos: Array<{ owner: string; repo: string }>,
-): void {
-	let configured = parseConfiguredRepositories(deps.settingsStore!.get("configured_repositories"));
+): Promise<void> {
+	const store = deps.repositoryStore!;
+	const operations: Promise<unknown>[] = [];
 	for (const repo of repos) {
 		const owner = repo.owner.trim();
 		const name = repo.repo.trim();
 		if (!owner || !name) {
 			continue;
 		}
-		configured = upsertConfiguredRepository(configured, { owner, repo: name });
+		operations.push(store.upsert({ owner, repo: name }));
 	}
-	deps.settingsStore!.set("configured_repositories", stringifyConfiguredRepositories(configured));
+	return Promise.all(operations).then(() => undefined);
 }
 
 function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
@@ -236,7 +232,7 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/onboarding\/init-workspaces$/u,
 		auth: false,
 		parseBody: true,
-		requiresDeps: ["settingsStore"],
+		requiresDeps: ["settingsStore", "repositoryStore"],
 		handler: async (ctx) => {
 			const settingsDeps = {
 				...ctx.deps,
@@ -258,7 +254,7 @@ const registry = new AdminRouteRegistry()
 			if (!token || !username) {
 				throw new ValidationError("Token and username are required");
 			}
-			storeConfiguredRepositories(settingsDeps, repos);
+			await storeConfiguredRepositories(settingsDeps, repos);
 			if (repos.length === 0) {
 				return { status: 200, body: { initialized: [] } };
 			}

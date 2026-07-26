@@ -15,7 +15,7 @@ import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-ses
 import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
 import type { GitHubEvent, GitHubEventStateStore } from "../github-events/model.js";
-import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventMode } from "../repos/configured-repositories.js";
+import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventMode } from "../repos/repository.js";
 
 export interface WebhookHandlers {
 	handleGitHubEvent?(event: GitHubEvent): Promise<void>;

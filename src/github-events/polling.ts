@@ -8,7 +8,7 @@ import type {
 	PollPullRequest,
 } from "../ports/github-polling-service.js";
 import type { GitHubEvent, GitHubEventStateStore, GitHubPollSubject } from "./model.js";
-import { repoModeIncludesPolling, type RepoGitHubEventMode } from "../repos/configured-repositories.js";
+import { repoModeIncludesPolling, type RepoGitHubEventMode } from "../repos/repository.js";
 
 const POLL_OVERLAP_MS = 2 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,6 +22,8 @@ export interface GitHubPollingDeps {
 	eventStore: GitHubEventStateStore;
 	githubUsername: string;
 	intervalMs: number;
+	/** Returns the managed repositories to poll, sourced from the repositories table. */
+	listManagedRepos?: () => Promise<Array<{ owner: string; repo: string }>>;
 	shouldPollRepo?: (owner: string, repo: string) => boolean;
 	resolveGitHubEventMode?: (owner: string, repo: string) => RepoGitHubEventMode;
 	now?: () => Date;
@@ -232,6 +234,13 @@ export function normalizePolledPRReviewComment(owner: string, repo: string, comm
 	};
 }
 
+async function listPollingRepos(deps: GitHubPollingDeps): Promise<Array<{ owner: string; repo: string }>> {
+	if (deps.listManagedRepos) {
+		return deps.listManagedRepos();
+	}
+	return deps.github.listAccessibleRepositories();
+}
+
 export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> {
 	const now = deps.now?.() ?? new Date();
 	log(`[github-poll] tick started at ${now.toISOString()}`);
@@ -244,7 +253,7 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 	}
 
 	const since = new Date(Math.max(0, Date.parse(lastReceivedAt) - POLL_OVERLAP_MS)).toISOString();
-	const repos = await deps.github.listAccessibleRepositories();
+	const repos = await listPollingRepos(deps);
 	const events: GitHubEvent[] = [];
 
 	for (const repo of repos) {
@@ -366,7 +375,7 @@ export function startGitHubPolling(deps: GitHubPollingDeps): void {
 async function logStartupRepositories(deps: GitHubPollingDeps): Promise<void> {
 	let repos;
 	try {
-		repos = await deps.github.listAccessibleRepositories();
+		repos = await listPollingRepos(deps);
 	} catch (error) {
 		log(`[github-poll] failed to enumerate repositories at startup: ${errorMessage(error)}`);
 		return;

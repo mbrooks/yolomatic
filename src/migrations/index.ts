@@ -116,6 +116,27 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_logs_key_time ON session_logs(session_key, timestamp)`);
 		},
 	},
+	{
+		id: 6,
+		name: "create_repositories_table",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS repositories (
+					id TEXT PRIMARY KEY,
+					owner TEXT NOT NULL COLLATE NOCASE,
+					repo TEXT NOT NULL COLLATE NOCASE,
+					full_name TEXT,
+					visibility TEXT CHECK(visibility IN ('public', 'private', 'internal')),
+					github_event_mode TEXT CHECK(github_event_mode IN ('webhook', 'polling', 'both')),
+					default_branch TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL,
+					UNIQUE(owner, repo)
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_repositories_owner_repo ON repositories(owner, repo)`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

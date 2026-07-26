@@ -4,6 +4,7 @@ import path from "node:path";
 import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 import { SessionStore } from "./session/store.js";
+import { RepositoryStore } from "./repos/repository-store.js";
 import { SessionLogStore, configureSessionLogPersistence, loadPersistedSessionLogs } from "./logging/session-log-store.js";
 import { TaskController } from "./task-controller.js";
 import { createWebhookServer } from "./webhook/server.js";
@@ -39,6 +40,7 @@ export async function main(): Promise<void> {
 	configureSessionLogPersistence(new SessionLogStore(path.join(memoryDir, "bot-state.sqlite")));
 	loadPersistedSessionLogs();
 	const taskController = new TaskController();
+	const repositoryStore = new RepositoryStore(path.join(memoryDir, "bot-state.sqlite"));
 
 	if (!isBootstrapComplete(config)) {
 		process.stdout.write("[onboarding] Required settings missing. Starting in onboarding mode.\n");
@@ -71,8 +73,9 @@ export async function main(): Promise<void> {
 						});
 					}
 					process.stdout.write("[onboarding] Settings loaded. Starting full runtime.\n");
-					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController });
+					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController, repositoryStore });
 				},
+				repositoryStore,
 				adminPath: config.adminPath,
 				adminDefaultPage: config.adminDefaultPage,
 			},
@@ -86,7 +89,7 @@ export async function main(): Promise<void> {
 		return;
 	}
 
-	await startRuntime(config, { settingsStore, sessionStore, taskController });
+	await startRuntime(config, { settingsStore, sessionStore, taskController, repositoryStore });
 }
 
 /* v8 ignore start */

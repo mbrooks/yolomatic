@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import { handleOnboardingRoutes } from "./onboarding-routes.js";
 import { SettingsStore } from "../../../settings/store.js";
+import { RepositoryStore } from "../../../repos/repository-store.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
@@ -10,6 +11,14 @@ import path from "node:path";
 async function tmpStore(): Promise<SettingsStore> {
 	const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-"));
 	return new SettingsStore(path.join(dir, "settings.sqlite"));
+}
+
+async function tmpStores(): Promise<{ settings: SettingsStore; repository: RepositoryStore }> {
+	const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-"));
+	return {
+		settings: new SettingsStore(path.join(dir, "settings.sqlite")),
+		repository: new RepositoryStore(path.join(dir, "settings.sqlite")),
+	};
 }
 
 function mockRequest(options: {
@@ -43,12 +52,13 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 	return res;
 }
 
-function makeDeps(store?: SettingsStore) {
+function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 	return {
 		adminAssetsDir: "/tmp/admin-assets",
 		adminPath: "/tars/admin",
 		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
+		repositoryStore: repoStore,
 		getAdminStatus: { execute: vi.fn() },
 		getSession: {} as never,
 		getSessionLog: { execute: vi.fn() },
@@ -363,7 +373,7 @@ describe("handleOnboardingRoutes", () => {
 
 	describe("POST /api/onboarding/init-workspaces", () => {
 		it("rejects when token or username is missing", async () => {
-			const store = await tmpStore();
+			const stores = await tmpStores();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
 				method: "POST",
@@ -371,7 +381,7 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(400);
@@ -380,7 +390,7 @@ describe("handleOnboardingRoutes", () => {
 		});
 
 		it("returns empty initialized list when no repos provided", async () => {
-			const store = await tmpStore();
+			const stores = await tmpStores();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
 				method: "POST",
@@ -388,18 +398,18 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.initialized).toEqual([]);
-			expect(store.get("configured_repositories")).toBe("[]");
+			expect(await stores.repository.list()).toEqual([]);
 		});
 
-		it("attempts to initialize provided repos", async () => {
+		it("attempts to initialize provided repos and persists them to the repositories table", async () => {
 			const initializeRepo = vi.spyOn(WorkspaceManager.prototype, "initializeRepo").mockResolvedValue();
-			const store = await tmpStore();
+			const stores = await tmpStores();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
 				method: "POST",
@@ -411,14 +421,16 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.initialized).toEqual(["mbrooks/tars"]);
 			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "tars");
-			expect(store.get("configured_repositories")).toBe(JSON.stringify([{ owner: "mbrooks", repo: "tars" }]));
+			const managed = await stores.repository.list();
+			expect(managed).toHaveLength(1);
+			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "tars" });
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {
@@ -437,10 +449,27 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.error).toContain("Settings store not configured");
 		});
 
-		it("falls back to the stored github_token and github_username when submitted empty", async () => {
+		it("returns 500 when repositoryStore is missing", async () => {
 			const store = await tmpStore();
-			store.set("github_token", "stored-ghp-token");
-			store.set("github_username", "stored-user");
+			const req = mockRequest({
+				url: "/api/onboarding/init-workspaces",
+				method: "POST",
+				body: JSON.stringify({ token: "tok", username: "user", repos: [] }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store, undefined), "/api/onboarding/init-workspaces");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Repository store not configured");
+		});
+
+		it("falls back to the stored github_token and github_username when submitted empty", async () => {
+			const stores = await tmpStores();
+			stores.settings.set("github_token", "stored-ghp-token");
+			stores.settings.set("github_username", "stored-user");
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
 				method: "POST",
@@ -448,17 +477,17 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.initialized).toEqual([]);
-			expect(store.get("configured_repositories")).toBe("[]");
+			expect(await stores.repository.list()).toEqual([]);
 		});
 
 		it("rejects init-workspaces when neither submitted nor stored token is available", async () => {
-			const store = await tmpStore();
+			const stores = await tmpStores();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
 				method: "POST",
@@ -466,7 +495,7 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(400);
