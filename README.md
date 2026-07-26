@@ -124,6 +124,80 @@ The configured admin GitHub user can stop an issue from GitHub by commenting:
 
 Sessions can also be paused, resumed, restarted, archived, or deleted from the admin dashboard when their current state permits it.
 
+## Issue Management Architecture
+
+The diagram below traces how a GitHub event becomes a TARS session, worktree, branch, and pull request, with the source file responsible for each stage.
+
+```mermaid
+flowchart TD
+    GH[GitHub Issues / Comments / PR Reviews]
+    WH[Webhook Receiver<br/>src/webhook/server.ts]
+    PD[GitHub Event Dispatcher<br/>src/github-events/dispatcher.ts]
+    POL[Poller<br/>src/github-events/polling.ts]
+    HIE[HandleIssueEvent<br/>src/app/commands/handle-issue-event.ts]
+    HIC[HandleIssueComment<br/>src/app/commands/handle-issue-comment.ts]
+    HPR[HandlePRReview<br/>src/app/commands/handle-pr-review.ts]
+    POLICY[Workflow Policy<br/>src/domain/workflow/policy.ts]
+    SM[Session Manager<br/>src/session/manager.ts]
+    SS[(Session Store<br/>sessions/github-{owner}-{repo}/issue-{number}.jsonl)]
+    WM[Workspace Manager<br/>src/workspace/manager.ts]
+    WT[(Git Worktree<br/>WORKSPACES_DIR/{owner}-{repo}/.worktrees/issue-{n})]
+    TC[Task Controller<br/>src/task-controller.ts]
+    ES[Execution Service / Worker<br/>src/executor/index.ts]
+    REP[Reporter<br/>src/app/commands/execute-session-reporter.ts]
+    DEL[Delivery<br/>src/app/commands/execute-session-delivery.ts]
+    GH_API[GitHub API Adapter<br/>src/adapters/github/github-service-adapter.ts]
+    LABELS[(Issue Labels)]
+    PR[(Pull Request)]
+
+    GH -->|issues.opened / assigned / edited / unassigned| WH
+    GH -->|issue_comment.created| WH
+    GH -->|pull_request_review* / pr comments| WH
+    WH --> PD
+    POL --> PD
+    PD -->|issue| HIE
+    PD -->|issue_comment| HIC
+    PD -->|pull_request_review*| HPR
+
+    HIE --> POLICY
+    HIC --> POLICY
+    HPR --> POLICY
+
+    HIE -->|ensureSessionExists| SM
+    HIC -->|ensureSessionExists| SM
+    HPR -->|resume session| SM
+    SM --> SS
+    SM -->|createOrGetWorktree| WM
+    WM --> WT
+
+    HIE -->|startIssueExecution| TC
+    HIC -->|startIssueExecution| TC
+    HPR -->|startIssueExecution| TC
+    TC --> ES
+    ES -->|status: working / waiting-feedback / complete / failed / cancelled| REP
+    REP -->|terminal result| DEL
+    DEL -->|commitAndPush + createPR| WM
+    DEL --> PR
+
+    REP --> GH_API
+    DEL --> GH_API
+    HIE --> GH_API
+    HIC --> GH_API
+    HPR --> GH_API
+    GH_API --> LABELS
+    GH_API -->|postComment| GH
+```
+
+Walkthrough of each numbered stage:
+
+1. **Inbound events.** GitHub sends `issues`, `issue_comment`, `pull_request_review`, and `pull_request_review_comment` webhooks to `src/webhook/server.ts`. The dispatcher can also receive events from the poller (`src/github-events/polling.ts`) for repositories configured in polling mode.
+2. **Dispatch.** `src/github-events/dispatcher.ts` routes each event to the appropriate command: `HandleIssueEvent`, `HandleIssueComment`, or `HandlePRReview`.
+3. **Policy gate.** Each command consults `src/domain/workflow/policy.ts` to decide whether to ignore the event (wrong sender, bot comment, no TARS label/assignment, do-not-work labels, etc.).
+4. **Session + workspace.** `src/session/manager.ts` and `src/workspace/manager.ts` ensure a persistent session exists and that the per-issue git worktree is created under `WORKSPACES_DIR/{owner}-{repo}`.
+5. **Execution.** `TaskController` registers the run, then the `ExecutionService` (or an isolated worker container in the proposed design) runs the agent in the worktree.
+6. **Result reporting.** `ExecuteSessionReporter` translates the agent result (`complete`, `waiting-feedback`, `failed`, `cancelled`, `working`) into issue comments and workflow labels (`tars-working`, `tars-feedback-required`, `tars-failed`, `tars-cancelled`).
+7. **Delivery.** `ExecuteSessionDelivery` commits and pushes the branch, creates or reuses a PR, and applies the `tars-pr-created` label when work is complete.
+
 ## How It Works
 
 TARS is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to TARS over a WebSocket session.
