@@ -349,7 +349,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
-	it("processes comment on issue/PR created by TARS without assignee or mention", async () => {
+	it("ignores comments on issues created by TARS when TARS is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -382,8 +382,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
-		expect(executor.execute).toHaveBeenCalled();
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
 	it("processes human comments even when webhook sender is the bot account", async () => {
@@ -596,7 +596,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("processes unassigned issue comments with @tars mention", async () => {
+	it("ignores unassigned issue comments with @tars mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValueOnce(null as never).mockResolvedValue({
 			issueNumber: 56,
@@ -641,12 +641,10 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.createSession).toHaveBeenCalled();
-		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars"] }),
-		);
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
-		expect(executor.execute).toHaveBeenCalled();
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+		expect(sessionManager.createSession).not.toHaveBeenCalled();
+		expect(octokit.issues.addLabels).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
 	it("ignores assigned issue comments without a TARS label or mention", async () => {
@@ -674,7 +672,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("processes comment on unassigned issue with @tars mention", async () => {
+	it("does not add labels for an @tars mention when TARS is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -707,16 +705,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
-		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, labels: ["tars"] }),
-		);
-		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-working"] }),
-		);
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
+		expect(octokit.issues.addLabels).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("processes comment on unassigned issue with @tarsmbrooks mention", async () => {
+	it("ignores configured-username mentions when TARS is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -749,10 +744,10 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
-		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, labels: ["tars"] }),
-		);
+		expect(sessionManager.getSession).not.toHaveBeenCalled();
+		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
+		expect(octokit.issues.addLabels).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
 	it("reuses existing PR when createPR reports a pull request already exists", async () => {
