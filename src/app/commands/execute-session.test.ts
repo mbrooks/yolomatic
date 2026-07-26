@@ -40,6 +40,7 @@ function makeDeps(overrides?: {
 
 	const workspaces: WorkspaceService = {
 		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
+		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
 		commitAndPushPath: vi.fn(async () => true),
@@ -58,6 +59,7 @@ function makeDeps(overrides?: {
 		getIssue: vi.fn(),
 		listPullRequests: vi.fn(async () => []),
 		getPullRequest: vi.fn(),
+		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: overrides?.createPullRequest ? vi.fn(overrides.createPullRequest) : vi.fn(async () => null),
 		createIssue: vi.fn(),
 		initializeEmptyRepo: vi.fn(async () => undefined),
@@ -813,6 +815,123 @@ describe("ExecuteSession", () => {
 		await execute.run(state);
 
 		expect(deps.executor.execute).toHaveBeenCalled();
+	});
+
+	it("fails the session without launching when syncWorktree raises a non-diverged error", async () => {
+		const deps = makeDeps();
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			throw new Error("credential cleanup failed");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("credential cleanup failed") }));
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, expect.stringContaining("TARS stopped before execution"));
+	});
+
+	it("calls updatePullRequestBranch and retries when syncWorktree diverges for a PR session", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			head: { ref: "tars/issue-1" },
+		});
+		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
+		let syncCalls = 0;
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			syncCalls += 1;
+			if (syncCalls === 1) throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(deps.workspaces.syncWorktree).toHaveBeenCalledTimes(2);
+		expect(deps.executor.execute).toHaveBeenCalled();
+	});
+
+	it("fails the session when divergence has no associated PR", async () => {
+		const deps = makeDeps();
+		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.updatePullRequestBranch).not.toHaveBeenCalled();
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("diverged") }));
+	});
+
+	it("fails the session when update-branch cannot resolve the divergence", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			head: { ref: "tars/issue-1" },
+		});
+		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+		}) as never;
+		(deps.github.updatePullRequestBranch as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			throw new Error("merge conflict");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "tars-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("merge conflict") }));
 	});
 
 	it("records task execution start and finish timestamps", async () => {

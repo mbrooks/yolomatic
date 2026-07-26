@@ -109,4 +109,21 @@ describe("buildPRReviewPrompt", () => {
 		expect(prompt).not.toContain("Overall review comment:");
 		expect(prompt).not.toContain("Review comments:");
 	});
+
+	it("does not instruct the worker to push", () => {
+		const state = {
+			issueNumber: 56,
+			owner: "mbrooks",
+			repo: "tars",
+			workspacePath: "/tmp/ws",
+			title: "Fix bug",
+			body: "Description here",
+		} as never;
+		const prompt = buildPRReviewPrompt(state, []);
+		expect(prompt).not.toContain("git push");
+		expect(prompt).not.toContain("push origin");
+		expect(prompt).toContain("commit");
+		expect(prompt).toContain("Do NOT push");
+		expect(prompt).toContain("control plane owns delivery");
+	});
 });

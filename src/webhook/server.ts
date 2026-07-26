@@ -19,6 +19,7 @@ import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps, fallbackWorkspaceService } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
 import { createAdminWebSocketServer, type CredentialProvider, type StatusProvider } from "./websocket-server.js";
+import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../config.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
@@ -29,6 +30,8 @@ type WebhookServerOptions = {
 	onOnboardingComplete?: () => void | Promise<void>;
 	prebuiltStartIssueSession?: StartIssueSession;
 	repositoryStore?: RepositoryStore;
+	adminPath?: string;
+	adminDefaultPage?: string;
 };
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -51,6 +54,8 @@ export function createWebhookServer(
 	executor?: ExecutionService,
 	workerRpcServer?: WorkerRpcServer,
 ) {
+	const adminPath = options.adminPath ?? DEFAULT_ADMIN_PATH;
+	const adminDefaultPage = options.adminDefaultPage ?? DEFAULT_ADMIN_DEFAULT_PAGE;
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
 		adminUsername,
@@ -65,6 +70,8 @@ export function createWebhookServer(
 		executor,
 		options.prebuiltStartIssueSession,
 		options.repositoryStore,
+		adminPath,
+		adminDefaultPage,
 	);
 
 	serverDeps.skillStore = skillStore;
@@ -152,6 +159,7 @@ export function createWebhookServer(
 		credentialProvider,
 		statusProvider,
 		serverDeps.taskController,
+		adminPath,
 	);
 	workerRpcServer?.attach(server);
 

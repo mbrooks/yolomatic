@@ -2,6 +2,16 @@ import type { LogEntry } from "../app/types.js";
 
 export type WebSocketStatus = "connecting" | "open" | "closed" | "error";
 
+export const DEFAULT_ADMIN_PATH = "/tars/admin";
+
+function adminWsPath(): string {
+	const configured =
+		typeof window !== "undefined" && typeof (window as unknown as { __TARS_ADMIN_PATH__?: unknown }).__TARS_ADMIN_PATH__ === "string"
+			? (window as unknown as { __TARS_ADMIN_PATH__: string }).__TARS_ADMIN_PATH__
+			: DEFAULT_ADMIN_PATH;
+	return configured === "/" ? "/ws" : `${configured}/ws`;
+}
+
 export interface StatusMessage {
 	type: "status";
 	data: unknown;
@@ -46,7 +56,7 @@ class WebSocketManager {
 
 		this.setStatus("connecting");
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const url = `${protocol}//${window.location.host}/tarsadmin/ws`;
+		const url = `${protocol}//${window.location.host}${adminWsPath()}`;
 		let opened = false;
 
 		try {

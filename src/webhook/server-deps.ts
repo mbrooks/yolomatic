@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { systemClock } from "../ports/clock.js";
+import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../config.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
 import { GetAdminStatus } from "../app/queries/get-admin-status.js";
 import { GetSession } from "../app/queries/get-session.js";
@@ -31,6 +32,7 @@ const fallbackTaskController = {
 
 const fallbackWorkspaceService = {
 	createOrGetWorktree: async () => ({ path: "", branch: "" }),
+	syncWorktree: async () => undefined,
 	removeWorktree: async () => undefined,
 	commitAndPush: async () => false,
 	commitAndPushPath: async () => false,
@@ -56,6 +58,8 @@ export function createWebhookServerDeps(
 	executor?: ExecutionService,
 	prebuiltStartIssueSession?: StartIssueSession,
 	repositoryStore?: RepositoryStore,
+	adminPath: string = DEFAULT_ADMIN_PATH,
+	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -78,5 +82,7 @@ export function createWebhookServerDeps(
 		settingsStore,
 		repositoryStore,
 		cleanupCommand: new CleanupOldSessions(sessionRepo, workspaceService),
+		adminPath,
+		adminDefaultPage,
 	};
 }

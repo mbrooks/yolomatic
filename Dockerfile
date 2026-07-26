@@ -21,7 +21,7 @@ ENV WORKSPACES_DIR=/app/workspaces
 ENV MEMORY_DIR=/app/memory
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-RUN apt-get update && apt-get install -y ca-certificates git curl gnupg \
+RUN apt-get update && apt-get install -y ca-certificates git curl gnupg sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app

@@ -182,7 +182,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workspaceManager,
 		staleDetector,
 		config.archiveDir,
-		{ prebuiltStartIssueSession: startIssueSession, repositoryStore: deps.repositoryStore },
+		{ prebuiltStartIssueSession: startIssueSession, repositoryStore: deps.repositoryStore, adminPath: config.adminPath, adminDefaultPage: config.adminDefaultPage },
 		github,
 		settingsStore,
 		skillStore,

@@ -9,6 +9,7 @@ import type { SettingsStore } from "../../settings/store.js";
 import type { SkillStore } from "../../skills/store.js";
 import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import type { RepositoryStore } from "../../repos/repository-store.js";
+import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../../config.js";
 import { sendJson } from "./response-helpers.js";
 import { requireAdminJson, requireAdminText } from "./admin-auth.js";
 import { readBody } from "../../webhook/http-utils.js";
@@ -168,6 +169,16 @@ export interface AdminRouterDeps {
 	repoSkillService?: RepoSkillService;
 	repositoryStore?: RepositoryStore;
 	onOnboardingComplete?: () => void | Promise<void>;
+	adminPath?: string;
+	adminDefaultPage?: string;
+}
+
+export function resolveAdminPath(deps: AdminRouterDeps): string {
+	return deps.adminPath ?? DEFAULT_ADMIN_PATH;
+}
+
+export function resolveAdminDefaultPage(deps: AdminRouterDeps): string {
+	return deps.adminDefaultPage ?? DEFAULT_ADMIN_DEFAULT_PAGE;
 }
 
 export function mapResultToStatus(code: string): number {

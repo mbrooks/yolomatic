@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceConfig } from "./config.js";
 import { BareRepoManager } from "./bare-repo.js";
+import { WorktreeBranchDivergedError } from "./errors.js";
 import { type CommandRunner, GitCommandRunner } from "./git-runner.js";
 import { WorktreeManager } from "./worktree.js";
 
@@ -27,6 +28,8 @@ function makeBareRepos(bareRepoPath: string, overrides: Partial<{
 	updateDefaultBranch: () => Promise<void>;
 	resolveBaseRef: () => Promise<string>;
 	getBareRepoPath: () => string;
+	fetchOrigin: () => Promise<void>;
+	remoteBranchExists: () => Promise<boolean>;
 }> = {}): BareRepoManager {
 	return {
 		ensureBareRepo: vi.fn(async () => bareRepoPath),
@@ -34,6 +37,8 @@ function makeBareRepos(bareRepoPath: string, overrides: Partial<{
 		updateDefaultBranch: vi.fn(async () => {}),
 		resolveBaseRef: vi.fn(async () => "origin/HEAD"),
 		getBareRepoPath: vi.fn(() => bareRepoPath),
+		fetchOrigin: vi.fn(async () => {}),
+		remoteBranchExists: vi.fn(async () => false),
 		...overrides,
 	} as unknown as BareRepoManager;
 }
@@ -435,5 +440,254 @@ describe("WorktreeManager", () => {
 
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("Strategy: lru"));
 		writeSpy.mockRestore();
+	});
+
+	describe("syncWorktree", () => {
+		it("throws when the worktree has not been created yet", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-missing-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: "", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => false),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await expect(worktrees.syncWorktree("mbrooks", "tars", 42)).rejects.toThrow("syncWorktree called before createOrGetWorktree");
+			expect(bareRepos.fetchOrigin).not.toHaveBeenCalled();
+		});
+
+		it("fast-forwards the worktree branch to origin and sanitizes the remote URL", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-ff-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const calls: Array<{ cmd: string; args: string[] }> = [];
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				calls.push({ cmd: _command, args });
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/tars/issue-42\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "merge" && args[1] === "--ff-only") {
+					return { stdout: "Updating abcd1234..efgh5678\nFast-forward\n", stderr: "" };
+				}
+				if (args[0] === "remote" && args[1] === "set-url") {
+					return { stdout: "", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => true),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await worktrees.syncWorktree("mbrooks", "tars", 42);
+
+			expect(bareRepos.fetchOrigin).toHaveBeenCalledWith(bareRepoPath);
+			expect(bareRepos.remoteBranchExists).toHaveBeenCalledWith(bareRepoPath, "tars/issue-42");
+			expect(runCommand).toHaveBeenCalledWith("git", ["merge", "--ff-only", "origin/tars/issue-42"], { cwd: worktreePath });
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["remote", "set-url", "origin", "https://github.com/mbrooks/tars.git"],
+				{ cwd: worktreePath },
+			);
+		});
+
+		it("leaves a not-yet-pushed branch in place without merging", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-nopush-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "remote" && args[1] === "set-url") {
+					return { stdout: "", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => false),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await worktrees.syncWorktree("mbrooks", "tars", 42);
+
+			const mergeCalls = (runCommand as ReturnType<typeof vi.fn>).mock.calls.filter(
+				([, args]) => args[0] === "merge",
+			);
+			expect(mergeCalls).toHaveLength(0);
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["remote", "set-url", "origin", "https://github.com/mbrooks/tars.git"],
+				{ cwd: worktreePath },
+			);
+		});
+
+		it("raises WorktreeBranchDivergedError when ff-only merge fails", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-diverged-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "merge" && args[1] === "--ff-only") {
+					throw new Error("Not possible to fast-forward, aborting.");
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => true),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await expect(worktrees.syncWorktree("mbrooks", "tars", 42)).rejects.toBeInstanceOf(WorktreeBranchDivergedError);
+
+			// Remote must NOT be sanitized when the worktree is diverged and un-launched.
+			const setUrlCalls = (runCommand as ReturnType<typeof vi.fn>).mock.calls.filter(
+				([, args]) => args[0] === "remote" && args[1] === "set-url",
+			);
+			expect(setUrlCalls).toHaveLength(0);
+		});
+
+		it("stashes and restores a dirty worktree across sync", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-stash-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "M file.txt\n", stderr: "" };
+				}
+				if (args[0] === "config") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "stash" && args[1] === "push") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "stash" && args[1] === "pop") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "merge" && args[1] === "--ff-only") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "remote" && args[1] === "set-url") {
+					return { stdout: "", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => true),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await worktrees.syncWorktree("mbrooks", "tars", 42);
+
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["stash", "push", "-m", "TARS auto-stash before sync of issue-42", "-u"],
+				{ cwd: worktreePath },
+			);
+			expect(runCommand).toHaveBeenCalledWith("git", ["stash", "pop"], { cwd: worktreePath });
+		});
+
+		it("fails when stash pop conflicts", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-stash-conflict-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "M file.txt\n", stderr: "" };
+				}
+				if (args[0] === "config") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "stash" && args[1] === "push") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "stash" && args[1] === "pop") {
+					throw new Error("CONFLICT (content): Merge conflict in file.txt");
+				}
+				if (args[0] === "merge" && args[1] === "--ff-only") {
+					return { stdout: "", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => true),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await expect(worktrees.syncWorktree("mbrooks", "tars", 42)).rejects.toThrow("Could not restore stashed changes after sync");
+		});
+
+		it("fails when sanitizing the remote URL fails", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-sanitize-fail-"));
+			const bareRepoPath = path.join(root, "mbrooks-tars");
+			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+			await mkdir(worktreePath, { recursive: true });
+
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "worktree" && args[1] === "list") {
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\n`, stderr: "" };
+				}
+				if (args[0] === "status" && args[1] === "--porcelain") {
+					return { stdout: "", stderr: "" };
+				}
+				if (args[0] === "remote" && args[1] === "set-url") {
+					throw new Error("permission denied");
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = makeBareRepos(bareRepoPath, {
+				fetchOrigin: vi.fn(async () => {}),
+				remoteBranchExists: vi.fn(async () => false),
+			});
+			const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+			await expect(worktrees.syncWorktree("mbrooks", "tars", 42)).rejects.toThrow("Failed to sanitize remote.origin.url");
+		});
 	});
 });

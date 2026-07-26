@@ -294,6 +294,18 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("delegates syncWorktree to the worktree manager", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "tars-manager-sync-"));
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+		const syncSpy = vi.fn(async () => undefined);
+		vi.spyOn(manager as unknown as { worktrees: { syncWorktree: typeof syncSpy } }, "worktrees", "get").mockReturnValue({ syncWorktree: syncSpy });
+
+		await manager.syncWorktree("mbrooks", "tars", 42);
+
+		expect(syncSpy).toHaveBeenCalledWith("mbrooks", "tars", 42);
+	});
+
 	it("commits and pushes from worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "tars-commit-"));
 		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");

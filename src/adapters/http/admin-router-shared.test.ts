@@ -7,6 +7,8 @@ import {
 	checkAdminJson,
 	checkAdminTextAllowOnboarding,
 	requireDeps,
+	resolveAdminPath,
+	resolveAdminDefaultPage,
 } from "./admin-router-shared.js";
 
 vi.mock("./admin-auth.js", () => ({
@@ -138,5 +140,23 @@ describe("admin-router-shared", () => {
 		expect(response.statusCode).toBe(500);
 		expect(JSON.parse(response.body).error).toBe("Settings store not configured");
 		expect(handler).not.toHaveBeenCalled();
+	});
+});
+
+describe("resolveAdminPath / resolveAdminDefaultPage", () => {
+	it("falls back to the default admin path when unset", () => {
+		expect(resolveAdminPath({} as never)).toBe("/tars/admin");
+	});
+
+	it("returns the configured admin path when set", () => {
+		expect(resolveAdminPath({ adminPath: "/custom/admin" } as never)).toBe("/custom/admin");
+	});
+
+	it("falls back to the default admin default page when unset", () => {
+		expect(resolveAdminDefaultPage({} as never)).toBe("#/dashboard");
+	});
+
+	it("returns the configured admin default page when set", () => {
+		expect(resolveAdminDefaultPage({ adminDefaultPage: "#/repos" } as never)).toBe("#/repos");
 	});
 });
