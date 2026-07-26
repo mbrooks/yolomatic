@@ -52,11 +52,14 @@ describe("worker entrypoint", () => {
 	});
 
 	it("throws when required env vars are missing", async () => {
-		process.env = { ...originalEnv };
+		const baseEnv = { ...originalEnv };
+		delete baseEnv.TARS_SESSION_WS_URL;
+		delete baseEnv.TARS_SESSION_KEY;
+		process.env = { ...baseEnv };
 		await expect(main()).rejects.toThrow("TARS_SESSION_WS_URL is required");
 
 		process.env = {
-			...originalEnv,
+			...baseEnv,
 			TARS_SESSION_WS_URL: "ws://host.docker.internal:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23420&token=test",
 		};
 		await expect(main()).rejects.toThrow("TARS_SESSION_KEY is required");

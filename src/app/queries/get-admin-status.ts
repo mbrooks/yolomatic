@@ -2,7 +2,7 @@ import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { StaleSessionService } from "../../ports/stale-session-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
-import type { SettingsStore } from "../../settings/store.js";
+import type { RepositoryStore } from "../../repos/repository-store.js";
 import {
 	buildRepoSummaries,
 	computeAgentStatus,
@@ -11,7 +11,6 @@ import {
 	sortSessionsByRecency,
 } from "../../domain/session/model.js";
 import { formatUptime } from "../../domain/workflow/policy.js";
-import { parseConfiguredRepositories } from "../../repos/configured-repositories.js";
 import type { StaleSessionInfo } from "../../session/stale-detector.js";
 import { ok, type AppResult } from "../result.js";
 
@@ -56,7 +55,7 @@ export class GetAdminStatus {
 		private readonly stale: StaleSessionService,
 		private readonly clock: Clock,
 		private readonly taskControl: TaskControlService,
-		private readonly settingsStore?: SettingsStore,
+		private readonly repositoryStore?: RepositoryStore,
 	) {}
 
 	async execute(): Promise<AppResult<AdminStatusView>> {
@@ -75,9 +74,10 @@ export class GetAdminStatus {
 
 		let repos = buildRepoSummaries(sorted);
 
-		if (this.settingsStore) {
+		if (this.repositoryStore) {
+			const managed = await this.repositoryStore.list();
 			const repoMap = new Map(repos.map((r) => [`${r.owner}/${r.repo}`.toLowerCase(), r]));
-			for (const configured of parseConfiguredRepositories(this.settingsStore.get("configured_repositories"))) {
+			for (const configured of managed) {
 				const key = `${configured.owner}/${configured.repo}`.toLowerCase();
 				if (repoMap.has(key)) {
 					continue;

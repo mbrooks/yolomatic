@@ -22,15 +22,20 @@ function accessibleResponse(
 function mockAccessible(
 	repositories: Array<{ owner: string; repo: string; fullName: string; visibility: "public" | "private" | "internal" }>,
 	configured: Array<{ owner: string; repo: string }>,
-	patchResponse: { updated: string[]; requiresRestart: string[] } = { updated: [], requiresRestart: [] },
+	addResponse: { owner: string; repo: string; fullName: string; added: boolean } = { owner: "", repo: "", fullName: "", added: true },
+	removeResponse: { removed: boolean } = { removed: true },
 ) {
 	return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
 		const url = typeof input === "string" ? input : input.url;
-		if (url === "/api/repos/accessible" && init?.method !== "PATCH") {
+		const method = init?.method;
+		if (url === "/api/repos/accessible" && (!method || method === "GET")) {
 			return Promise.resolve(accessibleResponse(repositories, configured));
 		}
-		if (url === "/api/settings" && init?.method === "PATCH") {
-			return Promise.resolve(jsonResponse(patchResponse));
+		if (url === "/api/repos" && method === "POST") {
+			return Promise.resolve(jsonResponse(addResponse));
+		}
+		if (url.startsWith("/api/repos/") && method === "DELETE") {
+			return Promise.resolve(jsonResponse(removeResponse));
 		}
 		return Promise.reject(new Error(`Unexpected fetch: ${url}`));
 	});
@@ -100,8 +105,8 @@ describe("RepositoriesSettingsSection", () => {
 		expect(helloCheckbox.checked).toBe(true);
 		expect((screen.getByRole("button", { name: "Save Changes" }) as HTMLButtonElement).disabled).toBe(false);
 		expect(screen.getByText("2 of 2 selected")).not.toBeNull();
-		// No PATCH issued yet.
-		expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+		// No mutation issued yet.
+		expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "POST" || init?.method === "DELETE")).toBe(false);
 	});
 
 	it("Select All and Deselect All toggle the full displayed list", async () => {
@@ -125,7 +130,7 @@ describe("RepositoriesSettingsSection", () => {
 		expect((screen.getByRole("button", { name: "Save Changes" }) as HTMLButtonElement).disabled).toBe(false);
 	});
 
-	it("persists selections to configured_repositories via PATCH /api/settings", async () => {
+	it("adds new selections via POST /api/repos and removes deselections via DELETE /api/repos/:owner/:repo", async () => {
 		const fetchSpy = mockAccessible(
 			[
 				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
@@ -136,22 +141,27 @@ describe("RepositoriesSettingsSection", () => {
 		render(<RepositoriesSettingsSection />);
 
 		await screen.findByRole("checkbox", { name: /octocat\/hello-world/ });
-		fireEvent.click(screen.getByRole("button", { name: "Select All" }));
+		// Deselect the configured repo (mbrooks/tars) and select the new one (octocat/hello-world).
+		fireEvent.click(screen.getByRole("checkbox", { name: /mbrooks\/tars/ }));
+		fireEvent.click(screen.getByRole("checkbox", { name: /octocat\/hello-world/ }));
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
 		await waitFor(() => {
 			expect(screen.getByText("Repositories saved.")).not.toBeNull();
 		});
 
-		const patchCall = fetchSpy.mock.calls.find(([, init]) => init?.method === "PATCH");
-		expect(patchCall).toBeDefined();
-		const body = JSON.parse(patchCall![1]!.body as string);
-		expect(body).toEqual({
-			configured_repositories: JSON.stringify([
-				{ owner: "mbrooks", repo: "tars" },
-				{ owner: "octocat", repo: "hello-world" },
-			]),
+		const postCall = fetchSpy.mock.calls.find(([input, init]) => {
+			const url = typeof input === "string" ? input : input.url;
+			return url === "/api/repos" && init?.method === "POST";
 		});
+		expect(postCall).toBeDefined();
+		expect(JSON.parse(postCall![1]!.body as string)).toEqual({ owner: "octocat", repo: "hello-world" });
+
+		const deleteCall = fetchSpy.mock.calls.find(([input, init]) => {
+			const url = typeof input === "string" ? input : input.url;
+			return url === "/api/repos/mbrooks/tars" && init?.method === "DELETE";
+		});
+		expect(deleteCall).toBeDefined();
 		// Save disabled again after persisting.
 		expect((screen.getByRole("button", { name: "Save Changes" }) as HTMLButtonElement).disabled).toBe(true);
 	});
@@ -182,16 +192,17 @@ describe("RepositoriesSettingsSection", () => {
 		});
 	});
 
-	it("shows an error banner when the save PATCH fails", async () => {
+	it("shows an error banner when an add fails during save", async () => {
 		vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
 			const url = typeof input === "string" ? input : input.url;
-			if (url === "/api/repos/accessible" && init?.method !== "PATCH") {
+			const method = init?.method;
+			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
 				return Promise.resolve(accessibleResponse(
 					[{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }],
 					[],
 				));
 			}
-			if (url === "/api/settings" && init?.method === "PATCH") {
+			if (url === "/api/repos" && method === "POST") {
 				return Promise.resolve(jsonResponse({ error: "Database locked" }, 500));
 			}
 			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -203,7 +214,7 @@ describe("RepositoriesSettingsSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("Database locked")).not.toBeNull();
+			expect(screen.getByText(/Database locked/)).not.toBeNull();
 		});
 	});
 });
