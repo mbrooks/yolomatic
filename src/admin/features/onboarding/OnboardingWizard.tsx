@@ -5,6 +5,10 @@ import {
 	generateWebhookSecret,
 	listAccessibleRepositories,
 	initializeWorkspaces,
+	fetchOnboardingConfig,
+	isSecretField,
+	type OnboardingConfig,
+	type OnboardingSecretField,
 } from "../../api/onboarding.js";
 import { Modal } from "../../components/Modal.js";
 
@@ -14,12 +18,15 @@ interface WizardState {
 	step: number;
 	adminUsername: string;
 	adminPassword: string;
+	adminPasswordProtected: boolean;
 	githubToken: string;
+	githubTokenProtected: boolean;
 	githubUsername: string;
 	githubUsernameConfirmed: boolean;
 	githubEventMode: string;
 	githubPollIntervalMs: string;
 	webhookSecret: string;
+	webhookSecretProtected: boolean;
 	repositories: Array<{ owner: string; repo: string; fullName: string; selected: boolean }>;
 	error: string | null;
 }
@@ -70,19 +77,6 @@ function generatePassword(): string {
 	return password;
 }
 
-function loadState(): WizardState {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (raw) {
-			const parsed = JSON.parse(raw) as WizardState;
-			return { ...getDefaultState(), ...parsed, error: null };
-		}
-	} catch {
-		// ignore
-	}
-	return getDefaultState();
-}
-
 function saveState(state: WizardState): void {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -96,25 +90,114 @@ function getDefaultState(): WizardState {
 		step: 1,
 		adminUsername: "admin",
 		adminPassword: generatePassword(),
+		adminPasswordProtected: false,
 		githubToken: "",
+		githubTokenProtected: false,
 		githubUsername: "",
 		githubUsernameConfirmed: false,
 		githubEventMode: "",
 		githubPollIntervalMs: "",
 		webhookSecret: "",
+		webhookSecretProtected: false,
 		repositories: [],
 		error: null,
 	};
 }
 
+function readStoredState(): WizardState | null {
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (!raw) return null;
+		return JSON.parse(raw) as WizardState;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Builds the initial wizard state by layering the effective configuration
+ * over the defaults, then overlaying any in-progress wizard state from
+ * localStorage so the operator does not lose unsaved edits on reload.
+ */
+export function buildInitialState(config: OnboardingConfig | null): WizardState {
+	const base = getDefaultState();
+	if (config) {
+		applyConfig(base, config);
+	}
+	const stored = readStoredState();
+	if (!stored) return base;
+	return mergeStoredState(base, stored);
+}
+
+function applyConfig(state: WizardState, config: OnboardingConfig): void {
+	const adminUsername = config.admin_username;
+	if (typeof adminUsername === "string" && adminUsername.trim()) {
+		state.adminUsername = adminUsername;
+	}
+	if (isSecretField(config.admin_password) && config.admin_password.configured) {
+		state.adminPassword = "";
+		state.adminPasswordProtected = true;
+	}
+	if (isSecretField(config.github_token) && config.github_token.configured) {
+		state.githubTokenProtected = true;
+	}
+	const githubUsername = config.github_username;
+	if (typeof githubUsername === "string" && githubUsername.trim()) {
+		state.githubUsername = githubUsername;
+		state.githubUsernameConfirmed = true;
+	}
+	const eventMode = config.github_event_mode;
+	if (typeof eventMode === "string" && isValidEventMode(eventMode)) {
+		state.githubEventMode = eventMode;
+	}
+	const pollInterval = config.github_poll_interval_ms;
+	if (typeof pollInterval === "string" && parsePollIntervalMs(pollInterval) !== null) {
+		state.githubPollIntervalMs = pollInterval;
+	}
+	if (isSecretField(config.webhook_secret) && config.webhook_secret.configured) {
+		state.webhookSecretProtected = true;
+	}
+}
+
+function mergeStoredState(base: WizardState, stored: WizardState): WizardState {
+	const merged: WizardState = { ...base, ...stored, error: null };
+	// Preserve protected flags from the in-progress session, but unprotect a
+	// sensitive field once the operator has typed a replacement value.
+	if (stored.adminPassword && stored.adminPassword.length > 0) merged.adminPasswordProtected = false;
+	if (stored.githubToken && stored.githubToken.length > 0) merged.githubTokenProtected = false;
+	if (stored.webhookSecret && stored.webhookSecret.length > 0) merged.webhookSecretProtected = false;
+	return merged;
+}
+
 export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): React.ReactElement {
-	const [state, setState] = useState<WizardState>(() => loadState());
+	const [state, setState] = useState<WizardState>(getDefaultState);
+	const [configLoading, setConfigLoading] = useState(true);
+	const [configError, setConfigError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [done, setDone] = useState(false);
 
 	useEffect(() => {
-		saveState(state);
-	}, [state]);
+		let cancelled = false;
+		fetchOnboardingConfig()
+			.then((config) => {
+				if (cancelled) return;
+				setState(buildInitialState(config));
+				setConfigLoading(false);
+			})
+			.catch((err) => {
+				if (cancelled) return;
+				setConfigError(err instanceof Error ? err.message : String(err));
+				setState(buildInitialState(null));
+				setConfigLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!configLoading) saveState(state);
+	}, [state, configLoading]);
 
 	const setError = useCallback((error: string | null) => {
 		setState((prev) => ({ ...prev, error }));
@@ -161,13 +244,14 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			state.step === 3 &&
 			isWebhookMode(state.githubEventMode) &&
 			!state.webhookSecret &&
+			!state.webhookSecretProtected &&
 			!loading &&
 			!hasAutoGeneratedSecretRef.current
 		) {
 			hasAutoGeneratedSecretRef.current = true;
 			handleGenerateSecret();
 		}
-	}, [state.step, state.githubEventMode, state.webhookSecret, loading, handleGenerateSecret]);
+	}, [state.step, state.githubEventMode, state.webhookSecret, state.webhookSecretProtected, loading, handleGenerateSecret]);
 
 	const handleFetchRepos = useCallback(async () => {
 		setLoading(true);
@@ -203,7 +287,8 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 		setError(null);
 		try {
 			const selectedRepos = state.repositories.filter((r) => r.selected);
-			if (selectedRepos.length > 0) {
+			const canInitWorkspaces = state.githubToken.trim().length > 0 || state.githubTokenProtected;
+			if (canInitWorkspaces && selectedRepos.length > 0) {
 				await initializeWorkspaces({
 					token: state.githubToken.trim(),
 					username: state.githubUsername.trim(),
@@ -248,17 +333,30 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	const canGoNext = useMemo(() => {
 		switch (state.step) {
 			case 1:
-				return state.adminUsername.trim().length > 0 && state.adminPassword.trim().length > 0;
+				return state.adminUsername.trim().length > 0 && (state.adminPasswordProtected || state.adminPassword.trim().length > 0);
 			case 2:
-				return state.githubToken.trim().length > 0 && state.githubUsernameConfirmed;
+				return (state.githubTokenProtected || state.githubToken.trim().length > 0) && state.githubUsernameConfirmed;
 			case 3:
-				return isEventModeStepValid(state.githubEventMode, state.githubPollIntervalMs, state.webhookSecret);
+				return isEventModeStepValid(state.githubEventMode, state.githubPollIntervalMs, state.webhookSecret, state.webhookSecretProtected);
 			case 4:
 				return true;
 			default:
 				return false;
 		}
 	}, [state]);
+
+	if (configLoading) {
+		return (
+			<div className="onboarding-screen">
+				<div className="onboarding-card">
+					<h2>Loading configuration…</h2>
+					<p className="onboarding-subtitle">
+						Loading your current onboarding settings.
+					</p>
+				</div>
+			</div>
+		);
+	}
 
 	if (done) {
 		return (
@@ -302,7 +400,12 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 				</div>
 				<p className="onboarding-subtitle">{getStepSubtitle(state.step)}</p>
 
-				{state.error && <div className="error-banner">{state.error}</div>}
+				{configError && (
+				<div className="error-banner" style={{ background: "var(--yellow)" }}>
+					Could not load current configuration ({configError}). Showing defaults.
+				</div>
+			)}
+			{state.error && <div className="error-banner">{state.error}</div>}
 
 				{state.step === 1 && (
 					<StepOneAdminCredentials
@@ -386,14 +489,19 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	);
 }
 
-function isEventModeStepValid(mode: string, pollInterval: string, webhookSecret: string): boolean {
+export function isEventModeStepValid(
+	mode: string,
+	pollInterval: string,
+	webhookSecret: string,
+	webhookSecretProtected = false,
+): boolean {
 	if (!isValidEventMode(mode)) {
 		return false;
 	}
 	if (isPollingMode(mode) && parsePollIntervalMs(pollInterval) === null) {
 		return false;
 	}
-	if (isWebhookMode(mode) && webhookSecret.trim().length === 0) {
+	if (isWebhookMode(mode) && !webhookSecretProtected && webhookSecret.trim().length === 0) {
 		return false;
 	}
 	return true;
@@ -446,8 +554,11 @@ function StepOneAdminCredentials({
 						id="admin_password"
 						type={showPassword ? "text" : "password"}
 						value={state.adminPassword}
-						onChange={(e) => updateField("adminPassword", e.target.value)}
-						placeholder="password"
+						onChange={(e) => {
+							updateField("adminPassword", e.target.value);
+							if (state.adminPasswordProtected) updateField("adminPasswordProtected", false);
+						}}
+						placeholder={state.adminPasswordProtected ? "Leave unchanged (configured)" : "password"}
 						required
 						style={{ flex: 1 }}
 					/>
@@ -470,7 +581,7 @@ function StepOneAdminCredentials({
 						Show password
 					</label>
 				</div>
-				<span className="setting-description">A strong password has been suggested. You may override it.</span>
+				<span className="setting-description">{state.adminPasswordProtected ? "A password is already configured. Leave the field blank to keep it, or enter a new one to replace it." : "A strong password has been suggested. You may override it."}</span>
 			</div>
 		</div>
 	);
@@ -500,8 +611,9 @@ function StepTwoGitHubIntegration({
 							updateField("githubToken", e.target.value);
 							updateField("githubUsernameConfirmed", false);
 							updateField("githubUsername", "");
+							if (state.githubTokenProtected) updateField("githubTokenProtected", false);
 						}}
-						placeholder="ghp_..."
+						placeholder={state.githubTokenProtected ? "Leave unchanged (configured)" : "ghp_..."}
 						required
 						style={{ flex: 1 }}
 					/>
@@ -615,8 +727,11 @@ function StepThreeEventMode({
 							id="webhook_secret"
 							type={showSecret ? "text" : "password"}
 							value={state.webhookSecret}
-							onChange={(e) => updateField("webhookSecret", e.target.value)}
-							placeholder="Generate a secret..."
+							onChange={(e) => {
+								updateField("webhookSecret", e.target.value);
+								if (state.webhookSecretProtected) updateField("webhookSecretProtected", false);
+							}}
+							placeholder={state.webhookSecretProtected ? "Leave unchanged (configured)" : "Generate a secret..."}
 							required
 							style={{ flex: 1 }}
 						/>
@@ -696,12 +811,14 @@ function StepFiveWorkspaceInit({
 					className="action-btn"
 					style={{ background: "var(--blue)", color: "#000" }}
 					onClick={onFetchRepos}
-					disabled={loading || !state.githubToken.trim()}
+					disabled={loading || (!state.githubToken.trim() && !state.githubTokenProtected)}
 				>
 					{loading && state.repositories.length === 0 ? "Fetching..." : "Fetch Repositories"}
 				</button>
 				<span style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-					{selectedCount > 0 && `${selectedCount} selected`}
+					{state.githubTokenProtected
+					? "Using the configured GitHub token."
+					: selectedCount > 0 && `${selectedCount} selected`}
 				</span>
 			</div>
 
