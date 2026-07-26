@@ -146,6 +146,18 @@ function makeDeps(): RuntimeDeps {
 			isDraining: vi.fn(() => false),
 			setDraining: vi.fn(),
 		} as never,
+		repositoryStore: {
+			list: vi.fn(async () => []),
+			listSync: vi.fn(() => []),
+			get: vi.fn(async () => null),
+			getSync: vi.fn(() => null),
+			upsert: vi.fn(async () => ({})),
+			upsertSync: vi.fn(() => ({})),
+			remove: vi.fn(async () => false),
+			removeSync: vi.fn(() => false),
+			listForPolling: vi.fn(async () => []),
+			close: vi.fn(),
+		} as never,
 	};
 }
 
@@ -209,17 +221,21 @@ describe("buildRuntimeGraph", () => {
 	it("passes the prebuilt StartIssueSession through webhook server options", () => {
 		const graph = buildRuntimeGraph(baseConfig, makeDeps());
 		const callArgs = (createWebhookServerMock as ReturnType<typeof vi.fn>).mock.calls[0];
-		expect(callArgs?.[9]).toEqual({ prebuiltStartIssueSession: graph.startIssueSession });
+		expect(callArgs?.[9]).toEqual({ prebuiltStartIssueSession: graph.startIssueSession, repositoryStore: expect.anything() });
 	});
 
 	it("resolve helpers passed to handlers resolve default branch and event mode", () => {
 		const deps = makeDeps();
-		(deps.settingsStore.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
-			if (key === "configured_repositories") {
-				return JSON.stringify([{ owner: "mbrooks", repo: "tars", settings: { github_event_mode: "polling", default_branch: "develop" } }]);
-			}
-			return undefined;
-		});
+		const managedRepo = {
+			owner: "mbrooks",
+			repo: "tars",
+			githubEventMode: "polling" as const,
+			defaultBranch: "develop",
+		};
+		(deps.repositoryStore.listSync as ReturnType<typeof vi.fn>).mockReturnValue([managedRepo]);
+		(deps.repositoryStore.getSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(owner: string, repo: string) => (owner === "mbrooks" && repo === "tars" ? managedRepo : null),
+		);
 		buildRuntimeGraph(baseConfig, deps);
 		const handlerDeps = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
 			resolveDefaultBranch: (owner: string, repo: string) => string;
@@ -254,12 +270,16 @@ describe("startRuntime", () => {
 
 	it("exposes resolveGitHubEventMode and shouldPollRepo to the polling loop", async () => {
 		const deps = makeDeps();
-		(deps.settingsStore.get as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
-			if (key === "configured_repositories") {
-				return JSON.stringify([{ owner: "mbrooks", repo: "tars", settings: { github_event_mode: "polling" } }]);
-			}
-			return undefined;
-		});
+		const managedRepo = {
+			owner: "mbrooks",
+			repo: "tars",
+			githubEventMode: "polling" as const,
+			defaultBranch: null,
+		};
+		(deps.repositoryStore.listSync as ReturnType<typeof vi.fn>).mockReturnValue([managedRepo]);
+		(deps.repositoryStore.getSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(owner: string, repo: string) => (owner === "mbrooks" && repo === "tars" ? managedRepo : null),
+		);
 		const pollingConfig = { ...baseConfig, githubEventMode: "webhook" as const };
 		await startRuntime(pollingConfig, deps);
 		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as {

@@ -39,7 +39,7 @@ describe("resolveConfiguredModel", () => {
 			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
 		]);
 
-		const model = resolveConfiguredModel(registry, { model: "kimi-k2.7-code:cloud" });
+		const model = resolveConfiguredModel(registry, { model: "kimi-k2.7-code:cloud" }, {});
 
 		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
@@ -50,7 +50,7 @@ describe("resolveConfiguredModel", () => {
 			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
 		]);
 
-		const model = resolveConfiguredModel(registry, { model: "ollama/kimi-k2.7-code:cloud" });
+		const model = resolveConfiguredModel(registry, { model: "ollama/kimi-k2.7-code:cloud" }, {});
 
 		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
@@ -61,7 +61,7 @@ describe("resolveConfiguredModel", () => {
 			{ provider: "provider-b", id: "shared-model" },
 		]);
 
-		const model = resolveConfiguredModel(registry, { model: "shared-model" });
+		const model = resolveConfiguredModel(registry, { model: "shared-model" }, {});
 
 		expect(model).toBeUndefined();
 	});
@@ -78,7 +78,7 @@ describe("resolveConfiguredModel", () => {
 			{ provider: "provider-b", id: "shared-model" },
 		]);
 
-		const model = resolveConfiguredModel(registry, { model: "provider-b/shared-model" });
+		const model = resolveConfiguredModel(registry, { model: "provider-b/shared-model" }, {});
 
 		expect(model).toEqual({ provider: "provider-b", id: "shared-model" });
 	});

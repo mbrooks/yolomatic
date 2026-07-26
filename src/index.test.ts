@@ -44,6 +44,23 @@ vi.mock("./settings/store.js", () => ({
 	})),
 }));
 
+const repositoryStoreMock = vi.hoisted(() => ({
+	list: vi.fn(async () => [] as unknown[]),
+	listSync: vi.fn(() => [] as unknown[]),
+	get: vi.fn(async (_owner?: string, _repo?: string) => null as unknown),
+	getSync: vi.fn((_owner?: string, _repo?: string) => null as unknown),
+	upsert: vi.fn(async () => ({} as unknown)),
+	upsertSync: vi.fn(() => ({} as unknown)),
+	remove: vi.fn(async () => false),
+	removeSync: vi.fn(() => false),
+	listForPolling: vi.fn(async () => [] as unknown[]),
+	close: vi.fn(),
+}));
+
+vi.mock("./repos/repository-store.js", () => ({
+	RepositoryStore: vi.fn(() => repositoryStoreMock),
+}));
+
 
 vi.mock("./session/store.js", () => ({
 	SessionStore: vi.fn(() => ({
@@ -150,6 +167,11 @@ describe("main", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.mocked(isBootstrapComplete).mockReturnValue(true);
+		repositoryStoreMock.listSync.mockReturnValue([]);
+		repositoryStoreMock.getSync.mockReturnValue(null);
+		repositoryStoreMock.list.mockResolvedValue([]);
+		repositoryStoreMock.listForPolling.mockResolvedValue([]);
+		repositoryStoreMock.get.mockResolvedValue(null);
 		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
 			handleGitHubEvent: vi.fn(),
 			isInFlight: vi.fn(() => false),
@@ -270,17 +292,21 @@ describe("main", () => {
 	});
 
 	it("starts polling when a configured repository overrides webhook mode to polling", async () => {
-		(SettingsStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-			get: vi.fn((key: string) => {
-				if (key === "configured_repositories") {
-					return JSON.stringify([{ owner: "mbrooks", repo: "tars", settings: { github_event_mode: "polling" } }]);
-				}
-				return undefined;
-			}),
-			seedFromEnv: vi.fn(),
-			applyDefaults: vi.fn(),
-			onChange: vi.fn(() => () => {}),
-		}));
+		const managedRepo = {
+			id: "mbrooks/tars",
+			owner: "mbrooks",
+			repo: "tars",
+			fullName: null,
+			visibility: null,
+			githubEventMode: "polling" as const,
+			defaultBranch: null,
+			createdAt: "",
+			updatedAt: "",
+		};
+		repositoryStoreMock.listSync.mockReturnValue([managedRepo]);
+		repositoryStoreMock.getSync.mockImplementation((owner, repo) =>
+			owner === "mbrooks" && repo === "tars" ? managedRepo : null,
+		);
 
 		await main();
 

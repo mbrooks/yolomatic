@@ -8,6 +8,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { SettingsStore } from "../../settings/store.js";
 import type { SkillStore } from "../../skills/store.js";
 import type { RepoSkillService } from "../../skills/repo-skill-service.js";
+import type { RepositoryStore } from "../../repos/repository-store.js";
 import { sendJson } from "./response-helpers.js";
 import { requireAdminJson, requireAdminText } from "./admin-auth.js";
 import { readBody } from "../../webhook/http-utils.js";
@@ -41,6 +42,7 @@ const missingDependencyErrors = {
 	skillStore: "Skill store not configured",
 	repoSkillService: "Repo skill service not configured",
 	startIssueSession: "Session executor not configured",
+	repositoryStore: "Repository store not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
 
 export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
@@ -164,6 +166,7 @@ export interface AdminRouterDeps {
 	settingsStore?: SettingsStore;
 	skillStore?: SkillStore;
 	repoSkillService?: RepoSkillService;
+	repositoryStore?: RepositoryStore;
 	onOnboardingComplete?: () => void | Promise<void>;
 }
 

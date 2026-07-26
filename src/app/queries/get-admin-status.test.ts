@@ -5,7 +5,8 @@ import type { StaleSessionService } from "../../ports/stale-session-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { SessionState } from "../../session/store.js";
-import type { SettingsStore } from "../../settings/store.js";
+import type { RepositoryStore } from "../../repos/repository-store.js";
+import type { Repository } from "../../repos/repository.js";
 
 function makeState(partial: Partial<SessionState> & { owner: string; repo: string; issueNumber: number }): SessionState {
 	return {
@@ -137,7 +138,7 @@ describe("GetAdminStatus", () => {
 		}
 	});
 
-	it("ignores invalid configured_repositories", async () => {
+	it("returns empty repos when no sessions and no managed repos", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => []),
 		} as unknown as SessionRepository;
@@ -154,13 +155,10 @@ describe("GetAdminStatus", () => {
 			isDraining: vi.fn(() => false),
 			setDraining: vi.fn(),
 		};
-		const settingsStore = {
-			get: vi.fn((key: string) => {
-				if (key === "configured_repositories") return "not json";
-				return undefined;
-			}),
-		} as unknown as SettingsStore;
-		const query = new GetAdminStatus(repo, stale, clock, taskControl, settingsStore);
+		const repositoryStore = {
+			list: vi.fn(async () => []),
+		} as unknown as RepositoryStore;
+		const query = new GetAdminStatus(repo, stale, clock, taskControl, repositoryStore);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -168,7 +166,7 @@ describe("GetAdminStatus", () => {
 		}
 	});
 
-	it("filters malformed configured repositories", async () => {
+	it("adds managed repos with no sessions to the inventory", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => []),
 		} as unknown as SessionRepository;
@@ -185,22 +183,13 @@ describe("GetAdminStatus", () => {
 			isDraining: vi.fn(() => false),
 			setDraining: vi.fn(),
 		};
-		const settingsStore = {
-			get: vi.fn((key: string) => {
-				if (key === "configured_repositories") {
-					return JSON.stringify([
-						null,
-						"not an object",
-						{ owner: "  ", repo: "tars" },
-						{ owner: "mbrooks", repo: "" },
-						{ owner: "mbrooks", repo: "valid" },
-						{ owner: "mbrooks", repo: "valid" },
-					]);
-				}
-				return undefined;
-			}),
-		} as unknown as SettingsStore;
-		const query = new GetAdminStatus(repo, stale, clock, taskControl, settingsStore);
+		const managed: Repository[] = [
+			{ id: "mbrooks/valid", owner: "mbrooks", repo: "valid", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
+		];
+		const repositoryStore = {
+			list: vi.fn(async () => managed),
+		} as unknown as RepositoryStore;
+		const query = new GetAdminStatus(repo, stale, clock, taskControl, repositoryStore);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -254,18 +243,14 @@ describe("GetAdminStatus", () => {
 			isDraining: vi.fn(() => false),
 			setDraining: vi.fn(),
 		};
-		const settingsStore = {
-			get: vi.fn((key: string) => {
-				if (key === "configured_repositories") {
-					return JSON.stringify([
-						{ owner: "mbrooks", repo: "tars" },
-						{ owner: "mbrooks", repo: "new-repo" },
-					]);
-				}
-				return undefined;
-			}),
-		} as unknown as SettingsStore;
-		const query = new GetAdminStatus(repo, stale, clock, taskControl, settingsStore);
+		const managed: Repository[] = [
+			{ id: "mbrooks/tars", owner: "mbrooks", repo: "tars", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
+			{ id: "mbrooks/new-repo", owner: "mbrooks", repo: "new-repo", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
+		];
+		const repositoryStore = {
+			list: vi.fn(async () => managed),
+		} as unknown as RepositoryStore;
+		const query = new GetAdminStatus(repo, stale, clock, taskControl, repositoryStore);
 		const result = await query.execute();
 		expect(result.success).toBe(true);
 		if (result.success) {

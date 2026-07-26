@@ -15,6 +15,7 @@ import type { WorkspaceManager } from "../workspace/manager.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
+import type { RepositoryStore } from "../repos/repository-store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 
@@ -54,6 +55,7 @@ export function createWebhookServerDeps(
 	settingsStore?: SettingsStore,
 	executor?: ExecutionService,
 	prebuiltStartIssueSession?: StartIssueSession,
+	repositoryStore?: RepositoryStore,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -63,7 +65,7 @@ export function createWebhookServerDeps(
 	const staleService = staleDetector ?? { detectStaleSessions: async () => [] };
 
 	return {
-		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, settingsStore),
+		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, repositoryStore),
 		getSession: new GetSession(sessionRepo),
 		getSessionLog: new GetSessionLog(sessionRepo),
 		runSessionCommand: new RunSessionCommand(sessionRepo, workspaceService, taskService, systemClock, archiveDir),
