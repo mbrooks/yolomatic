@@ -68,6 +68,7 @@ function makeCommand(
 	const repo = makeMockRepo(state);
 	const workspaces: WorkspaceService = deps?.workspaces ?? {
 		createOrGetWorktree: vi.fn(),
+		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: vi.fn(),
 		commitAndPushPath: vi.fn(),

@@ -27,6 +27,7 @@ function createMockOctokit(overrides?: Partial<{
 			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/tars/pulls/1" } })),
 			list: vi.fn(async () => ({ data: [] })),
 			listReviewComments: vi.fn(async () => ({ data: [] })),
+			updateBranch: vi.fn(async () => ({ data: { message: "update" } })),
 			...(overrides?.pulls ?? {}),
 		},
 		repos: {
@@ -163,6 +164,43 @@ describe("GitHubServiceAdapter", () => {
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			await expect(adapter.createPullRequest("mbrooks", "tars", "Title", "Body", "feature", "main")).rejects.toThrow("Auth failed");
+		});
+	});
+
+	describe("updatePullRequestBranch", () => {
+		it("calls pulls.updateBranch without expected_head_sha by default", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.updatePullRequestBranch("mbrooks", "tars", 42);
+			expect(octokit.pulls.updateBranch).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars", pull_number: 42 });
+		});
+
+		it("passes expected_head_sha when provided", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.updatePullRequestBranch("mbrooks", "tars", 42, "abcdef");
+			expect(octokit.pulls.updateBranch).toHaveBeenCalledWith({
+				owner: "mbrooks",
+				repo: "tars",
+				pull_number: 42,
+				expected_head_sha: "abcdef",
+			});
+		});
+
+		it("wraps merge-conflict errors with guidance", async () => {
+			const octokit = createMockOctokit({
+				pulls: { updateBranch: vi.fn(async () => { throw new Error("422 Unprocessable Entity: merge conflict"); }) },
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await expect(adapter.updatePullRequestBranch("mbrooks", "tars", 42)).rejects.toThrow(/update-branch failed/);
+		});
+
+		it("rethrows non-conflict errors unchanged", async () => {
+			const octokit = createMockOctokit({
+				pulls: { updateBranch: vi.fn(async () => { throw new Error("network down"); }) },
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await expect(adapter.updatePullRequestBranch("mbrooks", "tars", 42)).rejects.toThrow("network down");
 		});
 	});
 

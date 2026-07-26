@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { WorkspaceConfig } from "./config.js";
 import { BareRepoManager } from "./bare-repo.js";
+import { WorktreeBranchDivergedError } from "./errors.js";
 import { GitCommandRunner } from "./git-runner.js";
 import { getBranchName, getWorktreePath, normalizeSegment } from "./paths.js";
 
@@ -89,6 +90,87 @@ export class WorktreeManager {
 			path: worktreePath,
 			branch: branchName,
 		};
+	}
+
+	/**
+	 * Refresh a worktree from origin so a worker starts on a fresh,
+	 * conflict-free, credential-free workspace.
+	 *
+	 * 1. Fetch origin in the bare repo (updates origin/main and origin/<branch>).
+	 * 2. Fast-forward the worktree branch to origin/<branch> without discarding
+	 *    un-pushed local commits. If the branch has not been pushed yet, leave
+	 *    the locally-created branch in place. If the branch has diverged from
+	 *    origin, raise WorktreeBranchDivergedError so the control plane can
+	 *    resolve it via the GitHub update-branch API.
+	 * 3. Sanitize remote.origin.url so no token is ever visible to the worker.
+	 *
+	 * Stashes and restores a dirty worktree from a previous session; if the
+	 * stash pop conflicts, the session must fail.
+	 */
+	async syncWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const normalizedOwner = normalizeSegment(owner, "owner");
+		const normalizedRepo = normalizeSegment(repo, "repo");
+		const bareRepoPath = this.bareRepos.getBareRepoPath(normalizedOwner, normalizedRepo);
+		const worktreePath = this.getWorktreePath(normalizedOwner, normalizedRepo, issueNumber);
+		const branchName = this.getBranchName(issueNumber);
+		const remoteRef = `origin/${branchName}`;
+		const sanitizedUrl = `https://github.com/${normalizedOwner}/${normalizedRepo}.git`;
+
+		if (!(await this.worktreeExists(bareRepoPath, worktreePath))) {
+			throw new Error(
+				`[workspace] syncWorktree called before createOrGetWorktree for ${normalizedOwner}/${normalizedRepo}#${issueNumber}`,
+			);
+		}
+
+		await this.bareRepos.fetchOrigin(bareRepoPath);
+
+		const stashed = await this.stashIfDirty(worktreePath, `TARS auto-stash before sync of issue-${issueNumber}`);
+
+		const remoteExists = await this.bareRepos.remoteBranchExists(bareRepoPath, branchName);
+		if (remoteExists) {
+			try {
+				await this.git.run("git", ["merge", "--ff-only", remoteRef], { cwd: worktreePath });
+			} catch (error) {
+				await this.popStashSafely(worktreePath, stashed);
+				throw new WorktreeBranchDivergedError(branchName, remoteRef);
+			}
+		}
+
+		await this.popStashSafely(worktreePath, stashed);
+
+		try {
+			await this.git.run("git", ["remote", "set-url", "origin", sanitizedUrl], { cwd: worktreePath });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(
+				`[workspace] Failed to sanitize remote.origin.url for ${normalizedOwner}/${normalizedRepo}#${issueNumber}: ${message}`,
+			);
+		}
+	}
+
+	private async stashIfDirty(worktreePath: string, message: string): Promise<boolean> {
+		const dirty = await this.git.hasAnyChanges(worktreePath);
+		if (!dirty) {
+			return false;
+		}
+		await this.git.ensureGitIdentity(worktreePath);
+		await this.git.run("git", ["stash", "push", "-m", message, "-u"], { cwd: worktreePath });
+		return true;
+	}
+
+	private async popStashSafely(worktreePath: string, stashed: boolean): Promise<void> {
+		if (!stashed) {
+			return;
+		}
+		try {
+			await this.git.run("git", ["stash", "pop"], { cwd: worktreePath });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(
+				`[workspace] Could not restore stashed changes after sync in ${worktreePath}: ${message}. ` +
+					`The stash is preserved; resolve the conflict manually before relaunching.`,
+			);
+		}
 	}
 
 	async removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {

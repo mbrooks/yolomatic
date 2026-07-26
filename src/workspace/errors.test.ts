@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EmptyRepositoryError } from "./errors.js";
+import { EmptyRepositoryError, WorktreeBranchDivergedError } from "./errors.js";
 
 describe("EmptyRepositoryError", () => {
 	it("has the correct name and message", () => {
@@ -13,5 +13,16 @@ describe("EmptyRepositoryError", () => {
 	it("exposes the bareRepoPath", () => {
 		const error = new EmptyRepositoryError("/some/path");
 		expect(error.bareRepoPath).toBe("/some/path");
+	});
+});
+
+describe("WorktreeBranchDivergedError", () => {
+	it("has the correct name, branch, and remoteRef", () => {
+		const error = new WorktreeBranchDivergedError("tars/issue-472", "origin/tars/issue-472");
+		expect(error.name).toBe("WorktreeBranchDivergedError");
+		expect(error.branch).toBe("tars/issue-472");
+		expect(error.remoteRef).toBe("origin/tars/issue-472");
+		expect(error.message).toContain("diverged");
+		expect(error.message).toContain("update-branch");
 	});
 });
