@@ -208,9 +208,15 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/onboarding\/repos$/u,
 		auth: false,
 		parseBody: true,
+		requiresDeps: ["settingsStore"],
 		handler: async (ctx) => {
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as { token?: string };
-			const token = body.token?.trim();
+			// The wizard submits an empty token when the GitHub PAT is already
+			// configured (protected). Fall back to the stored value so the
+			// operator can still fetch repositories without re-entering the
+			// secret.
+			const token = resolveSecretSetting((k) => settingsStore.get(k), "github_token", body.token);
 			if (!token) {
 				throw new ValidationError("Token is required");
 			}
@@ -239,8 +245,13 @@ const registry = new AdminRouteRegistry()
 				username?: string;
 				repos?: Array<{ owner: string; repo: string }>;
 			};
-			const token = body.token?.trim();
-			const username = body.username?.trim();
+			// The wizard submits an empty token when the GitHub PAT is already
+			// configured (protected). Fall back to the stored value so the
+			// operator can still initialize workspaces without re-entering the
+			// secret. The username is non-sensitive and normally pre-populated,
+			// but fall back to the stored value as a safety net.
+			const token = resolveSecretSetting((k) => settingsDeps.settingsStore.get(k), "github_token", body.token);
+			const username = body.username?.trim() || settingsDeps.settingsStore.get("github_username")?.trim();
 			const repos = body.repos ?? [];
 			if (!token || !username) {
 				throw new ValidationError("Token and username are required");

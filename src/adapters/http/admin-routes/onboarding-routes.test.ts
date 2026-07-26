@@ -286,6 +286,7 @@ describe("handleOnboardingRoutes", () => {
 
 	describe("POST /api/onboarding/repos", () => {
 		it("rejects missing token", async () => {
+			const store = await tmpStore();
 			const req = mockRequest({
 				url: "/api/onboarding/repos",
 				method: "POST",
@@ -293,7 +294,7 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/api/onboarding/repos");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/repos");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(400);
@@ -302,6 +303,41 @@ describe("handleOnboardingRoutes", () => {
 		});
 
 		it("returns repositories for a valid-looking token", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding/repos",
+				method: "POST",
+				body: JSON.stringify({ token: "ghp_test" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/repos");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.repositories).toEqual([]);
+		});
+
+		it("falls back to the stored github_token when the submitted token is empty", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "stored-ghp-token");
+			const req = mockRequest({
+				url: "/api/onboarding/repos",
+				method: "POST",
+				body: JSON.stringify({ token: "" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/repos");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.repositories).toEqual([]);
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
 			const req = mockRequest({
 				url: "/api/onboarding/repos",
 				method: "POST",
@@ -312,9 +348,9 @@ describe("handleOnboardingRoutes", () => {
 			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/api/onboarding/repos");
 
 			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(200);
+			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
-			expect(body.repositories).toEqual([]);
+			expect(body.error).toContain("Settings store not configured");
 		});
 	});
 
@@ -390,6 +426,43 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toContain("Settings store not configured");
+		});
+
+		it("falls back to the stored github_token and github_username when submitted empty", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "stored-ghp-token");
+			store.set("github_username", "stored-user");
+			const req = mockRequest({
+				url: "/api/onboarding/init-workspaces",
+				method: "POST",
+				body: JSON.stringify({ token: "", username: "", repos: [] }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.initialized).toEqual([]);
+			expect(store.get("configured_repositories")).toBe("[]");
+		});
+
+		it("rejects init-workspaces when neither submitted nor stored token is available", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding/init-workspaces",
+				method: "POST",
+				body: JSON.stringify({ token: "", username: "user", repos: [] }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/init-workspaces");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Token and username are required");
 		});
 	});
 
