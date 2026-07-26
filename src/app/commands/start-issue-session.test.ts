@@ -84,6 +84,7 @@ function makeCommand(
 	const repo = makeMockRepo(state);
 	const workspaces: WorkspaceService = {
 		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-1", branch: "tars/issue-1" })),
+			syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: vi.fn(),
 		commitAndPushPath: vi.fn(),
@@ -98,6 +99,7 @@ function makeCommand(
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
 		getPullRequest: vi.fn(async () => null),
+		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: vi.fn(async () => null),
 		listPullRequests: vi.fn(async () => []),
 		getIssue: vi.fn(async () => null),
@@ -151,6 +153,7 @@ describe("StartIssueSession", () => {
 		const repo = makeMockRepo(null);
 		const workspaces = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(),
 			commitAndPushPath: vi.fn(),

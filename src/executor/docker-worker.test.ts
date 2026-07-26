@@ -750,6 +750,70 @@ describe("DockerWorkerExecutor", () => {
 			await harness.close();
 		}
 	});
+
+	it("refuses to launch when the worktree origin URL contains credentials", async () => {
+		const harness = await createHarness(430);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://x-access-token:ghp_secret@github.com/mbrooks/tars.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+			return;
+		});
+
+		spawnMock.mockImplementation(() => makeChildProcess());
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(430, harness.workspacePath))).rejects.toThrow(
+				/remote origin URL contains credentials/,
+			);
+			expect(spawnMock).not.toHaveBeenCalled();
+			expect(execFileMock).toHaveBeenCalledWith("git", ["remote", "get-url", "origin"], expect.any(Object), expect.any(Function));
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("launches after verifying the worktree origin URL is token-free", async () => {
+		const harness = await createHarness(431);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://github.com/mbrooks/tars.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+			return;
+		});
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.TARS_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/tars#431", "ack-safe", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/tars#431", "complete-safe", {
+							result: { status: "complete", summary: "done", rawResponse: "TARS_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+				return child;
+		});
+
+		try {
+			const result = await harness.executor.execute(makeSessionState(431, harness.workspacePath));
+			expect(result.status).toBe("complete");
+			expect(execFileMock).toHaveBeenCalledWith("git", ["remote", "get-url", "origin"], expect.any(Object), expect.any(Function));
+		} finally {
+			await harness.close();
+		}
+	});
 });
 
 async function createHarness(issueNumber: number): Promise<{

@@ -32,6 +32,7 @@ describe("createWebhookServerDeps", () => {
 			path: "",
 			branch: "",
 		});
+		await expect(fallbackWorkspaceService.syncWorktree("mbrooks", "tars", 1)).resolves.toBeUndefined();
 		await expect(fallbackWorkspaceService.removeWorktree("mbrooks", "tars", 1)).resolves.toBeUndefined();
 		await expect(fallbackWorkspaceService.commitAndPush("mbrooks", "tars", 1, "msg")).resolves.toBe(false);
 		await expect(fallbackWorkspaceService.commitAndPushPath("/tmp/ws", "branch", "msg", "main")).resolves.toBe(false);

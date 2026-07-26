@@ -52,6 +52,11 @@ export class WorkspaceManager implements WorkspaceService {
 		return { path: worktree.path, branch: worktree.branch };
 	}
 
+	async syncWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {
+		await mkdir(this.config.workspacesDir, { recursive: true });
+		await this.worktrees.syncWorktree(owner, repo, issueNumber);
+	}
+
 	async removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void> {
 		await this.worktrees.removeWorktree(owner, repo, issueNumber);
 	}

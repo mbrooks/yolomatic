@@ -31,6 +31,7 @@ const fallbackTaskController = {
 
 const fallbackWorkspaceService = {
 	createOrGetWorktree: async () => ({ path: "", branch: "" }),
+	syncWorktree: async () => undefined,
 	removeWorktree: async () => undefined,
 	commitAndPush: async () => false,
 	commitAndPushPath: async () => false,

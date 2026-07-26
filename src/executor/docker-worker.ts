@@ -27,6 +27,8 @@ const WORKER_IMAGE_TRANSPORT_LABEL = "io.tars.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 const MAX_WORKER_LAUNCH_RETRIES = 3;
 const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
+/** Matches userinfo credentials embedded in a URL (e.g. https://user:token@host). */
+const CREDENTIAL_URL_PATTERN = /^[a-z]+:\/\/[^/]*@/i;
 
 async function execFileText(command: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
 	const result = await execFileAsync(command, args, { cwd });
@@ -570,6 +572,30 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private async validateLaunch(workspacePath: string): Promise<void> {
 		await access(workspacePath);
+		await this.assertWorkspaceRemoteIsSanitized(workspacePath);
+	}
+
+	/**
+	 * Refuse to launch a worker whose mounted workspace still exposes a
+	 * credential-bearing remote.origin.url. The control plane is responsible
+	 * for sanitizing the remote before the worker starts; a token here would
+	 * let the credential-free worker push directly.
+	 */
+	private async assertWorkspaceRemoteIsSanitized(workspacePath: string): Promise<void> {
+		let url: string;
+		try {
+			const result = await execFileAsync("git", ["remote", "get-url", "origin"], { cwd: workspacePath });
+			url = String(typeof result === "string" ? result : result.stdout ?? "").trim();
+		} catch {
+			return;
+		}
+		if (url.length === 0 || !CREDENTIAL_URL_PATTERN.test(url)) {
+			return;
+		}
+		throw new Error(
+			`[worker] Refusing to launch: workspace remote origin URL contains credentials (${url}). ` +
+				"The control plane must sanitize remote.origin.url before launching a worker.",
+		);
 	}
 
 	private resolveWorkerOllamaHost(): string | undefined {
