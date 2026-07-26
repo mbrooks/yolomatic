@@ -11,3 +11,23 @@ export class EmptyRepositoryError extends Error {
 		this.bareRepoPath = bareRepoPath;
 	}
 }
+
+/**
+ * Raised by syncWorktree() when the issue branch has diverged from its remote
+ * tip and cannot be fast-forwarded. The control plane should resolve the
+ * divergence (e.g. via the GitHub update-branch API) before launching a worker.
+ */
+export class WorktreeBranchDivergedError extends Error {
+	public readonly branch: string;
+	public readonly remoteRef: string;
+
+	constructor(branch: string, remoteRef: string) {
+		super(
+			`[workspace] Branch '${branch}' has diverged from '${remoteRef}' and cannot be fast-forwarded. ` +
+				`Resolve the conflict via the GitHub update-branch API before launching a worker.`,
+		);
+		this.name = "WorktreeBranchDivergedError";
+		this.branch = branch;
+		this.remoteRef = remoteRef;
+	}
+}

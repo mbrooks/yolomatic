@@ -192,6 +192,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 99,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -298,6 +299,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 42,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -451,6 +453,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 42,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => false),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -560,6 +563,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -634,6 +638,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -749,6 +754,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -878,6 +884,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 7,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -997,6 +1004,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1081,6 +1089,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1137,6 +1146,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1227,6 +1237,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1369,6 +1380,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "teamhub-case",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => {
 				throw new Error("Author identity unknown");
 			}),
@@ -1472,6 +1484,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1576,6 +1589,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1664,6 +1678,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1759,6 +1774,7 @@ describe("GitHubIssueHandlers", () => {
 				repo: "tars",
 				issueNumber: 1,
 			})),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1820,6 +1836,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 		};
 		const executor = { execute: vi.fn() };
 		const octokit = { issues: { createComment: vi.fn() } };
@@ -1874,6 +1891,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
@@ -1969,6 +1987,7 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(),
+			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
