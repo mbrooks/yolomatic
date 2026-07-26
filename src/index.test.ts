@@ -31,6 +31,8 @@ vi.mock("./config.js", () => ({
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
 		workerOllamaHost: undefined,
+		adminPath: "/tars/admin",
+		adminDefaultPage: "#/dashboard",
 	})),
 	isBootstrapComplete: vi.fn(() => true),
 }));
@@ -235,6 +237,8 @@ describe("main", () => {
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
+		adminPath: "/tars/admin",
+		adminDefaultPage: "#/dashboard",
 		});
 
 		await main();
@@ -328,6 +332,8 @@ describe("main", () => {
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
+		adminPath: "/tars/admin",
+		adminDefaultPage: "#/dashboard",
 		});
 
 		await main();
@@ -507,6 +513,8 @@ describe("main", () => {
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
+		adminPath: "/tars/admin",
+		adminDefaultPage: "#/dashboard",
 		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();

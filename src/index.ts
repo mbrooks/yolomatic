@@ -73,6 +73,8 @@ export async function main(): Promise<void> {
 					process.stdout.write("[onboarding] Settings loaded. Starting full runtime.\n");
 					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController });
 				},
+				adminPath: config.adminPath,
+				adminDefaultPage: config.adminDefaultPage,
 			},
 			undefined,
 			settingsStore,
