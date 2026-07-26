@@ -16,6 +16,8 @@ describe("HandlePRReview", () => {
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/tars/pull/99",
 			...overrides,
 		};
 	}
@@ -222,7 +224,7 @@ describe("HandlePRReview", () => {
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
 
-	it("ignores when no session exists for the mapped issue", async () => {
+	it("silently ignores a TARS-named PR when no session exists for the mapped issue", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(null);
 
@@ -235,16 +237,11 @@ describe("HandlePRReview", () => {
 		});
 
 		expect(executor.executePRReview).not.toHaveBeenCalled();
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
-		expect(github.postPRComment).toHaveBeenCalledWith(
-			"mbrooks",
-			"tars",
-			99,
-			expect.stringContaining("will not create a new session from a PR comment"),
-		);
+		expect(sessions.findSessionByPR).not.toHaveBeenCalled();
+		expect(github.postPRComment).not.toHaveBeenCalled();
 	});
 
-	it("stops when stored PR mapping points at a different PR", async () => {
+	it("silently ignores a TARS-named PR associated with a different PR", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(
 			makeSession({
@@ -262,21 +259,8 @@ describe("HandlePRReview", () => {
 		});
 
 		expect(executor.executePRReview).not.toHaveBeenCalled();
-		expect(sessions.updateStatus).toHaveBeenCalledWith(
-			"mbrooks",
-			"tars",
-			56,
-			"failed",
-			expect.objectContaining({
-				summary: expect.stringContaining("already associated with PR #100"),
-			}),
-		);
-		expect(github.postPRComment).toHaveBeenCalledWith(
-			"mbrooks",
-			"tars",
-			99,
-			expect.stringContaining("stopped before execution"),
-		);
+		expect(sessions.updateStatus).not.toHaveBeenCalled();
+		expect(github.postPRComment).not.toHaveBeenCalled();
 	});
 
 	it("processes actionable review comments and pushes changes", async () => {
@@ -375,6 +359,33 @@ describe("HandlePRReview", () => {
 		);
 	});
 
+	it("reports a cancelled review without pushing changes", async () => {
+		const { handler, sessions, workspaces, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession());
+		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
+			status: "cancelled",
+			summary: "Stopped by request.",
+			rawResponse: "TARS_STATUS: cancelled\nStopped by request.",
+		});
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			repository: { name: "tars", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Please stop", user: { login: "user" } },
+		});
+
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "cancelled");
+		expect(workspaces.commitAndPushPath).not.toHaveBeenCalled();
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"tars",
+			99,
+			expect.stringContaining("Task cancelled by admin."),
+		);
+	});
+
 	it("replies to discussion-only comments without executing", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(makeSession());
@@ -396,9 +407,9 @@ describe("HandlePRReview", () => {
 		);
 	});
 
-	it("associates PR if not already tracked", async () => {
-		const { handler, sessions } = createHandler();
-		sessions.get.mockResolvedValue(makeSession());
+	it("does not claim an untracked PR from its branch name", async () => {
+		const { handler, sessions, executor, github } = createHandler();
+		sessions.get.mockResolvedValue(makeSession({ prNumber: undefined, prUrl: undefined }));
 
 		await handler.execute({
 			action: "created",
@@ -408,13 +419,9 @@ describe("HandlePRReview", () => {
 			comment: { id: 1, body: "LGTM", user: { login: "user" } },
 		});
 
-		expect(sessions.associatePR).toHaveBeenCalledWith(
-			"mbrooks",
-			"tars",
-			56,
-			99,
-			"https://github.com/mbrooks/tars/pull/99",
-		);
+		expect(sessions.associatePR).not.toHaveBeenCalled();
+		expect(executor.executePRReview).not.toHaveBeenCalled();
+		expect(github.postPRComment).not.toHaveBeenCalled();
 	});
 
 	it("handles submitted review events", async () => {
