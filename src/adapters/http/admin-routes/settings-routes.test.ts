@@ -39,6 +39,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 			setTyped: vi.fn(),
 			getString: vi.fn((key: string, defaultValue: string) => defaultValue),
 			get: vi.fn(),
+			getEnvSource: vi.fn(() => "database" as const),
 		},
 		githubService: {
 			listPendingInvitations: vi.fn(async () => []),
@@ -104,6 +105,63 @@ describe("handleSettingsRoutes", () => {
 		expect(body.updated).toContain("admin_username");
 		expect(body.updated).not.toContain("admin_password");
 		expect(body.requiresRestart).toContain("admin_username");
+		expect(body.ignored).toEqual([]);
+	});
+
+	it("ignores PATCH updates for env-sourced keys and reports them in ignored", async () => {
+		const res = response();
+		const setTyped = vi.fn();
+		const deps = makeDeps({
+			settingsStore: {
+				getAllViews: vi.fn(() => ({})),
+				setTyped,
+				get: vi.fn(),
+				getString: vi.fn(),
+				getEnvSource: vi.fn((key: string) => (key === "github_token" ? "env" : "database")),
+			},
+		});
+		const handled = await handleSettingsRoutes(
+			request(
+				"/api/settings",
+				"PATCH",
+				JSON.stringify({ github_token: "new-token", github_username: "new-user" }),
+			),
+			res,
+			deps,
+			"/api/settings",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(res.body);
+		expect(body.updated).toEqual(["github_username"]);
+		expect(body.ignored).toEqual(["github_token"]);
+		expect(setTyped).toHaveBeenCalledTimes(1);
+		expect(setTyped).toHaveBeenCalledWith("github_username", "new-user");
+	});
+
+	it("GET /api/settings passes through getAllViews including envSource", async () => {
+		const res = response();
+		const deps = makeDeps({
+			settingsStore: {
+				getAllViews: vi.fn(() => [
+					{ key: "github_token", value: "", envSource: "env" },
+					{ key: "port", value: 8080, envSource: "database" },
+				]),
+				setTyped: vi.fn(),
+				get: vi.fn(),
+				getString: vi.fn(),
+				getEnvSource: vi.fn(() => "database"),
+			},
+		});
+		const handled = await handleSettingsRoutes(request("/api/settings"), res, deps, "/api/settings");
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(res.body);
+		expect(body.settings).toHaveLength(2);
+		expect(body.settings[0].envSource).toBe("env");
+		expect(body.settings[1].envSource).toBe("database");
 	});
 
 	it("lists pending GitHub invitations", async () => {

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import http from "node:http";
 import { handleOnboardingRoutes } from "./onboarding-routes.js";
 import { SettingsStore } from "../../../settings/store.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
+import { SETTING_DEFINITIONS } from "../../../settings/model.js";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -62,7 +63,18 @@ function makeDeps(store?: SettingsStore) {
 	} as never;
 }
 
+const ONBOARDING_ENV_VARS = SETTING_DEFINITIONS.map((d) => d.envVar);
+
+let originalEnv: NodeJS.ProcessEnv = process.env;
+
+beforeEach(() => {
+	originalEnv = process.env;
+	process.env = { ...originalEnv };
+	for (const name of ONBOARDING_ENV_VARS) delete process.env[name];
+});
+
 afterEach(() => {
+	process.env = originalEnv;
 	vi.restoreAllMocks();
 });
 
@@ -237,6 +249,51 @@ describe("handleOnboardingRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.complete).toBe(true);
 			expect(body.missing).toEqual([]);
+		});
+
+		it("returns a sources record mapping each onboarding key to its EnvSource", async () => {
+			const store = await tmpStore();
+			store.set("github_username", "stored-user");
+			store.set("admin_username", "stored-admin");
+			store.set("github_event_mode", "webhook");
+			process.env.GITHUB_TOKEN = "env-token";
+			process.env.ADMIN_PASSWORD = "env-pass";
+			process.env.WEBHOOK_SECRET = "env-secret";
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.sources.github_token).toBe("env");
+			expect(body.sources.admin_password).toBe("env");
+			expect(body.sources.webhook_secret).toBe("env");
+			expect(body.sources.github_username).toBe("database");
+			expect(body.sources.admin_username).toBe("database");
+			expect(body.sources.github_event_mode).toBe("database");
+		});
+
+		it("does not report env-sourced required fields as missing", async () => {
+			const store = await tmpStore();
+			process.env.GITHUB_TOKEN = "env-token";
+			process.env.GITHUB_USERNAME = "env-user";
+			process.env.ADMIN_USERNAME = "env-admin";
+			process.env.ADMIN_PASSWORD = "env-pass";
+			process.env.GITHUB_EVENT_MODE = "webhook";
+			process.env.WEBHOOK_SECRET = "env-secret";
+			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/status");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.missing).not.toContain("github_token");
+			expect(body.missing).not.toContain("admin_password");
+			expect(body.missing).not.toContain("webhook_secret");
 		});
 	});
 
@@ -940,6 +997,77 @@ describe("handleOnboardingRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toContain("webhook_secret");
 			expect(store.get("onboarding_complete")).toBeUndefined();
+		});
+
+		it("does not overwrite env-sourced SQLite values on submit", async () => {
+			const store = await tmpStore();
+			store.set("github_token", "sqlite-token");
+			store.set("github_username", "sqlite-user");
+			store.set("admin_username", "sqlite-admin");
+			store.set("admin_password", "sqlite-pass");
+			store.set("webhook_secret", "sqlite-secret");
+			store.set("github_event_mode", "webhook");
+			process.env.GITHUB_TOKEN = "env-token";
+			process.env.ADMIN_PASSWORD = "env-pass";
+			process.env.WEBHOOK_SECRET = "env-secret";
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "",
+					github_username: "submitted-user",
+					webhook_secret: "",
+					admin_username: "submitted-admin",
+					admin_password: "",
+					github_event_mode: "webhook",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			// Env-sourced keys keep their SQLite values (not overwritten).
+			expect(store.getAll().find((e) => e.key === "github_token")?.value).toBe("sqlite-token");
+			expect(store.getAll().find((e) => e.key === "admin_password")?.value).toBe("sqlite-pass");
+			expect(store.getAll().find((e) => e.key === "webhook_secret")?.value).toBe("sqlite-secret");
+			// Non-env-sourced keys are written from the submitted body.
+			expect(store.get("github_username")).toBe("submitted-user");
+			expect(store.get("admin_username")).toBe("submitted-admin");
+			expect(store.get("onboarding_complete")).toBe("true");
+		});
+
+		it("completes onboarding when all required fields are env-sourced", async () => {
+			const store = await tmpStore();
+			process.env.GITHUB_TOKEN = "env-token";
+			process.env.GITHUB_USERNAME = "env-user";
+			process.env.ADMIN_USERNAME = "env-admin";
+			process.env.ADMIN_PASSWORD = "env-pass";
+			process.env.GITHUB_EVENT_MODE = "webhook";
+			process.env.WEBHOOK_SECRET = "env-secret";
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "",
+					github_username: "",
+					webhook_secret: "",
+					admin_username: "",
+					admin_password: "",
+					github_event_mode: "",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.success).toBe(true);
+			expect(body.activated).toBe(true);
+			expect(store.get("onboarding_complete")).toBe("true");
 		});
 	});
 

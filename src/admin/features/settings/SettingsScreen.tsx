@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
+import { SETTING_DEFINITIONS } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
@@ -20,6 +21,10 @@ const SERVER_SETTINGS_SECTIONS = [
 const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
 };
+
+const SETTING_ENV_VARS: Readonly<Record<string, string>> = Object.fromEntries(
+	SETTING_DEFINITIONS.map((def) => [def.key, def.envVar]),
+);
 
 export function SettingsScreen({
 	onBack,
@@ -69,7 +74,17 @@ export function SettingsScreen({
 		try {
 			const body: Record<string, string | number | boolean> = {};
 			for (const key of changedKeys) {
+				const setting = settings.find((s) => s.key === key);
+				// Env-sourced settings are controlled by .env and cannot be
+				// updated through the UI; skip them so the backend ignores them.
+				if (setting?.envSource === "env") continue;
 				body[key] = edited[key];
+			}
+			if (Object.keys(body).length === 0) {
+				setChangedKeys(new Set());
+				setEdited({});
+				setSaving(false);
+				return;
 			}
 			const result = await updateSettings(body);
 			setPendingRestart(result.requiresRestart.length > 0);
@@ -83,7 +98,7 @@ export function SettingsScreen({
 		} finally {
 			setSaving(false);
 		}
-	}, [changedKeys, edited]);
+	}, [changedKeys, edited, settings]);
 
 	const handleRerunOnboarding = useCallback(async () => {
 		if (!window.confirm("Are you sure you want to rerun the on-boarding wizard?")) return;
@@ -300,13 +315,16 @@ function SettingRow({
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
 	const options = SETTING_OPTIONS[setting.key];
+	const envLocked = setting.envSource === "env";
+	const envVarName = SETTING_ENV_VARS[setting.key];
 
 	return (
-		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}`}>
+		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}${envLocked ? " env-locked" : ""}`}>
 			<label htmlFor={`setting-${setting.key}`}>
 				<span className="setting-key">{setting.key}</span>
 				{setting.requiresRestart && <span className="restart-badge">restart</span>}
 				{setting.sensitive && <span className="sensitive-badge">sensitive</span>}
+				{envLocked && <span className="env-locked-badge">env</span>}
 			</label>
 			<p className="setting-description">{setting.description}</p>
 			{options ? (
@@ -314,6 +332,7 @@ function SettingRow({
 					id={`setting-${setting.key}`}
 					value={String(displayValue)}
 					onChange={(e) => onChange(setting.key, e.target.value)}
+					disabled={envLocked}
 				>
 					{options.map((option) => (
 						<option key={option} value={option}>{option}</option>
@@ -324,6 +343,7 @@ function SettingRow({
 					id={`setting-${setting.key}`}
 					value={displayValue === true ? "true" : "false"}
 					onChange={(e) => onChange(setting.key, e.target.value === "true")}
+					disabled={envLocked}
 				>
 					<option value="true">true</option>
 					<option value="false">false</option>
@@ -334,6 +354,7 @@ function SettingRow({
 					type="number"
 					value={String(displayValue)}
 					onChange={(e) => onChange(setting.key, Number.parseInt(e.target.value, 10) || 0)}
+					disabled={envLocked}
 				/>
 			) : (
 				<input
@@ -341,9 +362,16 @@ function SettingRow({
 					type={setting.sensitive ? "password" : "text"}
 					value={String(displayValue)}
 					onChange={(e) => onChange(setting.key, e.target.value)}
+					disabled={envLocked}
 				/>
 			)}
-			{setting.default !== undefined && (
+			{envLocked && envVarName && (
+				<p className="env-source-warning">
+					This setting is controlled by the environment variable <code>{envVarName}</code>.
+					Change it in <code>.env</code> and restart TARS to update.
+				</p>
+			)}
+			{!envLocked && setting.default !== undefined && (
 				<span className="setting-default">Default: {String(setting.default)}</span>
 			)}
 		</div>

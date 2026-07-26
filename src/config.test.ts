@@ -157,6 +157,35 @@ describe("getConfig", () => {
 		const config = getConfig(createStore());
 		expect(config.cleanupRetentionDays).toBeUndefined();
 	});
+
+	it("prefers environment variables over SQLite values", () => {
+		const store = createStore();
+		// Seed SQLite with one set of values.
+		store.set("port", "7000");
+		store.set("github_token", "sqlite-token");
+		store.set("github_username", "sqlite-user");
+		store.set("admin_username", "sqlite-admin");
+		store.set("admin_password", "sqlite-pass");
+		store.set("onboarding_complete", "true");
+		store.set("github_event_mode", "polling");
+		store.set("github_poll_interval_ms", "15000");
+
+		// Env values should win at read time.
+		process.env.PORT = "8080";
+		process.env.GITHUB_TOKEN = "env-token";
+		process.env.GITHUB_USERNAME = "env-user";
+		process.env.ADMIN_USERNAME = "env-admin";
+		process.env.ADMIN_PASSWORD = "env-pass";
+
+		const config = getConfig(store);
+		expect(config.port).toBe(8080);
+		expect(config.githubToken).toBe("env-token");
+		expect(config.githubUsername).toBe("env-user");
+		expect(config.adminUsername).toBe("env-admin");
+		expect(config.adminPassword).toBe("env-pass");
+		// SQLite value is unchanged.
+		expect(store.getAll().find((e) => e.key === "github_token")?.value).toBe("sqlite-token");
+	});
 });
 
 describe("isBootstrapComplete", () => {

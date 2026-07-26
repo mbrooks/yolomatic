@@ -1,8 +1,10 @@
 import { apiGet, apiPost } from "./client.js";
+import type { EnvSource } from "../../settings/model.js";
 
 export interface OnboardingStatus {
 	complete: boolean;
 	missing: string[];
+	sources: Record<string, EnvSource>;
 }
 
 export interface OnboardingSecretField {

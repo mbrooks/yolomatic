@@ -6,6 +6,7 @@ import {
 	listAccessibleRepositories,
 	initializeWorkspaces,
 	fetchOnboardingConfig,
+	fetchOnboardingStatus,
 	isSecretField,
 	type OnboardingConfig,
 	type OnboardingSecretField,
@@ -29,6 +30,7 @@ interface WizardState {
 	webhookSecretProtected: boolean;
 	repositories: Array<{ owner: string; repo: string; fullName: string; selected: boolean }>;
 	error: string | null;
+	envSourced: Record<string, boolean>;
 }
 
 const STORAGE_KEY = "tars-onboarding-wizard";
@@ -101,6 +103,7 @@ function getDefaultState(): WizardState {
 		webhookSecretProtected: false,
 		repositories: [],
 		error: null,
+		envSourced: {},
 	};
 }
 
@@ -118,18 +121,38 @@ function readStoredState(): WizardState | null {
  * Builds the initial wizard state by layering the effective configuration
  * over the defaults, then overlaying any in-progress wizard state from
  * localStorage so the operator does not lose unsaved edits on reload.
+ *
+ * `sources` maps onboarding keys to their `EnvSource` so the wizard can lock
+ * fields that are controlled by `.env` and warn the operator up front.
  */
-export function buildInitialState(config: OnboardingConfig | null): WizardState {
+export function buildInitialState(
+	config: OnboardingConfig | null,
+	sources: Record<string, "env" | "database"> = {},
+): WizardState {
 	const base = getDefaultState();
 	if (config) {
-		applyConfig(base, config);
+		applyConfig(base, config, sources);
 	}
 	const stored = readStoredState();
 	if (!stored) return base;
 	return mergeStoredState(base, stored);
 }
 
-function applyConfig(state: WizardState, config: OnboardingConfig): void {
+function applyConfig(
+	state: WizardState,
+	config: OnboardingConfig,
+	sources: Record<string, "env" | "database">,
+): void {
+	const envSourced = (key: string): boolean => sources[key] === "env";
+	state.envSourced = {
+		admin_username: envSourced("admin_username"),
+		admin_password: envSourced("admin_password"),
+		github_token: envSourced("github_token"),
+		github_username: envSourced("github_username"),
+		github_event_mode: envSourced("github_event_mode"),
+		github_poll_interval_ms: envSourced("github_poll_interval_ms"),
+		webhook_secret: envSourced("webhook_secret"),
+	};
 	const adminUsername = config.admin_username;
 	if (typeof adminUsername === "string" && adminUsername.trim()) {
 		state.adminUsername = adminUsername;
@@ -161,6 +184,9 @@ function applyConfig(state: WizardState, config: OnboardingConfig): void {
 
 function mergeStoredState(base: WizardState, stored: WizardState): WizardState {
 	const merged: WizardState = { ...base, ...stored, error: null };
+	// envSourced is always re-derived from the live onboarding status, so the
+	// freshest source mapping wins over any stale localStorage copy.
+	merged.envSourced = base.envSourced;
 	// Preserve protected flags from the in-progress session, but unprotect a
 	// sensitive field once the operator has typed a replacement value.
 	if (stored.adminPassword && stored.adminPassword.length > 0) merged.adminPasswordProtected = false;
@@ -178,10 +204,10 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 
 	useEffect(() => {
 		let cancelled = false;
-		fetchOnboardingConfig()
-			.then((config) => {
+		Promise.all([fetchOnboardingConfig(), fetchOnboardingStatus().catch(() => null)])
+			.then(([config, status]) => {
 				if (cancelled) return;
-				setState(buildInitialState(config));
+				setState(buildInitialState(config, status?.sources ?? {}));
 				setConfigLoading(false);
 			})
 			.catch((err) => {
@@ -296,17 +322,17 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 				});
 			}
 
-			const onboardingBody: Record<string, string> = {
-				github_token: state.githubToken.trim(),
-				github_username: state.githubUsername.trim(),
-				admin_username: state.adminUsername.trim(),
-				admin_password: state.adminPassword.trim(),
-				github_event_mode: state.githubEventMode,
-			};
-			if (isWebhookMode(state.githubEventMode)) {
+			const isEnv = (key: string): boolean => state.envSourced[key] === true;
+			const onboardingBody: Record<string, string> = {};
+			if (!isEnv("github_token")) onboardingBody.github_token = state.githubToken.trim();
+			if (!isEnv("github_username")) onboardingBody.github_username = state.githubUsername.trim();
+			if (!isEnv("admin_username")) onboardingBody.admin_username = state.adminUsername.trim();
+			if (!isEnv("admin_password")) onboardingBody.admin_password = state.adminPassword.trim();
+			if (!isEnv("github_event_mode")) onboardingBody.github_event_mode = state.githubEventMode;
+			if (isWebhookMode(state.githubEventMode) && !isEnv("webhook_secret")) {
 				onboardingBody.webhook_secret = state.webhookSecret.trim();
 			}
-			if (isPollingMode(state.githubEventMode)) {
+			if (isPollingMode(state.githubEventMode) && !isEnv("github_poll_interval_ms")) {
 				const interval = parsePollIntervalMs(state.githubPollIntervalMs);
 				if (interval !== null) {
 					onboardingBody.github_poll_interval_ms = String(interval);
@@ -331,13 +357,22 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	}, []);
 
 	const canGoNext = useMemo(() => {
+		const isEnv = (key: string): boolean => state.envSourced[key] === true;
 		switch (state.step) {
 			case 1:
-				return state.adminUsername.trim().length > 0 && (state.adminPasswordProtected || state.adminPassword.trim().length > 0);
+				return (isEnv("admin_username") || state.adminUsername.trim().length > 0)
+					&& (isEnv("admin_password") || state.adminPasswordProtected || state.adminPassword.trim().length > 0);
 			case 2:
-				return (state.githubTokenProtected || state.githubToken.trim().length > 0) && state.githubUsernameConfirmed;
+				return (isEnv("github_token") || state.githubTokenProtected || state.githubToken.trim().length > 0)
+					&& (isEnv("github_username") || state.githubUsernameConfirmed);
 			case 3:
-				return isEventModeStepValid(state.githubEventMode, state.githubPollIntervalMs, state.webhookSecret, state.webhookSecretProtected);
+				return isEventModeStepValid(
+					state.githubEventMode,
+					state.githubPollIntervalMs,
+					state.webhookSecret,
+					state.webhookSecretProtected || isEnv("webhook_secret"),
+				)
+					|| (isEnv("github_event_mode") && (isEnv("github_poll_interval_ms") || !isPollingMode(state.githubEventMode)));
 			case 4:
 				return true;
 			default:
@@ -406,6 +441,13 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 				</div>
 			)}
 			{state.error && <div className="error-banner">{state.error}</div>}
+
+			{hasEnvSourcedField(state.envSourced) && (
+				<div className="env-source-banner" role="status">
+					Some settings are locked because they are set in <code>.env</code>.
+					You can review them, but you cannot change them here.
+				</div>
+			)}
 
 				{state.step === 1 && (
 					<StepOneAdminCredentials
@@ -507,6 +549,14 @@ export function isEventModeStepValid(
 	return true;
 }
 
+/**
+ * Returns true when any onboarding field is controlled by `.env`, so the
+ * wizard can render a persistent warning banner.
+ */
+export function hasEnvSourcedField(envSourced: Record<string, boolean>): boolean {
+	return Object.values(envSourced).some((value) => value === true);
+}
+
 function getStepSubtitle(step: number): string {
 	switch (step) {
 		case 1:
@@ -532,6 +582,8 @@ function StepOneAdminCredentials({
 	onGeneratePassword: () => void;
 }): React.ReactElement {
 	const [showPassword, setShowPassword] = useState(true);
+	const usernameEnv = state.envSourced.admin_username === true;
+	const passwordEnv = state.envSourced.admin_password === true;
 
 	return (
 		<div className="onboarding-form">
@@ -544,7 +596,11 @@ function StepOneAdminCredentials({
 					onChange={(e) => updateField("adminUsername", e.target.value)}
 					placeholder="admin"
 					required
+					disabled={usernameEnv}
 				/>
+				{usernameEnv && (
+					<p className="env-source-warning">Controlled by <code>ADMIN_USERNAME</code> in <code>.env</code>.</p>
+				)}
 				<span className="setting-description">Username for the admin dashboard</span>
 			</div>
 			<div className="form-group">
@@ -561,12 +617,14 @@ function StepOneAdminCredentials({
 						placeholder={state.adminPasswordProtected ? "Leave unchanged (configured)" : "password"}
 						required
 						style={{ flex: 1 }}
+						disabled={passwordEnv}
 					/>
 					<button
 						type="button"
 						className="action-btn"
 						style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", whiteSpace: "nowrap" }}
 						onClick={onGeneratePassword}
+						disabled={passwordEnv}
 					>
 						Regenerate
 					</button>
@@ -577,10 +635,14 @@ function StepOneAdminCredentials({
 							type="checkbox"
 							checked={showPassword}
 							onChange={(e) => setShowPassword(e.target.checked)}
+							disabled={passwordEnv}
 						/>
 						Show password
 					</label>
 				</div>
+				{passwordEnv && (
+					<p className="env-source-warning">Controlled by <code>ADMIN_PASSWORD</code> in <code>.env</code>.</p>
+				)}
 				<span className="setting-description">{state.adminPasswordProtected ? "A password is already configured. Leave the field blank to keep it, or enter a new one to replace it." : "A strong password has been suggested. You may override it."}</span>
 			</div>
 		</div>
@@ -598,6 +660,8 @@ function StepTwoGitHubIntegration({
 	onVerifyToken: () => Promise<void>;
 	loading: boolean;
 }): React.ReactElement {
+	const tokenEnv = state.envSourced.github_token === true;
+	const usernameEnv = state.envSourced.github_username === true;
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -616,17 +680,21 @@ function StepTwoGitHubIntegration({
 						placeholder={state.githubTokenProtected ? "Leave unchanged (configured)" : "ghp_..."}
 						required
 						style={{ flex: 1 }}
+						disabled={tokenEnv}
 					/>
 					<button
 						type="button"
 						className="action-btn"
 						style={{ background: "var(--blue)", color: "#000", whiteSpace: "nowrap" }}
 						onClick={onVerifyToken}
-						disabled={loading || !state.githubToken.trim()}
+						disabled={tokenEnv || loading || !state.githubToken.trim()}
 					>
 						{loading ? "Verifying..." : "Verify"}
 					</button>
 				</div>
+				{tokenEnv && (
+					<p className="env-source-warning">Controlled by <code>GITHUB_TOKEN</code> in <code>.env</code>.</p>
+				)}
 				<span className="setting-description">Personal access token with repo and issues scope</span>
 			</div>
 
@@ -640,7 +708,11 @@ function StepTwoGitHubIntegration({
 						onChange={(e) => updateField("githubUsername", e.target.value)}
 						placeholder="username"
 						required
+						disabled={usernameEnv}
 					/>
+					{usernameEnv && (
+						<p className="env-source-warning">Controlled by <code>GITHUB_USERNAME</code> in <code>.env</code>.</p>
+					)}
 					<span className="setting-description">Inferred from your token. Confirm or edit if needed.</span>
 				</div>
 			)}
@@ -664,6 +736,9 @@ function StepThreeEventMode({
 	const showWebhookSecret = isWebhookMode(mode);
 	const [showSecret, setShowSecret] = useState(true);
 	const [showInstructions, setShowInstructions] = useState(false);
+	const eventModeEnv = state.envSourced.github_event_mode === true;
+	const pollIntervalEnv = state.envSourced.github_poll_interval_ms === true;
+	const webhookSecretEnv = state.envSourced.webhook_secret === true;
 	const intervalError =
 		showPollInterval && state.githubPollIntervalMs.trim().length > 0
 			? parsePollIntervalMs(state.githubPollIntervalMs) === null
@@ -678,6 +753,7 @@ function StepThreeEventMode({
 				<select
 					id="github_event_mode"
 					value={mode}
+					disabled={eventModeEnv}
 					onChange={(e) => {
 						const next = e.target.value;
 						updateField("githubEventMode", next);
@@ -693,6 +769,9 @@ function StepThreeEventMode({
 						</option>
 					))}
 				</select>
+				{eventModeEnv && (
+					<p className="env-source-warning">Controlled by <code>GITHUB_EVENT_MODE</code> in <code>.env</code>.</p>
+				)}
 				<span className="setting-description">Choose how TARS discovers GitHub events.</span>
 				<span className="setting-description">These are the default settings for all projects. Each project can override them later.</span>
 			</div>
@@ -709,7 +788,11 @@ function StepThreeEventMode({
 						onChange={(e) => updateField("githubPollIntervalMs", e.target.value)}
 						placeholder={`at least ${MIN_POLL_INTERVAL_MS}`}
 						required
+						disabled={pollIntervalEnv}
 					/>
+					{pollIntervalEnv && (
+						<p className="env-source-warning">Controlled by <code>GITHUB_POLL_INTERVAL_MS</code> in <code>.env</code>.</p>
+					)}
 					<span className="setting-description">
 						Positive integer in milliseconds. Minimum {MIN_POLL_INTERVAL_MS} ms.
 					</span>
@@ -734,13 +817,14 @@ function StepThreeEventMode({
 							placeholder={state.webhookSecretProtected ? "Leave unchanged (configured)" : "Generate a secret..."}
 							required
 							style={{ flex: 1 }}
+							disabled={webhookSecretEnv}
 						/>
 						<button
 							type="button"
 							className="action-btn"
 							style={{ background: "var(--yellow)", color: "#000", whiteSpace: "nowrap" }}
 							onClick={onGenerateSecret}
-							disabled={loading}
+							disabled={webhookSecretEnv || loading}
 						>
 							{loading ? "Generating..." : "Regenerate"}
 						</button>
@@ -751,10 +835,14 @@ function StepThreeEventMode({
 								type="checkbox"
 								checked={showSecret}
 								onChange={(e) => setShowSecret(e.target.checked)}
+								disabled={webhookSecretEnv}
 							/>
 							Show secret
 						</label>
 					</div>
+					{webhookSecretEnv && (
+						<p className="env-source-warning">Controlled by <code>WEBHOOK_SECRET</code> in <code>.env</code>.</p>
+					)}
 					<span className="setting-description">Used to verify GitHub webhook signatures.</span>
 					<button
 						type="button"

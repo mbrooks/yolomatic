@@ -39,6 +39,20 @@ describe("onboarding API", () => {
 			const calls = fetchSpy.mock.calls as [string, RequestInit][];
 			expect(calls[0][0]).toBe("/api/onboarding/status");
 		});
+
+		it("passes through the sources record", async () => {
+			fetchSpy.mockImplementation(async () => {
+				return mockOkResponse({
+					complete: true,
+					missing: [],
+					sources: { github_token: "env", admin_username: "database" },
+				});
+			});
+			const result = await fetchOnboardingStatus();
+			expect(result.complete).toBe(true);
+			expect(result.sources.github_token).toBe("env");
+			expect(result.sources.admin_username).toBe("database");
+		});
 	});
 
 	describe("fetchOnboardingConfig", () => {

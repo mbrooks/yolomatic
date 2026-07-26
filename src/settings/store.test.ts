@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { unlinkSync } from "node:fs";
 import { SettingsStore } from "./store.js";
+import { SETTING_DEFINITIONS } from "./model.js";
 
 const TEST_DB = "/tmp/tars-settings-store-test.sqlite";
 
@@ -105,6 +106,106 @@ describe("SettingsStore", () => {
 		expect(store.isEmpty()).toBe(true);
 		store.set("port", "6767");
 		expect(store.isEmpty()).toBe(false);
+	});
+
+	describe("env priority", () => {
+		const originalEnv = process.env;
+		const envVars = SETTING_DEFINITIONS.map((d) => d.envVar);
+
+		beforeEach(() => {
+			process.env = { ...originalEnv };
+			for (const name of envVars) delete process.env[name];
+		});
+
+		afterEach(() => {
+			process.env = originalEnv;
+		});
+
+		it("get() returns the env value over the SQLite value", () => {
+			store.set("port", "7000");
+			expect(store.get("port")).toBe("7000");
+			process.env.PORT = "8080";
+			expect(store.get("port")).toBe("8080");
+		});
+
+		it("getNumber() and getBoolean() prefer env over SQLite", () => {
+			store.set("port", "7000");
+			store.set("self_report_enabled", "false");
+			process.env.PORT = "8080";
+			process.env.TARS_SELF_REPORT_ENABLED = "true";
+			expect(store.getNumber("port")).toBe(8080);
+			expect(store.getBoolean("self_report_enabled")).toBe(true);
+		});
+
+		it("falls back to SQLite when env is unset", () => {
+			store.set("port", "7000");
+			expect(store.get("port")).toBe("7000");
+			expect(store.getNumber("port")).toBe(7000);
+		});
+
+		it("falls back to the definition default when neither env nor SQLite is set", () => {
+			expect(store.getNumber("port")).toBe(6767);
+			expect(store.getBoolean("self_report_enabled")).toBe(true);
+		});
+
+		it("ignores invalid env values and falls back to SQLite", () => {
+			store.set("port", "7000");
+			process.env.PORT = "not-a-number";
+			expect(store.get("port")).toBe("7000");
+			expect(store.getNumber("port")).toBe(7000);
+		});
+
+		it("treats whitespace-only env values as unset", () => {
+			store.set("github_username", "stored-user");
+			process.env.GITHUB_USERNAME = "   ";
+			expect(store.get("github_username")).toBe("stored-user");
+		});
+
+		it("getEnvSource reports env vs database", () => {
+			store.set("port", "7000");
+			expect(store.getEnvSource("port")).toBe("database");
+			process.env.PORT = "8080";
+			expect(store.getEnvSource("port")).toBe("env");
+			delete process.env.PORT;
+			expect(store.getEnvSource("port")).toBe("database");
+		});
+
+		it("getAllViews sets envSource to env for env-sourced settings", () => {
+			store.set("port", "7000");
+			store.set("github_token", "stored-tok");
+			process.env.PORT = "8080";
+			const views = store.getAllViews();
+			const portView = views.find((v) => v.key === "port");
+			const tokenView = views.find((v) => v.key === "github_token");
+			expect(portView?.envSource).toBe("env");
+			expect(portView?.value).toBe(8080);
+			expect(tokenView?.envSource).toBe("database");
+		});
+
+		it("getAllViews reports envSource env for sensitive settings while still redacting the value", () => {
+			process.env.GITHUB_TOKEN = "ghp_secret";
+			const views = store.getAllViews();
+			const tokenView = views.find((v) => v.key === "github_token");
+			expect(tokenView?.envSource).toBe("env");
+			expect(tokenView?.value).toBe("");
+			expect(tokenView?.sensitive).toBe(true);
+		});
+
+		it("getAllViews includes envSource for every setting", () => {
+			store.applyDefaults();
+			const views = store.getAllViews();
+			for (const view of views) {
+				expect(view.envSource).toBe("database");
+		}
+		});
+
+		it("seedFromEnv is a no-op for keys already controlled by env", () => {
+			process.env.PORT = "8080";
+			store.seedFromEnv();
+			// SQLite never receives a row because env already satisfies get().
+			expect(store.getAll().find((e) => e.key === "port")).toBeUndefined();
+			expect(store.get("port")).toBe("8080");
+		});
 	});
 
 	describe("onChange", () => {

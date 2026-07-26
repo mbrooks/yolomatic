@@ -1167,6 +1167,55 @@ a:hover {
 	font-size: 0.75rem;
 }
 
+.env-locked-badge {
+	background: rgba(255, 193, 7, 0.15);
+	border: 1px solid var(--yellow);
+	border-radius: 4px;
+	color: var(--yellow);
+	font-size: 0.65rem;
+	padding: 0.1rem 0.3rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.env-source-warning {
+	color: var(--yellow);
+	font-size: 0.75rem;
+	max-width: 32rem;
+	white-space: normal;
+}
+
+.env-source-warning code {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 3px;
+	padding: 0.05rem 0.25rem;
+}
+
+.env-source-banner {
+	background: rgba(255, 193, 7, 0.12);
+	border: 1px solid var(--yellow);
+	border-radius: 6px;
+	color: var(--yellow);
+	font-size: 0.8125rem;
+	padding: 0.6rem 0.75rem;
+	margin-bottom: 1rem;
+}
+
+.env-source-banner code {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 3px;
+	padding: 0.05rem 0.25rem;
+}
+
+.setting-row.env-locked input,
+.setting-row.env-locked select {
+	background: var(--surface);
+	cursor: not-allowed;
+	opacity: 0.7;
+}
+
 .settings-actions {
 	flex-shrink: 0;
 }

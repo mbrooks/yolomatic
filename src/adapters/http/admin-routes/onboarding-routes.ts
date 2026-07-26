@@ -9,6 +9,7 @@ import {
 	getRequiredDeps,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
+import type { EnvSource } from "../../../settings/model.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import {
 	parseConfiguredRepositories,
@@ -128,6 +129,7 @@ function storeConfiguredRepositories(
 
 function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	const missing = REQUIRED_ONBOARDING_SETTINGS.filter((key) => {
+		if (deps.settingsStore!.getEnvSource(key) === "env") return false;
 		const value = deps.settingsStore!.get(key);
 		return value === undefined || value === "";
 	});
@@ -135,16 +137,30 @@ function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	if (modeRaw && !isValidEventMode(modeRaw) && !missing.includes("github_event_mode")) {
 		missing.push("github_event_mode");
 	}
-	if (isPollingMode(modeRaw) && !isValidPollIntervalMs(deps.settingsStore!.get("github_poll_interval_ms"))) {
+	if (isPollingMode(modeRaw) && deps.settingsStore!.getEnvSource("github_poll_interval_ms") !== "env" && !isValidPollIntervalMs(deps.settingsStore!.get("github_poll_interval_ms"))) {
 		missing.push("github_poll_interval_ms");
 	}
-	if (isWebhookMode(modeRaw) && (deps.settingsStore!.get("webhook_secret") === undefined || deps.settingsStore!.get("webhook_secret") === "")) {
+	if (isWebhookMode(modeRaw) && deps.settingsStore!.getEnvSource("webhook_secret") !== "env" && (deps.settingsStore!.get("webhook_secret") === undefined || deps.settingsStore!.get("webhook_secret") === "")) {
 		missing.push("webhook_secret");
 	}
 	if (deps.settingsStore!.get(ONBOARDING_COMPLETE_SETTING) !== "true") {
 		missing.push(ONBOARDING_COMPLETE_SETTING);
 	}
 	return missing;
+}
+
+/**
+ * Maps each onboarding configuration key to its effective `EnvSource` so the
+ * wizard can warn the operator before they interact with a locked field.
+ */
+export function buildOnboardingSources(
+	getEnvSource: (key: string) => EnvSource,
+): Record<string, EnvSource> {
+	const sources: Record<string, EnvSource> = {};
+	for (const key of ONBOARDING_CONFIG_KEYS) {
+		sources[key] = getEnvSource(key);
+	}
+	return sources;
 }
 
 const registry = new AdminRouteRegistry()
@@ -159,7 +175,8 @@ const registry = new AdminRouteRegistry()
 				...getRequiredDeps(ctx.deps, ["settingsStore"]),
 			};
 			const missing = getMissingOnboardingSettings(settingsDeps);
-			return { status: 200, body: { complete: missing.length === 0, missing } };
+			const sources = buildOnboardingSources((key) => settingsDeps.settingsStore.getEnvSource(key));
+			return { status: 200, body: { complete: missing.length === 0, missing, sources } };
 		},
 	})
 	.route({
@@ -292,13 +309,17 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as Record<string, string>;
+			const envSourced = (key: string): boolean => settingsStore.getEnvSource(key) === "env";
 			const resolveSecret = (key: string): string | undefined =>
-				resolveSecretSetting((k) => settingsStore.get(k), key, body[key]);
+				envSourced(key)
+					? settingsStore.get(key)
+					: resolveSecretSetting((k) => settingsStore.get(k), key, body[key]);
 			const githubToken = resolveSecret("github_token");
 			const adminPassword = resolveSecret("admin_password");
 			const webhookSecret = resolveSecret("webhook_secret");
 			const missing: string[] = [];
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
+				if (envSourced(key)) continue;
 				if (key === "github_token") {
 					if (!githubToken) missing.push(key);
 				} else if (key === "admin_password") {
@@ -313,7 +334,11 @@ const registry = new AdminRouteRegistry()
 				});
 				return;
 			}
-			const eventMode = body.github_event_mode.trim().toLowerCase();
+			const eventMode = (
+				envSourced("github_event_mode")
+					? settingsStore.get("github_event_mode") ?? ""
+					: body.github_event_mode
+			).trim().toLowerCase();
 			if (!isValidEventMode(eventMode)) {
 				sendJson(ctx.response, 400, {
 					error: `github_event_mode must be one of: ${VALID_EVENT_MODES.join(", ")}`,
@@ -326,26 +351,29 @@ const registry = new AdminRouteRegistry()
 				});
 				return;
 			}
+			const pollIntervalRaw = envSourced("github_poll_interval_ms")
+				? settingsStore.get("github_poll_interval_ms")
+				: body.github_poll_interval_ms;
 			if (isPollingMode(eventMode)) {
-				if (!isValidPollIntervalMs(body.github_poll_interval_ms)) {
+				if (!isValidPollIntervalMs(pollIntervalRaw)) {
 					sendJson(ctx.response, 400, {
 						error: `github_poll_interval_ms must be a whole number of at least ${MIN_POLL_INTERVAL_MS}`,
 					});
 					return;
 				}
 			}
-			settingsStore.set("github_token", githubToken!);
-			settingsStore.set("github_username", body.github_username.trim());
-			settingsStore.set("admin_username", body.admin_username.trim());
-			settingsStore.set("admin_password", adminPassword!);
-			settingsStore.set("github_event_mode", eventMode);
-			if (isWebhookMode(eventMode)) {
+			if (!envSourced("github_token")) settingsStore.set("github_token", githubToken!);
+			if (!envSourced("github_username")) settingsStore.set("github_username", body.github_username.trim());
+			if (!envSourced("admin_username")) settingsStore.set("admin_username", body.admin_username.trim());
+			if (!envSourced("admin_password")) settingsStore.set("admin_password", adminPassword!);
+			if (!envSourced("github_event_mode")) settingsStore.set("github_event_mode", eventMode);
+			if (isWebhookMode(eventMode) && !envSourced("webhook_secret")) {
 				settingsStore.set("webhook_secret", webhookSecret!);
 			}
-			if (isPollingMode(eventMode)) {
-				settingsStore.set("github_poll_interval_ms", String(Number.parseInt(body.github_poll_interval_ms.trim(), 10)));
+			if (isPollingMode(eventMode) && !envSourced("github_poll_interval_ms")) {
+				settingsStore.set("github_poll_interval_ms", String(Number.parseInt((pollIntervalRaw ?? "").trim(), 10)));
 			}
-			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
+			if (!envSourced(ONBOARDING_COMPLETE_SETTING)) settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({
 				...ctx.deps,
 				settingsStore,

@@ -153,6 +153,20 @@ function mockSettingsFetch() {
 	});
 }
 
+const ENV_LOCKED_SETTINGS = MOCK_SETTINGS.map((s) => ({ ...s, envSource: "database" as const })).map((s) =>
+	s.key === "github_token" ? { ...s, envSource: "env" as const } : s,
+);
+
+function mockEnvLockedSettingsFetch() {
+	return vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+		const url = typeof input === "string" ? input : input.url;
+		if (url === "/api/settings") {
+			return Promise.resolve(jsonResponse({ settings: ENV_LOCKED_SETTINGS }));
+		}
+		return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+	});
+}
+
 function mockFetchWithSave(response: { updated: string[]; requiresRestart: string[] } = { updated: [], requiresRestart: [] }) {
 	return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
 		const url = typeof input === "string" ? input : input.url;
@@ -446,6 +460,61 @@ describe("SettingsScreen", () => {
 		expect(patchCall).toBeDefined();
 		const body = JSON.parse(patchCall![1].body as string);
 		expect(body).toEqual({ github_username: "new-bot" });
+	});
+
+	it("disables inputs and shows a warning for env-sourced settings", async () => {
+		mockEnvLockedSettingsFetch();
+		const { container } = render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("github_token")).not.toBeNull();
+		});
+
+		const tokenInput = container.querySelector("#setting-github_token") as HTMLInputElement;
+		expect(tokenInput.disabled).toBe(true);
+		expect(screen.getByText(/controlled by the environment variable/u)).not.toBeNull();
+		expect(screen.getByText("GITHUB_TOKEN")).not.toBeNull();
+
+		// Non-env-sourced fields remain editable.
+		const usernameInput = container.querySelector("#setting-github_username") as HTMLInputElement;
+		expect(usernameInput.disabled).toBe(false);
+	});
+
+	it("does not include env-sourced keys in the PATCH payload", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings" && init?.method === "PATCH") {
+				return Promise.resolve(jsonResponse({ updated: [], requiresRestart: [], ignored: ["github_token"] }));
+			}
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: ENV_LOCKED_SETTINGS }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		const { container } = render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
+
+		await waitFor(() => {
+			expect(screen.getByDisplayValue("tars-bot")).not.toBeNull();
+		});
+
+		// Edit a non-env field and the env-locked field; only the editable one is sent.
+		fireEvent.change(screen.getByDisplayValue("tars-bot"), { target: { value: "new-bot" } });
+		const tokenInput = container.querySelector("#setting-github_token") as HTMLInputElement;
+		fireEvent.change(tokenInput, { target: { value: "should-be-ignored" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => {
+			expect((screen.getByRole("button", { name: "Save Changes" }) as HTMLButtonElement).disabled).toBe(true);
+		});
+
+		const patchCall = fetchSpy.mock.calls.find(([input, init]) => {
+			const url = typeof input === "string" ? input : input.url;
+			return url === "/api/settings" && init?.method === "PATCH";
+		});
+		expect(patchCall).toBeDefined();
+		const body = JSON.parse(patchCall![1].body as string);
+		expect(body).toEqual({ github_username: "new-bot" });
+		expect(body.github_token).toBeUndefined();
 	});
 
 	it("styles the Rerun On-Boarding tab like the other neutral settings tabs", async () => {

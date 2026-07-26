@@ -77,6 +77,9 @@ describe("OnboardingWizard", () => {
 		(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockImplementation(
 			async (): Promise<OnboardingConfig> => emptyConfig(),
 		);
+		(onboarding.fetchOnboardingStatus as ReturnType<typeof vi.fn>).mockImplementation(
+			async () => ({ complete: false, missing: ["github_token"], sources: {} }),
+		);
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockOkResponse({ success: true });
 		});
@@ -429,6 +432,122 @@ describe("OnboardingWizard", () => {
 			expect(state.adminPasswordProtected).toBe(false);
 			expect(state.githubTokenProtected).toBe(false);
 			expect(state.webhookSecretProtected).toBe(false);
+		});
+	});
+
+	describe("env-sourced fields", () => {
+		it("buildInitialState records env-sourced fields from sources", () => {
+			const state = buildInitialState(emptyConfig(), {
+				github_token: "env",
+				admin_password: "env",
+				webhook_secret: "env",
+			});
+			expect(state.envSourced.github_token).toBe(true);
+			expect(state.envSourced.admin_password).toBe(true);
+			expect(state.envSourced.webhook_secret).toBe(true);
+			expect(state.envSourced.admin_username).toBe(false);
+		});
+
+		it("shows a banner when any required field is env-sourced", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(emptyConfig());
+			(onboarding.fetchOnboardingStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				complete: false,
+				missing: [],
+				sources: { admin_password: "env" },
+			});
+			render(<OnboardingWizard />);
+			await waitForReady();
+			expect(screen.getByText(/Some settings are locked/u)).not.toBeNull();
+		});
+
+		it("does not show the banner when no fields are env-sourced", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(emptyConfig());
+			(onboarding.fetchOnboardingStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				complete: false,
+				missing: [],
+				sources: {},
+			});
+			render(<OnboardingWizard />);
+			await waitForReady();
+			expect(screen.queryByText(/Some settings are locked/u)).toBeNull();
+		});
+
+		it("disables env-sourced admin credentials inputs and still allows proceeding", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.admin_username = "env-admin";
+			config.admin_password = { configured: true };
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			(onboarding.fetchOnboardingStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				complete: false,
+				missing: [],
+				sources: { admin_username: "env", admin_password: "env" },
+			});
+			const { container } = render(<OnboardingWizard />);
+			await waitForReady();
+			const usernameInput = screen.getByLabelText("Admin Username") as HTMLInputElement;
+			const passwordInput = screen.getByLabelText("Admin Password") as HTMLInputElement;
+			expect(usernameInput.disabled).toBe(true);
+			expect(passwordInput.disabled).toBe(true);
+			const warnings = container.querySelectorAll(".env-source-warning");
+			expect(Array.from(warnings).some((el) => el.textContent?.includes("ADMIN_USERNAME"))).toBe(true);
+			// Env-sourced fields satisfy the step, so Next is enabled.
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+		});
+
+		it("completes onboarding when all required fields are env-sourced", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.admin_username = "env-admin";
+			config.admin_password = { configured: true };
+			config.github_token = { configured: true };
+			config.github_username = "env-user";
+			config.github_event_mode = "webhook";
+			config.webhook_secret = { configured: true };
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			(onboarding.fetchOnboardingStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				complete: false,
+				missing: [],
+				sources: {
+					admin_username: "env",
+					admin_password: "env",
+					github_token: "env",
+					github_username: "env",
+					github_event_mode: "env",
+					webhook_secret: "env",
+				},
+			});
+			render(<OnboardingWizard />);
+			await waitForReady();
+			// Step 1
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			fireEvent.click(screen.getByText("Next"));
+			// Step 2
+			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			const tokenInput = screen.getByLabelText("GitHub PAT (Personal Access Token)") as HTMLInputElement;
+			expect(tokenInput.disabled).toBe(true);
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			fireEvent.click(screen.getByText("Next"));
+			// Step 3
+			await waitFor(() => expect(screen.queryByText("Step 3 of 4")).not.toBeNull());
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			fireEvent.click(screen.getByText("Next"));
+			// Step 4
+			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+			fireEvent.click(screen.getByText("Initialize & Finish"));
+			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
+
+			expect(onboarding.submitOnboarding).toHaveBeenCalledTimes(1);
+			const body = (onboarding.submitOnboarding as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<string, string>;
+			// Env-sourced keys are omitted from the submission body.
+			expect(body.github_token).toBeUndefined();
+			expect(body.admin_password).toBeUndefined();
+			expect(body.webhook_secret).toBeUndefined();
+			expect(body.github_event_mode).toBeUndefined();
+			expect(body.admin_username).toBeUndefined();
+			expect(body.github_username).toBeUndefined();
 		});
 	});
 

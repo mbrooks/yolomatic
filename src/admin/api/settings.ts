@@ -5,8 +5,8 @@ export function fetchSettings(): Promise<{ settings: SettingView[] }> {
 	return apiGet<{ settings: SettingView[] }>("/api/settings");
 }
 
-export function updateSettings(body: Record<string, string | number | boolean>): Promise<{ updated: string[]; requiresRestart: string[] }> {
-	return apiPatch<{ updated: string[]; requiresRestart: string[] }>("/api/settings", body);
+export function updateSettings(body: Record<string, string | number | boolean>): Promise<{ updated: string[]; requiresRestart: string[]; ignored: string[] }> {
+	return apiPatch<{ updated: string[]; requiresRestart: string[]; ignored: string[] }>("/api/settings", body);
 }
 
 async function apiPatch<T>(path: string, body?: unknown): Promise<T> {

@@ -9,7 +9,7 @@ import {
 	coerceEnvValue,
 	SETTING_DEFINITIONS,
 } from "./model.js";
-import type { SettingEntry, SettingDefinition, SettingView } from "./model.js";
+import type { EnvSource, SettingEntry, SettingDefinition, SettingView } from "./model.js";
 
 export type SettingsChangeListener = (key: string, value: string) => void;
 
@@ -51,9 +51,32 @@ export class SettingsStore {
 	}
 
 	get(key: string): string | undefined {
+		const envValue = this.getEnvValue(key);
+		if (envValue !== undefined) return envValue;
 		const row = this.getStmt.get(key) as Record<string, unknown> | undefined;
 		if (!row) return undefined;
 		return String(row.value);
+	}
+
+	/**
+	 * Returns the coerced environment-variable value for a setting, or
+	 * undefined when the env var is unset or invalid. Env values always take
+	 * priority over SQLite and defaults at read time.
+	 */
+	private getEnvValue(key: string, env = process.env): string | undefined {
+		const def = getSettingDefinition(key);
+		if (!def) return undefined;
+		const raw = env[def.envVar];
+		if (raw === undefined) return undefined;
+		return coerceEnvValue(key, raw);
+	}
+
+	/**
+	 * Reports whether the effective value for a setting is sourced from the
+	 * environment (`env`) or from the SQLite store (`database`).
+	 */
+	getEnvSource(key: string): EnvSource {
+		return this.getEnvValue(key) !== undefined ? "env" : "database";
 	}
 
 	getString(key: string, defaultValue?: string): string {
@@ -120,7 +143,9 @@ export class SettingsStore {
 		const entryMap = new Map(entries.map((e) => [e.key, e]));
 		return SETTING_DEFINITIONS.map((def) => {
 			const entry = entryMap.get(def.key);
-			let rawValue = entry?.value ?? def.default ?? "";
+			const envValue = this.getEnvValue(def.key);
+			const envSource: EnvSource = envValue !== undefined ? "env" : "database";
+			let rawValue = envValue ?? entry?.value ?? def.default ?? "";
 			if (def.sensitive) {
 				rawValue = "";
 			}
@@ -134,6 +159,7 @@ export class SettingsStore {
 				sensitive: def.sensitive,
 				updatedAt: entry?.updatedAt ?? "",
 				category: def.category,
+				envSource,
 			};
 		});
 	}

@@ -28,8 +28,15 @@ const registry = new AdminRouteRegistry()
 			const body = ctx.body as Record<string, string | number | boolean>;
 			const requiresRestart: string[] = [];
 			const updated: string[] = [];
+			const ignored: string[] = [];
 			for (const [key, value] of Object.entries(body)) {
 				const definition = getSettingDefinition(key);
+				if (settingsStore.getEnvSource(key) === "env") {
+					// The value is controlled by the environment; UI edits must not
+					// overwrite it. Report it as ignored so the client can confirm.
+					ignored.push(key);
+					continue;
+				}
 				if (definition?.sensitive && value === "") {
 					continue;
 				}
@@ -39,7 +46,7 @@ const registry = new AdminRouteRegistry()
 				}
 				updated.push(key);
 			}
-			return { status: 200, body: { updated, requiresRestart } };
+			return { status: 200, body: { updated, requiresRestart, ignored } };
 		},
 	})
 	.route({

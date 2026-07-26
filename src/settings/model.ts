@@ -1,5 +1,15 @@
 export type SettingType = "string" | "number" | "boolean";
 
+/**
+ * Indicates where the effective value of a setting comes from.
+ *
+ * - `env`: the value is supplied by an environment variable (`.env`), and
+ *   cannot be changed through the admin UI.
+ * - `database`: the value is read from the SQLite settings store and may be
+ *   edited through the admin UI.
+ */
+export type EnvSource = "env" | "database";
+
 export interface SettingDefinition {
 	key: string;
 	type: SettingType;
@@ -27,6 +37,7 @@ export interface SettingView {
 	sensitive: boolean;
 	updatedAt: string;
 	category: string;
+	envSource: EnvSource;
 }
 
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
