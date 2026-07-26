@@ -7,6 +7,8 @@ import {
 	ValidationError,
 	checkAdminTextAllowOnboarding,
 	getRequiredDeps,
+	resolveAdminDefaultPage,
+	resolveAdminPath,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
@@ -369,20 +371,33 @@ export async function handleOnboardingRoutes(
 	deps: AdminRouterDeps,
 	pathname: string,
 ): Promise<boolean> {
-	if (pathname === "/tarsadmin" || pathname === "/tarsadmin/") {
-		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
-			return true;
-		}
-		sendHtml(response, 200, await adminHtml(deps.adminAssetsDir));
-		return true;
-	}
+	const adminPath = resolveAdminPath(deps);
+	const adminDefaultPage = resolveAdminDefaultPage(deps);
 
-	if (pathname.startsWith("/tarsadmin/")) {
-		if (!checkAdminTextAllowOnboarding(request, response, deps)) {
+	if (adminPath === "/") {
+		if (pathname === "/") {
+			if (!checkAdminTextAllowOnboarding(request, response, deps)) {
+				return true;
+			}
+			sendHtml(response, 200, await adminHtml(deps.adminAssetsDir, adminPath, adminDefaultPage));
 			return true;
 		}
-		await serveAdminAsset(response, deps.adminAssetsDir, pathname.slice("/tarsadmin/".length));
-		return true;
+	} else {
+		if (pathname === adminPath || pathname === `${adminPath}/`) {
+			if (!checkAdminTextAllowOnboarding(request, response, deps)) {
+				return true;
+			}
+			sendHtml(response, 200, await adminHtml(deps.adminAssetsDir, adminPath, adminDefaultPage));
+			return true;
+		}
+
+		if (pathname.startsWith(`${adminPath}/`)) {
+			if (!checkAdminTextAllowOnboarding(request, response, deps)) {
+				return true;
+			}
+			await serveAdminAsset(response, deps.adminAssetsDir, pathname.slice(`${adminPath}/`.length));
+			return true;
+		}
 	}
 
 	return registry.handle(request, response, deps, pathname);

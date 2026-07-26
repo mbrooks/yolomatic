@@ -141,7 +141,7 @@ describe("createAdminWebSocketServer", () => {
 		const onboardingServer = new FakeHttpServer();
 		createAdminWebSocketServer(onboardingServer as never, { getCredentials: () => ({}) });
 		const onboardingSocket = new FakeUpgradeSocket();
-		onboardingServer.upgradeHandler?.({ url: "/tarsadmin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
+		onboardingServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
 		expect(onboardingSocket.writes).toEqual([]);
 		expect(onboardingSocket.destroyed).toBe(false);
 
@@ -151,14 +151,14 @@ describe("createAdminWebSocketServer", () => {
 		});
 
 		const rejectedSocket = new FakeUpgradeSocket();
-		protectedServer.upgradeHandler?.({ url: "/tarsadmin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
+		protectedServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
 		expect(rejectedSocket.writes).toEqual(["HTTP/1.1 401 Unauthorized\r\n\r\n"]);
 		expect(rejectedSocket.destroyed).toBe(true);
 
 		const acceptedSocket = new FakeUpgradeSocket();
 		protectedServer.upgradeHandler?.(
 			{
-				url: "/tarsadmin/ws",
+				url: "/tars/admin/ws",
 				headers: {
 					authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
 				},
@@ -168,6 +168,28 @@ describe("createAdminWebSocketServer", () => {
 		);
 		expect(acceptedSocket.writes).toEqual([]);
 		expect(acceptedSocket.destroyed).toBe(false);
+	});
+
+	it("uses a custom configured admin path for the websocket upgrade", async () => {
+		const { createAdminWebSocketServer } = await import("./websocket-server.js");
+		const httpServer = new FakeHttpServer();
+		createAdminWebSocketServer(
+			httpServer as never,
+			{ getCredentials: () => ({}) },
+			undefined,
+			undefined,
+			"/custom/admin",
+		);
+
+		const matchingSocket = new FakeUpgradeSocket();
+		httpServer.upgradeHandler?.({ url: "/custom/admin/ws", headers: {} }, matchingSocket, Buffer.alloc(0));
+		expect(matchingSocket.writes).toEqual([]);
+		expect(matchingSocket.destroyed).toBe(false);
+
+		const legacySocket = new FakeUpgradeSocket();
+		httpServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, legacySocket, Buffer.alloc(0));
+		expect(legacySocket.writes).toEqual([]);
+		expect(legacySocket.destroyed).toBe(false);
 	});
 
 	it("ignores upgrade requests for other websocket paths", async () => {

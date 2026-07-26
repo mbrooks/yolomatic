@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
 import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
+import { adminWebSocketPath, DEFAULT_ADMIN_PATH } from "../config.js";
 
 export type ClientMessage =
 	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
@@ -29,6 +30,7 @@ export function createAdminWebSocketServer(
 	credentialProvider: CredentialProvider,
 	statusProvider?: StatusProvider,
 	taskControlService?: TaskControlService,
+	adminPath: string = DEFAULT_ADMIN_PATH,
 ): {
 	broadcastLog: (sessionKey: string, entry: SessionLogEntry) => void;
 	broadcastStatus: (data: unknown) => void;
@@ -41,9 +43,11 @@ export function createAdminWebSocketServer(
 		noServer: true,
 	});
 
+	const wsUpgradePath = adminWebSocketPath(adminPath);
+
 	httpServer.on("upgrade", (request, socket, head) => {
 		const url = request.url ? new URL(request.url, "http://localhost") : null;
-		if (!url || url.pathname !== "/tarsadmin/ws") {
+		if (!url || url.pathname !== wsUpgradePath) {
 			return;
 		}
 
