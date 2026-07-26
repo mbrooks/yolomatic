@@ -287,7 +287,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 		setError(null);
 		try {
 			const selectedRepos = state.repositories.filter((r) => r.selected);
-			const canInitWorkspaces = state.githubToken.trim().length > 0;
+			const canInitWorkspaces = state.githubToken.trim().length > 0 || state.githubTokenProtected;
 			if (canInitWorkspaces && selectedRepos.length > 0) {
 				await initializeWorkspaces({
 					token: state.githubToken.trim(),
@@ -811,12 +811,14 @@ function StepFiveWorkspaceInit({
 					className="action-btn"
 					style={{ background: "var(--blue)", color: "#000" }}
 					onClick={onFetchRepos}
-					disabled={loading || !state.githubToken.trim()}
+					disabled={loading || (!state.githubToken.trim() && !state.githubTokenProtected)}
 				>
 					{loading && state.repositories.length === 0 ? "Fetching..." : "Fetch Repositories"}
 				</button>
 				<span style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-					{selectedCount > 0 && `${selectedCount} selected`}
+					{state.githubTokenProtected
+					? "Using the configured GitHub token."
+					: selectedCount > 0 && `${selectedCount} selected`}
 				</span>
 			</div>
 

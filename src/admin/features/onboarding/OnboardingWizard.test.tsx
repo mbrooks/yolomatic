@@ -287,6 +287,44 @@ describe("OnboardingWizard", () => {
 			expect(body.github_event_mode).toBe("webhook");
 		});
 
+		it("fetches repositories and initializes workspaces using the stored token when it is protected", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.github_token = { configured: true };
+			config.github_username = "configured-user";
+			config.admin_password = { configured: true };
+			config.github_event_mode = "webhook";
+			config.webhook_secret = { configured: true };
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			render(<OnboardingWizard />);
+			await waitForReady();
+			// Step 1: admin password protected, proceed.
+			fireEvent.click(screen.getByText("Next"));
+			// Step 2: token protected, username pre-confirmed, proceed.
+			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			fireEvent.click(screen.getByText("Next"));
+			// Step 3: webhook mode with protected secret, proceed.
+			await waitFor(() => expect(screen.queryByText("Step 3 of 4")).not.toBeNull());
+			fireEvent.click(screen.getByText("Next"));
+			// Step 4: token is protected, so the Fetch button is enabled and the
+			// backend resolves the stored token from the empty submitted value.
+			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+			expect(screen.queryByText("Using the configured GitHub token.")).not.toBeNull();
+			fireEvent.click(screen.getByText("Fetch Repositories"));
+			await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+
+			fireEvent.click(screen.getByText("Initialize & Finish"));
+			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
+
+			expect(onboarding.listAccessibleRepositories).toHaveBeenCalledWith("");
+			expect(onboarding.initializeWorkspaces).toHaveBeenCalledWith({
+				token: "",
+				username: "configured-user",
+				repos: [{ owner: "mbrooks", repo: "tars" }, { owner: "octocat", repo: "hello" }],
+			});
+			expect(onboarding.submitOnboarding).toHaveBeenCalledTimes(1);
+		});
+
 		it("rerunning onboarding shows the values currently configured in the app", async () => {
 			const onboarding = await import("../../api/onboarding.js");
 			const config = emptyConfig();
