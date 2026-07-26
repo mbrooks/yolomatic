@@ -118,12 +118,26 @@ export function navigate(route: Route): void {
 	window.location.hash = buildHash(route);
 }
 
+export function getDefaultAdminPage(): string {
+	const configured =
+		typeof window !== "undefined" && typeof (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__?: unknown }).__TARS_ADMIN_DEFAULT_PAGE__ === "string"
+			? (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__
+			: "#/dashboard";
+	return configured || "#/dashboard";
+}
+
 export function useRoute(): Route {
 	const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
 
 	useEffect(() => {
 		const handler = () => setRoute(parseHash(window.location.hash));
 		window.addEventListener("hashchange", handler);
+		if (!window.location.hash) {
+			const defaultPage = getDefaultAdminPage();
+			if (defaultPage) {
+				window.location.hash = defaultPage;
+			}
+		}
 		return () => window.removeEventListener("hashchange", handler);
 	}, []);
 
