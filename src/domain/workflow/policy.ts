@@ -110,6 +110,10 @@ export function shouldIgnoreCommentEvent(
 	}
 
 	const isAssigned = isAssignedToTars(payload.issue, githubUsername);
+	if (!isAssigned) {
+		return { ignore: true, reason: `not assigned to ${githubUsername}` };
+	}
+
 	const isCreatedByTars = payload.issue.user?.login === githubUsername;
 	const isMentioned =
 		payload.comment.body.includes(`@${githubUsername}`) ||
@@ -117,11 +121,7 @@ export function shouldIgnoreCommentEvent(
 	const hasTarsLabel =
 		hasTarsVisibleLabel(payload.issue.labels);
 
-	if (!isAssigned && !isCreatedByTars && !isMentioned) {
-		return { ignore: true, reason: "not assigned, not created by TARS, and no mention" };
-	}
-
-	if (isAssigned && !hasTarsLabel && !isMentioned) {
+	if (!hasTarsLabel && !isMentioned) {
 		return { ignore: true, reason: "no tars label or mention" };
 	}
 

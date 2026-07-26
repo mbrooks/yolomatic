@@ -222,7 +222,7 @@ describe("shouldIgnoreCommentEvent", () => {
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores comments without assignment, creation, or mention", () => {
+	it("ignores comments when TARS is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
@@ -231,7 +231,7 @@ describe("shouldIgnoreCommentEvent", () => {
 			},
 			"tars-bot",
 		);
-		expect(result.ignore).toBe(true);
+		expect(result).toEqual({ ignore: true, reason: "not assigned to tars-bot" });
 	});
 
 	it("allows comments that mention the bot", () => {
@@ -239,7 +239,7 @@ describe("shouldIgnoreCommentEvent", () => {
 			{
 				action: "created",
 				comment: { body: "Hey @tars-bot", user: { login: "user" } },
-				issue: { labels: [], assignees: [] },
+				issue: { labels: [], assignees: [{ login: "tars-bot" }] },
 			},
 			"tars-bot",
 		);
@@ -249,19 +249,28 @@ describe("shouldIgnoreCommentEvent", () => {
 		}
 	});
 
-	it("allows comments on issues created by TARS", () => {
+	it("ignores mentions when github_username does not match the assignee", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "@tars please help", user: { login: "user" } },
+				issue: { labels: [{ name: "tars" }], assignees: [{ login: "tarsmbrooks" }] },
+			},
+			"mbrooks",
+		);
+		expect(result).toEqual({ ignore: true, reason: "not assigned to mbrooks" });
+	});
+
+	it("ignores comments on TARS-created issues when TARS is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "user" } },
-				issue: { labels: [], assignees: [], user: { login: "tars-bot" } },
+				issue: { labels: [{ name: "tars" }], assignees: [], user: { login: "tars-bot" } },
 			},
 			"tars-bot",
 		);
-		expect(result.ignore).toBe(false);
-		if (!result.ignore) {
-			expect(result.isCreatedByTars).toBe(true);
-		}
+		expect(result).toEqual({ ignore: true, reason: "not assigned to tars-bot" });
 	});
 });
 
