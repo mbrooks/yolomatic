@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
 	fetchOnboardingStatus,
+	fetchOnboardingConfig,
 	verifyGitHubToken,
 	generateWebhookSecret,
 	listAccessibleRepositories,
@@ -37,6 +38,30 @@ describe("onboarding API", () => {
 			expect(result.complete).toBe(false);
 			const calls = fetchSpy.mock.calls as [string, RequestInit][];
 			expect(calls[0][0]).toBe("/api/onboarding/status");
+		});
+	});
+
+	describe("fetchOnboardingConfig", () => {
+		it("calls /api/onboarding/config", async () => {
+			fetchSpy.mockImplementation(async () => {
+				return mockOkResponse({
+					admin_username: "bob",
+					admin_password: { configured: true },
+					github_token: { configured: false },
+					github_username: "",
+					github_event_mode: "polling",
+					github_poll_interval_ms: "15000",
+					webhook_secret: { configured: true },
+				});
+			});
+			const result = await fetchOnboardingConfig();
+			expect(result.admin_username).toBe("bob");
+			expect(result.admin_password).toEqual({ configured: true });
+			expect(result.github_event_mode).toBe("polling");
+			expect(result.github_poll_interval_ms).toBe("15000");
+			const calls = fetchSpy.mock.calls as [string, RequestInit | undefined][];
+			expect(calls[0][0]).toBe("/api/onboarding/config");
+			expect(calls[0][1]).toBeUndefined();
 		});
 	});
 
