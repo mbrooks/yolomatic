@@ -10,7 +10,7 @@ import type { SettingsCategoryTab } from "../../app/routes.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
 
-const GENERAL_SETTINGS_SECTIONS = [
+const SERVER_SETTINGS_SECTIONS = [
 	{ category: "server", label: "Server" },
 	{ category: "authentication", label: "Authentication" },
 	{ category: "file-system", label: "File System" },
@@ -103,7 +103,7 @@ export function SettingsScreen({
 		}
 	}, [onRerunOnboarding]);
 
-	const settingsSections = tab === "server" ? GENERAL_SETTINGS_SECTIONS : null;
+	const settingsSections = tab === "server" ? SERVER_SETTINGS_SECTIONS : null;
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);

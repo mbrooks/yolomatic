@@ -52,7 +52,7 @@ docker compose down
 TARS persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
 
 To rerun the onboarding wizard without deleting existing settings, open
-**Settings → General**, click the red **Rerun On-Boarding** button, and confirm
+**Settings**, click **Rerun On-Boarding** button, and confirm
 the action.
 
 To force the wizard to run from the command line instead:
