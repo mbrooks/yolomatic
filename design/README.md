@@ -14,6 +14,7 @@ This folder describes the worker-session runtime currently implemented by TARS:
 - [protocol-launch.md](protocol-launch.md): how TARS starts a worker session and exposes the worker session URL
 - [protocol-websocket-transport.md](protocol-websocket-transport.md): transport, session isolation, reconnect, and shutdown rules
 - [protocol-session-messages.md](protocol-session-messages.md): bidirectional message types for launch, events, heartbeat, steering, and completion
+- [schema.md](schema.md): SQLite tables, columns, indexes, and persistence conventions used by the control plane
 
 ## Goals
 
