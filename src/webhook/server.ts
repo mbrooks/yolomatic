@@ -9,6 +9,7 @@ import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
+import type { RepositoryStore } from "../repos/repository-store.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 import type { WorkerRpcServer } from "../worker/rpc-server.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
@@ -28,6 +29,7 @@ type WebhookServerOptions = {
 	adminAssetsDir?: string;
 	onOnboardingComplete?: () => void | Promise<void>;
 	prebuiltStartIssueSession?: StartIssueSession;
+	repositoryStore?: RepositoryStore;
 	adminPath?: string;
 	adminDefaultPage?: string;
 };
@@ -67,6 +69,7 @@ export function createWebhookServer(
 		settingsStore,
 		executor,
 		options.prebuiltStartIssueSession,
+		options.repositoryStore,
 		adminPath,
 		adminDefaultPage,
 	);

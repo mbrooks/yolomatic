@@ -12,6 +12,16 @@ import { GitHubIssueHandlers, type WebhookHandlers } from "../webhook/handlers.j
 import { cleanupOldSessions, createWebhookServer } from "../webhook/server.js";
 import { SkillStore } from "../skills/store.js";
 import { RepoSkillService } from "../skills/repo-skill-service.js";
+import { RepositoryStore } from "../repos/repository-store.js";
+import {
+	repoKey,
+	repoModeIncludesPolling,
+	repoModeIncludesWebhook,
+	resolveRepoDefaultBranch,
+	resolveRepoGitHubEventMode,
+	type RepoGitHubEventMode,
+	type Repository,
+} from "../repos/repository.js";
 import { GitHubPollingAdapter } from "../adapters/github/github-polling-adapter.js";
 import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.js";
 import { GitHubEventStore } from "../github-events/store.js";
@@ -20,13 +30,6 @@ import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-s
 import { systemClock } from "../ports/clock.js";
 import { createStartIssueSession, type StartIssueSession } from "./commands/start-issue-session.js";
 import type { SettingsStore } from "../settings/store.js";
-import {
-	parseConfiguredRepositories,
-	repoModeIncludesPolling,
-	repoModeIncludesWebhook,
-	resolveConfiguredRepoDefaultBranch,
-	resolveConfiguredRepoGitHubEventMode,
-} from "../repos/configured-repositories.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -50,6 +53,7 @@ export interface RuntimeDeps {
 	settingsStore: SettingsStore;
 	sessionStore: SessionStore;
 	taskController: TaskController;
+	repositoryStore: RepositoryStore;
 }
 
 export interface RuntimeGraph {
@@ -72,14 +76,21 @@ export interface RuntimeGraph {
  * no startup side effects are performed here.
  */
 export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): RuntimeGraph {
-	const { settingsStore, sessionStore, taskController } = deps;
+	const { settingsStore, sessionStore, taskController, repositoryStore } = deps;
 
-	const configuredRepositories = () =>
-		parseConfiguredRepositories(settingsStore.get("configured_repositories"));
+	// Load managed repositories once at construction time. Per-repo overrides
+	// (github_event_mode, default_branch) require a restart to take effect, so
+	// snapshotting the table here matches the existing restart-required contract.
+	const managedRepositories = repositoryStore.listSync();
+	const managedRepoIndex = new Map<string, Repository>(
+		managedRepositories.map((repo) => [repoKey(repo.owner, repo.repo), repo]),
+	);
+	const findManaged = (owner: string, repo: string) =>
+		managedRepoIndex.get(repoKey(owner, repo)) ?? null;
 	const resolveDefaultBranch = (owner: string, repo: string) =>
-		resolveConfiguredRepoDefaultBranch(configuredRepositories(), owner, repo, config.defaultBranch);
+		resolveRepoDefaultBranch(findManaged(owner, repo), config.defaultBranch);
 	const resolveGitHubEventMode = (owner: string, repo: string) =>
-		resolveConfiguredRepoGitHubEventMode(configuredRepositories(), owner, repo, config.githubEventMode);
+		resolveRepoGitHubEventMode(findManaged(owner, repo), config.githubEventMode);
 
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
 	const workspaceManager = new WorkspaceManager({
@@ -150,8 +161,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		selfReportEnabled: config.selfReportEnabled,
 	});
 
-	const repoModes = configuredRepositories().map((repo) =>
-		resolveConfiguredRepoGitHubEventMode([repo], repo.owner, repo.repo, config.githubEventMode),
+	const repoModes = managedRepositories.map((repo) =>
+		resolveRepoGitHubEventMode(repo, config.githubEventMode),
 	);
 	const githubEventsEnabled =
 		repoModeIncludesWebhook(config.githubEventMode) ||
@@ -171,7 +182,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workspaceManager,
 		staleDetector,
 		config.archiveDir,
-		{ prebuiltStartIssueSession: startIssueSession, adminPath: config.adminPath, adminDefaultPage: config.adminDefaultPage },
+		{ prebuiltStartIssueSession: startIssueSession, repositoryStore: deps.repositoryStore, adminPath: config.adminPath, adminDefaultPage: config.adminDefaultPage },
 		github,
 		settingsStore,
 		skillStore,
@@ -219,10 +230,11 @@ export async function startRuntime(
 			eventStore: graph.eventStore,
 			githubUsername: config.githubUsername,
 			intervalMs: config.githubPollIntervalMs,
+			listManagedRepos: async () => deps.repositoryStore.listForPolling(),
 			shouldPollRepo: (owner, repo) =>
-				repoModeIncludesPolling(resolveConfiguredRepoGitHubEventModeFor(config, deps, owner, repo)),
+				repoModeIncludesPolling(resolveManagedGitHubEventModeFor(config, deps, owner, repo)),
 			resolveGitHubEventMode: (owner, repo) =>
-				resolveConfiguredRepoGitHubEventModeFor(config, deps, owner, repo),
+				resolveManagedGitHubEventModeFor(config, deps, owner, repo),
 			dispatch: (event) => handlers.handleGitHubEvent(event),
 		});
 	}
@@ -284,12 +296,12 @@ export async function startRuntime(
 	return graph;
 }
 
-function resolveConfiguredRepoGitHubEventModeFor(
+function resolveManagedGitHubEventModeFor(
 	config: AppConfig,
 	deps: RuntimeDeps,
 	owner: string,
 	repo: string,
-) {
-	const configuredRepositories = parseConfiguredRepositories(deps.settingsStore.get("configured_repositories"));
-	return resolveConfiguredRepoGitHubEventMode(configuredRepositories, owner, repo, config.githubEventMode);
+): RepoGitHubEventMode {
+	const managed = deps.repositoryStore.getSync(owner, repo);
+	return resolveRepoGitHubEventMode(managed, config.githubEventMode);
 }

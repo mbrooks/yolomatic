@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	addRepo,
 	listAccessibleRepos,
+	removeRepo,
 	type AccessibleRepo,
 } from "../../api/repos.js";
-import { updateSettings } from "../../api/settings.js";
 
 interface SelectableRepo extends AccessibleRepo {
 	selected: boolean;
@@ -102,12 +103,30 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 		setSaving(true);
 		setError(null);
 		try {
-			const selectedRepos = repos
-				.filter((r) => r.selected)
-				.map((r) => ({ owner: r.owner, repo: r.repo }));
-			await updateSettings({
-				configured_repositories: JSON.stringify(selectedRepos),
-			});
+			// Add newly selected repos and remove newly deselected configured repos
+			// via the table-backed repos API. Failures are collected and reported.
+			const failures: string[] = [];
+			for (const repo of repos) {
+				const key = repoKey(repo.owner, repo.repo);
+				if (repo.selected && !repo.configured) {
+					try {
+						await addRepo(repo.owner, repo.repo);
+					} catch (err) {
+						const message = err instanceof Error ? err.message : String(err);
+						failures.push(`add ${key}: ${message}`);
+					}
+				} else if (!repo.selected && repo.configured) {
+					try {
+						await removeRepo(repo.owner, repo.repo);
+					} catch (err) {
+						const message = err instanceof Error ? err.message : String(err);
+						failures.push(`remove ${key}: ${message}`);
+					}
+				}
+			}
+			if (failures.length > 0) {
+				throw new Error(failures.join("; "));
+			}
 			setRepos((prev) =>
 				prev.map((repo) => ({ ...repo, configured: repo.selected })),
 			);
@@ -126,8 +145,8 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 	return (
 		<div className="settings-repositories">
 			<p className="setting-description">
-				Choose which repositories TARS should show and use. Selections are saved
-				to <code>configured_repositories</code>.
+				Choose which repositories TARS should manage. Selections are persisted
+				to the <code>repositories</code> table.
 			</p>
 
 			{error && <div className="error-banner">{error}</div>}

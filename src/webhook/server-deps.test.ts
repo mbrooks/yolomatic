@@ -142,6 +142,27 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);
 	});
 
+	it("exposes repositoryStore on the admin router deps when provided", () => {
+		const repositoryStore = { listSync: vi.fn(() => []) } as never;
+		const deps = createWebhookServerDeps(
+			createSessionStore(),
+			"admin",
+			"secret",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			repositoryStore,
+		);
+
+		expect(deps.repositoryStore).toBe(repositoryStore);
+	});
+
 	it("reuses a prebuilt StartIssueSession command when provided", () => {
 		const prebuiltStartIssueSession = {
 			execute: vi.fn(),
@@ -170,6 +191,7 @@ describe("createWebhookServerDeps", () => {
 			createSessionStore(),
 			"admin",
 			"secret",
+			undefined,
 			undefined,
 			undefined,
 			undefined,

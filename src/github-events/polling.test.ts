@@ -119,6 +119,28 @@ describe("tickGitHubPolling", () => {
 		}));
 	});
 
+	it("iterates over listManagedRepos instead of github.listAccessibleRepositories when provided", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		const github = makeGithub();
+		const listManagedRepos = vi.fn(async () => [
+			{ owner: "managed", repo: "repo" },
+		]);
+		const dispatch = vi.fn(async () => {});
+
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "tars-bot",
+			intervalMs: 60000,
+			listManagedRepos,
+			dispatch,
+		});
+
+		expect(listManagedRepos).toHaveBeenCalledTimes(1);
+		expect(github.listAccessibleRepositories).not.toHaveBeenCalled();
+		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("managed", "repo", expect.any(String));
+	});
+
 	it("normalizes every supported polled event shape", () => {
 		const issue = {
 			number: 1,

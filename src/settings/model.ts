@@ -135,16 +135,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "server",
 	},
 	{
-		key: "configured_repositories",
-		type: "string",
-		description: "JSON list of repositories configured during onboarding",
-		default: "[]",
-		requiresRestart: false,
-		sensitive: false,
-		envVar: "CONFIGURED_REPOSITORIES",
-		category: "repositories",
-	},
-	{
 		key: "onboarding_complete",
 		type: "boolean",
 		description: "Whether the onboarding wizard has been completed",
