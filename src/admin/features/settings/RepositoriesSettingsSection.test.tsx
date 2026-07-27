@@ -217,4 +217,89 @@ describe("RepositoriesSettingsSection", () => {
 			expect(screen.getByText(/Database locked/)).not.toBeNull();
 		});
 	});
+
+	it("opens a manual Add Repository modal and adds the repo, then refreshes the list", async () => {
+		let accessibleCallCount = 0;
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+			const url = typeof input === "string" ? input : input.url;
+			const method = init?.method;
+			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
+				accessibleCallCount++;
+				return Promise.resolve(accessibleResponse(
+					[{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }],
+					[],
+				));
+			}
+			if (url === "/api/repos" && method === "POST") {
+				return Promise.resolve(jsonResponse({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: true }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<RepositoriesSettingsSection />);
+
+		await screen.findByRole("checkbox", { name: /mbrooks\/tars/ });
+		expect(accessibleCallCount).toBe(1);
+
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		expect(screen.getByRole("dialog")).not.toBeNull();
+		fireEvent.change(screen.getByLabelText(/^owner$/i), { target: { value: "octocat" } });
+		fireEvent.change(screen.getByLabelText(/^repository name$/i), { target: { value: "hello-world" } });
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
+
+		await waitFor(() => {
+			expect(screen.queryByRole("dialog")).toBeNull();
+		});
+		const postCall = fetchSpy.mock.calls.find(([input, init]) => {
+			const url = typeof input === "string" ? input : input.url;
+			return url === "/api/repos" && init?.method === "POST";
+		});
+		expect(postCall).toBeDefined();
+		expect(JSON.parse(postCall![1]!.body as string)).toEqual({ owner: "octocat", repo: "hello-world" });
+		// Manual add triggers a refresh of the accessible list.
+		await waitFor(() => {
+			expect(accessibleCallCount).toBe(2);
+		});
+	});
+
+	it("shows a validation error in the Add Repository modal when fields are blank", async () => {
+		mockAccessible(
+			[{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }],
+			[],
+		);
+		render(<RepositoriesSettingsSection />);
+
+		await screen.findByRole("checkbox", { name: /mbrooks\/tars/ });
+		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/owner and repository name are required/i)).not.toBeNull();
+		});
+		expect(screen.getByRole("dialog")).not.toBeNull();
+	});
+
+	it("refreshes the accessible list when Refresh is clicked", async () => {
+		let accessibleCallCount = 0;
+		vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+			const url = typeof input === "string" ? input : input.url;
+			const method = init?.method;
+			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
+				accessibleCallCount++;
+				return Promise.resolve(accessibleResponse(
+					[{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }],
+					[],
+				));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<RepositoriesSettingsSection />);
+
+		await screen.findByRole("checkbox", { name: /mbrooks\/tars/ });
+		expect(accessibleCallCount).toBe(1);
+
+		fireEvent.click(screen.getByRole("button", { name: /refresh/i }));
+		await waitFor(() => {
+			expect(accessibleCallCount).toBe(2);
+		});
+	});
 });

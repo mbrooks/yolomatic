@@ -229,7 +229,7 @@ function AppContent({
 				repos={repos}
 				onSelectRepo={onSelectRepo}
 				onBack={onBack}
-				onRescanComplete={onMutate}
+				onMutate={onMutate}
 			/>
 		);
 	}

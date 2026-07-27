@@ -8,12 +8,10 @@ import {
 } from "../admin-router-shared.js";
 import { mapResultToStatus } from "../admin-router-shared.js";
 import {
-	repoKey,
 	type RepoGitHubEventMode,
 	type Repository,
 } from "../../../repos/repository.js";
 import { NotFoundError } from "../admin-router-shared.js";
-import { isPublicVisibility } from "../../../ports/github-service.js";
 
 interface RepoSettingView {
 	key: "github_event_mode" | "default_branch";
@@ -115,46 +113,6 @@ const registry = new AdminRouteRegistry()
 					added: true,
 				},
 			};
-		},
-	})
-	.route({
-		method: "POST",
-		pattern: /^\/api\/repos\/scan$/u,
-		requiresDeps: ["githubService", "repositoryStore"],
-		handler: async (ctx) => {
-			const { githubService, repositoryStore } = getRequiredDeps(ctx.deps, [
-				"githubService",
-				"repositoryStore",
-			]);
-			const user = await githubService.getAuthenticatedUser();
-			if (!user) {
-				sendJson(ctx.response, 500, { error: "GitHub token is invalid or not configured" });
-				return;
-			}
-			const discovered = await githubService.listAccessibleRepositories();
-			const managed = await repositoryStore.list();
-			const seen = new Set(managed.map((r) => repoKey(r.owner, r.repo)));
-			let added = 0;
-			const skipped: import("../../../ports/github-service.js").AccessibleRepo[] = [];
-			for (const repo of discovered) {
-				const key = repoKey(repo.owner, repo.repo);
-				if (seen.has(key)) {
-					continue;
-				}
-				if (isPublicVisibility(repo.visibility)) {
-					skipped.push(repo);
-					continue;
-				}
-				seen.add(key);
-				await repositoryStore.upsert({
-					owner: repo.owner,
-					repo: repo.repo,
-					fullName: repo.fullName,
-					visibility: repo.visibility,
-				});
-				added++;
-			}
-			return { status: 200, body: { repos: discovered, added, skipped } };
 		},
 	})
 	.route({

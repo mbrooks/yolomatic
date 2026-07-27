@@ -37,6 +37,7 @@ export interface RepoItem {
 
 export interface ListReposResponse {
 	repositories: RepoItem[];
+	configured?: Array<{ owner: string; repo: string }>;
 }
 
 export interface InitWorkspacesRequest {

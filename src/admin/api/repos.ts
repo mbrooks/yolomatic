@@ -20,12 +20,6 @@ export interface AccessibleRepo {
 	visibility: "public" | "private" | "internal";
 }
 
-export interface ScanReposResponse {
-	repos: AccessibleRepo[];
-	added: number;
-	skipped?: AccessibleRepo[];
-}
-
 export interface RemoveRepoResponse {
 	removed: boolean;
 }
@@ -41,10 +35,6 @@ export async function addRepo(owner: string, repo: string): Promise<AddRepoRespo
 
 export async function listAccessibleRepos(): Promise<AccessibleReposResponse> {
 	return apiGet<AccessibleReposResponse>("/api/repos/accessible");
-}
-
-export async function scanRepos(): Promise<ScanReposResponse> {
-	return apiPost<ScanReposResponse>("/api/repos/scan");
 }
 
 export async function removeRepo(owner: string, repo: string): Promise<RemoveRepoResponse> {
