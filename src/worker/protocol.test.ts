@@ -8,7 +8,7 @@ describe("worker protocol", () => {
 			result: {
 				status: "complete",
 				summary: "done",
-				rawResponse: "TARS_STATUS: complete\ndone",
+				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
 			},
 		});
 
@@ -21,7 +21,7 @@ describe("worker protocol", () => {
 				result: {
 					status: "complete",
 					summary: "done",
-					rawResponse: "TARS_STATUS: complete\ndone",
+					rawResponse: "YEETOMATIC_STATUS: complete\ndone",
 				},
 			},
 		});

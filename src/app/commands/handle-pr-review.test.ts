@@ -48,7 +48,7 @@ describe("HandlePRReview", () => {
 		const workspaces = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-				branch: "tars/issue-56",
+				branch: "yeetomatic/issue-56",
 			})),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
@@ -63,7 +63,7 @@ describe("HandlePRReview", () => {
 			executePRReview: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Fixed the typo.",
-				rawResponse: "TARS_STATUS: complete\nFixed the typo.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nFixed the typo.",
 			})),
 		};
 		const github = {
@@ -96,7 +96,7 @@ describe("HandlePRReview", () => {
 			executor: executor as never,
 			github: github as never,
 			tasks: tasks as never,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 		});
 
 		return { handler, sessions, workspaces, executor, github, tasks };
@@ -106,10 +106,10 @@ describe("HandlePRReview", () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "tars-bot" },
-			comment: { id: 1, body: "Fix this", user: { login: "tars-bot" } },
+			sender: { login: "yeetomatic-bot" },
+			comment: { id: 1, body: "Fix this", user: { login: "yeetomatic-bot" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
@@ -122,7 +122,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -135,7 +135,7 @@ describe("HandlePRReview", () => {
 			"mbrooks",
 			"tars",
 			99,
-			"Review feedback was steered to the active TARS task.",
+			"Review feedback was steered to the active Yeetomatic task.",
 		);
 	});
 
@@ -147,7 +147,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -158,11 +158,11 @@ describe("HandlePRReview", () => {
 			"mbrooks",
 			"tars",
 			99,
-			"TARS is busy. Review feedback could not be steered.",
+			"Yeetomatic is busy. Review feedback could not be steered.",
 		);
 	});
 
-	it("ignores non-TARS branches", async () => {
+	it("ignores non-Yeetomatic branches", async () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
@@ -179,7 +179,7 @@ describe("HandlePRReview", () => {
 		const { handler, sessions, workspaces, executor, github, tasks } = createHandler();
 		const session = makeSession({
 			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/custom-branch-123",
-			branch: "tars/custom-branch-123",
+			branch: "yeetomatic/custom-branch-123",
 			prNumber: 99,
 			prUrl: "https://github.com/mbrooks/tars/pull/99",
 		});
@@ -188,7 +188,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/custom-branch-123" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/custom-branch-123" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please update the generated file", user: { login: "user" }, path: "src/foo.ts", line: 42 },
@@ -199,8 +199,8 @@ describe("HandlePRReview", () => {
 		expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-tars/.worktrees/custom-branch-123",
-			"tars/custom-branch-123",
-			"TARS: Fix the typo",
+			"yeetomatic/custom-branch-123",
+			"Yeetomatic: Fix the typo",
 		);
 		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function), expect.any(Function));
 		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Symbol));
@@ -216,7 +216,7 @@ describe("HandlePRReview", () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "closed", merged: true },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "closed", merged: true },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -224,13 +224,13 @@ describe("HandlePRReview", () => {
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
 
-	it("silently ignores a TARS-named PR when no session exists for the mapped issue", async () => {
+	it("silently ignores a Yeetomatic-named PR when no session exists for the mapped issue", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(null);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -241,7 +241,7 @@ describe("HandlePRReview", () => {
 		expect(github.postPRComment).not.toHaveBeenCalled();
 	});
 
-	it("silently ignores a TARS-named PR associated with a different PR", async () => {
+	it("silently ignores a Yeetomatic-named PR associated with a different PR", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(
 			makeSession({
@@ -252,7 +252,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -274,7 +274,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
@@ -294,8 +294,8 @@ describe("HandlePRReview", () => {
 		);
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-			"tars/issue-56",
-			"TARS: Fix the typo",
+			"yeetomatic/issue-56",
+			"Yeetomatic: Fix the typo",
 		);
 		expect(sessions.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(tasks.register).toHaveBeenCalledWith("mbrooks/tars#56", expect.any(Function), expect.any(Function));
@@ -320,7 +320,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
@@ -328,8 +328,8 @@ describe("HandlePRReview", () => {
 
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-			"tars/issue-56",
-			"TARS: Fix the typo",
+			"yeetomatic/issue-56",
+			"Yeetomatic: Fix the typo",
 		);
 	});
 
@@ -345,7 +345,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
@@ -365,12 +365,12 @@ describe("HandlePRReview", () => {
 		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
 			status: "cancelled",
 			summary: "Stopped by request.",
-			rawResponse: "TARS_STATUS: cancelled\nStopped by request.",
+			rawResponse: "YEETOMATIC_STATUS: cancelled\nStopped by request.",
 		});
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please stop", user: { login: "user" } },
@@ -392,7 +392,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "LGTM", user: { login: "user" } },
@@ -413,7 +413,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "LGTM", user: { login: "user" } },
@@ -430,7 +430,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "Please add more tests.", state: "changes_requested", user: { login: "user" } },
@@ -455,7 +455,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "Please add more tests.", state: "changes_requested", user: { login: "user" } },
@@ -485,7 +485,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "dismissed",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: null, state: "dismissed", user: { login: "user" } },
@@ -502,7 +502,7 @@ describe("HandlePRReview", () => {
 		await expect(
 			handler.execute({
 				action: "created",
-				pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 				comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -529,7 +529,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -555,7 +555,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -565,7 +565,7 @@ describe("HandlePRReview", () => {
 			"mbrooks",
 			"tars",
 			99,
-			expect.stringContaining("TARS failed."),
+			expect.stringContaining("Yeetomatic failed."),
 		);
 		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "failed");
 	});
@@ -582,7 +582,7 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -605,7 +605,7 @@ describe("HandlePRReview", () => {
 		await expect(
 			handler.execute({
 				action: "created",
-				pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 				comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -616,7 +616,7 @@ describe("HandlePRReview", () => {
 			"mbrooks",
 			"tars",
 			99,
-			expect.stringContaining("TARS failed"),
+			expect.stringContaining("Yeetomatic failed"),
 		);
 	});
 });

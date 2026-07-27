@@ -4,7 +4,7 @@ import http from "node:http";
 import { handleAdminRoute } from "./admin-router.js";
 import { SettingsStore } from "../../settings/store.js";
 
-const TEST_DB = "/tmp/tars-admin-router-test.sqlite";
+const TEST_DB = "/tmp/yeetomatic-admin-router-test.sqlite";
 
 vi.mock("./asset-server.js", () => ({
 	adminHtml: vi.fn(async () => "<html></html>"),
@@ -229,9 +229,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(store.getString("github_token")).toBe("tok");
 	});
 
-	it("GET /tars/admin returns HTML when credentials configured", async () => {
+	it("GET /yeetomatic/admin returns HTML when credentials configured", async () => {
 		const req = mockRequest({
-			url: "/tars/admin",
+			url: "/yeetomatic/admin",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -243,9 +243,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(String(res.body)).toContain("<html>");
 	});
 
-	it("GET /tars/admin/assets/main.js serves asset", async () => {
+	it("GET /yeetomatic/admin/assets/main.js serves asset", async () => {
 		const req = mockRequest({
-			url: "/tars/admin/assets/main.js",
+			url: "/yeetomatic/admin/assets/main.js",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -393,7 +393,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/settings blanks sensitive values", async () => {
 		store.set("github_token", "supersecret");
-		store.set("github_username", "tars");
+		store.set("github_username", "yeetomatic");
 
 		const req = mockRequest({
 			url: "/api/settings",
@@ -410,7 +410,7 @@ describe.sequential("handleAdminRoute", () => {
 		const userView = body.settings.find((s: { key: string }) => s.key === "github_username");
 		expect(tokenView.value).toBe("");
 		expect(tokenView.sensitive).toBe(true);
-		expect(userView.value).toBe("tars");
+		expect(userView.value).toBe("yeetomatic");
 		expect(userView.sensitive).toBe(false);
 	});
 
@@ -683,10 +683,10 @@ describe.sequential("handleAdminRoute", () => {
 		expect(body.error).toBe("Settings store not configured");
 	});
 
-	it("GET /tars/admin allows access without auth during onboarding", async () => {
+	it("GET /yeetomatic/admin allows access without auth during onboarding", async () => {
 		const onboardingDeps = { ...deps, adminUsername: undefined, adminPassword: undefined };
 		const req = mockRequest({
-			url: "/tars/admin",
+			url: "/yeetomatic/admin",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -913,12 +913,12 @@ describe.sequential("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(404);
 	});
 
-	it("GET /tars/admin uses credentials from settingsStore when deps credentials missing", async () => {
+	it("GET /yeetomatic/admin uses credentials from settingsStore when deps credentials missing", async () => {
 		store.set("admin_username", "store-admin");
 		store.set("admin_password", "store-secret");
 		const credsDeps = { ...deps, adminUsername: undefined, adminPassword: undefined };
 		const req = mockRequest({
-			url: "/tars/admin",
+			url: "/yeetomatic/admin",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("store-admin", "store-secret") },
 		});
@@ -1748,8 +1748,8 @@ describe.sequential("handleAdminRoute", () => {
 		expect(body.error).toContain("Network error");
 	});
 
-	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to TARS username", async () => {
-		store.set("github_username", "tars-bot");
+	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to Yeetomatic username", async () => {
+		store.set("github_username", "yeetomatic-bot");
 		const req = mockRequest({
 			url: "/api/repos/mbrooks/tars/issues/42/assign",
 			method: "POST",
@@ -1764,7 +1764,7 @@ describe.sequential("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.started).toBe(true);
 		expect(body.status).toBe("queued");
-		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
+		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["yeetomatic-bot"]);
 		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 	});
 
@@ -1815,11 +1815,11 @@ describe.sequential("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("TARS GitHub username not configured");
+		expect(body.error).toBe("Yeetomatic GitHub username not configured");
 	});
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign handles service error", async () => {
-		store.set("github_username", "tars-bot");
+		store.set("github_username", "yeetomatic-bot");
 		githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
 		const req = mockRequest({
 			url: "/api/repos/mbrooks/tars/issues/42/assign",

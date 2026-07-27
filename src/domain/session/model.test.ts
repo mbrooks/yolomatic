@@ -30,8 +30,8 @@ describe("sessionKey", () => {
 });
 
 describe("branchName", () => {
-	it("formats tars/issue-N", () => {
-		expect(branchName(42)).toBe("tars/issue-42");
+	it("formats yeetomatic/issue-N", () => {
+		expect(branchName(42)).toBe("yeetomatic/issue-42");
 	});
 });
 
@@ -51,7 +51,7 @@ describe("detectSessionRisk", () => {
 	});
 
 	it("flags PR-shaped title", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 42, title: "TARS: Fix bug" });
+		const session = makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 42, title: "Yeetomatic: Fix bug" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(true);
 		expect(risk.reasons).toContain("Session title looks like a generated PR title.");

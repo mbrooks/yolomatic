@@ -70,17 +70,17 @@ describe("IssueDetail", () => {
 
 	it("does not show action buttons when issue has assignees", () => {
 		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
-		expect(screen.queryByText("Assign to TARS")).toBeNull();
+		expect(screen.queryByText("Assign to Yeetomatic")).toBeNull();
 		expect(screen.queryByText("Start Session")).toBeNull();
 	});
 
-	it("shows Assign to TARS and Start Session buttons when issue is unassigned", () => {
+	it("shows Assign to Yeetomatic and Start Session buttons when issue is unassigned", () => {
 		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="tars" />);
-		expect(screen.getByText("Assign to TARS")).toBeDefined();
+		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
 		expect(screen.getByText("Start Session")).toBeDefined();
 	});
 
-	it("calls assignIssue and onAssignSuccess when Assign to TARS is clicked", async () => {
+	it("calls assignIssue and onAssignSuccess when Assign to Yeetomatic is clicked", async () => {
 		mockAssignIssue.mockResolvedValue({ started: true, status: "working", message: "ok" });
 		const onAssignSuccess = vi.fn();
 		render(
@@ -91,7 +91,7 @@ describe("IssueDetail", () => {
 				onAssignSuccess={onAssignSuccess}
 			/>,
 		);
-		const button = screen.getByText("Assign to TARS");
+		const button = screen.getByText("Assign to Yeetomatic");
 		fireEvent.click(button);
 		await waitFor(() =>
 			expect(mockAssignIssue).toHaveBeenCalledWith(
@@ -141,7 +141,7 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		const button = screen.getByText("Assign to TARS");
+		const button = screen.getByText("Assign to Yeetomatic");
 		fireEvent.click(button);
 		await waitFor(() => expect(screen.getByText("Network error")).toBeDefined());
 	});
@@ -155,7 +155,7 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		const button = screen.getByText("Assign to TARS");
+		const button = screen.getByText("Assign to Yeetomatic");
 		fireEvent.click(button);
 		await waitFor(() => expect(screen.getByText("Assigning...")).toBeDefined());
 	});
@@ -208,7 +208,7 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		fireEvent.click(screen.getByText("Assign to TARS"));
+		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
 		await waitFor(() => expect(screen.getByText("Assigning...")).toBeDefined());
 
 		rerender(
@@ -219,7 +219,7 @@ describe("IssueDetail", () => {
 			/>,
 		);
 		expect(screen.queryByText("Assigning...")).toBeNull();
-		expect(screen.getByText("Assign to TARS")).toBeDefined();
+		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
 	});
 
 	it("resets start session state when selected issue changes", async () => {
@@ -255,7 +255,7 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		fireEvent.click(screen.getByText("Assign to TARS"));
+		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
 		fireEvent.click(screen.getByText("Start Session"));
 		await waitFor(() => expect(screen.getByText("Network error")).toBeDefined());
 		await waitFor(() => expect(screen.getByText("Start failed")).toBeDefined());
@@ -271,7 +271,7 @@ describe("IssueDetail", () => {
 		expect(screen.queryByText("Start failed")).toBeNull();
 	});
 
-	it("shows TARS as optimistic assignee after successful assignment", async () => {
+	it("shows Yeetomatic as optimistic assignee after successful assignment", async () => {
 		mockAssignIssue.mockResolvedValue({ started: true, status: "working", message: "ok" });
 		render(
 			<IssueDetail
@@ -280,10 +280,10 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		const button = screen.getByText("Assign to TARS");
+		const button = screen.getByText("Assign to Yeetomatic");
 		fireEvent.click(button);
-		await waitFor(() => expect(screen.getByText("TARS")).toBeDefined());
-		expect(screen.queryByText("Assign to TARS")).toBeNull();
+		await waitFor(() => expect(screen.getByText("Yeetomatic")).toBeDefined());
+		expect(screen.queryByText("Assign to Yeetomatic")).toBeNull();
 		expect(screen.queryByText("Start Session")).toBeNull();
 	});
 
@@ -296,8 +296,8 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		fireEvent.click(screen.getByText("Assign to TARS"));
-		await waitFor(() => expect(screen.getByText("TARS")).toBeDefined());
+		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
+		await waitFor(() => expect(screen.getByText("Yeetomatic")).toBeDefined());
 
 		rerender(
 			<IssueDetail
@@ -306,8 +306,8 @@ describe("IssueDetail", () => {
 				repo="tars"
 			/>,
 		);
-		expect(screen.queryByText("TARS")).toBeNull();
+		expect(screen.queryByText("Yeetomatic")).toBeNull();
 		expect(screen.getByText("Unassigned")).toBeDefined();
-		expect(screen.getByText("Assign to TARS")).toBeDefined();
+		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
 	});
 });

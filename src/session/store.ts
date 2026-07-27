@@ -39,7 +39,7 @@ export interface SessionState {
 	queuedComments?: string[];
 	/** Overrides the default `${repo}-issue-${issueNumber}` log tag */
 	sessionTag?: string;
-	/** Branch associated with this session. Defaults to `tars/issue-${issueNumber}` for issues. */
+	/** Branch associated with this session. Defaults to `yeetomatic/issue-${issueNumber}` for issues. */
 	branch?: string;
 	/** ISO timestamp when the current/latest task execution started. */
 	taskStartedAt?: string;

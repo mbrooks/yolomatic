@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTarsModelRegistry, resolveOllamaBaseUrl } from "./model-registry.js";
+import { createYeetomaticModelRegistry, resolveOllamaBaseUrl } from "./model-registry.js";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn(() => ({})) },
@@ -12,14 +12,14 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 
 import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
-describe("createTarsModelRegistry", () => {
+describe("createYeetomaticModelRegistry", () => {
 	it("creates an in-memory registry with ollama provider", () => {
 		const mockAuthStorage = {};
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const mockRegistry = { registerProvider: vi.fn() };
 		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 
-		const registry = createTarsModelRegistry(mockAuthStorage as never);
+		const registry = createYeetomaticModelRegistry(mockAuthStorage as never);
 
 		expect(ModelRegistry.inMemory).toHaveBeenCalledWith(mockAuthStorage);
 		expect(mockRegistry.registerProvider).toHaveBeenCalledWith("ollama", expect.objectContaining({

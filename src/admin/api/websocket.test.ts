@@ -91,7 +91,7 @@ describe("webSocketManager", () => {
 		const socket = sockets[0];
 		socket.triggerOpen();
 
-		expect(socket.url).toBe("ws://localhost:6767/tars/admin/ws");
+		expect(socket.url).toBe("ws://localhost:6767/yeetomatic/admin/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
 		expect(socket.sent).toContain(
 			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 }),
@@ -247,11 +247,11 @@ describe("webSocketManager", () => {
 		expect(() => unsub()).not.toThrow();
 	});
 
-	it("uses window.__TARS_ADMIN_PATH__ when building the websocket url", () => {
-		(window as unknown as { __TARS_ADMIN_PATH__: string }).__TARS_ADMIN_PATH__ = "/custom/admin";
+	it("uses window.__YEETOMATIC_ADMIN_PATH__ when building the websocket url", () => {
+		(window as unknown as { __YEETOMATIC_ADMIN_PATH__: string }).__YEETOMATIC_ADMIN_PATH__ = "/custom/admin";
 		webSocketManager.subscribeLog("custom-owner", "custom-repo", 77, () => {});
 		const socket = sockets[sockets.length - 1];
 		expect(socket.url).toBe("ws://localhost:6767/custom/admin/ws");
-		delete (window as unknown as { __TARS_ADMIN_PATH__?: string }).__TARS_ADMIN_PATH__;
+		delete (window as unknown as { __YEETOMATIC_ADMIN_PATH__?: string }).__YEETOMATIC_ADMIN_PATH__;
 	});
 });

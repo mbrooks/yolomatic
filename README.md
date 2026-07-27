@@ -1,12 +1,12 @@
-# TARS
+# Yeetomatic
 
-TARS (Task Automation & Response System) is a self-hosted coding agent that turns GitHub issues into pull requests.
+Yeetomatic (Task Automation & Response System) is a self-hosted coding agent that turns GitHub issues into pull requests.
 
-Assign an issue to TARS—or start it from the admin dashboard—and TARS creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through implementation, feedback, and PR delivery.
+Assign an issue to Yeetomatic—or start it from the admin dashboard—and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through implementation, feedback, and PR delivery.
 
 ## Features
 
-- **Issue-to-PR automation** — creates a `tars/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
+- **Issue-to-PR automation** — creates a `yeetomatic/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
 - **GitHub-native collaboration** — responds to issue updates, comments, PR reviews, and inline review comments.
 - **Multi-repository support** — manages each repository, worktree, and issue session independently.
 - **Admin dashboard** — configure repositories and models, start and control sessions, manage skills, and inspect live logs.
@@ -19,18 +19,18 @@ Assign an issue to TARS—or start it from the admin dashboard—and TARS create
 ### Requirements
 
 - Docker Engine or Docker Desktop with Docker Compose
-- A GitHub personal access token that can read and modify the repositories TARS will manage
+- A GitHub personal access token that can read and modify the repositories Yeetomatic will manage
 
-### Start TARS
+### Start Yeetomatic
 
 ```bash
 git clone https://github.com/mbrooks/tars.git
-cd tars
+cd yeetomatic
 cp .env.example .env
 docker compose up --build -d
 ```
 
-Open [http://127.0.0.1:6767/tarsadmin](http://127.0.0.1:6767/tarsadmin) and complete the setup wizard. It will:
+Open [http://127.0.0.1:6767/yeetomatic/admin](http://127.0.0.1:6767/yeetomatic/admin) and complete the setup wizard. It will:
 
 1. Create admin credentials.
 2. Verify your GitHub token.
@@ -40,16 +40,16 @@ Open [http://127.0.0.1:6767/tarsadmin](http://127.0.0.1:6767/tarsadmin) and comp
 Follow the logs with:
 
 ```bash
-docker compose logs -f tars
+docker compose logs -f yeetomatic
 ```
 
-Stop TARS with:
+Stop Yeetomatic with:
 
 ```bash
 docker compose down
 ```
 
-TARS persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
+Yeetomatic persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
 
 To rerun the onboarding wizard without deleting existing settings, open
 **Settings**, click **Rerun On-Boarding** button, and confirm
@@ -58,21 +58,21 @@ the action.
 To force the wizard to run from the command line instead:
 
 ```bash
-docker compose exec -T tars npm run onboarding:reset
+docker compose exec -T yeetomatic npm run onboarding:reset
 ```
 
-Refresh `/tarsadmin` after the command completes. Restart TARS as well if you
+Refresh `/yeetomatic/admin` after the command completes. Restart Yeetomatic as well if you
 want it to start in onboarding-only mode:
 
 ```bash
-docker compose restart tars
+docker compose restart yeetomatic
 ```
 
 To dump every effective configuration value using the same
-database-over-environment-over-default precedence as TARS:
+database-over-environment-over-default precedence as Yeetomatic:
 
 ```bash
-docker compose exec -T tars npm run config:dump
+docker compose exec -T yeetomatic npm run config:dump
 ```
 
 The output includes all values, including tokens, passwords, and webhook
@@ -80,7 +80,7 @@ secrets. Treat it as secret material.
 
 ## Connect GitHub
 
-TARS can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
+Yeetomatic can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
 
 ### Webhook
 
@@ -95,38 +95,38 @@ For local testing, a tunnel such as `ngrok http 6767` can provide the public URL
 
 ### Polling
 
-Select `polling` if TARS cannot receive a public webhook. No public URL is required. The default polling interval is 60 seconds.
+Select `polling` if Yeetomatic cannot receive a public webhook. No public URL is required. The default polling interval is 60 seconds.
 
 ## Usage
 
 1. Add a repository in the setup wizard or the **Repositories** screen.
 2. Open an issue with a clear description and acceptance criteria.
-3. Assign the issue to the GitHub account connected to TARS, or choose **Start Session** from the issue in the admin dashboard.
+3. Assign the issue to the GitHub account connected to Yeetomatic, or choose **Start Session** from the issue in the admin dashboard.
 4. Follow progress in GitHub or inspect the live session log in the dashboard.
-5. Add an issue comment or update the issue description to steer active work. TARS keeps the same issue session and worktree.
+5. Add an issue comment or update the issue description to steer active work. Yeetomatic keeps the same issue session and worktree.
 6. Review the pull request. Actionable review comments trigger another implementation pass and are pushed to the same branch.
 
-TARS uses workflow labels and GitHub comments to show its current state:
+Yeetomatic uses workflow labels and GitHub comments to show its current state:
 
 | Label | Meaning |
 | --- | --- |
-| `tars-working` | The issue is being processed. |
-| `tars-feedback-required` | TARS needs more information. |
-| `tars-pr-created` | The implementation has been pushed and a PR is ready. |
-| `tars-failed` | The agent run failed. |
-| `tars-cancelled` | The session was stopped. |
+| `yeetomatic-working` | The issue is being processed. |
+| `yeetomatic-feedback-required` | Yeetomatic needs more information. |
+| `yeetomatic-pr-created` | The implementation has been pushed and a PR is ready. |
+| `yeetomatic-failed` | The agent run failed. |
+| `yeetomatic-cancelled` | The session was stopped. |
 
 The configured admin GitHub user can stop an issue from GitHub by commenting:
 
 ```text
-/tars stop
+/yeetomatic stop
 ```
 
 Sessions can also be paused, resumed, restarted, archived, or deleted from the admin dashboard when their current state permits it.
 
 ## Issue Management Architecture
 
-The diagram below traces how a GitHub event becomes a TARS session, worktree, branch, and pull request, with the source file responsible for each stage.
+The diagram below traces how a GitHub event becomes a Yeetomatic session, worktree, branch, and pull request, with the source file responsible for each stage.
 
 ```mermaid
 flowchart TD
@@ -192,17 +192,17 @@ Walkthrough of each numbered stage:
 
 1. **Inbound events.** GitHub sends `issues`, `issue_comment`, `pull_request_review`, and `pull_request_review_comment` webhooks to `src/webhook/server.ts`. The dispatcher can also receive events from the poller (`src/github-events/polling.ts`) for repositories configured in polling mode.
 2. **Dispatch.** `src/github-events/dispatcher.ts` routes each event to the appropriate command: `HandleIssueEvent`, `HandleIssueComment`, or `HandlePRReview`.
-3. **Policy gate.** Each command consults `src/domain/workflow/policy.ts` to decide whether to ignore the event (wrong sender, bot comment, no TARS label/assignment, do-not-work labels, etc.).
+3. **Policy gate.** Each command consults `src/domain/workflow/policy.ts` to decide whether to ignore the event (wrong sender, bot comment, no Yeetomatic label/assignment, do-not-work labels, etc.).
 4. **Session + workspace.** `src/session/manager.ts` and `src/workspace/manager.ts` ensure a persistent session exists and that the per-issue git worktree is created under `WORKSPACES_DIR/{owner}-{repo}`.
 5. **Execution.** `TaskController` registers the run, then the `ExecutionService` (or an isolated worker container in the proposed design) runs the agent in the worktree.
-6. **Result reporting.** `ExecuteSessionReporter` translates the agent result (`complete`, `waiting-feedback`, `failed`, `cancelled`, `working`) into issue comments and workflow labels (`tars-working`, `tars-feedback-required`, `tars-failed`, `tars-cancelled`).
-7. **Delivery.** `ExecuteSessionDelivery` commits and pushes the branch, creates or reuses a PR, and applies the `tars-pr-created` label when work is complete.
+6. **Result reporting.** `ExecuteSessionReporter` translates the agent result (`complete`, `waiting-feedback`, `failed`, `cancelled`, `working`) into issue comments and workflow labels (`yeetomatic-working`, `yeetomatic-feedback-required`, `yeetomatic-failed`, `yeetomatic-cancelled`).
+7. **Delivery.** `ExecuteSessionDelivery` commits and pushes the branch, creates or reuses a PR, and applies the `yeetomatic-pr-created` label when work is complete.
 
 ## How It Works
 
-TARS is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to TARS over a WebSocket session.
+Yeetomatic is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to Yeetomatic over a WebSocket session.
 
-The diagram below shows the high-level request and event flow. The **TARS control plane** owns everything deterministic — event intake, session and workspace state, delivery — while **worker execution** is isolated in a disposable container with no GitHub credentials and no Docker socket access.
+The diagram below shows the high-level request and event flow. The **Yeetomatic control plane** owns everything deterministic — event intake, session and workspace state, delivery — while **worker execution** is isolated in a disposable container with no GitHub credentials and no Docker socket access.
 
 ```mermaid
 flowchart TD
@@ -212,7 +212,7 @@ flowchart TD
         GH["GitHub repository"]
     end
 
-    subgraph ControlPlane["TARS control plane — tars container"]
+    subgraph ControlPlane["Yeetomatic control plane — yeetomatic container"]
         direction TB
         WebUI["Admin dashboard<br/>port 6767"]
         Webhook["Webhook endpoint<br/>/webhook"]
@@ -279,7 +279,7 @@ npm run dev:admin    # run the admin UI with Vite
 npm test             # run unit tests
 ```
 
-Running agent sessions still requires Docker because TARS executes coding work in worker containers.
+Running agent sessions still requires Docker because Yeetomatic executes coding work in worker containers.
 
 ## Operations
 
@@ -288,4 +288,4 @@ Running agent sessions still requires Docker because TARS executes coding work i
 - [MIGRATIONS.md](MIGRATIONS.md) — SQLite migration management
 - [CHANGELOG.md](CHANGELOG.md) — release changes
 
-TARS writes application and agent logs to standard output. In Docker, use `docker compose logs` rather than looking for log files.
+Yeetomatic writes application and agent logs to standard output. In Docker, use `docker compose logs` rather than looking for log files.

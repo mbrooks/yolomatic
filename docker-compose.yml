@@ -1,11 +1,11 @@
 services:
-  tars:
-    image: tars-control-plane:latest
+  yeetomatic:
+    image: yeetomatic-control-plane:latest
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    container_name: tars
+    container_name: yeetomatic
     restart: unless-stopped
     ports:
       - "127.0.0.1:6767:6767"
@@ -13,33 +13,33 @@ services:
       - .env
     environment:
       OLLAMA_HOST: http://127.0.0.1:11434
-      TARS_WORKER_CONTROL_BASE_URL: http://127.0.0.1:6767
-      TARS_WORKER_DOCKER_NETWORK_MODE: container:tars
-      TARS_WORKER_RUNTIME_DIR: /app/runtime
-      TARS_WORKER_RUNTIME_MOUNT_SOURCE: tars_runtime
-      TARS_WORKER_WORKSPACE_MOUNT_SOURCE: tars_workspaces
-      TARS_WORKER_OLLAMA_HOST: http://127.0.0.1:11434
+      YEETOMATIC_WORKER_CONTROL_BASE_URL: http://127.0.0.1:6767
+      YEETOMATIC_WORKER_DOCKER_NETWORK_MODE: container:yeetomatic
+      YEETOMATIC_WORKER_RUNTIME_DIR: /app/runtime
+      YEETOMATIC_WORKER_RUNTIME_MOUNT_SOURCE: yeetomatic_runtime
+      YEETOMATIC_WORKER_WORKSPACE_MOUNT_SOURCE: yeetomatic_workspaces
+      YEETOMATIC_WORKER_OLLAMA_HOST: http://127.0.0.1:11434
     group_add:
       - "${DOCKER_GID:-999}"
     volumes:
-      - tars_sessions:/app/sessions
-      - tars_workspaces:/app/workspaces
-      - tars_pi:/home/tars/.pi/agent
-      - tars_memory:/app/memory
-      - tars_runtime:/app/runtime
+      - yeetomatic_sessions:/app/sessions
+      - yeetomatic_workspaces:/app/workspaces
+      - yeetomatic_pi:/home/yeetomatic/.pi/agent
+      - yeetomatic_memory:/app/memory
+      - yeetomatic_runtime:/app/runtime
       - /var/run/docker.sock:/var/run/docker.sock
 
   ollama:
     image: alpine/ollama:0.20.5
-    container_name: tars-ollama
-    network_mode: "service:tars"
+    container_name: yeetomatic-ollama
+    network_mode: "service:yeetomatic"
     restart: unless-stopped
     volumes:
       - ${HOME}/.ollama:/root/.ollama
 
 volumes:
-  tars_sessions:
-  tars_workspaces:
-  tars_pi:
-  tars_memory:
-  tars_runtime:
+  yeetomatic_sessions:
+  yeetomatic_workspaces:
+  yeetomatic_pi:
+  yeetomatic_memory:
+  yeetomatic_runtime:

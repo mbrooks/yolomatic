@@ -107,7 +107,7 @@ export class StartIssueSession {
 				repo,
 				issueNumber,
 				session,
-				"Picked up by TARS. Working on it...",
+				"Picked up by Yeetomatic. Working on it...",
 			);
 
 			return ok<StartIssueSessionResult>({

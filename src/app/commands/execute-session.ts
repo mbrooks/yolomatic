@@ -136,8 +136,8 @@ export class ExecuteSession {
 					process.stdout.write(`[execute] execution aborted for ${key}\n`);
 					await this.deps.sessions.cancelSession(owner, repo, issueNumber);
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-					await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-cancelled"]);
-					await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. TARS is idle.");
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-cancelled"]);
+					await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. Yeetomatic is idle.");
 					return;
 				}
 
@@ -147,16 +147,16 @@ export class ExecuteSession {
 						owner,
 						repo,
 						issueNumber,
-						`⛔ TARS stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+						`⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
 					);
 					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-					await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-failed"]);
 					process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 					return;
 				}
 
-				if (process.env.TARS_SELF_EVOLUTION_ENABLED === "true") {
+				if (process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED === "true") {
 					try {
 						const engine = new SelfEvolutionEngine({
 							github: this.deps.github,
@@ -276,7 +276,7 @@ export class ExecuteSession {
 
 		if (state.prNumber === undefined) {
 			return this.formatSyncError(
-				`Branch tars/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
+				`Branch yeetomatic/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
 			);
 		}
 
@@ -300,7 +300,7 @@ export class ExecuteSession {
 			"Control-plane workspace sync failed for this session.",
 			message,
 			"",
-			"TARS will not launch a worker on a stale or credential-bearing workspace.",
+			"Yeetomatic will not launch a worker on a stale or credential-bearing workspace.",
 		].join("\n");
 	}
 
@@ -309,13 +309,13 @@ export class ExecuteSession {
 		process.stdout.write(`[execute] execution blocked for ${key}: ${message}\n`);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: message });
 		await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-failed"]);
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-failed"]);
 		await this.deps.github.postComment(
 			owner,
 			repo,
 			issueNumber,
 			[
-				"**TARS stopped before execution.**",
+				"**Yeetomatic stopped before execution.**",
 				"",
 				message,
 				"",
@@ -327,6 +327,6 @@ export class ExecuteSession {
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {
 		const body = SelfMonitor.formatBugReportBody(error.evidence);
 		const title = SelfMonitor.getIssueTitle(error.evidence);
-		return this.deps.github.fileSelfReport(title, body, ["tars-self-report", "bug"]);
+		return this.deps.github.fileSelfReport(title, body, ["yeetomatic-self-report", "bug"]);
 	}
 }

@@ -25,10 +25,10 @@ function fallbackAdminHtml(): string {
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>TARS Admin</title>
+		<title>Yeetomatic Admin</title>
 	</head>
 	<body>
-		<div id="root">TARS Admin assets have not been built.</div>
+		<div id="root">Yeetomatic Admin assets have not been built.</div>
 	</body>
 </html>`;
 }
@@ -43,7 +43,7 @@ export function injectAdminConfig(
 	adminPath: string = DEFAULT_ADMIN_PATH,
 	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
 ): string {
-	const script = `<script>window.__TARS_ADMIN_PATH__ = ${JSON.stringify(adminPath)}; window.__TARS_ADMIN_DEFAULT_PAGE__ = ${JSON.stringify(adminDefaultPage)};</script>`;
+	const script = `<script>window.__YEETOMATIC_ADMIN_PATH__ = ${JSON.stringify(adminPath)}; window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = ${JSON.stringify(adminDefaultPage)};</script>`;
 	if (html.includes("</head>")) {
 		return html.replace("</head>", `${script}</head>`);
 	}

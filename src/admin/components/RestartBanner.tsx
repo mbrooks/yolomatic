@@ -1,7 +1,7 @@
 import React from "react";
 
 export function RestartBanner({
-	children = "TARS is marked for restart. Maintenance mode active.",
+	children = "Yeetomatic is marked for restart. Maintenance mode active.",
 }: {
 	children?: React.ReactNode;
 }): React.ReactElement {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { RepoSkillService, parseSkillFile, buildSkillFile } from "./repo-skill-service.js";
 import type { CommandRunner } from "./repo-skill-service.js";
 
-const TEST_DIR = "/tmp/tars-repo-skill-test";
+const TEST_DIR = "/tmp/yeetomatic-repo-skill-test";
 
 function makeMockRunner(): { runner: CommandRunner; calls: Array<{ command: string; args: string[]; cwd?: string }>; setFiles: Set<string> } {
 	const calls: Array<{ command: string; args: string[]; cwd?: string }> = [];

@@ -13,7 +13,7 @@ describe("workspace paths", () => {
 		expect(getWorktreePath("/tmp/workspaces", "MBrooks", "CaseBot", 42)).toBe(
 			path.join("/tmp/workspaces", "mbrooks-casebot", ".worktrees", "issue-42"),
 		);
-		expect(getBranchName(42)).toBe("tars/issue-42");
+		expect(getBranchName(42)).toBe("yeetomatic/issue-42");
 	});
 
 	it("rejects empty or invalid path segments", () => {

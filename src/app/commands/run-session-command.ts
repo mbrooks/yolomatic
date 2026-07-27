@@ -105,7 +105,7 @@ export class RunSessionCommand {
 					return ok<CancelResult>({
 						cancelled: true,
 						wasActive,
-						message: "Cancellation signal sent. TARS will stop after completing the current step.",
+						message: "Cancellation signal sent. Yeetomatic will stop after completing the current step.",
 					});
 				}
 				if (session.status === "working") {
@@ -116,7 +116,7 @@ export class RunSessionCommand {
 					cancelled: false,
 					wasActive,
 					status: session.status,
-					message: session.status === "cancelled" ? "Session marked as cancelled." : "TARS was not active on this session.",
+					message: session.status === "cancelled" ? "Session marked as cancelled." : "Yeetomatic was not active on this session.",
 				});
 			}
 
@@ -131,7 +131,7 @@ export class RunSessionCommand {
 				return ok<RestartResult>({
 					restarted: true,
 					status: restarted.status,
-					message: "Session restarted. Workspace reset to fresh state. TARS will re-process on the next triggering event.",
+					message: "Session restarted. Workspace reset to fresh state. Yeetomatic will re-process on the next triggering event.",
 				});
 			}
 

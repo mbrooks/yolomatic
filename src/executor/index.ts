@@ -6,7 +6,7 @@ import {
 	getAgentDir,
 	SessionManager as PiSessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { createTarsModelRegistry } from "./model-registry.js";
+import { createYeetomaticModelRegistry } from "./model-registry.js";
 
 import { LlmLogger } from "../logging/llm-logger.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
@@ -109,7 +109,7 @@ export class PiAgentExecutor implements ExecutionService {
 		await loader.reload();
 
 		const authStorage = AuthStorage.create();
-		const modelRegistry = createTarsModelRegistry(authStorage);
+		const modelRegistry = createYeetomaticModelRegistry(authStorage);
 		const configuredModelOverride = this.getModelConfig();
 		const configuredModel = resolveConfiguredModel(modelRegistry, configuredModelOverride);
 		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();

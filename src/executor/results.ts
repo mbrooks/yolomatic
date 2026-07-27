@@ -78,7 +78,7 @@ export function parseExecutionResult(rawResponse: string): ExecutionResult {
 
 	for (let i = lines.length - 1; i >= 0; i -= 1) {
 		const line = lines[i]?.trim() || "";
-		const match = /^TARS_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(line);
+		const match = /^YEETOMATIC_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(line);
 		if (match) {
 			statusLineIndex = i;
 			status = match[1] as ExecutionResult["status"];

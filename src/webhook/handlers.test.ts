@@ -63,7 +63,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			pulls: {
 				get: vi.fn(async () => ({
 					data: {
-						head: { ref: "tars/issue-56" },
+						head: { ref: "yeetomatic/issue-56" },
 						state: "open",
 						merged: false,
 					},
@@ -125,7 +125,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-				branch: "tars/issue-56",
+				branch: "yeetomatic/issue-56",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 56,
@@ -141,12 +141,12 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as never,
 				summary: "Fixed.",
-				rawResponse: "TARS_STATUS: complete\nFixed.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
 			})),
 			executePRReview: vi.fn(async () => ({
 				status: "complete" as never,
 				summary: "Fixed.",
-				rawResponse: "TARS_STATUS: complete\nFixed.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
 			})),
 		};
 		return { octokit, sessionManager, workspaceManager, executor };
@@ -159,7 +159,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -167,7 +167,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handlePullRequestReviewCommentEvent({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
@@ -183,7 +183,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -191,7 +191,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handlePullRequestReviewEvent({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "tars/issue-56" }, state: "open", merged: false },
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "LGTM", state: "approved", user: { login: "user" } },
@@ -220,7 +220,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -229,7 +229,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+				issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 			}),
@@ -241,7 +241,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "working" as never,
 			summary: "Still working.",
-			rawResponse: "TARS_STATUS: working\nStill working.",
+			rawResponse: "YEETOMATIC_STATUS: working\nStill working.",
 		});
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -262,7 +262,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -270,7 +270,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Update", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -278,7 +278,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-working"] }),
+			expect.objectContaining({ labels: ["yeetomatic-working"] }),
 		);
 	});
 
@@ -301,7 +301,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -309,7 +309,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -338,7 +338,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -346,7 +346,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -354,7 +354,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
-	it("ignores comments on issues created by TARS when TARS is not assigned", async () => {
+	it("ignores comments on issues created by Yeetomatic when Yeetomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -373,7 +373,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -381,7 +381,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [], assignees: [], user: { login: "tars-bot" } },
+			issue: { number: 56, labels: [], assignees: [], user: { login: "yeetomatic-bot" } },
 			comment: { body: "Just a comment", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -410,7 +410,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -418,10 +418,10 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Please resume work", user: { login: "mbrooks", type: "User" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "tars-bot" },
+			sender: { login: "yeetomatic-bot" },
 		});
 
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "working");
@@ -441,7 +441,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -453,7 +453,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				number: 99,
 				labels: [],
 				assignees: [],
-				user: { login: "tars-bot" },
+				user: { login: "yeetomatic-bot" },
 				pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" },
 			},
 			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
@@ -470,8 +470,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 99);
 		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
-			"tars/issue-56",
-			"TARS: Fixed",
+			"yeetomatic/issue-56",
+			"Yeetomatic: Fixed",
 		);
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
@@ -484,7 +484,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -496,7 +496,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				number: 99,
 				labels: [],
 				assignees: [],
-				user: { login: "tars-bot" },
+				user: { login: "yeetomatic-bot" },
 				pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" },
 			},
 			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
@@ -515,7 +515,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		octokit.pulls.get.mockResolvedValue({
 			data: {
-				head: { ref: "tars/issue-57" },
+				head: { ref: "yeetomatic/issue-57" },
 				state: "open",
 				merged: false,
 			},
@@ -539,7 +539,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -547,7 +547,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Continue", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -560,7 +560,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			56,
 			"failed",
 			expect.objectContaining({
-				summary: expect.stringContaining("maps to 'tars/issue-57'"),
+				summary: expect.stringContaining("maps to 'yeetomatic/issue-57'"),
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -571,14 +571,14 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 	});
 
-	it("ignores unassigned issue comments without a TARS mention", async () => {
+	it("ignores unassigned issue comments without a Yeetomatic mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -596,7 +596,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores unassigned issue comments with @tars mention", async () => {
+	it("ignores unassigned issue comments with @yeetomatic mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValueOnce(null as never).mockResolvedValue({
 			issueNumber: 56,
@@ -627,7 +627,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -636,7 +636,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @tars, help me", user: { login: "user" } },
+			comment: { body: "Hey @yeetomatic, help me", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -647,14 +647,14 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores assigned issue comments without a TARS label or mention", async () => {
+	it("ignores assigned issue comments without a Yeetomatic label or mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -662,7 +662,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Just a comment", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -672,7 +672,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("does not add labels for an @tars mention when TARS is not assigned", async () => {
+	it("does not add labels for an @yeetomatic mention when Yeetomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -691,7 +691,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -700,7 +700,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @tars can you help?", user: { login: "user" } },
+			comment: { body: "Hey @yeetomatic can you help?", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -711,7 +711,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores configured-username mentions when TARS is not assigned", async () => {
+	it("ignores configured-username mentions when Yeetomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -730,7 +730,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -739,7 +739,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @tars-bot can you help?", user: { login: "user" } },
+			comment: { body: "Hey @yeetomatic-bot can you help?", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -755,12 +755,12 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "complete" as never,
 			summary: "Fixed.",
-			rawResponse: "TARS_STATUS: complete\nFixed.",
+			rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
 		});
 		const existingPrUrl = "https://github.com/mbrooks/tars/pull/42";
 		const existingPrNumber = 42;
 		octokit.pulls.create.mockRejectedValue(
-			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"A pull request already exists for mbrooks:tars/issue-6."}'),
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"A pull request already exists for mbrooks:yeetomatic/issue-6."}'),
 		);
 		octokit.pulls.list.mockResolvedValue({
 			data: [{ number: existingPrNumber, html_url: existingPrUrl }],
@@ -783,7 +783,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -791,19 +791,19 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Update", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(octokit.pulls.list).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "tars", head: "mbrooks:tars/issue-56", base: "main", state: "open" }),
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", head: "mbrooks:yeetomatic/issue-56", base: "main", state: "open" }),
 		);
 		expect(sessionManager.associatePR).toHaveBeenCalledWith("mbrooks", "tars", 56, existingPrNumber, existingPrUrl);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "complete");
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-pr-created"] }),
+			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining(existingPrUrl) }),
@@ -815,10 +815,10 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "complete" as never,
 			summary: "Fixed.",
-			rawResponse: "TARS_STATUS: complete\nFixed.",
+			rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
 		});
 		octokit.pulls.create.mockRejectedValue(
-			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and tars/issue-56."}'),
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and yeetomatic/issue-56."}'),
 		);
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
@@ -838,7 +838,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -846,7 +846,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Update", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -854,21 +854,21 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 56, "complete");
 		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-pr-created"] }),
+			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining("No code changes were necessary.") }),
 		);
 	});
 
-	it("ignores /tars stop from non-admin", async () => {
+	it("ignores /yeetomatic stop from non-admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -877,19 +877,19 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "/tars stop", user: { login: "user" } },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "/yeetomatic stop", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Only admins can stop TARS." }),
+			expect.objectContaining({ body: "Only admins can stop Yeetomatic." }),
 		);
 	});
 
-	it("cancels in-flight execution on /tars stop from admin", async () => {
+	it("cancels in-flight execution on /yeetomatic stop from admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => true),
@@ -902,7 +902,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -912,20 +912,20 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "/tars stop", user: { login: "admin" } },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "/yeetomatic stop", user: { login: "admin" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
 		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/tars#56");
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Stopping TARS..." }),
+			expect.objectContaining({ body: "Stopping Yeetomatic..." }),
 		);
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("marks session cancelled on /tars stop when not in-flight", async () => {
+	it("marks session cancelled on /yeetomatic stop when not in-flight", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -951,7 +951,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -961,25 +961,25 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "/tars stop", user: { login: "admin" } },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "/yeetomatic stop", user: { login: "admin" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
 		expect(sessionManager.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
 		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, name: "tars-working" }),
+			expect.objectContaining({ owner: "mbrooks", repo: "tars", issue_number: 56, name: "yeetomatic-working" }),
 		);
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-cancelled"] }),
+			expect.objectContaining({ labels: ["yeetomatic-cancelled"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Task cancelled by admin. TARS is idle." }),
+			expect.objectContaining({ body: "Task cancelled by admin. Yeetomatic is idle." }),
 		);
 	});
 
-	it("steers comments when TARS is actively executing", async () => {
+	it("steers comments when Yeetomatic is actively executing", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -1006,7 +1006,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1015,7 +1015,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Do this instead", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -1029,7 +1029,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 	});
 
-	it("steers description updates when TARS is actively executing", async () => {
+	it("steers description updates when Yeetomatic is actively executing", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -1056,7 +1056,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1065,7 +1065,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -1074,7 +1074,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/tars#56", "New body");
 		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Issue description updated. Steering to TARS." }),
+			expect.objectContaining({ body: "Issue description updated. Steering to Yeetomatic." }),
 		);
 	});
 
@@ -1105,7 +1105,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1114,7 +1114,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -1150,7 +1150,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1158,7 +1158,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 57, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 57, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Can you also add tests?", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
@@ -1168,7 +1168,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "TARS is paused on this issue. It will resume when unpaused.",
+				body: "Yeetomatic is paused on this issue. It will resume when unpaused.",
 			}),
 		);
 	});
@@ -1182,7 +1182,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1190,7 +1190,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -1207,7 +1207,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,

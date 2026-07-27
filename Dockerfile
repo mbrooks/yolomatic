@@ -25,32 +25,32 @@ RUN apt-get update && apt-get install -y ca-certificates git curl gnupg sqlite3 
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app
-COPY scripts/container-entrypoint.sh /usr/local/bin/tars-container-entrypoint
+COPY scripts/container-entrypoint.sh /usr/local/bin/yeetomatic-container-entrypoint
 
 RUN cd /app/.pi/npm \
   && npm install @ollama/pi-web-search || true
 
-RUN useradd --create-home --shell /bin/bash tars \
-  && mkdir -p /home/tars/.pi/agent/sessions \
+RUN useradd --create-home --shell /bin/bash yeetomatic \
+  && mkdir -p /home/yeetomatic/.pi/agent/sessions \
   && mkdir -p /app/sessions /app/workspaces /app/memory \
-  && chown -R tars:tars /app /home/tars
+  && chown -R yeetomatic:yeetomatic /app /home/yeetomatic
 
-RUN chmod 0755 /usr/local/bin/tars-container-entrypoint
+RUN chmod 0755 /usr/local/bin/yeetomatic-container-entrypoint
 
 FROM base-runtime AS worker
 
-ENV HOME=/home/tars
-ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
+ENV HOME=/home/yeetomatic
+ENV PI_CODING_AGENT_DIR=/home/yeetomatic/.pi/agent
 
-USER tars
+USER yeetomatic
 
 CMD ["node", "./dist/worker/entrypoint.js"]
 
 # Runtime stage
 FROM base-runtime AS runtime
 
-ENV HOME=/home/tars
-ENV PI_CODING_AGENT_DIR=/home/tars/.pi/agent
+ENV HOME=/home/yeetomatic
+ENV PI_CODING_AGENT_DIR=/home/yeetomatic/.pi/agent
 
 # Install GitHub CLI and Docker CLI for the control plane container
 RUN apt-get update && apt-get install -y gnupg \
@@ -66,10 +66,10 @@ RUN apt-get update && apt-get install -y gnupg \
 
 # Create docker group for socket access
 RUN groupadd -g 999 docker \
-  && usermod -aG docker tars \
-  && chown -R tars:tars /app /home/tars
+  && usermod -aG docker yeetomatic \
+  && chown -R yeetomatic:yeetomatic /app /home/yeetomatic
 
-ENTRYPOINT ["tars-container-entrypoint"]
+ENTRYPOINT ["yeetomatic-container-entrypoint"]
 
 EXPOSE 6767
 

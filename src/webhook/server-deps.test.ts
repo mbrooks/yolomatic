@@ -60,7 +60,7 @@ describe("createWebhookServerDeps", () => {
 			setDraining: vi.fn(),
 		};
 		const workspaceManager = {
-			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-1" })),
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1" })),
 			removeWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			commitAndPushPath: vi.fn(async () => true),
@@ -75,13 +75,13 @@ describe("createWebhookServerDeps", () => {
 		const githubService = { postComment: vi.fn() };
 		const settingsStore = {
 			get: vi.fn((key: string) => {
-				if (key === "github_username") return "tars-bot";
+				if (key === "github_username") return "yeetomatic-bot";
 				if (key === "default_branch") return "main";
 				if (key === "self_report_enabled") return "true";
 				return undefined;
 			}),
 			getString: vi.fn((key: string, defaultValue?: string) => {
-				if (key === "github_username") return "tars-bot";
+				if (key === "github_username") return "yeetomatic-bot";
 				if (key === "default_branch") return "main";
 				return defaultValue ?? "";
 			}),
@@ -136,7 +136,7 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.adminUsername).toBe("admin");
 		expect(deps.adminPassword).toBe("secret");
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
-		expect(deps.adminPath).toBe("/tars/admin");
+		expect(deps.adminPath).toBe("/yeetomatic/admin");
 		expect(deps.adminDefaultPage).toBe("#/dashboard");
 		expect(deps.settingsStore).toBe(settingsStore);
 		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);

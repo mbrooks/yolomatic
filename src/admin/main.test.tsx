@@ -101,7 +101,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/1",
-						branch: "tars/issue-1",
+						branch: "yeetomatic/issue-1",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 3600000).toISOString(),
 						prUrl: null,
@@ -120,7 +120,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/2",
-						branch: "tars/issue-2",
+						branch: "yeetomatic/issue-2",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 7200000).toISOString(),
 						prUrl: null,
@@ -139,7 +139,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/3",
-						branch: "tars/issue-3",
+						branch: "yeetomatic/issue-3",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
@@ -158,7 +158,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/4",
-						branch: "tars/issue-4",
+						branch: "yeetomatic/issue-4",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 1800000).toISOString(),
 						prUrl: null,
@@ -232,7 +232,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/1",
-						branch: "tars/issue-1",
+						branch: "yeetomatic/issue-1",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
@@ -328,7 +328,7 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("TARS is marked for restart. Maintenance mode active.")).not.toBeNull();
+			expect(screen.queryByText("Yeetomatic is marked for restart. Maintenance mode active.")).not.toBeNull();
 		});
 	});
 
@@ -339,7 +339,7 @@ describe("App", () => {
 			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		expect(screen.queryByText("TARS is marked for restart. Maintenance mode active.")).toBeNull();
+		expect(screen.queryByText("Yeetomatic is marked for restart. Maintenance mode active.")).toBeNull();
 	});
 });
 
@@ -375,7 +375,7 @@ function makeSession(status: "working" | "pending" | "waiting-feedback" | "compl
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "tars/issue-1",
+		branch: "yeetomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,

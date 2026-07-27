@@ -1,6 +1,6 @@
 # GitHub Issues Extension for pi-coding-agent
 
-This extension provides GitHub issue management tools for TARS and direct pi-agent workflows.
+This extension provides GitHub issue management tools for Yeetomatic and direct pi-agent workflows.
 
 ## Installation
 
@@ -136,9 +136,9 @@ GITHUB_TOKEN=ghp_your_token_here
 5. Click "Generate token"
 6. Copy the token and store it securely
 
-## Usage with TARS
+## Usage with Yeetomatic
 
-TARS can use these tools to autonomously manage GitHub issues:
+Yeetomatic can use these tools to autonomously manage GitHub issues:
 
 1. Query for open issues: `github_query_issues owner="..." repo="..." state="open"`
 2. Fetch issue details: `github_fetch_issue owner="..." repo="..." issue_number=123`

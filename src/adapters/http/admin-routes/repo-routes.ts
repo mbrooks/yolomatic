@@ -256,9 +256,9 @@ const registry = new AdminRouteRegistry()
 			);
 			const [owner, repo, issueNumberStr] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
-			const tarsUsername = settingsStore.get("github_username");
-			if (!tarsUsername) {
-				sendJson(ctx.response, 500, { error: "TARS GitHub username not configured" });
+			const yeetomaticUsername = settingsStore.get("github_username");
+			if (!yeetomaticUsername) {
+				sendJson(ctx.response, 500, { error: "Yeetomatic GitHub username not configured" });
 				return;
 			}
 			const body = ctx.body as {
@@ -269,7 +269,7 @@ const registry = new AdminRouteRegistry()
 			if (!body.title) {
 				throw new ValidationError("Missing required field: title");
 			}
-			await githubService.updateIssueAssignees(owner, repo, issueNumber, [tarsUsername]);
+			await githubService.updateIssueAssignees(owner, repo, issueNumber, [yeetomaticUsername]);
 			startIssueSession.execute(
 				owner,
 				repo,
@@ -304,9 +304,9 @@ const registry = new AdminRouteRegistry()
 			]);
 			const [owner, repo, issueNumberStr] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
-			const tarsUsername = settingsStore.get("github_username");
-			if (!tarsUsername) {
-				sendJson(ctx.response, 500, { error: "TARS GitHub username not configured" });
+			const yeetomaticUsername = settingsStore.get("github_username");
+			if (!yeetomaticUsername) {
+				sendJson(ctx.response, 500, { error: "Yeetomatic GitHub username not configured" });
 				return;
 			}
 			const body = ctx.body as {
