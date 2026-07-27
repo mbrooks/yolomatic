@@ -76,7 +76,7 @@ interface CommentGuardPayload {
 
 export type GuardEventResult =
 	| { skip: true; reason: string }
-	| { skip: false; isMentioned?: boolean; isCreatedByTars?: boolean };
+	| { skip: false; isMentioned?: boolean; isCreatedByYeetomatic?: boolean };
 
 /**
  * Applies the existing policy helpers ({@link shouldIgnoreIssueEvent} /
@@ -112,7 +112,7 @@ export function guardEvent(
 	if (check.ignore) {
 		return { skip: true, reason: check.reason };
 	}
-	return { skip: false, isMentioned: check.isMentioned, isCreatedByTars: check.isCreatedByTars };
+	return { skip: false, isMentioned: check.isMentioned, isCreatedByYeetomatic: check.isCreatedByYeetomatic };
 }
 
 export type PrepareIssueSessionResult =
@@ -213,7 +213,7 @@ export async function routePRTimelineComment(
 	const mappedIssueNumber = branchIssueNumber ?? mappedSession?.issueNumber;
 	if (!mappedIssueNumber) {
 		process.stdout.write(
-			`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: PR branch ${pr.head.ref} is not associated with a TARS session\n`,
+			`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: PR branch ${pr.head.ref} is not associated with a Yeetomatic session\n`,
 		);
 		return true;
 	}
@@ -264,10 +264,10 @@ export async function removeWorkflowLabels(
 	repo: string,
 	issueNumber: number,
 ): Promise<void> {
-	await github.removeLabel(owner, repo, issueNumber, "tars-working");
-	await github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
-	await github.removeLabel(owner, repo, issueNumber, "tars-pr-created");
-	await github.removeLabel(owner, repo, issueNumber, "tars-complete");
+	await github.removeLabel(owner, repo, issueNumber, "yeetomatic-working");
+	await github.removeLabel(owner, repo, issueNumber, "yeetomatic-feedback-required");
+	await github.removeLabel(owner, repo, issueNumber, "yeetomatic-pr-created");
+	await github.removeLabel(owner, repo, issueNumber, "yeetomatic-complete");
 }
 
 export async function markIssueWorking(
@@ -278,7 +278,7 @@ export async function markIssueWorking(
 	message?: string,
 ): Promise<void> {
 	await removeWorkflowLabels(github, owner, repo, issueNumber);
-	await github.addLabels(owner, repo, issueNumber, ["tars-working"]);
+	await github.addLabels(owner, repo, issueNumber, ["yeetomatic-working"]);
 	if (message) {
 		await github.postComment(owner, repo, issueNumber, message);
 	}
@@ -295,20 +295,20 @@ export async function stopSessionByAdmin(
 ): Promise<"stopping" | "cancelled" | "idle"> {
 	const key = issueSessionKey(owner, repo, sessionIssueNumber);
 	if (tasks.cancel(key)) {
-		await github.postComment(owner, repo, commentIssueNumber, "Stopping TARS...");
+		await github.postComment(owner, repo, commentIssueNumber, "Stopping Yeetomatic...");
 		return "stopping";
 	}
 
 	const session = await sessions.get(owner, repo, sessionIssueNumber);
 	if (session?.status === "working") {
 		await sessions.cancelSession(owner, repo, sessionIssueNumber);
-		await github.removeLabel(owner, repo, sessionIssueNumber, "tars-working");
-		await github.addLabels(owner, repo, sessionIssueNumber, ["tars-cancelled"]);
-		await github.postComment(owner, repo, commentIssueNumber, "Task cancelled by admin. TARS is idle.");
+		await github.removeLabel(owner, repo, sessionIssueNumber, "yeetomatic-working");
+		await github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-cancelled"]);
+		await github.postComment(owner, repo, commentIssueNumber, "Task cancelled by admin. Yeetomatic is idle.");
 		return "cancelled";
 	}
 
-	await github.postComment(owner, repo, commentIssueNumber, "TARS is not currently working on this issue.");
+	await github.postComment(owner, repo, commentIssueNumber, "Yeetomatic is not currently working on this issue.");
 	return "idle";
 }
 
@@ -425,7 +425,7 @@ export async function handleAdminStop(
 	commentIssueNumber: number,
 ): Promise<"not-admin" | "stopping" | "cancelled" | "idle"> {
 	if (!isAdmin(senderLogin, adminGithubUsername)) {
-		await github.postComment(owner, repo, commentIssueNumber, "Only admins can stop TARS.");
+		await github.postComment(owner, repo, commentIssueNumber, "Only admins can stop Yeetomatic.");
 		return "not-admin";
 	}
 	return stopSessionByAdmin(sessions, github, tasks, owner, repo, sessionIssueNumber, commentIssueNumber);

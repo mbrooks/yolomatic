@@ -187,7 +187,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
-				branch: "tars/issue-99",
+				branch: "yeetomatic/issue-99",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 99,
@@ -202,7 +202,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
-				rawResponse: "TARS_STATUS: waiting-feedback\nNeed clarification.",
+				rawResponse: "YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -210,7 +210,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -220,8 +220,8 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: {
 				number: 99,
-				labels: [{ name: "tars-working" }],
-				assignees: [{ login: "tars-bot" }],
+				labels: [{ name: "yeetomatic-working" }],
+				assignees: [{ login: "yeetomatic-bot" }],
 				title: "Test issue",
 				body: "Test body",
 			},
@@ -238,12 +238,12 @@ describe("GitHubIssueHandlers", () => {
 			"Test issue",
 			"Test body",
 			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
-			["tars-working"],
+			["yeetomatic-working"],
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 	});
 
-	it("resumes a session for any TARS label and pushes branch on complete", async () => {
+	it("resumes a session for any Yeetomatic label and pushes branch on complete", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -294,7 +294,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
-				branch: "tars/issue-42",
+				branch: "yeetomatic/issue-42",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 42,
@@ -309,7 +309,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -317,45 +317,45 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// Should resume on tars-feedback-required
+		// Should resume on yeetomatic-feedback-required
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 42, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "TARS: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "Yeetomatic: Done");
 
-		// Should add tars-pr-created on complete, not tars-complete
+		// Should add yeetomatic-pr-created on complete, not yeetomatic-complete
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
 		const lastAddLabels = addLabelsCalls[addLabelsCalls.length - 1];
-		expect(lastAddLabels?.[0]?.labels).toContain("tars-pr-created");
+		expect(lastAddLabels?.[0]?.labels).toContain("yeetomatic-pr-created");
 
 		// Should create a PR via the GitHub API
 		expect(octokit.pulls.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
 				repo: "tars",
-				title: "TARS: Title",
+				title: "Yeetomatic: Title",
 				body: expect.stringContaining("Fixes #42"),
-				head: "tars/issue-42",
+				head: "yeetomatic/issue-42",
 				base: "main",
 			}),
 		);
 
-		// Should resume on tars-pr-created too
+		// Should resume on yeetomatic-pr-created too
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -363,10 +363,10 @@ describe("GitHubIssueHandlers", () => {
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Should ignore non-TARS labels
+		// Should ignore non-Yeetomatic labels
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -377,18 +377,18 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore bot comments
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "LGTM", user: { login: "tars-bot", type: "Bot" } },
+			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "LGTM", user: { login: "yeetomatic-bot", type: "Bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "tars-bot" },
+			sender: { login: "yeetomatic-bot" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Should ignore comments on issues not assigned to TARS
+		// Should ignore comments on issues not assigned to Yeetomatic
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-pr-created" }], assignees: [{ login: "someone-else" }] },
+			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "someone-else" }] },
 			comment: { body: "Help", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -448,7 +448,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
-				branch: "tars/issue-42",
+				branch: "yeetomatic/issue-42",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 42,
@@ -463,7 +463,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -471,7 +471,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -479,13 +479,13 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Proceed", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "TARS: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "Yeetomatic: Done");
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 42, "complete");
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -494,7 +494,7 @@ describe("GitHubIssueHandlers", () => {
 			}),
 		);
 		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-pr-created"] }),
+			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
 		);
 	});
 
@@ -558,7 +558,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -573,7 +573,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -581,7 +581,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -590,14 +590,14 @@ describe("GitHubIssueHandlers", () => {
 		// Simulate an opened event immediately followed by an assigned event
 		const openedPromise = handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		const assignedPromise = handlers.handleIssueEvent({
 			action: "assigned",
-			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "tars-bot" } },
+			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "yeetomatic-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -609,7 +609,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should comment for pickup and completion (2 total, not 4)
 		expect(octokit.issues.createComment).toHaveBeenCalledTimes(2);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Picked up by TARS. Working on it..." }),
+			expect.objectContaining({ body: "Picked up by Yeetomatic. Working on it..." }),
 		);
 	});
 
@@ -652,7 +652,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -661,9 +661,9 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore issue events from self
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "tars-bot" },
+			sender: { login: "yeetomatic-bot" },
 		});
 
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
@@ -671,16 +671,16 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore comment events from self
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "Update", user: { login: "tars-bot" } },
+			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "Update", user: { login: "yeetomatic-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
-			sender: { login: "tars-bot" },
+			sender: { login: "yeetomatic-bot" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("only works on issues assigned to TARS", async () => {
+	it("only works on issues assigned to Yeetomatic", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -749,7 +749,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -764,7 +764,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -772,13 +772,13 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// Ignore opened issues not assigned to TARS
+		// Ignore opened issues not assigned to Yeetomatic
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [] },
@@ -787,20 +787,20 @@ describe("GitHubIssueHandlers", () => {
 		});
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
 
-		// Process opened issues already assigned to TARS
+		// Process opened issues already assigned to Yeetomatic
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(1);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 
-		// Process assignment to TARS
+		// Process assignment to Yeetomatic
 		await handlers.handleIssueEvent({
 			action: "assigned",
-			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "tars-bot" } },
+			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "yeetomatic-bot" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -817,7 +817,7 @@ describe("GitHubIssueHandlers", () => {
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Pause work when TARS is unassigned
+		// Pause work when Yeetomatic is unassigned
 		await handlers.handleIssueEvent({
 			action: "unassigned",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
@@ -827,11 +827,11 @@ describe("GitHubIssueHandlers", () => {
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "pending");
 		expect(octokit.issues.removeLabel).toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "TARS unassigned. Pausing work." }),
+			expect.objectContaining({ body: "Yeetomatic unassigned. Pausing work." }),
 		);
 	});
 
-	it("processes comments that @mention the bot even without a tars label", async () => {
+	it("processes comments that @mention the bot even without a yeetomatic label", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -848,7 +848,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/tars-issue-7.jsonl",
+				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -867,7 +867,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/tars-issue-7.jsonl",
+				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -879,7 +879,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
-				branch: "tars/issue-7",
+				branch: "yeetomatic/issue-7",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 7,
@@ -894,7 +894,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
-				rawResponse: "TARS_STATUS: waiting-feedback\nNeed clarification.",
+				rawResponse: "YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -902,41 +902,41 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// No tars labels, but @mention should allow processing
+		// No yeetomatic labels, but @mention should allow processing
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 7, labels: [], assignees: [{ login: "tars-bot" }] },
-			comment: { body: "Hey @tars-bot can you help?", user: { login: "user" } },
+			issue: { number: 7, labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+			comment: { body: "Hey @yeetomatic-bot can you help?", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 
-		// Should auto-add the tars label once
+		// Should auto-add the yeetomatic label once
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars"] }),
+			expect.objectContaining({ labels: ["yeetomatic"] }),
 		);
 
-		// Second comment now has a tars label; mention gate is no longer needed
+		// Second comment now has a yeetomatic label; mention gate is no longer needed
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 7, labels: [{ name: "tars-working" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 7, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Thanks!", user: { login: "user" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
-		// Should NOT add tars label again because hasTarsLabel is true
-		const tarsAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
-		expect(tarsAdds.filter((call) => call[0].labels.includes("tars"))).toHaveLength(1);
+		// Should NOT add yeetomatic label again because hasYeetomaticLabel is true
+		const yeetomaticAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
+		expect(yeetomaticAdds.filter((call) => call[0].labels.includes("yeetomatic"))).toHaveLength(1);
 	});
 
 	it("posts failure comment when execution throws", async () => {
@@ -999,7 +999,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1020,7 +1020,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1029,7 +1029,7 @@ describe("GitHubIssueHandlers", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "other-user" },
 			}),
@@ -1037,7 +1037,7 @@ describe("GitHubIssueHandlers", () => {
 
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: expect.stringContaining("TARS failed"),
+				body: expect.stringContaining("Yeetomatic failed"),
 			}),
 		);
 	});
@@ -1101,7 +1101,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1158,7 +1158,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1232,7 +1232,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1249,7 +1249,7 @@ describe("GitHubIssueHandlers", () => {
 			toolHistory: [],
 			fatalError: { category: "disk_full" as const, message: "ENOSPC", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
@@ -1273,7 +1273,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1286,7 +1286,7 @@ describe("GitHubIssueHandlers", () => {
 					number: 1,
 					title: "Test",
 					body: "Body",
-					assignees: [{ login: "tars-bot" }],
+					assignees: [{ login: "yeetomatic-bot" }],
 				},
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
@@ -1297,8 +1297,8 @@ describe("GitHubIssueHandlers", () => {
 			expect.objectContaining({
 				owner: "mbrooks",
 				repo: "tars",
-				title: expect.stringContaining("TARS self-report"),
-				labels: ["tars-self-report", "bug"],
+				title: expect.stringContaining("Yeetomatic self-report"),
+				labels: ["yeetomatic-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -1375,7 +1375,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "teamhub-case",
 				issueNumber: 1,
@@ -1392,7 +1392,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1400,7 +1400,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1413,7 +1413,7 @@ describe("GitHubIssueHandlers", () => {
 					number: 1,
 					title: "Test",
 					body: "Body",
-					assignees: [{ login: "tars-bot" }],
+					assignees: [{ login: "yeetomatic-bot" }],
 				},
 				repository: { name: "teamhub-case", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
@@ -1424,9 +1424,9 @@ describe("GitHubIssueHandlers", () => {
 			expect.objectContaining({
 				owner: "mbrooks",
 				repo: "tars",
-				title: expect.stringContaining("TARS self-report"),
+				title: expect.stringContaining("Yeetomatic self-report"),
 				body: expect.stringContaining("Author identity unknown"),
-				labels: ["tars-self-report", "bug"],
+				labels: ["yeetomatic-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -1434,7 +1434,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "teamhub-case",
 				issue_number: 1,
-				body: expect.stringContaining("TARS delivery failed"),
+				body: expect.stringContaining("Yeetomatic delivery failed"),
 			}),
 		);
 		expect(sessionManager.updateStatus).not.toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "complete");
@@ -1479,7 +1479,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1506,7 +1506,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1515,7 +1515,7 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "tars-bot" }] },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -1584,7 +1584,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1599,7 +1599,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1607,7 +1607,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1617,7 +1617,7 @@ describe("GitHubIssueHandlers", () => {
 
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "TARS was restarted while working on this issue. Resuming work...",
+				body: "Yeetomatic was restarted while working on this issue. Resuming work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1673,7 +1673,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1688,7 +1688,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1696,7 +1696,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1705,11 +1705,11 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
 
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-working"] }),
+			expect.objectContaining({ labels: ["yeetomatic-working"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "TARS was restarted while queued. Picking up work...",
+				body: "Yeetomatic was restarted while queued. Picking up work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1769,7 +1769,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
 				repo: "tars",
 				issueNumber: 1,
@@ -1784,7 +1784,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "TARS_STATUS: complete\nDone.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1792,7 +1792,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1801,14 +1801,14 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
 
 		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
-			expect.objectContaining({ name: "tars-feedback-required" }),
+			expect.objectContaining({ name: "yeetomatic-feedback-required" }),
 		);
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["tars-working"] }),
+			expect.objectContaining({ labels: ["yeetomatic-working"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "TARS was restarted with queued feedback. Resuming work...",
+				body: "Yeetomatic was restarted with queued feedback. Resuming work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1845,7 +1845,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1911,7 +1911,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1920,7 +1920,7 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 1, labels: [{ name: "tars-feedback-required" }], assignees: [{ login: "tars-bot" }] },
+			issue: { number: 1, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Proceed", user: { login: "mbrooks" } },
 			repository: { name: "tars", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
@@ -1949,7 +1949,7 @@ describe("GitHubIssueHandlers", () => {
 			pulls: {
 				get: vi.fn(async () => ({
 					data: {
-						head: { ref: "tars/issue-1" },
+						head: { ref: "yeetomatic/issue-1" },
 						state: "open",
 						merged: false,
 					},
@@ -2007,7 +2007,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -2018,7 +2018,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "submitted",
 			pull_request: {
 				number: 99,
-				head: { ref: "tars/issue-1" },
+				head: { ref: "yeetomatic/issue-1" },
 				state: "open",
 				merged: false,
 			},
@@ -2316,13 +2316,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 200 for /tars/admin when credentials are not configured", async () => {
+	it("returns 200 for /yeetomatic/admin when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/tars/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
 		expect(response.statusCode).toBe(200);
 
 		server.close();
@@ -2340,13 +2340,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 401 for /tars/admin without auth header when credentials are configured", async () => {
+	it("returns 401 for /yeetomatic/admin without auth header when credentials are configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/tars/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
 		expect(response.statusCode).toBe(401);
 		expect(response.body).toBe("Unauthorized");
 
@@ -2372,12 +2372,12 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns HTML for /tars/admin with valid credentials", async () => {
+	it("returns HTML for /yeetomatic/admin with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
 		await writeFile(
 			join(adminAssetsDir, "index.html"),
-			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div><script type="module" src="/tars/admin/assets/main.js"></script></body></html>',
+			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div><script type="module" src="/yeetomatic/admin/assets/main.js"></script></body></html>',
 		);
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2386,25 +2386,25 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/tars/admin",
+				path: "/yeetomatic/admin",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
 			});
 			expect(response.statusCode).toBe(200);
 			expect(response.headers["content-type"]).toContain("text/html");
-			expect(response.body).toContain("TARS Admin");
+			expect(response.body).toContain("Yeetomatic Admin");
 			expect(response.body).toContain('id="root"');
-			expect(response.body).toContain("/tars/admin/assets/main.js");
+			expect(response.body).toContain("/yeetomatic/admin/assets/main.js");
 		} finally {
 			server.close();
 			await rm(adminAssetsDir, { force: true, recursive: true });
 		}
 	});
 
-	it("serves /tars/admin bundled assets with valid credentials", async () => {
+	it("serves /yeetomatic/admin bundled assets with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
@@ -2414,7 +2414,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/tars/admin/assets/main.js",
+				path: "/yeetomatic/admin/assets/main.js",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -2428,9 +2428,9 @@ describe("createWebhookServer", () => {
 		}
 	});
 
-	it("requires auth for /tars/admin bundled assets", async () => {
+	it("requires auth for /yeetomatic/admin bundled assets", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
@@ -2438,7 +2438,7 @@ describe("createWebhookServer", () => {
 		const port = (server.address() as { port: number }).port;
 
 		try {
-			const response = await makeRequest(port, { method: "GET", path: "/tars/admin/assets/main.js" });
+			const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin/assets/main.js" });
 			expect(response.statusCode).toBe(401);
 			expect(response.body).toBe("Unauthorized");
 		} finally {
@@ -2486,7 +2486,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.agent).toBe("busy");
 		expect(body.sessions).toHaveLength(1);
-		expect(body.sessions[0].branch).toBe("tars/issue-1");
+		expect(body.sessions[0].branch).toBe("yeetomatic/issue-1");
 		expect(body.sessions[0].risk).toEqual({
 			suspectedMisroute: false,
 			reasons: [],
@@ -2506,7 +2506,7 @@ describe("createWebhookServer", () => {
 					issueNumber: 89,
 					repo: "tars",
 					owner: "mbrooks",
-					title: "TARS: Add stale session detection",
+					title: "Yeetomatic: Add stale session detection",
 					body: "Fixes #86\n\nSummary",
 					status: "complete" as const,
 					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
@@ -2950,7 +2950,7 @@ describe("createWebhookServer", () => {
 			issueNumber: 89,
 			repo: "tars",
 			owner: "mbrooks",
-			title: "TARS: Add stale session detection",
+			title: "Yeetomatic: Add stale session detection",
 			body: "Fixes #86\n\nSummary",
 			status: "complete" as const,
 			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
@@ -4080,7 +4080,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -4103,7 +4103,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/tars/admin",
+			path: "/yeetomatic/admin",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -4114,7 +4114,7 @@ describe("createWebhookServer", () => {
 		expect(cookieHeader).toBeTruthy();
 		const cookie = Array.isArray(cookieHeader) ? cookieHeader[0].split(";")[0] : String(cookieHeader).split(";")[0];
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
 				Cookie: cookie,
 			},
@@ -4135,7 +4135,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/tars/admin/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
 
 		await new Promise<void>((resolve, reject) => {
 			client.once("open", resolve);
@@ -4148,23 +4148,23 @@ describe("createWebhookServer", () => {
 
 	it("serves the admin UI and websocket under a custom configured admin path", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "tars-admin-custom-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-custom-"));
 		await writeFile(
 			join(adminAssetsDir, "index.html"),
-			'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div></body></html>',
+			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div></body></html>',
 		);
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, undefined, undefined, { adminAssetsDir, adminPath: "/custom/admin", adminDefaultPage: "#/repos" });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		try {
-			const legacyResponse = await makeRequest(port, { method: "GET", path: "/tars/admin" });
+			const legacyResponse = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
 			expect(legacyResponse.statusCode).toBe(404);
 
 			const customResponse = await makeRequest(port, { method: "GET", path: "/custom/admin" });
 			expect(customResponse.statusCode).toBe(200);
-			expect(customResponse.body).toContain('window.__TARS_ADMIN_PATH__ = "/custom/admin"');
-			expect(customResponse.body).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+			expect(customResponse.body).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/custom/admin"');
+			expect(customResponse.body).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos"');
 
 			const client = new WebSocket(`ws://127.0.0.1:${port}/custom/admin/ws`);
 			await new Promise<void>((resolve, reject) => {

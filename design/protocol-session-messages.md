@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This protocol defines the bidirectional messages used between a worker and TARS for one issue session.
+This protocol defines the bidirectional messages used between a worker and Yeetomatic for one issue session.
 
 ## Common Envelope
 
@@ -45,7 +45,7 @@ That is enough to support launch, logging, liveness, steering, and terminal resu
 
 ### Direction
 
-Worker -> TARS
+Worker -> Yeetomatic
 
 ### Purpose
 
@@ -70,11 +70,11 @@ The worker starts the session handshake and identifies which session it is claim
 
 ### Direction
 
-TARS -> worker
+Yeetomatic -> worker
 
 ### Purpose
 
-TARS sends the authoritative launch payload after validating the session identity for that WebSocket connection.
+Yeetomatic sends the authoritative launch payload after validating the session identity for that WebSocket connection.
 
 ### Example
 
@@ -87,7 +87,7 @@ TARS sends the authoritative launch payload after validating the session identit
   "payload": {
     "session": {
       "owner": "mbrooks",
-      "repo": "tars",
+      "repo": "yeetomatic",
       "issueNumber": 395,
       "workspacePath": "/app/workspaces/mbrooks-tars/.worktrees/issue-395",
       "title": "Implement worker-based agent sessions",
@@ -132,11 +132,11 @@ Acknowledges receipt and acceptance of a message.
 
 ### Direction
 
-Worker -> TARS
+Worker -> Yeetomatic
 
 ### Purpose
 
-The worker sends structured execution events to TARS in batches.
+The worker sends structured execution events to Yeetomatic in batches.
 
 ### Example
 
@@ -169,7 +169,7 @@ The implemented V1 event type is `session_log`, containing the existing `Session
 
 ### Direction
 
-Worker -> TARS
+Worker -> Yeetomatic
 
 ### Purpose
 
@@ -195,11 +195,11 @@ The worker periodically reports liveness while running.
 
 ### Direction
 
-TARS -> worker
+Yeetomatic -> worker
 
 ### Purpose
 
-TARS sends live control or steering instructions to the worker.
+Yeetomatic sends live control or steering instructions to the worker.
 
 ### Allowed Actions
 
@@ -238,7 +238,7 @@ Tells the worker to inject a text message into the live agent session.
 
 For `steer`:
 
-1. TARS sends the message.
+1. Yeetomatic sends the message.
 2. The worker responds with `ack`.
 3. The worker passes the text into the live agent session through the agent's existing steering mechanism.
 4. The worker continues normal event streaming.
@@ -254,11 +254,11 @@ The policy should be explicit in implementation.
 
 ### Direction
 
-Worker -> TARS
+Worker -> Yeetomatic
 
 ### Purpose
 
-The worker sends one terminal execution result to TARS.
+The worker sends one terminal execution result to Yeetomatic.
 
 ### Example
 
@@ -272,7 +272,7 @@ The worker sends one terminal execution result to TARS.
     "result": {
       "status": "complete",
       "summary": "Implement worker session launch and result handling.",
-      "rawResponse": "TARS_STATUS: complete\nImplement worker session launch and result handling."
+      "rawResponse": "YEETOMATIC_STATUS: complete\nImplement worker session launch and result handling."
     }
   }
 }
@@ -288,12 +288,12 @@ The payload wraps the existing `ExecutionResult`. Allowed `payload.result.status
 - `failed`
 - `cancelled`
 
-These should match the existing `ExecutionResult` shape used by TARS.
+These should match the existing `ExecutionResult` shape used by Yeetomatic.
 
 ### Completion Rules
 
 - The worker sends one completion result and then closes its connection during cleanup.
-- TARS treats that result as the execution result returned to the existing reporting and delivery flow.
+- Yeetomatic treats that result as the execution result returned to the existing reporting and delivery flow.
 - The worker must not push or create the PR itself.
 
 ## `error`
@@ -322,20 +322,20 @@ Reports a protocol-level or session-level error.
 
 ## Host Mapping
 
-TARS translates worker messages like this:
+Yeetomatic translates worker messages like this:
 
 - `event_batch` -> `recordSessionLog` and activity updates for each `session_log` entry
 - `heartbeat` -> liveness tracking and activity updates
 - `complete` -> `ExecutionResult` handoff into the existing reporting and delivery flow
 
-The `event_batch` stream carries the data TARS persists centrally, including:
+The `event_batch` stream carries the data Yeetomatic persists centrally, including:
 
 - assistant responses
 - reasoning summaries
 - tool execution events
 - steering-related status updates
 
-TARS exposes live steering and stop actions through outbound `control` messages.
+Yeetomatic exposes live steering and stop actions through outbound `control` messages.
 
 ## Missing Completion Handling
 

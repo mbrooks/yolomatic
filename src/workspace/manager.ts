@@ -72,7 +72,7 @@ export class WorkspaceManager implements WorkspaceService {
 
 		const hasStagedChanges = await this.git.hasChanges(worktreePath, true);
 		if (hasStagedChanges) {
-			await this.git.run("git", ["commit", "-m", message ?? `TARS: Changes for branch ${branchName}`], {
+			await this.git.run("git", ["commit", "-m", message ?? `Yeetomatic: Changes for branch ${branchName}`], {
 				cwd: worktreePath,
 			});
 		}
@@ -88,7 +88,7 @@ export class WorkspaceManager implements WorkspaceService {
 	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
-		return this.commitAndPushPath(worktreePath, branchName, message ?? `TARS: Changes for issue #${issueNumber}`);
+		return this.commitAndPushPath(worktreePath, branchName, message ?? `Yeetomatic: Changes for issue #${issueNumber}`);
 	}
 
 	async hasChanges(workspacePath: string, cached = false): Promise<boolean> {

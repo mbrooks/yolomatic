@@ -93,7 +93,7 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 			);
 		});
 
-		tempDir = await mkdtemp(path.join(os.tmpdir(), "tars-worker-"));
+		tempDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-"));
 		const executor = new PiAgentExecutor({ soulPath: options.soulPath });
 
 		ws.on("message", (raw) => {

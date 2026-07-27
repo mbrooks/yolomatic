@@ -115,7 +115,7 @@ export class GetAdminStatus {
 					body: s.body ?? null,
 					summary: s.summary ?? null,
 					workspacePath: s.workspacePath,
-					branch: s.branch ?? `tars/issue-${s.issueNumber}`,
+					branch: s.branch ?? `yeetomatic/issue-${s.issueNumber}`,
 					lastActivity: s.lastActivity,
 					createdAt: s.createdAt ?? null,
 					prUrl: s.prUrl ?? null,

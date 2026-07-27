@@ -34,7 +34,7 @@ function makeDeps(overrides?: {
 	} as unknown as SessionRepository;
 
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
 		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
@@ -97,7 +97,7 @@ const state: SessionState = {
 const result: ExecutionResult = {
 	status: "complete",
 	summary: "Fixed the parser bug.",
-	rawResponse: "TARS_STATUS: complete\nFixed the parser bug.",
+	rawResponse: "YEETOMATIC_STATUS: complete\nFixed the parser bug.",
 };
 
 describe("ExecuteSessionDelivery", () => {
@@ -149,9 +149,9 @@ describe("ExecuteSessionDelivery", () => {
 		expect(deps.github.createPullRequest).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
-			"TARS: Test title",
+			"Yeetomatic: Test title",
 			expect.stringContaining("Fixes #1"),
-			"tars/issue-1",
+			"yeetomatic/issue-1",
 			"main",
 		);
 		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "tars", 1, 42, "https://github.com/mbrooks/tars/pull/42");
@@ -161,13 +161,13 @@ describe("ExecuteSessionDelivery", () => {
 			1,
 			expect.stringContaining("PR created: https://github.com/mbrooks/tars/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("handles existing PR when createPullRequest throws 'already exists'", async () => {
 		const deps = makeDeps({
 			createPullRequest: vi.fn(async () => {
-				throw new Error("A pull request already exists for tars/issue-1");
+				throw new Error("A pull request already exists for yeetomatic/issue-1");
 			}),
 		});
 		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -195,7 +195,7 @@ describe("ExecuteSessionDelivery", () => {
 	it("returns no-changes when createPullRequest throws 'No commits between'", async () => {
 		const deps = makeDeps({
 			createPullRequest: vi.fn(async () => {
-				throw new Error("No commits between main and tars/issue-1");
+				throw new Error("No commits between main and yeetomatic/issue-1");
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({
@@ -360,7 +360,7 @@ describe("ExecuteSessionDelivery", () => {
 	it("reports delivery failure when PR already exists but listPullRequests returns empty", async () => {
 		const deps = makeDeps({
 			createPullRequest: vi.fn(async () => {
-				throw new Error("A pull request already exists for tars/issue-1");
+				throw new Error("A pull request already exists for yeetomatic/issue-1");
 			}),
 		});
 		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([]);

@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { getConfig, isBootstrapComplete, getBootstrapMissingFields, normalizeAdminPath, adminWebSocketPath, DEFAULT_ADMIN_PATH, DEFAULT_ADMIN_DEFAULT_PAGE } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 
-const TEST_DB = "/tmp/tars-config-test.sqlite";
+const TEST_DB = "/tmp/yeetomatic-config-test.sqlite";
 
 function createStore(): SettingsStore {
 	try {
@@ -31,7 +31,7 @@ describe("getConfig", () => {
 		delete process.env.GITHUB_USERNAME;
 		delete process.env.WORKSPACES_DIR;
 		delete process.env.SOUL_PATH;
-		delete process.env.TARS_SELF_REPORT_ENABLED;
+		delete process.env.YEETOMATIC_SELF_REPORT_ENABLED;
 		delete process.env.ARCHIVE_DIR;
 		delete process.env.MEMORY_DIR;
 		delete process.env.CLEANUP_RETENTION_DAYS;
@@ -40,8 +40,8 @@ describe("getConfig", () => {
 		delete process.env.ONBOARDING_COMPLETE;
 		delete process.env.GITHUB_EVENT_MODE;
 		delete process.env.GITHUB_POLL_INTERVAL_MS;
-		delete process.env.TARS_WORKER_CONTROL_BASE_URL;
-		delete process.env.TARS_WORKER_DOCKER_NETWORK_MODE;
+		delete process.env.YEETOMATIC_WORKER_CONTROL_BASE_URL;
+		delete process.env.YEETOMATIC_WORKER_DOCKER_NETWORK_MODE;
 	});
 
 	afterEach(() => {
@@ -102,8 +102,8 @@ describe("getConfig", () => {
 		process.env.ONBOARDING_COMPLETE = "true";
 		process.env.GITHUB_EVENT_MODE = "both";
 		process.env.GITHUB_POLL_INTERVAL_MS = "30000";
-		process.env.TARS_WORKER_CONTROL_BASE_URL = "http://worker-control.internal:9999";
-		process.env.TARS_WORKER_DOCKER_NETWORK_MODE = "container:tars";
+		process.env.YEETOMATIC_WORKER_CONTROL_BASE_URL = "http://worker-control.internal:9999";
+		process.env.YEETOMATIC_WORKER_DOCKER_NETWORK_MODE = "container:yeetomatic";
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
@@ -121,7 +121,7 @@ describe("getConfig", () => {
 		expect(config.githubEventMode).toBe("both");
 		expect(config.githubPollIntervalMs).toBe(30000);
 		expect(config.workerControlBaseUrl).toBe("http://worker-control.internal:9999");
-		expect(config.workerDockerNetworkMode).toBe("container:tars");
+		expect(config.workerDockerNetworkMode).toBe("container:yeetomatic");
 	});
 
 	it("falls back to webhook mode for unknown GitHub event modes", () => {
@@ -138,11 +138,11 @@ describe("getConfig", () => {
 		expect(config.githubUsername).toBe("");
 	});
 
-	it("reads TARS_SELF_REPORT_ENABLED", () => {
+	it("reads YEETOMATIC_SELF_REPORT_ENABLED", () => {
 		process.env.WEBHOOK_SECRET = "secret";
 		process.env.GITHUB_TOKEN = "token";
 		process.env.GITHUB_USERNAME = "user";
-		process.env.TARS_SELF_REPORT_ENABLED = "false";
+		process.env.YEETOMATIC_SELF_REPORT_ENABLED = "false";
 
 		const config = getConfig(createStore());
 		expect(config.selfReportEnabled).toBe(false);
@@ -230,8 +230,8 @@ describe("normalizeAdminPath", () => {
 	});
 
 	it("strips trailing slashes except for root", () => {
-		expect(normalizeAdminPath("/tars/admin/")).toBe("/tars/admin");
-		expect(normalizeAdminPath("/tars/admin///")).toBe("/tars/admin");
+		expect(normalizeAdminPath("/yeetomatic/admin/")).toBe("/yeetomatic/admin");
+		expect(normalizeAdminPath("/yeetomatic/admin///")).toBe("/yeetomatic/admin");
 	});
 
 	it("preserves the root path", () => {
@@ -241,7 +241,7 @@ describe("normalizeAdminPath", () => {
 
 describe("adminWebSocketPath", () => {
 	it("appends /ws to a non-root admin path", () => {
-		expect(adminWebSocketPath("/tars/admin")).toBe("/tars/admin/ws");
+		expect(adminWebSocketPath("/yeetomatic/admin")).toBe("/yeetomatic/admin/ws");
 	});
 
 	it("returns /ws for the root admin path", () => {

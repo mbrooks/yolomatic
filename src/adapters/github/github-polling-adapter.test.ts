@@ -40,9 +40,9 @@ describe("GitHubPollingAdapter", () => {
 						state: "open",
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:01:00Z",
-						labels: [{ name: "tars" }],
-						assignee: { login: "tars-bot" },
-						assignees: [{ login: "tars-bot" }],
+						labels: [{ name: "yeetomatic" }],
+						assignee: { login: "yeetomatic-bot" },
+						assignees: [{ login: "yeetomatic-bot" }],
 						user: { login: "human" },
 					}],
 				})),
@@ -52,8 +52,8 @@ describe("GitHubPollingAdapter", () => {
 		const result = await adapter.listIssuesUpdatedSince("mbrooks", "tars", "2026-06-01T00:00:00Z");
 		expect(result[0]).toEqual(expect.objectContaining({
 			number: 1,
-			labels: [{ name: "tars" }],
-			assignees: [{ login: "tars-bot" }],
+			labels: [{ name: "yeetomatic" }],
+			assignees: [{ login: "yeetomatic-bot" }],
 		}));
 	});
 
@@ -67,8 +67,8 @@ describe("GitHubPollingAdapter", () => {
 				created_at: "2026-06-01T00:00:00Z",
 				updated_at: "2026-06-01T00:01:00Z",
 				labels: [],
-				assignee: { login: "tars-bot" },
-				assignees: [{ login: "tars-bot" }],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
 				user: { login: "human" },
 			},
 			{
@@ -79,8 +79,8 @@ describe("GitHubPollingAdapter", () => {
 				created_at: "2026-06-01T00:00:00Z",
 				updated_at: "2026-06-01T00:02:00Z",
 				labels: [],
-				assignee: { login: "tars-bot" },
-				assignees: [{ login: "tars-bot" }],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
 				user: { login: "human" },
 			},
 		];
@@ -148,7 +148,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:05:00Z",
-						head: { ref: "tars/issue-1" },
+						head: { ref: "yeetomatic/issue-1" },
 						user: { login: "human" },
 					}],
 				})),
@@ -161,7 +161,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:05:00Z",
-						head: { ref: "tars/issue-1" },
+						head: { ref: "yeetomatic/issue-1" },
 						user: { login: "human" },
 					},
 				})),
@@ -207,7 +207,7 @@ describe("GitHubPollingAdapter", () => {
 				})),
 				listEventsForTimeline: vi.fn(async () => ({
 					data: [
-						{ id: 1, event: "assigned", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" }, assignee: { login: "tars-bot" } },
+						{ id: 1, event: "assigned", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" }, assignee: { login: "yeetomatic-bot" } },
 						{ id: 2, event: "labeled", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" } },
 						{ id: 3, event: "unassigned", created_at: "2026-05-31T00:02:00Z", actor: { login: "human" } },
 					],
@@ -223,7 +223,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:02:00Z",
-						head: { ref: "tars/issue-1" },
+						head: { ref: "yeetomatic/issue-1" },
 						user: { login: "human" },
 					}],
 				})),
@@ -292,8 +292,8 @@ describe("GitHubPollingAdapter", () => {
 				listForRepo: vi.fn(async () => ({
 					data: [{
 						number: 1,
-						labels: ["tars", {}],
-						assignees: [{ login: "" }, { login: "tars-bot" }],
+						labels: ["yeetomatic", {}],
+						assignees: [{ login: "" }, { login: "yeetomatic-bot" }],
 					}],
 				})),
 				listCommentsForRepo: vi.fn(async () => ({
@@ -339,9 +339,9 @@ describe("GitHubPollingAdapter", () => {
 				title: "",
 				body: null,
 				state: "",
-				labels: [{ name: "tars" }, { name: undefined }],
+				labels: [{ name: "yeetomatic" }, { name: undefined }],
 				assignee: null,
-				assignees: [{ login: "tars-bot" }],
+				assignees: [{ login: "yeetomatic-bot" }],
 				user: undefined,
 				pull_request: undefined,
 			}),

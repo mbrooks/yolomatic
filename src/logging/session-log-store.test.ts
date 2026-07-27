@@ -13,7 +13,7 @@ import {
 } from "./session-log-store.js";
 import { onSessionLogEvent } from "./log-events.js";
 
-const TEST_DB = path.join(os.tmpdir(), "tars-session-log-test.sqlite");
+const TEST_DB = path.join(os.tmpdir(), "yeetomatic-session-log-test.sqlite");
 
 describe("session-log-store", () => {
 	beforeEach(() => {

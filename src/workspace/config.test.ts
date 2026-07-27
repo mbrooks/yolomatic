@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { getWorkspaceConfig } from "./config.js";
 import { SettingsStore } from "../settings/store.js";
 
-const TEST_DB = "/tmp/tars-workspace-config-test.sqlite";
+const TEST_DB = "/tmp/yeetomatic-workspace-config-test.sqlite";
 
 function createStore(): SettingsStore {
 	try {

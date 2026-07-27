@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	hasLabel,
 	hasAnyLabel,
-	isAssignedToTars,
+	isAssignedToYeetomatic,
 	isAdmin,
 	shouldIgnoreIssueEvent,
 	shouldIgnoreCommentEvent,
@@ -31,11 +31,11 @@ describe("hasLabel", () => {
 
 describe("hasAnyLabel", () => {
 	it("returns true when any label matches", () => {
-		expect(hasAnyLabel([{ name: "bug" }, { name: "tars" }], ["tars", "tars-working"])).toBe(true);
+		expect(hasAnyLabel([{ name: "bug" }, { name: "yeetomatic" }], ["yeetomatic", "yeetomatic-working"])).toBe(true);
 	});
 
 	it("returns false when no labels match", () => {
-		expect(hasAnyLabel([{ name: "bug" }], ["tars"])).toBe(false);
+		expect(hasAnyLabel([{ name: "bug" }], ["yeetomatic"])).toBe(false);
 	});
 });
 
@@ -46,17 +46,17 @@ describe("DO_NOT_WORK_LABELS", () => {
 	});
 });
 
-describe("isAssignedToTars", () => {
+describe("isAssignedToYeetomatic", () => {
 	it("returns true when assignee matches", () => {
-		expect(isAssignedToTars({ assignee: { login: "tars-bot" } }, "tars-bot")).toBe(true);
+		expect(isAssignedToYeetomatic({ assignee: { login: "yeetomatic-bot" } }, "yeetomatic-bot")).toBe(true);
 	});
 
 	it("returns true when assignees include match", () => {
-		expect(isAssignedToTars({ assignees: [{ login: "tars-bot" }] }, "tars-bot")).toBe(true);
+		expect(isAssignedToYeetomatic({ assignees: [{ login: "yeetomatic-bot" }] }, "yeetomatic-bot")).toBe(true);
 	});
 
 	it("returns false when no match", () => {
-		expect(isAssignedToTars({ assignees: [{ login: "other" }] }, "tars-bot")).toBe(false);
+		expect(isAssignedToYeetomatic({ assignees: [{ login: "other" }] }, "yeetomatic-bot")).toBe(false);
 	});
 });
 
@@ -79,36 +79,36 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "tars-bot" }] },
-				sender: { login: "tars-bot" },
+				issue: { assignees: [{ login: "yeetomatic-bot" }] },
+				sender: { login: "yeetomatic-bot" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores opened events not assigned to TARS", () => {
+	it("ignores opened events not assigned to Yeetomatic", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
 				issue: { assignees: [] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores unassigned when TARS is still assigned", () => {
+	it("ignores unassigned when Yeetomatic is still assigned", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "unassigned",
-				issue: { assignees: [{ login: "tars-bot" }] },
+				issue: { assignees: [{ login: "yeetomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -118,23 +118,23 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "tars-bot" }] },
+				issue: { assignees: [{ login: "yeetomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			true,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("allows opened events assigned to TARS", () => {
+	it("allows opened events assigned to Yeetomatic", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "tars-bot" }] },
+				issue: { assignees: [{ login: "yeetomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(false);
@@ -144,10 +144,10 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "tars-bot" }], labels: [{ name: "wontfix" }] },
+				issue: { assignees: [{ login: "yeetomatic-bot" }], labels: [{ name: "wontfix" }] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -158,10 +158,10 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "assigned",
-				issue: { assignees: [{ login: "tars-bot" }], labels: [{ name: "invalid" }] },
+				issue: { assignees: [{ login: "yeetomatic-bot" }], labels: [{ name: "invalid" }] },
 				sender: { login: "user" },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -174,9 +174,9 @@ describe("shouldIgnoreCommentEvent", () => {
 			{
 				action: "edited",
 				comment: { body: "hello", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "tars-bot" }] },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
@@ -185,15 +185,15 @@ describe("shouldIgnoreCommentEvent", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "@tars-bot please continue", user: { login: "user" } },
+				comment: { body: "@yeetomatic-bot please continue", user: { login: "user" } },
 				issue: {
 					state: "closed",
-					labels: [{ name: "tars" }],
-					assignees: [{ login: "tars-bot" }],
-					user: { login: "tars-bot" },
+					labels: [{ name: "yeetomatic" }],
+					assignees: [{ login: "yeetomatic-bot" }],
+					user: { login: "yeetomatic-bot" },
 				},
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
 		expect(result).toEqual({ ignore: true, reason: "issue is closed" });
 	});
@@ -202,10 +202,10 @@ describe("shouldIgnoreCommentEvent", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "hello", user: { login: "tars-bot" } },
-				issue: { labels: [], assignees: [{ login: "tars-bot" }] },
+				comment: { body: "hello", user: { login: "yeetomatic-bot" } },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
@@ -215,33 +215,33 @@ describe("shouldIgnoreCommentEvent", () => {
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "github-actions", type: "Bot" } },
-				issue: { labels: [], assignees: [{ login: "tars-bot" }] },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores comments when TARS is not assigned", () => {
+	it("ignores comments when Yeetomatic is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "user" } },
 				issue: { labels: [], assignees: [] },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to tars-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
 	});
 
 	it("allows comments that mention the bot", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "Hey @tars-bot", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "tars-bot" }] },
+				comment: { body: "Hey @yeetomatic-bot", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
 		expect(result.ignore).toBe(false);
 		if (!result.ignore) {
@@ -253,38 +253,38 @@ describe("shouldIgnoreCommentEvent", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "@tars please help", user: { login: "user" } },
-				issue: { labels: [{ name: "tars" }], assignees: [{ login: "tarsmbrooks" }] },
+				comment: { body: "@yeetomatic please help", user: { login: "user" } },
+				issue: { labels: [{ name: "yeetomatic" }], assignees: [{ login: "yeetomaticmbrooks" }] },
 			},
 			"mbrooks",
 		);
 		expect(result).toEqual({ ignore: true, reason: "not assigned to mbrooks" });
 	});
 
-	it("ignores comments on TARS-created issues when TARS is not assigned", () => {
+	it("ignores comments on Yeetomatic-created issues when Yeetomatic is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "user" } },
-				issue: { labels: [{ name: "tars" }], assignees: [], user: { login: "tars-bot" } },
+				issue: { labels: [{ name: "yeetomatic" }], assignees: [], user: { login: "yeetomatic-bot" } },
 			},
-			"tars-bot",
+			"yeetomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to tars-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
 	});
 });
 
 describe("isStopCommand", () => {
-	it("matches exact /tars stop", () => {
-		expect(isStopCommand("/tars stop")).toBe(true);
+	it("matches exact /yeetomatic stop", () => {
+		expect(isStopCommand("/yeetomatic stop")).toBe(true);
 	});
 
 	it("is case-insensitive", () => {
-		expect(isStopCommand("/TARS STOP")).toBe(true);
+		expect(isStopCommand("/Yeetomatic STOP")).toBe(true);
 	});
 
 	it("ignores extra text", () => {
-		expect(isStopCommand("/tars stop now")).toBe(false);
+		expect(isStopCommand("/yeetomatic stop now")).toBe(false);
 	});
 });
 

@@ -16,7 +16,7 @@ afterEach(async () => {
 
 describe("force-onboarding script", () => {
 	it("marks onboarding incomplete without removing other settings", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-force-onboarding-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-force-onboarding-"));
 		testDirs.push(dir);
 		const dbPath = path.join(dir, "bot-state.sqlite");
 		const db = new DatabaseSync(dbPath);
@@ -28,7 +28,7 @@ describe("force-onboarding script", () => {
 			)
 		`);
 		const insert = db.prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)");
-		insert.run("github_username", "tars-bot", new Date().toISOString());
+		insert.run("github_username", "yeetomatic-bot", new Date().toISOString());
 		insert.run("onboarding_complete", "true", new Date().toISOString());
 		db.close();
 
@@ -39,9 +39,9 @@ describe("force-onboarding script", () => {
 			value: "false",
 		});
 		expect(updatedDb.prepare("SELECT value FROM settings WHERE key = ?").get("github_username")).toEqual({
-			value: "tars-bot",
+			value: "yeetomatic-bot",
 		});
 		updatedDb.close();
-		expect(stdout).toContain("Refresh /tarsadmin to run the wizard");
+		expect(stdout).toContain("Refresh /yeetomatic/admin to run the wizard");
 	});
 });

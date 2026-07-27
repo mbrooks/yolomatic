@@ -5,8 +5,8 @@ interface IssueLabel {
 	name?: string;
 }
 
-export const TARS_WORKFLOW_LABELS = ["tars-working", "tars-feedback-required", "tars-pr-created", "tars-complete"] as const;
-export const TARS_VISIBLE_LABELS = [...TARS_WORKFLOW_LABELS, "tars"] as const;
+export const YEETOMATIC_WORKFLOW_LABELS = ["yeetomatic-working", "yeetomatic-feedback-required", "yeetomatic-pr-created", "yeetomatic-complete"] as const;
+export const YEETOMATIC_VISIBLE_LABELS = [...YEETOMATIC_WORKFLOW_LABELS, "yeetomatic"] as const;
 export const DO_NOT_WORK_LABELS = ["wontfix", "invalid"] as const;
 
 export function hasLabel(labels: IssueLabel[] | undefined, label: string): boolean {
@@ -17,11 +17,11 @@ export function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: stri
 	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
 }
 
-export function hasTarsVisibleLabel(labels: IssueLabel[] | undefined): boolean {
-	return hasAnyLabel(labels, [...TARS_VISIBLE_LABELS]);
+export function hasYeetomaticVisibleLabel(labels: IssueLabel[] | undefined): boolean {
+	return hasAnyLabel(labels, [...YEETOMATIC_VISIBLE_LABELS]);
 }
 
-export function isAssignedToTars(
+export function isAssignedToYeetomatic(
 	issue: { assignee?: { login: string } | null; assignees?: { login: string }[] },
 	githubUsername: string,
 ): boolean {
@@ -54,21 +54,21 @@ export function shouldIgnoreIssueEvent(
 	}
 
 	if (action === "opened" || action === "assigned") {
-		if (!isAssignedToTars(issue, githubUsername)) {
+		if (!isAssignedToYeetomatic(issue, githubUsername)) {
 			return { ignore: true, reason: `not assigned to ${githubUsername}` };
 		}
 	}
 
 	if (action === "unassigned") {
-		if (isAssignedToTars(issue, githubUsername)) {
-			return { ignore: true, reason: "TARS still assigned" };
+		if (isAssignedToYeetomatic(issue, githubUsername)) {
+			return { ignore: true, reason: "Yeetomatic still assigned" };
 		}
 	}
 
 	if (action === "edited") {
-		const hasTarsLabel = hasTarsVisibleLabel(issue.labels);
-		if (!isAssignedToTars(issue, githubUsername) && !hasTarsLabel && issue.user?.login !== githubUsername) {
-			return { ignore: true, reason: "not a TARS issue" };
+		const hasYeetomaticLabel = hasYeetomaticVisibleLabel(issue.labels);
+		if (!isAssignedToYeetomatic(issue, githubUsername) && !hasYeetomaticLabel && issue.user?.login !== githubUsername) {
+			return { ignore: true, reason: "not a Yeetomatic issue" };
 		}
 	}
 
@@ -92,7 +92,7 @@ export function shouldIgnoreCommentEvent(
 		};
 	},
 	githubUsername: string,
-): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isCreatedByTars: boolean } {
+): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isCreatedByYeetomatic: boolean } {
 	if (payload.action !== "created") {
 		return { ignore: true, reason: `action is ${payload.action}` };
 	}
@@ -109,27 +109,27 @@ export function shouldIgnoreCommentEvent(
 		return { ignore: true, reason: "bot comment" };
 	}
 
-	const isAssigned = isAssignedToTars(payload.issue, githubUsername);
+	const isAssigned = isAssignedToYeetomatic(payload.issue, githubUsername);
 	if (!isAssigned) {
 		return { ignore: true, reason: `not assigned to ${githubUsername}` };
 	}
 
-	const isCreatedByTars = payload.issue.user?.login === githubUsername;
+	const isCreatedByYeetomatic = payload.issue.user?.login === githubUsername;
 	const isMentioned =
 		payload.comment.body.includes(`@${githubUsername}`) ||
-		payload.comment.body.toLowerCase().includes("@tars");
-	const hasTarsLabel =
-		hasTarsVisibleLabel(payload.issue.labels);
+		payload.comment.body.toLowerCase().includes("@yeetomatic");
+	const hasYeetomaticLabel =
+		hasYeetomaticVisibleLabel(payload.issue.labels);
 
-	if (!hasTarsLabel && !isMentioned) {
-		return { ignore: true, reason: "no tars label or mention" };
+	if (!hasYeetomaticLabel && !isMentioned) {
+		return { ignore: true, reason: "no yeetomatic label or mention" };
 	}
 
-	return { ignore: false, isMentioned, isCreatedByTars };
+	return { ignore: false, isMentioned, isCreatedByYeetomatic };
 }
 
 export function isStopCommand(commentBody: string): boolean {
-	return commentBody.trim().toLowerCase() === "/tars stop";
+	return commentBody.trim().toLowerCase() === "/yeetomatic stop";
 }
 
 export function canPause(status: SessionStatus): { ok: true } | { ok: false; reason: string } {

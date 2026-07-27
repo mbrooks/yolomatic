@@ -2,7 +2,7 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { hasTarsVisibleLabel, isStopCommand } from "../../domain/workflow/policy.js";
+import { hasYeetomaticVisibleLabel, isStopCommand } from "../../domain/workflow/policy.js";
 import {
 	issueSessionKey,
 	startIssueExecution,
@@ -102,7 +102,7 @@ export class HandleIssueComment {
 				issueNumber,
 			);
 			if (result === "not-admin") {
-				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /tars stop from non-admin\n`);
+				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /yeetomatic stop from non-admin\n`);
 			} else {
 				process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
 			}
@@ -120,20 +120,20 @@ export class HandleIssueComment {
 
 		if (guard.isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
-		} else if (guard.isCreatedByTars) {
+		} else if (guard.isCreatedByYeetomatic) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: created by ${this.deps.githubUsername}\n`);
 		} else {
-			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has tars label\n`);
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has yeetomatic label\n`);
 		}
 
 		// Auto-label on mention so future comments pass via label gate
-		const hasTarsLabel = hasTarsVisibleLabel(payload.issue.labels);
-		if (guard.isMentioned && !hasTarsLabel) {
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["tars"]);
-			process.stdout.write(`[webhook] added tars label to ${owner}/${repo}#${issueNumber}\n`);
+		const hasYeetomaticLabel = hasYeetomaticVisibleLabel(payload.issue.labels);
+		if (guard.isMentioned && !hasYeetomaticLabel) {
+			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic"]);
+			process.stdout.write(`[webhook] added yeetomatic label to ${owner}/${repo}#${issueNumber}\n`);
 		}
 
-		// If TARS is actively executing, steer the comment instead of starting a new run
+		// If Yeetomatic is actively executing, steer the comment instead of starting a new run
 		if (this.deps.tasks.isActive(key)) {
 			const steered = await this.deps.tasks.steer(key, payload.comment.body);
 			if (steered) {
@@ -142,7 +142,7 @@ export class HandleIssueComment {
 				return;
 			}
 			process.stdout.write(`[webhook] could not steer comment for ${key}\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "TARS is busy. Comment could not be steered.");
+			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is busy. Comment could not be steered.");
 			return;
 		}
 
@@ -173,7 +173,7 @@ export class HandleIssueComment {
 		const session = prepared.session;
 		if (session.status === "paused") {
 			process.stdout.write(`[webhook] comment ignored: ${key} is paused\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "TARS is paused on this issue. It will resume when unpaused.");
+			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is paused on this issue. It will resume when unpaused.");
 			return;
 		}
 

@@ -9,7 +9,7 @@ vi.mock("../config.js", () => ({
 		memoryDir: "/tmp/memory",
 		defaultBranch: "main",
 		githubToken: "token",
-		githubUsername: "tars-bot",
+		githubUsername: "yeetomatic-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
 		selfReportEnabled: true,
@@ -29,7 +29,7 @@ vi.mock("../config.js", () => ({
 		logResponses: true,
 		githubEventMode: "webhook",
 		githubPollIntervalMs: 60000,
-		workerImage: "tars-worker:latest",
+		workerImage: "yeetomatic-worker:latest",
 		workerWorkspaceMountSource: "/tmp/workspaces",
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
@@ -264,7 +264,7 @@ describe("startRuntime", () => {
 		const pollingConfig = { ...baseConfig, githubEventMode: "polling" as const, githubPollIntervalMs: 30000 };
 		await startRuntime(pollingConfig, makeDeps());
 		expect(startGitHubPolling).toHaveBeenCalledWith(
-			expect.objectContaining({ intervalMs: 30000, githubUsername: "tars-bot" }),
+			expect.objectContaining({ intervalMs: 30000, githubUsername: "yeetomatic-bot" }),
 		);
 	});
 

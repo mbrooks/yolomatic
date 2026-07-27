@@ -141,7 +141,7 @@ describe("createAdminWebSocketServer", () => {
 		const onboardingServer = new FakeHttpServer();
 		createAdminWebSocketServer(onboardingServer as never, { getCredentials: () => ({}) });
 		const onboardingSocket = new FakeUpgradeSocket();
-		onboardingServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
+		onboardingServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
 		expect(onboardingSocket.writes).toEqual([]);
 		expect(onboardingSocket.destroyed).toBe(false);
 
@@ -151,14 +151,14 @@ describe("createAdminWebSocketServer", () => {
 		});
 
 		const rejectedSocket = new FakeUpgradeSocket();
-		protectedServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
+		protectedServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
 		expect(rejectedSocket.writes).toEqual(["HTTP/1.1 401 Unauthorized\r\n\r\n"]);
 		expect(rejectedSocket.destroyed).toBe(true);
 
 		const acceptedSocket = new FakeUpgradeSocket();
 		protectedServer.upgradeHandler?.(
 			{
-				url: "/tars/admin/ws",
+				url: "/yeetomatic/admin/ws",
 				headers: {
 					authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
 				},
@@ -187,7 +187,7 @@ describe("createAdminWebSocketServer", () => {
 		expect(matchingSocket.destroyed).toBe(false);
 
 		const legacySocket = new FakeUpgradeSocket();
-		httpServer.upgradeHandler?.({ url: "/tars/admin/ws", headers: {} }, legacySocket, Buffer.alloc(0));
+		httpServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, legacySocket, Buffer.alloc(0));
 		expect(legacySocket.writes).toEqual([]);
 		expect(legacySocket.destroyed).toBe(false);
 	});
@@ -200,7 +200,7 @@ describe("createAdminWebSocketServer", () => {
 		});
 
 		const socket = new FakeUpgradeSocket();
-		httpServer.upgradeHandler?.({ url: "/tars-worker/ws?token=abc", headers: {} }, socket, Buffer.alloc(0));
+		httpServer.upgradeHandler?.({ url: "/yeetomatic-worker/ws?token=abc", headers: {} }, socket, Buffer.alloc(0));
 		expect(socket.writes).toEqual([]);
 		expect(socket.destroyed).toBe(false);
 	});

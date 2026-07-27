@@ -11,8 +11,8 @@ function createPayload(overrides?: Partial<IssueEventPayload>): IssueEventPayloa
 			title: "Test issue",
 			body: "Issue body",
 			labels: [],
-			assignee: { login: "tars-bot" },
-			assignees: [{ login: "tars-bot" }],
+			assignee: { login: "yeetomatic-bot" },
+			assignees: [{ login: "yeetomatic-bot" }],
 			user: { login: "human" },
 		},
 		repository: { name: "tars", owner: { login: "mbrooks" } },
@@ -55,7 +55,7 @@ function createDeps(overrides?: {
 	const workspaces = {
 		createOrGetWorktree:
 			overrides?.createOrGetWorktree ??
-			vi.fn(async () => ({ path: "/tmp/worktree", branch: "tars/issue-1" })),
+			vi.fn(async () => ({ path: "/tmp/worktree", branch: "yeetomatic/issue-1" })),
 		removeWorktree: vi.fn(async () => {}),
 		commitAndPush: vi.fn(async () => true),
 		hasChanges: vi.fn(async () => false),
@@ -104,7 +104,7 @@ function createDeps(overrides?: {
 		github,
 		clock: { now: () => new Date() },
 		defaultBranch: "main",
-		githubUsername: "tars-bot",
+		githubUsername: "yeetomatic-bot",
 		selfReportEnabled: false,
 		executor: {
 			llm: {} as any,
@@ -114,19 +114,19 @@ function createDeps(overrides?: {
 			github: github as any,
 			tasks: tasks as any,
 			clock: { now: () => new Date() } as any,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			executor: {
 				execute: vi.fn(async () => ({
 					status: "complete" as const,
 					summary: "Done.",
-					rawResponse: "TARS_STATUS: complete\nDone.",
+					rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 				})),
 				executePRReview: vi.fn(async () => ({
 					status: "complete" as const,
 					summary: "Done.",
-					rawResponse: "TARS_STATUS: complete\nDone.",
+					rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
 				})),
 			} as any,
 		},
@@ -137,7 +137,7 @@ describe("HandleIssueEvent", () => {
 	it("ignores events sent by the bot itself", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
-		const payload = createPayload({ sender: { login: "tars-bot" } });
+		const payload = createPayload({ sender: { login: "yeetomatic-bot" } });
 
 		await handler.execute(payload);
 
@@ -153,7 +153,7 @@ describe("HandleIssueEvent", () => {
 		expect(handler.isInFlight("mbrooks", "tars", 2)).toBe(false);
 	});
 
-	it("ignores unassigned events when TARS is still assigned", async () => {
+	it("ignores unassigned events when Yeetomatic is still assigned", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({ action: "unassigned" });
@@ -163,7 +163,7 @@ describe("HandleIssueEvent", () => {
 		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 	});
 
-	it("handles unassigned events by pausing work when TARS is unassigned", async () => {
+	it("handles unassigned events by pausing work when Yeetomatic is unassigned", async () => {
 		const deps = createDeps();
 		deps.sessions.get = vi.fn(async () => ({ status: "working" } as any));
 		const handler = new HandleIssueEvent(deps as any);
@@ -183,7 +183,7 @@ describe("HandleIssueEvent", () => {
 		await handler.execute(payload);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "pending");
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, "TARS unassigned. Pausing work.");
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, "Yeetomatic unassigned. Pausing work.");
 	});
 
 	it("steers active execution on edited events", async () => {
@@ -192,15 +192,15 @@ describe("HandleIssueEvent", () => {
 		deps.tasks.isActive = vi.fn(() => true);
 		deps.tasks.steer = vi.fn(async () => true);
 		const handler = new HandleIssueEvent(deps as any);
-		const payload = createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "tars" }] } });
+		const payload = createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] } });
 
 		await handler.execute(payload);
 
 		expect(deps.tasks.steer).toHaveBeenCalled();
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, "Issue description updated. Steering to TARS.");
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, "Issue description updated. Steering to Yeetomatic.");
 	});
 
-	it("ignores edited events when not a TARS issue and no session", async () => {
+	it("ignores edited events when not a Yeetomatic issue and no session", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
@@ -224,7 +224,7 @@ describe("HandleIssueEvent", () => {
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
 			action: "edited",
-			issue: { ...createPayload().issue, labels: [{ name: "tars" }] },
+			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] },
 		});
 
 		await handler.execute(payload);
@@ -240,7 +240,7 @@ describe("HandleIssueEvent", () => {
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
 			action: "edited",
-			issue: { ...createPayload().issue, labels: [{ name: "tars" }] },
+			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] },
 		});
 
 		await handler.execute(payload);
@@ -378,7 +378,7 @@ describe("HandleIssueEvent", () => {
 			"mbrooks",
 			"tars",
 			1,
-			"Picked up by TARS. Working on it...",
+			"Picked up by Yeetomatic. Working on it...",
 		);
 	});
 
@@ -389,7 +389,7 @@ describe("HandleIssueEvent", () => {
 			if (callCount === 1) {
 				throw new EmptyRepositoryError("/tmp/workspaces/mbrooks-tars");
 			}
-			return { path: "/tmp/worktree", branch: "tars/issue-1" };
+			return { path: "/tmp/worktree", branch: "yeetomatic/issue-1" };
 		});
 		const initializeEmptyRepo = vi.fn(async () => {});
 		const deps = createDeps({ createOrGetWorktree, initializeEmptyRepo });

@@ -36,7 +36,7 @@ function makeSession(status: "working" | "pending" | "waiting-feedback" | "compl
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "tars/issue-1",
+		branch: "yeetomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,

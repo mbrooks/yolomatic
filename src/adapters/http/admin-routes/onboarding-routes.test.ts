@@ -9,12 +9,12 @@ import os from "node:os";
 import path from "node:path";
 
 async function tmpStore(): Promise<SettingsStore> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-"));
 	return new SettingsStore(path.join(dir, "settings.sqlite"));
 }
 
 async function tmpStores(): Promise<{ settings: SettingsStore; repository: RepositoryStore }> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-"));
 	return {
 		settings: new SettingsStore(path.join(dir, "settings.sqlite")),
 		repository: new RepositoryStore(path.join(dir, "settings.sqlite")),
@@ -55,7 +55,7 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 	return {
 		adminAssetsDir: "/tmp/admin-assets",
-		adminPath: "/tars/admin",
+		adminPath: "/yeetomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
 		repositoryStore: repoStore,
@@ -1009,31 +1009,31 @@ describe("handleOnboardingRoutes", () => {
 		});
 	});
 
-	describe("GET /tars/admin", () => {
+	describe("GET /yeetomatic/admin", () => {
 		it("returns HTML", async () => {
-			const req = mockRequest({ url: "/tars/admin", method: "GET" });
+			const req = mockRequest({ url: "/yeetomatic/admin", method: "GET" });
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tars/admin");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yeetomatic/admin");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 		});
 
 		it("serves assets under the configured admin path", async () => {
-			const req = mockRequest({ url: "/tars/admin/assets/main.js", method: "GET" });
+			const req = mockRequest({ url: "/yeetomatic/admin/assets/main.js", method: "GET" });
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tars/admin/assets/main.js");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yeetomatic/admin/assets/main.js");
 
 			expect(handled).toBe(true);
 		});
 
 		it("injects the configured admin path and default page into the served HTML", async () => {
-			const dir = await mkdtemp(path.join(os.tmpdir(), "tars-onboarding-html-"));
+			const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-html-"));
 			await writeFile(
 				path.join(dir, "index.html"),
-				'<!doctype html><html><head><title>TARS Admin</title></head><body><div id="root"></div></body></html>',
+				'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div></body></html>',
 			);
 			try {
 				const req = mockRequest({ url: "/custom/admin", method: "GET" });
@@ -1050,18 +1050,18 @@ describe("handleOnboardingRoutes", () => {
 				expect(handled).toBe(true);
 				expect(res.statusCode).toBe(200);
 				const body = String(res.body);
-				expect(body).toContain('window.__TARS_ADMIN_PATH__ = "/custom/admin"');
-				expect(body).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+				expect(body).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/custom/admin"');
+				expect(body).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos"');
 			} finally {
 				await rm(dir, { force: true, recursive: true });
 			}
 		});
 
-		it("returns false for the legacy /tarsadmin path when not configured", async () => {
-			const req = mockRequest({ url: "/tarsadmin", method: "GET" });
+		it("returns false for an unconfigured legacy admin path", async () => {
+			const req = mockRequest({ url: "/legacy-admin", method: "GET" });
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/tarsadmin");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/legacy-admin");
 
 			expect(handled).toBe(false);
 		});

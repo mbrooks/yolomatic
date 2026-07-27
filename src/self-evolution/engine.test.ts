@@ -57,12 +57,12 @@ describe("SelfEvolutionEngine", () => {
 			"tars",
 			expect.stringContaining("Self-evolution patch"),
 			expect.stringContaining("Root Cause Analysis"),
-			["tars-self-evolution", "bug"],
+			["yeetomatic-self-evolution", "bug"],
 		);
 	});
 
 	it("applies patch, validates, and files issue for successful fix", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-engine-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-engine-"));
 		const srcDir = path.join(dir, "src");
 		await mkdir(srcDir, { recursive: true });
 		const filePath = path.join(srcDir, "demo.ts");
@@ -87,7 +87,7 @@ describe("SelfEvolutionEngine", () => {
 	});
 
 	it("rolls back patch when validation fails", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-engine-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-engine-"));
 		const srcDir = path.join(dir, "src");
 		await mkdir(srcDir, { recursive: true });
 		const filePath = path.join(srcDir, "demo.ts");

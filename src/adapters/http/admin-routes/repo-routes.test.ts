@@ -51,7 +51,7 @@ describe("handleRepoRoutes", () => {
 
 	const settingsStore = {
 		get: vi.fn((key: string) => {
-			if (key === "github_username") return "tars-bot";
+			if (key === "github_username") return "yeetomatic-bot";
 			return undefined;
 		}),
 		getString: vi.fn((key: string, fallback?: string) => {
@@ -552,7 +552,7 @@ describe("handleRepoRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
-			expect(body.error).toBe("TARS GitHub username not configured");
+			expect(body.error).toBe("Yeetomatic GitHub username not configured");
 		});
 
 		it("returns 400 when title is missing", async () => {
@@ -584,7 +584,7 @@ describe("handleRepoRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.started).toBe(true);
 			expect(body.status).toBe("queued");
-			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["tars-bot"]);
+			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["yeetomatic-bot"]);
 			expect(startIssueSession.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
 		});
 
@@ -743,7 +743,7 @@ describe("handleRepoRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
-			expect(body.error).toBe("TARS GitHub username not configured");
+			expect(body.error).toBe("Yeetomatic GitHub username not configured");
 		});
 
 		it("returns 400 when title is missing", async () => {
@@ -764,7 +764,7 @@ describe("handleRepoRoutes", () => {
 						listAccessibleRepositories: vi.fn(async () => []),
 					},
 					settingsStore: {
-						get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+						get: vi.fn((key: string) => (key === "github_username" ? "yeetomatic-bot" : undefined)),
 					},
 					startIssueSession: {
 						execute: vi.fn(async () => ok({ started: true, status: "working", message: "ok" })),
@@ -800,7 +800,7 @@ describe("handleRepoRoutes", () => {
 						listAccessibleRepositories: vi.fn(async () => []),
 					},
 					settingsStore: {
-						get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+						get: vi.fn((key: string) => (key === "github_username" ? "yeetomatic-bot" : undefined)),
 					},
 					startIssueSession,
 				} as never,
@@ -839,7 +839,7 @@ describe("handleRepoRoutes", () => {
 						listAccessibleRepositories: vi.fn(async () => []),
 					},
 					settingsStore: {
-						get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+						get: vi.fn((key: string) => (key === "github_username" ? "yeetomatic-bot" : undefined)),
 					},
 					startIssueSession: {
 						execute: vi.fn(async () => ({
@@ -876,7 +876,7 @@ describe("handleRepoRoutes", () => {
 						listAccessibleRepositories: vi.fn(async () => []),
 					},
 					settingsStore: {
-						get: vi.fn((key: string) => (key === "github_username" ? "tars-bot" : undefined)),
+						get: vi.fn((key: string) => (key === "github_username" ? "yeetomatic-bot" : undefined)),
 					},
 					startIssueSession: {
 						execute: vi.fn(async () => {

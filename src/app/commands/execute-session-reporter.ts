@@ -39,7 +39,7 @@ export class ExecuteSessionReporter {
 			const body = [
 				"**Build failed**",
 				"",
-				"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+				"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
 				"",
 				`Error: ${message}`,
 			].join("\n");
@@ -49,7 +49,7 @@ export class ExecuteSessionReporter {
 		const stack = error instanceof Error ? error.stack ?? "" : "";
 		const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
 		const body = [
-			"**TARS failed.**",
+			"**Yeetomatic failed.**",
 			"",
 			`Context: ${context}`,
 			`Error: ${message}`,
@@ -74,7 +74,7 @@ export class ExecuteSessionReporter {
 		await this.deps.sessions.updateStatus(args.owner, args.repo, args.sessionIssueNumber, "failed");
 		if (args.target.kind === "issue") {
 			await removeWorkflowLabels(this.deps.github, args.owner, args.repo, args.sessionIssueNumber);
-			await this.deps.github.addLabels(args.owner, args.repo, args.sessionIssueNumber, ["tars-failed"]);
+			await this.deps.github.addLabels(args.owner, args.repo, args.sessionIssueNumber, ["yeetomatic-failed"]);
 		}
 	}
 
@@ -96,7 +96,7 @@ export class ExecuteSessionReporter {
 		if (result.status === "waiting-feedback") {
 			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "waiting-feedback");
 			if (target.kind === "issue") {
-				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-feedback-required"]);
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-feedback-required"]);
 			}
 			await this.postComment(
 				target,
@@ -104,7 +104,7 @@ export class ExecuteSessionReporter {
 				repo,
 				[
 					"Need clarification:",
-					result.summary || "TARS needs more information before continuing.",
+					result.summary || "Yeetomatic needs more information before continuing.",
 				].join("\n\n"),
 			);
 			return;
@@ -113,7 +113,7 @@ export class ExecuteSessionReporter {
 		if (result.status === "cancelled") {
 			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "cancelled");
 			if (target.kind === "issue") {
-				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-cancelled"]);
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-cancelled"]);
 			}
 			await this.postComment(
 				target,
@@ -124,7 +124,7 @@ export class ExecuteSessionReporter {
 					"",
 					result.summary || this.defaultCancelledSummary(target),
 					"",
-					"TARS is idle and ready for the next task.",
+					"Yeetomatic is idle and ready for the next task.",
 				].join("\n"),
 			);
 			return;
@@ -152,7 +152,7 @@ export class ExecuteSessionReporter {
 
 		await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "working");
 		if (target.kind === "issue") {
-			await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["tars-working"]);
+			await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-working"]);
 		}
 		await this.postComment(
 			target,
@@ -160,8 +160,8 @@ export class ExecuteSessionReporter {
 			repo,
 			[
 				target.kind === "issue"
-					? "TARS is still working on this issue."
-					: "TARS is still working on the review feedback.",
+					? "Yeetomatic is still working on this issue."
+					: "Yeetomatic is still working on the review feedback.",
 				"",
 				result.summary || "Execution is in progress.",
 			].join("\n"),
@@ -183,7 +183,7 @@ export class ExecuteSessionReporter {
 		if (this.deps.selfReportEnabled) {
 			const issueUrl = await this.fileSelfReport(this.createDeliveryFatalError(state, message, diagnostics));
 			commentBody = [
-				"**TARS delivery failed.**",
+				"**Yeetomatic delivery failed.**",
 				"",
 				scopeHint,
 				`A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
@@ -209,7 +209,7 @@ export class ExecuteSessionReporter {
 			const stack = error instanceof Error ? (error.stack ?? "") : "";
 			const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
 			commentBody = [
-				"**TARS delivery failed.**",
+				"**Yeetomatic delivery failed.**",
 				"",
 				scopeHint,
 				`Context: Delivering completed work`,
@@ -240,10 +240,10 @@ export class ExecuteSessionReporter {
 
 		await this.deps.github.postComment(owner, repo, issueNumber, commentBody);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-feedback-required");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-pr-created");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "tars-complete");
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["tars-working", "tars-delivery-failed"]);
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-feedback-required");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-pr-created");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-complete");
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
 	}
 
 	private classifyDeliveryError(message: string): FatalErrorCategory {
@@ -281,7 +281,7 @@ export class ExecuteSessionReporter {
 				lsWorkspace: diagnostics.lsWorkspace,
 				gitStatus: diagnostics.gitStatus,
 				gitDiff: diagnostics.gitDiff,
-				gitBranch: `tars/issue-${state.issueNumber}`,
+				gitBranch: `yeetomatic/issue-${state.issueNumber}`,
 				nodeVersion: process.version,
 				timestamp: new Date().toISOString(),
 			},
@@ -318,7 +318,7 @@ export class ExecuteSessionReporter {
 			lower.includes("workflow") &&
 			lower.includes("scope")
 		) {
-			return "The GitHub PAT is missing the `workflow` scope. Update the token in GitHub settings and restart TARS.";
+			return "The GitHub PAT is missing the `workflow` scope. Update the token in GitHub settings and restart Yeetomatic.";
 		}
 		return "";
 	}
@@ -326,7 +326,7 @@ export class ExecuteSessionReporter {
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {
 		const body = SelfMonitor.formatBugReportBody(error.evidence);
 		const title = SelfMonitor.getIssueTitle(error.evidence);
-		return this.deps.github.fileSelfReport(title, body, ["tars-self-report", "bug"]);
+		return this.deps.github.fileSelfReport(title, body, ["yeetomatic-self-report", "bug"]);
 	}
 
 	private async handlePullRequestCompletion(
@@ -337,7 +337,7 @@ export class ExecuteSessionReporter {
 		state: SessionState,
 		result: ExecutionResult,
 	): Promise<void> {
-		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
+		const branchName = state.branch ?? `yeetomatic/issue-${issueNumber}`;
 		const pushed = await this.deps.workspaces.commitAndPushPath(
 			state.workspacePath,
 			branchName,
@@ -350,7 +350,7 @@ export class ExecuteSessionReporter {
 				repo,
 				prNumber,
 				[
-					"**TARS iteration complete.**",
+					"**Yeetomatic iteration complete.**",
 					"",
 					"Changes pushed to the PR branch.",
 					"",
@@ -366,7 +366,7 @@ export class ExecuteSessionReporter {
 			repo,
 			prNumber,
 			[
-				"**TARS iteration complete.**",
+				"**Yeetomatic iteration complete.**",
 				"",
 				"No changes were needed.",
 				"",
@@ -378,8 +378,8 @@ export class ExecuteSessionReporter {
 
 	private defaultCancelledSummary(target: ExecutionCommentTarget): string {
 		return target.kind === "issue"
-			? "TARS has stopped working on this issue."
-			: "TARS has stopped working on this review.";
+			? "Yeetomatic has stopped working on this issue."
+			: "Yeetomatic has stopped working on this review.";
 	}
 
 	private async postComment(target: ExecutionCommentTarget, owner: string, repo: string, body: string): Promise<void> {

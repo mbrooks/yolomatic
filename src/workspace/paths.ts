@@ -29,5 +29,5 @@ export function getWorktreePath(
 }
 
 export function getBranchName(issueNumber: number): string {
-	return `tars/issue-${issueNumber}`;
+	return `yeetomatic/issue-${issueNumber}`;
 }
