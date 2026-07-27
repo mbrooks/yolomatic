@@ -1285,6 +1285,41 @@ a:hover {
 	text-transform: uppercase;
 }
 
+.settings-repository-badge.enabled {
+	background: var(--surface);
+	color: var(--muted);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	font-size: 0.65rem;
+	font-weight: 700;
+	padding: 0.05rem 0.4rem;
+	text-transform: uppercase;
+}
+
+.repo-manager {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.repo-manager-description {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.repo-manager-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.repo-manager-count,
+.repo-manager-note {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
 /* Onboarding wizard */
 .onboarding-screen {
 	display: flex;

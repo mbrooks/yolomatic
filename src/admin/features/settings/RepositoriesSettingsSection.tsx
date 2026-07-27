@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	addRepo,
-	listAccessibleRepos,
-	removeRepo,
-	type AccessibleRepo,
-} from "../../api/repos.js";
-
-interface SelectableRepo extends AccessibleRepo {
-	selected: boolean;
-	configured: boolean;
-}
+import { addRepo, listAccessibleRepos, removeRepo, type AccessibleRepo } from "../../api/repos.js";
+import { RepoManager, type ManagedRepo } from "../repos/RepoManager.js";
 
 function repoKey(owner: string, repo: string): string {
 	return `${owner}/${repo}`.toLowerCase();
@@ -21,12 +12,12 @@ function repoKey(owner: string, repo: string): string {
  * accessible list are retained (with a placeholder visibility) so the user can
  * still deselect them.
  */
-function mergeRepositories(
+export function mergeRepositories(
 	accessible: AccessibleRepo[],
 	configured: Array<{ owner: string; repo: string }>,
-): SelectableRepo[] {
+): ManagedRepo[] {
 	const configuredKeys = new Set(configured.map((r) => repoKey(r.owner, r.repo)));
-	const merged: SelectableRepo[] = accessible.map((repo) => ({
+	const merged: ManagedRepo[] = accessible.map((repo) => ({
 		...repo,
 		selected: configuredKeys.has(repoKey(repo.owner, repo.repo)),
 		configured: configuredKeys.has(repoKey(repo.owner, repo.repo)),
@@ -53,20 +44,26 @@ function mergeRepositories(
 }
 
 export function RepositoriesSettingsSection(): React.ReactElement {
-	const [repos, setRepos] = useState<SelectableRepo[]>([]);
+	const [repos, setRepos] = useState<ManagedRepo[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [savedAt, setSavedAt] = useState<number | null>(null);
+
+	const fetchRepos = useCallback(async () => {
+		setError(null);
+		const data = await listAccessibleRepos();
+		setRepos(mergeRepositories(data.repositories, data.configured));
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setError(null);
-		listAccessibleRepos()
-			.then((data) => {
+		fetchRepos()
+			.then(() => {
 				if (cancelled) return;
-				setRepos(mergeRepositories(data.repositories, data.configured));
 				setLoading(false);
 			})
 			.catch((err) => {
@@ -75,7 +72,19 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 				setLoading(false);
 			});
 		return () => { cancelled = true; };
-	}, []);
+	}, [fetchRepos]);
+
+	const handleRefresh = useCallback(async () => {
+		setRefreshing(true);
+		setError(null);
+		try {
+			await fetchRepos();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : String(err));
+		} finally {
+			setRefreshing(false);
+		}
+	}, [fetchRepos]);
 
 	const toggleRepo = useCallback((index: number) => {
 		setRepos((prev) => {
@@ -90,9 +99,6 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 		setRepos((prev) => prev.map((repo) => ({ ...repo, selected })));
 		setSavedAt(null);
 	}, []);
-
-	const allSelected = repos.length > 0 && repos.every((r) => r.selected);
-	const selectedCount = repos.filter((r) => r.selected).length;
 
 	const hasChanges = useMemo(() => {
 		return repos.some((r) => r.selected !== r.configured);
@@ -138,72 +144,30 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 		}
 	}, [hasChanges, repos]);
 
-	if (loading) {
-		return <div className="empty">Loading repositories...</div>;
-	}
-
 	return (
-		<div className="settings-repositories">
-			<p className="setting-description">
-				Choose which repositories TARS should manage. Selections are persisted
-				to the <code>repositories</code> table.
-			</p>
-
-			{error && <div className="error-banner">{error}</div>}
-			{savedAt !== null && !error && (
-				<div className="success-banner">Repositories saved.</div>
-			)}
-
-			{repos.length === 0 ? (
-				<div className="empty">
-					No repositories are available to the configured GitHub account.
-				</div>
-			) : (
-				<div className="settings-repositories-list">
-					<div className="settings-repositories-actions">
-						<button
-							type="button"
-							className="action-btn"
-							onClick={() => setAllSelected(!allSelected)}
-						>
-							{allSelected ? "Deselect All" : "Select All"}
-						</button>
-						<span className="settings-repositories-count">
-							{selectedCount} of {repos.length} selected
-						</span>
-					</div>
-
-					<div className="settings-repositories-items">
-						{repos.map((repo, i) => (
-							<label
-								key={repo.fullName}
-								className={`settings-repository-row${repo.selected ? " selected" : ""}${repo.configured && repo.selected ? " configured" : ""}`}
-							>
-								<input
-									type="checkbox"
-									checked={repo.selected}
-									onChange={() => toggleRepo(i)}
-								/>
-								<span className="settings-repository-name">{repo.fullName}</span>
-								{!repo.configured && repo.selected && (
-									<span className="settings-repository-badge new">new</span>
-								)}
-							</label>
-						))}
-					</div>
-				</div>
-			)}
-
-			<div className="settings-actions">
-				<button
-					className="action-btn restart"
-					onClick={handleSave}
-					disabled={saving || !hasChanges}
-					type="button"
-				>
-					{saving ? "Saving..." : "Save Changes"}
-				</button>
-			</div>
-		</div>
+		<RepoManager
+			repos={repos}
+			loading={loading}
+			error={error}
+			savedMessage={savedAt !== null ? "Repositories saved." : null}
+			selectable
+			onToggleRepo={toggleRepo}
+			onSetAllSelected={setAllSelected}
+			onSave={handleSave}
+			saving={saving}
+			canSave={hasChanges}
+			onRefresh={handleRefresh}
+			refreshing={refreshing}
+			allowManualAdd
+			onAdded={handleRefresh}
+			description={
+				<>
+					Choose which repositories TARS should manage. Selections are persisted
+					to the <code>repositories</code> table.
+				</>
+			}
+			emptyMessage="No repositories are available to the configured GitHub account."
+			loadingMessage="Loading repositories..."
+		/>
 	);
 }

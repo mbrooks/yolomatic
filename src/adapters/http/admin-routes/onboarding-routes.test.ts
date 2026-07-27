@@ -369,6 +369,41 @@ describe("handleOnboardingRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toContain("Settings store not configured");
 		});
+
+		it("returns configured repositories when repositoryStore is available", async () => {
+			const stores = await tmpStores();
+			await stores.repository.upsert({ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" });
+			const req = mockRequest({
+				url: "/api/onboarding/repos",
+				method: "POST",
+				body: JSON.stringify({ token: "ghp_test" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/repos");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "tars" }]);
+		});
+
+		it("returns an empty configured list when repositoryStore is absent", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding/repos",
+				method: "POST",
+				body: JSON.stringify({ token: "ghp_test" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/repos");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.configured).toEqual([]);
+		});
 	});
 
 	describe("POST /api/onboarding/init-workspaces", () => {

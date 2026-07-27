@@ -77,6 +77,15 @@ describe("OnboardingWizard", () => {
 		(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockImplementation(
 			async (): Promise<OnboardingConfig> => emptyConfig(),
 		);
+		// Restore the default accessible-repository response; individual tests may
+		// override it via mockResolvedValue/mockImplementation.
+		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
+			repositories: [
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
+			],
+			configured: [],
+		}));
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockOkResponse({ success: true });
 		});
@@ -261,6 +270,9 @@ describe("OnboardingWizard", () => {
 			config.github_event_mode = "webhook";
 			config.webhook_secret = { configured: true };
 			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			// No accessible repositories: the wizard auto-fetches on step 4 but has
+			// nothing to initialize, so init-workspaces stays uncalled.
+			(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockResolvedValue({ repositories: [], configured: [] });
 			render(<OnboardingWizard />);
 			await waitForReady();
 			// Step 1: admin password protected, proceed.
@@ -306,11 +318,11 @@ describe("OnboardingWizard", () => {
 			// Step 3: webhook mode with protected secret, proceed.
 			await waitFor(() => expect(screen.queryByText("Step 3 of 4")).not.toBeNull());
 			fireEvent.click(screen.getByText("Next"));
-			// Step 4: token is protected, so the Fetch button is enabled and the
-			// backend resolves the stored token from the empty submitted value.
+			// Step 4: token is protected, so the list auto-loads and the Refresh
+			// button is available. The backend resolves the stored token from the
+			// empty submitted value.
 			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 			expect(screen.queryByText("Using the configured GitHub token.")).not.toBeNull();
-			fireEvent.click(screen.getByText("Fetch Repositories"));
 			await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
 
 			fireEvent.click(screen.getByText("Initialize & Finish"));
@@ -671,7 +683,6 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
-		fireEvent.click(screen.getByText("Fetch Repositories"));
 		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
@@ -704,7 +715,6 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
-		fireEvent.click(screen.getByText("Fetch Repositories"));
 		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
@@ -847,5 +857,75 @@ describe("OnboardingWizard", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Select All" }));
 		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
+	});
+
+	it("auto-loads the repository list on reaching step 4 without clicking Fetch", async () => {
+		render(<OnboardingWizard />);
+		await advanceThroughGitHubIntegration();
+
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
+		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		// The list is populated automatically; the legacy Fetch button is gone.
+		expect(screen.queryByRole("button", { name: /fetch repositories/i })).toBeNull();
+		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+		expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeNull();
+	});
+
+	it("marks already-configured repositories as enabled and pre-selects only them in step 4", async () => {
+		const onboarding = await import("../../api/onboarding.js");
+		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
+			repositories: [
+				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
+			],
+			configured: [{ owner: "mbrooks", repo: "tars" }],
+		}));
+		render(<OnboardingWizard />);
+		await advanceThroughGitHubIntegration();
+
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
+		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+
+		// Rerunning the wizard with configured repos only pre-selects the
+		// configured repo; other accessible repos are left unchecked.
+		const tarsCheckbox = screen.getByLabelText("mbrooks/tars") as HTMLInputElement;
+		const helloCheckbox = screen.getByLabelText("octocat/hello") as HTMLInputElement;
+		expect(tarsCheckbox.checked).toBe(true);
+		expect(helloCheckbox.checked).toBe(false);
+		// ...and the configured one shows an "enabled" badge.
+		expect(screen.getAllByText("enabled")).not.toBeNull();
+	});
+
+	it("refreshes the repository list when Refresh is clicked", async () => {
+		let fetchCount = 0;
+		const onboarding = await import("../../api/onboarding.js");
+		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+			fetchCount++;
+			return {
+				repositories: [
+					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				],
+				configured: [],
+			};
+		});
+		render(<OnboardingWizard />);
+		await advanceThroughGitHubIntegration();
+
+		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "polling" } });
+		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
+		fireEvent.click(screen.getByText("Next"));
+
+		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await waitFor(() => expect(fetchCount).toBe(1));
+
+		fireEvent.click(screen.getByRole("button", { name: /refresh/i }));
+		await waitFor(() => expect(fetchCount).toBe(2));
 	});
 });
