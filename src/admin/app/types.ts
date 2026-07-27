@@ -54,6 +54,9 @@ export type Session = {
 	repo: string;
 	issueNumber: number;
 	status: SessionStatus;
+	title: string | null;
+	body: string | null;
+	summary: string | null;
 	workspacePath: string;
 	branch: string;
 	lastActivity: string;

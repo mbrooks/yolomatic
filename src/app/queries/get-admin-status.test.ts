@@ -314,4 +314,128 @@ describe("GetAdminStatus", () => {
 			});
 		}
 	});
+
+	it("exposes issue title, body, and summary in the session view", async () => {
+		const repo: SessionRepository = {
+			getAll: vi.fn(async () => [
+				makeState({
+					owner: "mbrooks",
+					repo: "tars",
+					issueNumber: 1,
+					status: "working",
+					title: "Fix the thing",
+					body: "The thing is broken and needs fixing.",
+					summary: "Short summary of the issue.",
+				}),
+			]),
+		} as unknown as SessionRepository;
+		const stale: StaleSessionService = {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
+		const result = await query.execute();
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.sessions[0]).toMatchObject({
+				title: "Fix the thing",
+				body: "The thing is broken and needs fixing.",
+				summary: "Short summary of the issue.",
+			});
+		}
+	});
+
+	it("coerces a missing optional summary to null while preserving title and body", async () => {
+		const repo: SessionRepository = {
+			getAll: vi.fn(async () => [
+				makeState({
+					owner: "mbrooks",
+					repo: "tars",
+					issueNumber: 1,
+					status: "working",
+					title: "Fix the thing",
+					body: "The thing is broken.",
+					summary: undefined,
+				}),
+			]),
+		} as unknown as SessionRepository;
+		const stale: StaleSessionService = {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
+		const result = await query.execute();
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.sessions[0]).toMatchObject({
+				title: "Fix the thing",
+				body: "The thing is broken.",
+				summary: null,
+			});
+		}
+	});
+
+	it("coerces undefined title and body to null when risk detection is stubbed", async () => {
+		const model = await import("../../domain/session/model.js");
+		const riskSpy = vi.spyOn(model, "detectSessionRisk").mockReturnValue({
+			suspectedMisroute: false,
+			reasons: [],
+			referencedIssueNumber: null,
+		});
+		const repo: SessionRepository = {
+			getAll: vi.fn(async () => [
+				makeState({
+					owner: "mbrooks",
+					repo: "tars",
+					issueNumber: 1,
+					status: "working",
+					title: undefined as unknown as string,
+					body: undefined as unknown as string,
+					summary: undefined,
+				}),
+			]),
+		} as unknown as SessionRepository;
+		const stale: StaleSessionService = {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+		const clock: Clock = { now: () => new Date(), uptime: () => 0 };
+		const taskControl: TaskControlService = {
+			cancel: vi.fn(),
+			isActive: vi.fn(),
+			steer: vi.fn(async () => false),
+			register: vi.fn(),
+			unregister: vi.fn(),
+			isDraining: vi.fn(() => false),
+			setDraining: vi.fn(),
+		};
+		const query = new GetAdminStatus(repo, stale, clock, taskControl);
+		const result = await query.execute();
+		riskSpy.mockRestore();
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.sessions[0]).toMatchObject({
+				title: null,
+				body: null,
+				summary: null,
+			});
+		}
+	});
 });

@@ -20,6 +20,9 @@ export interface AdminStatusSessionView {
 	repo: string;
 	issueNumber: number;
 	status: string;
+	title: string | null;
+	body: string | null;
+	summary: string | null;
 	workspacePath: string;
 	branch: string;
 	lastActivity: string;
@@ -108,6 +111,9 @@ export class GetAdminStatus {
 					repo: s.repo,
 					issueNumber: s.issueNumber,
 					status: s.status,
+					title: s.title ?? null,
+					body: s.body ?? null,
+					summary: s.summary ?? null,
 					workspacePath: s.workspacePath,
 					branch: s.branch ?? `tars/issue-${s.issueNumber}`,
 					lastActivity: s.lastActivity,
