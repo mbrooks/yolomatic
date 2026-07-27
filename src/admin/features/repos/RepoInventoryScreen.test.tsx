@@ -6,13 +6,11 @@ import { RepoInventoryScreen } from "./RepoInventoryScreen.js";
 import type { RepoSummary } from "../../app/types.js";
 
 vi.mock("../../api/repos.js", () => ({
-	scanRepos: vi.fn(),
 	addRepo: vi.fn(),
 }));
 
-import { scanRepos, addRepo } from "../../api/repos.js";
+import { addRepo } from "../../api/repos.js";
 
-const mockedScanRepos = vi.mocked(scanRepos);
 const mockedAddRepo = vi.mocked(addRepo);
 
 function makeRepo(overrides: Partial<RepoSummary> = {}): RepoSummary {
@@ -30,7 +28,7 @@ const defaultProps = {
 	repos: [] as RepoSummary[],
 	onSelectRepo: vi.fn(),
 	onBack: vi.fn(),
-	onRescanComplete: vi.fn(),
+	onMutate: vi.fn(),
 };
 
 beforeEach(() => {
@@ -38,6 +36,11 @@ beforeEach(() => {
 });
 
 describe("RepoInventoryScreen", () => {
+	it("does not render a Rescan button", () => {
+		render(<RepoInventoryScreen {...defaultProps} />);
+		expect(screen.queryByRole("button", { name: /rescan/i })).toBeNull();
+	});
+
 	it("renders empty state when no repos", () => {
 		render(<RepoInventoryScreen {...defaultProps} />);
 		expect(screen.getByText("No repositories have been used yet.")).not.toBeNull();
@@ -61,35 +64,6 @@ describe("RepoInventoryScreen", () => {
 
 		fireEvent.click(screen.getByText("mbrooks/tars"));
 		expect(onSelectRepo).toHaveBeenCalledWith("mbrooks", "tars");
-	});
-
-	it("shows scanning state and calls scanRepos when Rescan is clicked", async () => {
-		mockedScanRepos.mockResolvedValue({ repos: [], added: 0 });
-		const onRescanComplete = vi.fn();
-		render(<RepoInventoryScreen {...defaultProps} onRescanComplete={onRescanComplete} />);
-
-		const button = screen.getByRole("button", { name: /rescan/i });
-		fireEvent.click(button);
-
-		await waitFor(() => {
-			expect(screen.getByRole("button", { name: /scanning/i })).not.toBeNull();
-		});
-
-		await waitFor(() => {
-			expect(onRescanComplete).toHaveBeenCalled();
-		});
-	});
-
-	it("displays error when scanRepos fails", async () => {
-		mockedScanRepos.mockRejectedValue(new Error("Token invalid"));
-		render(<RepoInventoryScreen {...defaultProps} />);
-
-		const button = screen.getByRole("button", { name: /rescan/i });
-		fireEvent.click(button);
-
-		await waitFor(() => {
-			expect(screen.getByText(/Rescan failed: Token invalid/)).not.toBeNull();
-		});
 	});
 
 	it("opens a modal containing the add repository form when Add Repository is clicked", () => {
@@ -137,8 +111,8 @@ describe("RepoInventoryScreen", () => {
 
 	it("calls addRepo and refreshes the inventory on successful add, then closes the modal", async () => {
 		mockedAddRepo.mockResolvedValue({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", added: true });
-		const onRescanComplete = vi.fn();
-		render(<RepoInventoryScreen {...defaultProps} onRescanComplete={onRescanComplete} />);
+		const onMutate = vi.fn();
+		render(<RepoInventoryScreen {...defaultProps} onMutate={onMutate} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 		fireEvent.change(screen.getByLabelText(/owner/i), { target: { value: "octocat" } });
@@ -149,7 +123,7 @@ describe("RepoInventoryScreen", () => {
 			expect(mockedAddRepo).toHaveBeenCalledWith("octocat", "hello-world");
 		});
 		await waitFor(() => {
-			expect(onRescanComplete).toHaveBeenCalled();
+			expect(onMutate).toHaveBeenCalled();
 		});
 		await waitFor(() => {
 			expect(screen.queryByRole("dialog")).toBeNull();

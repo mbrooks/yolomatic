@@ -95,10 +95,14 @@ describe("onboarding API", () => {
 	describe("listAccessibleRepositories", () => {
 		it("calls /api/onboarding/repos with token", async () => {
 			fetchSpy.mockImplementation(async () => {
-				return mockOkResponse({ repositories: [{ owner: "a", repo: "b", fullName: "a/b" }] });
+				return mockOkResponse({
+					repositories: [{ owner: "a", repo: "b", fullName: "a/b" }],
+					configured: [{ owner: "a", repo: "b" }],
+				});
 			});
 			const result = await listAccessibleRepositories("ghp_test");
 			expect(result.repositories).toHaveLength(1);
+			expect(result.configured).toEqual([{ owner: "a", repo: "b" }]);
 			const calls = fetchSpy.mock.calls as [string, RequestInit][];
 			expect(calls[0][0]).toBe("/api/onboarding/repos");
 			const body = JSON.parse(calls[0][1].body as string);

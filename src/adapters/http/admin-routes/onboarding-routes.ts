@@ -220,7 +220,15 @@ const registry = new AdminRouteRegistry()
 			}
 			const gh = new GitHubServiceAdapter({ githubToken: token });
 			const repos = await gh.listAccessibleRepositories();
-			return { status: 200, body: { repositories: repos } };
+			// Include the currently configured repositories so the wizard can
+			// pre-select them when re-running onboarding. The repositoryStore is
+			// optional here so the endpoint keeps working before the store is
+			// wired up.
+			let configured: Array<{ owner: string; repo: string }> = [];
+			if (ctx.deps.repositoryStore) {
+				configured = (await ctx.deps.repositoryStore.list()).map((repo) => ({ owner: repo.owner, repo: repo.repo }));
+			}
+			return { status: 200, body: { repositories: repos, configured } };
 		},
 	})
 	.route<{
