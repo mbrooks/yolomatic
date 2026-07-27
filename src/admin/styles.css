@@ -206,6 +206,41 @@ h1 {
 	text-decoration: underline;
 }
 
+/* Issue summary block (session detail) */
+.issue-summary {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 0.75rem 1rem;
+}
+
+.issue-summary-title {
+	color: var(--blue);
+	display: block;
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin-bottom: 0.35rem;
+	text-decoration: none;
+	word-break: break-word;
+}
+
+.issue-summary-title:hover {
+	text-decoration: underline;
+}
+
+.issue-summary-body {
+	color: var(--text);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.issue-summary-empty {
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
 .detail-section {
 	margin-bottom: 1.25rem;
 }

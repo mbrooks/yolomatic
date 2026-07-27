@@ -28,6 +28,7 @@ export function SessionDetail({
 
 	return (
 		<div className="detail-pane">
+			<IssueSummaryBlock session={selected} />
 			<div className="detail-title">
 				{selected.owner}/{selected.repo}#{selected.issueNumber}
 			</div>
@@ -137,6 +138,48 @@ export function SessionDetail({
 					onPauseToggle={() => setPaused((current) => !current)}
 				/>
 			</div>
+		</div>
+	);
+}
+
+function IssueSummaryBlock({ session }: { session: Session }): React.ReactElement | null {
+	const issueUrl = `https://github.com/${session.owner}/${session.repo}/issues/${session.issueNumber}`;
+	const hasTitle = session.title !== null && session.title.trim() !== "";
+	const excerptBase = session.summary ?? session.body ?? "";
+	const hasExcerpt = excerptBase.trim() !== "";
+	const MAX_EXCERPT = 300;
+	const truncated = excerptBase.length > MAX_EXCERPT;
+	const excerpt = truncated ? `${excerptBase.slice(0, MAX_EXCERPT).trimEnd()}…` : excerptBase;
+
+	if (!hasTitle && !hasExcerpt) {
+		return (
+			<div className="detail-section issue-summary">
+				<h3>Issue summary</h3>
+				<div className="issue-summary-empty">No issue description available.</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="detail-section issue-summary">
+			<h3>Issue summary</h3>
+			{hasTitle ? (
+				<a className="issue-summary-title" href={issueUrl} target="_blank" rel="noreferrer">
+					#{session.issueNumber} {session.title}
+				</a>
+			) : (
+				<a className="issue-summary-title" href={issueUrl} target="_blank" rel="noreferrer">
+					#{session.issueNumber}
+				</a>
+			)}
+			{hasExcerpt ? (
+				<div className="issue-summary-body">
+					{excerpt}{" "}
+					{truncated ? (
+						<a href={issueUrl} target="_blank" rel="noreferrer">more</a>
+					) : null}
+				</div>
+			) : null}
 		</div>
 	);
 }
