@@ -3,7 +3,7 @@ import { Breadcrumb } from "../../components/Breadcrumb.js";
 import { Modal } from "../../components/Modal.js";
 import type { RepoSummary } from "../../app/types.js";
 import { formatRelative } from "../../lib/format.js";
-import { scanRepos, addRepo } from "../../api/repos.js";
+import { addRepo } from "../../api/repos.js";
 
 type SortKey = "repo" | "activeCount" | "sessionCount" | "lastActivity";
 type SortDir = "asc" | "desc";
@@ -38,16 +38,14 @@ export function RepoInventoryScreen({
 	repos,
 	onSelectRepo,
 	onBack,
-	onRescanComplete,
+	onMutate,
 }: {
 	repos: RepoSummary[];
 	onSelectRepo: (owner: string, repo: string) => void;
 	onBack: () => void;
-	onRescanComplete?: () => void;
+	onMutate?: () => void;
 }): React.ReactElement {
 	const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "lastActivity", dir: "desc" });
-	const [scanning, setScanning] = useState(false);
-	const [scanError, setScanError] = useState<string | null>(null);
 	const [showAdd, setShowAdd] = useState(false);
 	const [addOwner, setAddOwner] = useState("");
 	const [addRepoName, setAddRepoName] = useState("");
@@ -72,33 +70,6 @@ export function RepoInventoryScreen({
 		return sort.dir === "asc" ? " ▲" : " ▼";
 	}
 
-	async function handleRescan() {
-		setScanning(true);
-		setScanError(null);
-		try {
-			await scanRepos();
-			onRescanComplete?.();
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			setScanError(message);
-		} finally {
-			setScanning(false);
-		}
-	}
-
-	function openAddModal() {
-		setShowAdd(true);
-		setAddError(null);
-		setAddMessage(null);
-	}
-
-	function closeAddModal() {
-		if (addLoading) return;
-		setShowAdd(false);
-		setAddError(null);
-		setAddMessage(null);
-	}
-
 	async function handleAddRepo(event: React.FormEvent) {
 		event.preventDefault();
 		setAddError(null);
@@ -117,7 +88,7 @@ export function RepoInventoryScreen({
 				setAddRepoName("");
 				setAddMessage(`Added ${result.fullName ?? `${result.owner}/${result.repo}`}`);
 				setShowAdd(false);
-				onRescanComplete?.();
+				onMutate?.();
 			} else {
 				setAddMessage(result.message ?? "Repository already configured");
 			}
@@ -127,6 +98,19 @@ export function RepoInventoryScreen({
 		} finally {
 			setAddLoading(false);
 		}
+	}
+
+	function openAddModal() {
+		setShowAdd(true);
+		setAddError(null);
+		setAddMessage(null);
+	}
+
+	function closeAddModal() {
+		if (addLoading) return;
+		setShowAdd(false);
+		setAddError(null);
+		setAddMessage(null);
 	}
 
 	return (
@@ -143,23 +127,8 @@ export function RepoInventoryScreen({
 					>
 						➕ Add Repository
 					</button>
-					<button
-						type="button"
-						className="action-btn"
-						onClick={() => {
-							void handleRescan();
-						}}
-						disabled={scanning}
-					>
-						{scanning ? "🔄 Scanning..." : "🔄 Rescan"}
-					</button>
 				</div>
 			</div>
-			{scanError ? (
-				<div className="empty-state">
-					<p className="error-text">Rescan failed: {scanError}</p>
-				</div>
-			) : null}
 			<Modal open={showAdd} onClose={closeAddModal} title="Add Repository">
 				<form className="repo-add-form" onSubmit={handleAddRepo}>
 					<p className="repo-add-hint">Enter the repository as <code>owner/repo-name</code>.</p>

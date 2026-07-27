@@ -11,6 +11,7 @@ import {
 	type OnboardingSecretField,
 } from "../../api/onboarding.js";
 import { Modal } from "../../components/Modal.js";
+import { RepoManager, type ManagedRepo } from "../repos/RepoManager.js";
 
 export type GithubEventMode = "webhook" | "polling" | "both";
 
@@ -27,7 +28,7 @@ interface WizardState {
 	githubPollIntervalMs: string;
 	webhookSecret: string;
 	webhookSecretProtected: boolean;
-	repositories: Array<{ owner: string; repo: string; fullName: string; selected: boolean }>;
+	repositories: ManagedRepo[];
 	error: string | null;
 }
 
@@ -64,6 +65,55 @@ export function parsePollIntervalMs(raw: string): number | null {
 		return null;
 	}
 	return value;
+}
+
+function repoKey(owner: string, repo: string): string {
+	return `${owner}/${repo}`.toLowerCase();
+}
+
+/**
+ * Merges the accessible repositories returned by the API with the currently
+ * configured repositories and the wizard's previous selection. Configured
+ * repos that no longer appear in the accessible list are retained so the
+ * operator can still deselect them. On the first fetch (no previous selection)
+ * every accessible repo is pre-selected.
+ */
+function mergeAccessibleRepos(
+	accessible: Array<{ owner: string; repo: string; fullName: string }>,
+	configured: Array<{ owner: string; repo: string }>,
+	previous: ManagedRepo[],
+): ManagedRepo[] {
+	const configuredKeys = new Set(configured.map((r) => repoKey(r.owner, r.repo)));
+	const previousByKey = new Map(previous.map((r) => [repoKey(r.owner, r.repo), r]));
+	const merged: ManagedRepo[] = accessible.map((repo) => {
+		const key = repoKey(repo.owner, repo.repo);
+		const isConfigured = configuredKeys.has(key);
+		const prev = previousByKey.get(key);
+		return {
+			owner: repo.owner,
+			repo: repo.repo,
+			fullName: repo.fullName,
+			selected: prev ? prev.selected : true,
+			configured: isConfigured,
+		};
+	});
+
+	const accessibleKeys = new Set(accessible.map((r) => repoKey(r.owner, r.repo)));
+	for (const repo of configured) {
+		const key = repoKey(repo.owner, repo.repo);
+		if (accessibleKeys.has(key)) continue;
+		const prev = previousByKey.get(key);
+		merged.push({
+			owner: repo.owner,
+			repo: repo.repo,
+			fullName: `${repo.owner}/${repo.repo}`,
+			selected: prev ? prev.selected : true,
+			configured: true,
+		});
+	}
+
+	merged.sort((a, b) => a.fullName.localeCompare(b.fullName));
+	return merged;
 }
 
 function generatePassword(): string {
@@ -258,8 +308,14 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 		setError(null);
 		try {
 			const result = await listAccessibleRepositories(state.githubToken.trim());
-			const repos = result.repositories.map((r) => ({ ...r, selected: true }));
-			setState((prev) => ({ ...prev, repositories: repos }));
+			setState((prev) => ({
+				...prev,
+				repositories: mergeAccessibleRepos(
+					result.repositories,
+					result.configured ?? [],
+					prev.repositories,
+				),
+			}));
 		} catch (err) {
 			setError(err instanceof Error ? err.message : String(err));
 		} finally {
@@ -281,6 +337,25 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			repositories: prev.repositories.map((repo) => ({ ...repo, selected })),
 		}));
 	}, []);
+
+	const hasAutoFetchedReposRef = useRef(false);
+
+	useEffect(() => {
+		// Auto-load the repository list when the operator reaches step 4 so they
+		// do not have to click Fetch. Only runs once per mount and only when a
+		// GitHub token is available (entered or already configured).
+		const hasToken = state.githubToken.trim().length > 0 || state.githubTokenProtected;
+		if (
+			state.step === 4 &&
+			hasToken &&
+			state.repositories.length === 0 &&
+			!loading &&
+			!hasAutoFetchedReposRef.current
+		) {
+			hasAutoFetchedReposRef.current = true;
+			void handleFetchRepos();
+		}
+	}, [state.step, state.githubToken, state.githubTokenProtected, state.repositories, loading, handleFetchRepos]);
 
 	const handleFinish = useCallback(async () => {
 		setLoading(true);
@@ -436,7 +511,6 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 						onFetchRepos={handleFetchRepos}
 						onToggleRepo={toggleRepo}
 						onSetAllReposSelected={setAllReposSelected}
-						onFinish={handleFinish}
 						loading={loading}
 					/>
 				)}
@@ -791,88 +865,38 @@ function StepFiveWorkspaceInit({
 	onFetchRepos,
 	onToggleRepo,
 	onSetAllReposSelected,
-	onFinish,
 	loading,
 }: {
 	state: WizardState;
 	onFetchRepos: () => Promise<void>;
 	onToggleRepo: (index: number) => void;
 	onSetAllReposSelected: (selected: boolean) => void;
-	onFinish: () => Promise<void>;
 	loading: boolean;
 }): React.ReactElement {
-	const selectedCount = state.repositories.filter((r) => r.selected).length;
-
 	return (
 		<div className="onboarding-form">
-			<div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-				<button
-					type="button"
-					className="action-btn"
-					style={{ background: "var(--blue)", color: "#000" }}
-					onClick={onFetchRepos}
-					disabled={loading || (!state.githubToken.trim() && !state.githubTokenProtected)}
-				>
-					{loading && state.repositories.length === 0 ? "Fetching..." : "Fetch Repositories"}
-				</button>
-				<span style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-					{state.githubTokenProtected
-					? "Using the configured GitHub token."
-					: selectedCount > 0 && `${selectedCount} selected`}
-				</span>
-			</div>
-
-			{state.repositories.length > 0 && (
-				<div
-					style={{
-						background: "var(--bg)",
-						border: "1px solid var(--border)",
-						borderRadius: "6px",
-						padding: "1rem",
-							maxHeight: "16rem",
-							overflowY: "auto",
-						}}
-					>
-						<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-							<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-								<button
-									type="button"
-									className="action-btn"
-									style={{
-										background: "var(--surface)",
-										border: "1px solid var(--border)",
-										color: "var(--text)",
-										fontSize: "0.75rem",
-										padding: "0.25rem 0.5rem",
-									}}
-									onClick={() => onSetAllReposSelected(!state.repositories.every((r) => r.selected))}
-								>
-									{state.repositories.every((r) => r.selected) ? "Deselect All" : "Select All"}
-								</button>
-							</div>
-						{state.repositories.map((repo, i) => (
-							<label
-								key={repo.fullName}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: "0.5rem",
-									cursor: "pointer",
-									padding: "0.35rem 0",
-									borderBottom: "1px solid var(--border)",
-								}}
-							>
-								<input
-									type="checkbox"
-									checked={repo.selected}
-									onChange={() => onToggleRepo(i)}
-								/>
-								<span style={{ fontSize: "0.875rem" }}>{repo.fullName}</span>
-							</label>
-						))}
-					</div>
-				</div>
-			)}
+			<RepoManager
+				repos={state.repositories}
+				loading={loading}
+				error={state.error}
+				selectable
+				onToggleRepo={onToggleRepo}
+				onSetAllSelected={onSetAllReposSelected}
+				onRefresh={onFetchRepos}
+				refreshing={loading}
+				refreshLabel="Refresh"
+				note={
+					state.githubTokenProtected
+						? "Using the configured GitHub token."
+						: undefined
+				}
+				emptyMessage="No repositories are accessible to the configured GitHub account."
+				loadingMessage={
+					loading && state.repositories.length === 0
+						? "Fetching repositories..."
+						: "Loading repositories..."
+				}
+			/>
 		</div>
 	);
 }
