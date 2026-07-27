@@ -75,8 +75,15 @@ function repoKey(owner: string, repo: string): string {
  * Merges the accessible repositories returned by the API with the currently
  * configured repositories and the wizard's previous selection. Configured
  * repos that no longer appear in the accessible list are retained so the
- * operator can still deselect them. On the first fetch (no previous selection)
- * every accessible repo is pre-selected.
+ * operator can still deselect them.
+ *
+ * Pre-selection rules:
+ * - A previous in-progress selection for a repo is always preserved.
+ * - When no repositories have been previously configured (first run), every
+ *   accessible repo is pre-selected so the operator can just click Finish.
+ * - When repositories have already been configured (rerunning the wizard),
+ *   only those configured repos are pre-selected; other accessible repos are
+ *   left unchecked so the operator does not accidentally opt into new repos.
  */
 function mergeAccessibleRepos(
 	accessible: Array<{ owner: string; repo: string; fullName: string }>,
@@ -85,6 +92,10 @@ function mergeAccessibleRepos(
 ): ManagedRepo[] {
 	const configuredKeys = new Set(configured.map((r) => repoKey(r.owner, r.repo)));
 	const previousByKey = new Map(previous.map((r) => [repoKey(r.owner, r.repo), r]));
+	const hasAnyConfigured = configured.length > 0;
+	const defaultSelected = (isConfigured: boolean): boolean =>
+		hasAnyConfigured ? isConfigured : true;
+
 	const merged: ManagedRepo[] = accessible.map((repo) => {
 		const key = repoKey(repo.owner, repo.repo);
 		const isConfigured = configuredKeys.has(key);
@@ -93,7 +104,7 @@ function mergeAccessibleRepos(
 			owner: repo.owner,
 			repo: repo.repo,
 			fullName: repo.fullName,
-			selected: prev ? prev.selected : true,
+			selected: prev ? prev.selected : defaultSelected(isConfigured),
 			configured: isConfigured,
 		};
 	});
@@ -107,7 +118,7 @@ function mergeAccessibleRepos(
 			owner: repo.owner,
 			repo: repo.repo,
 			fullName: `${repo.owner}/${repo.repo}`,
-			selected: prev ? prev.selected : true,
+			selected: prev ? prev.selected : defaultSelected(true),
 			configured: true,
 		});
 	}

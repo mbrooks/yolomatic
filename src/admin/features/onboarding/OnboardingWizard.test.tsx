@@ -874,7 +874,7 @@ describe("OnboardingWizard", () => {
 		expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeNull();
 	});
 
-	it("marks already-configured repositories as enabled and pre-selects them in step 4", async () => {
+	it("marks already-configured repositories as enabled and pre-selects only them in step 4", async () => {
 		const onboarding = await import("../../api/onboarding.js");
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
@@ -893,11 +893,12 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
 
-		// Both repos are pre-selected on first fetch...
+		// Rerunning the wizard with configured repos only pre-selects the
+		// configured repo; other accessible repos are left unchecked.
 		const tarsCheckbox = screen.getByLabelText("mbrooks/tars") as HTMLInputElement;
 		const helloCheckbox = screen.getByLabelText("octocat/hello") as HTMLInputElement;
 		expect(tarsCheckbox.checked).toBe(true);
-		expect(helloCheckbox.checked).toBe(true);
+		expect(helloCheckbox.checked).toBe(false);
 		// ...and the configured one shows an "enabled" badge.
 		expect(screen.getAllByText("enabled")).not.toBeNull();
 	});
