@@ -43,7 +43,7 @@ docker run --rm \
   --network container:yeetomatic \
   --mount type=volume,src=yeetomatic_workspaces,dst=/app/workspaces \
   -e YEETOMATIC_SESSION_KEY=mbrooks/yeetomatic#395 \
-  -e YEETOMATIC_SESSION_WS_URL=ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
+  -e YEETOMATIC_SESSION_WS_URL=ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token> \
   -e YEETOMATIC_SOUL_PATH=/app/SOUL.md \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
@@ -87,7 +87,7 @@ The session URL exists only for the lifetime of one active worker run.
 
 Example:
 
-- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token>`
 
 For non-compose deployments, the base URL may instead point at `host.docker.internal` or another worker-reachable control-plane address. The key requirement is that the value matches the worker container's network perspective.
 
