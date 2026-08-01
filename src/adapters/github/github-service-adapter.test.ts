@@ -41,6 +41,7 @@ function createMockOctokit(overrides?: Partial<{
 			createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
 			listForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			getCollaboratorPermissionLevel: vi.fn(async () => ({ data: { permission: "read" } })),
+			checkCollaborator: vi.fn(async () => ({ status: 204 })),
 			...(overrides?.repos ?? {}),
 		},
 		search: {
@@ -833,6 +834,44 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
 			expect(result).toBeNull();
+		});
+	});
+
+	describe("isCollaborator", () => {
+		it("returns true when checkCollaborator responds with 204", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					checkCollaborator: vi.fn(async () => ({ status: 204 })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBe(true);
+			expect(octokit.repos.checkCollaborator).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", username: "octocat" });
+		});
+
+		it("returns false when checkCollaborator responds with a non-204 status", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					checkCollaborator: vi.fn(async () => ({ status: 200 })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBe(false);
+		});
+
+		it("returns false when checkCollaborator throws", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					checkCollaborator: vi.fn(async () => {
+						throw Object.assign(new Error("Not Found"), { status: 404 });
+					}),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBe(false);
 		});
 	});
 

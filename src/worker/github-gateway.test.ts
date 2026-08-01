@@ -55,6 +55,7 @@ function makeFakeGateway(overrides: Partial<GitHubGatewayService> = {}): GitHubG
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
 		getCollaboratorPermissionLevel: vi.fn(async () => null),
+		isCollaborator: vi.fn(async () => false),
 		getIssueDetail: vi.fn(async (owner, repo, issueNumber): Promise<GatewayIssueDetail | null> => {
 			return {
 				number: issueNumber,
