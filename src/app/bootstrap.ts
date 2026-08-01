@@ -8,6 +8,7 @@ import { TaskController } from "../task-controller.js";
 import { WorkspaceManager } from "../workspace/manager.js";
 import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 import { WorkerRpcServer } from "../worker/rpc-server.js";
+import { WorkerGitHubGateway } from "../worker/github-gateway.js";
 import { GitHubIssueHandlers, type WebhookHandlers } from "../webhook/handlers.js";
 import { cleanupOldSessions, createWebhookServer } from "../webhook/server.js";
 import { SkillStore } from "../skills/store.js";
@@ -104,6 +105,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		evictionStrategy: config.evictionStrategy,
 	});
 	const workerRpcServer = new WorkerRpcServer();
+	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
+	const githubGateway = new WorkerGitHubGateway(github);
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,
@@ -114,6 +117,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workerRpcServer,
 		workerOllamaHost: config.workerOllamaHost,
 		soulPath: config.soulPath,
+		githubGateway,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const refinementStore = new RefinementStore(path.join(config.memoryDir, "refinement.sqlite"));
@@ -149,7 +153,6 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		githubToken: config.githubToken,
 		defaultBranch: config.defaultBranch,
 	});
-	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
 	const githubPolling = new GitHubPollingAdapter({ githubToken: config.githubToken });
 
 	const sessionRepo = new SessionStoreRepositoryAdapter(sessionStore);

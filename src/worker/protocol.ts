@@ -64,6 +64,27 @@ export interface WorkerErrorPayload {
 	stack?: string;
 }
 
+/**
+ * Worker -> control plane. Asks the control plane to run a scoped GitHub
+ * operation on the worker's behalf. The control plane acks receipt and later
+ * replies with a `tool_response` carrying the result (or a scope/error failure).
+ */
+export interface WorkerToolRequestPayload {
+	tool: string;
+	params: Record<string, unknown>;
+}
+
+/**
+ * Control plane -> worker. Carries the result of a `tool_request`. The
+ * `requestMessageId` correlates the response to the originating request.
+ */
+export interface WorkerToolResponsePayload {
+	requestMessageId: string;
+	ok: boolean;
+	data?: unknown;
+	error?: string;
+}
+
 type WorkerMessageMap = {
 	hello: WorkerHelloPayload;
 	launch_config: WorkerLaunchConfigPayload;
@@ -73,6 +94,8 @@ type WorkerMessageMap = {
 	control: WorkerControlPayload;
 	complete: WorkerCompletePayload;
 	error: WorkerErrorPayload;
+	tool_request: WorkerToolRequestPayload;
+	tool_response: WorkerToolResponsePayload;
 };
 
 export type WorkerMessageType = keyof WorkerMessageMap;

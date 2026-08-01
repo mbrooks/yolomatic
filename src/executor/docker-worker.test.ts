@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWorkerMessage, type AnyWorkerProtocolMessage, type WorkerProtocolMessage } from "../worker/protocol.js";
 import type { PendingWorkerRpcConnection, WorkerRpcConnection, WorkerRpcServer } from "../worker/rpc-server.js";
+import { WorkerGitHubGateway, type GatewayToolResponse } from "../worker/github-gateway.js";
+import type { GitHubGatewayService } from "../ports/github-gateway-service.js";
 
 const { execFileMock, spawnMock, recordSessionLogMock } = vi.hoisted(() => ({
 	execFileMock: vi.fn(),
@@ -986,6 +988,189 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 });
+
+	describe("tool_request / tool_response gateway dispatch", () => {
+		const gatewayTransport = "websocket-v1";
+
+		it("routes a worker tool_request through the gateway and logs success", async () => {
+			const harness = await createHarness(460);
+			const github: GitHubGatewayService = {
+				getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
+			} as unknown as GitHubGatewayService;
+			const gateway = new WorkerGitHubGateway(github);
+			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
+			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+				if (args[0] === "remote" && args[1] === "get-url") {
+					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					return;
+				}
+				callback(null, gatewayTransport, "");
+			});
+
+			spawnMock.mockImplementation((_cmd, _args, options) => {
+				const child = makeChildProcess();
+				void connectMockWorker(
+					harness.workerRpcServer,
+					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					async (connection, message) => {
+						if (message.type === "launch_config") {
+							await connection.send(
+								createWorkerMessage("ack", "mbrooks/yeetomatic#460", "ack-launch", { ackMessageId: message.messageId }),
+							);
+							await connection.send(
+								createWorkerMessage("tool_request", "mbrooks/yeetomatic#460", "tool-1", {
+									tool: "get_authenticated_user",
+									params: {},
+								}),
+							);
+							return;
+						}
+						if (message.type === "tool_response") {
+							expect((message.payload as { ok: boolean }).ok).toBe(true);
+							await connection.send(
+								createWorkerMessage("complete", "mbrooks/yeetomatic#460", "complete-1", {
+									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								}),
+							);
+						}
+					},
+				);
+				return child;
+			});
+
+			try {
+				const result = await harness.executor.execute(makeSessionState(460, harness.workspacePath));
+				expect(result.status).toBe("complete");
+				expect(github.getAuthenticatedUser).toHaveBeenCalled();
+				expect(recordSessionLogMock).toHaveBeenCalledWith(
+					"mbrooks/yeetomatic#460",
+					expect.objectContaining({ message: "gateway get_authenticated_user done" }),
+				);
+			} finally {
+				await harness.close();
+			}
+		});
+
+		it("returns a scope-error tool_response and does not call GitHub for out-of-scope pr_number", async () => {
+			const harness = await createHarness(461);
+			const github: GitHubGatewayService = {
+				getAuthenticatedUser: vi.fn(async () => ({ login: "bot" })),
+				listPullRequestsForHead: vi.fn(async () => []),
+				postPRComment: vi.fn(async () => {
+					throw new Error("must not be called");
+				}),
+			} as unknown as GitHubGatewayService;
+			const gateway = new WorkerGitHubGateway(github);
+			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
+			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+				if (args[0] === "remote" && args[1] === "get-url") {
+					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					return;
+				}
+				callback(null, gatewayTransport, "");
+			});
+
+			let responsePayload: GatewayToolResponse | undefined;
+			spawnMock.mockImplementation((_cmd, _args, options) => {
+				const child = makeChildProcess();
+				void connectMockWorker(
+					harness.workerRpcServer,
+					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					async (connection, message) => {
+						if (message.type === "launch_config") {
+							await connection.send(
+								createWorkerMessage("ack", "mbrooks/yeetomatic#461", "ack-launch", { ackMessageId: message.messageId }),
+							);
+							await connection.send(
+								createWorkerMessage("tool_request", "mbrooks/yeetomatic#461", "tool-2", {
+									tool: "set_pr_comment",
+									params: { body: "hi", pr_number: 999 },
+								}),
+							);
+							return;
+						}
+						if (message.type === "tool_response") {
+							responsePayload = message.payload as unknown as GatewayToolResponse;
+							await connection.send(
+								createWorkerMessage("complete", "mbrooks/yeetomatic#461", "complete-2", {
+									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								}),
+							);
+						}
+					},
+				);
+				return child;
+			});
+
+			try {
+				await harness.executor.execute(makeSessionState(461, harness.workspacePath));
+				expect(responsePayload).toBeDefined();
+				expect(responsePayload?.ok).toBe(false);
+				expect(responsePayload?.scopeError).toBe(true);
+				expect(github.postPRComment).not.toHaveBeenCalled();
+				expect(github.listPullRequestsForHead).toHaveBeenCalled();
+				expect(recordSessionLogMock).toHaveBeenCalledWith(
+					"mbrooks/yeetomatic#461",
+					expect.objectContaining({ message: "gateway set_pr_comment scope-rejected" }),
+				);
+			} finally {
+				await harness.close();
+			}
+		});
+
+		it("returns an error tool_response when no gateway is configured", async () => {
+			const harness = await createHarness(462);
+			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+				if (args[0] === "remote" && args[1] === "get-url") {
+					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					return;
+				}
+				callback(null, gatewayTransport, "");
+			});
+
+			let responsePayload: GatewayToolResponse | undefined;
+			spawnMock.mockImplementation((_cmd, _args, options) => {
+				const child = makeChildProcess();
+				void connectMockWorker(
+					harness.workerRpcServer,
+					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					async (connection, message) => {
+						if (message.type === "launch_config") {
+							await connection.send(
+								createWorkerMessage("ack", "mbrooks/yeetomatic#462", "ack-launch", { ackMessageId: message.messageId }),
+							);
+							await connection.send(
+								createWorkerMessage("tool_request", "mbrooks/yeetomatic#462", "tool-3", {
+									tool: "fetch_issue",
+									params: {},
+								}),
+							);
+							return;
+						}
+						if (message.type === "tool_response") {
+							responsePayload = message.payload as unknown as GatewayToolResponse;
+							await connection.send(
+								createWorkerMessage("complete", "mbrooks/yeetomatic#462", "complete-3", {
+									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								}),
+							);
+						}
+					},
+				);
+				return child;
+			});
+
+			try {
+				await harness.executor.execute(makeSessionState(462, harness.workspacePath));
+				expect(responsePayload).toBeDefined();
+				expect(responsePayload?.ok).toBe(false);
+				expect(responsePayload?.error).toContain("GitHub gateway is not enabled");
+			} finally {
+				await harness.close();
+			}
+		});
+	});
+
 
 async function createHarness(issueNumber: number): Promise<{
 	executor: DockerWorkerExecutor;
