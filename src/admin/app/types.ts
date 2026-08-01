@@ -30,6 +30,28 @@ export type SessionLogResponse = {
 	logs: LogEntry[];
 };
 
+export type RefinementAttempt = {
+	id: string;
+	requester: string;
+	instructionSource: string;
+	repoCommit?: string;
+	state: string;
+	failureReason?: string;
+	summary?: string;
+	investigation?: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type RefinementAttemptsResponse = {
+	attempts: RefinementAttempt[];
+};
+
+export type RefinementLogResponse = {
+	available: boolean;
+	logs: LogEntry[];
+};
+
 export type SkillSource = "server" | "repo" | "inherited";
 
 export type ServerSkill = {

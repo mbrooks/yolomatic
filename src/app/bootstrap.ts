@@ -13,6 +13,7 @@ import { cleanupOldSessions, createWebhookServer } from "../webhook/server.js";
 import { SkillStore } from "../skills/store.js";
 import { RepoSkillService } from "../skills/repo-skill-service.js";
 import { RepositoryStore } from "../repos/repository-store.js";
+import { RefinementStore } from "../refinement/store.js";
 import {
 	repoKey,
 	repoModeIncludesPolling,
@@ -115,6 +116,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		soulPath: config.soulPath,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const refinementStore = new RefinementStore(path.join(config.memoryDir, "refinement.sqlite"));
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,
@@ -129,6 +131,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		eventStore,
 		memoryDir: config.memoryDir,
 		repositoryStore,
+		refinementStore,
 	});
 
 	const staleDetector = new StaleSessionDetector(
@@ -191,6 +194,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		repoSkillService,
 		executor,
 		workerRpcServer,
+		refinementStore,
 	);
 
 	return {

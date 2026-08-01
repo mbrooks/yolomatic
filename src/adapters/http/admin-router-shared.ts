@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { GetAdminStatus } from "../../app/queries/get-admin-status.js";
 import type { GetSession } from "../../app/queries/get-session.js";
 import type { GetSessionLog } from "../../app/queries/get-session-log.js";
+import type { GetRefinementLog } from "../../app/queries/get-refinement-log.js";
+import type { ListRefinementAttempts } from "../../app/queries/list-refinement-attempts.js";
 import type { RunSessionCommand } from "../../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
@@ -9,6 +11,7 @@ import type { SettingsStore } from "../../settings/store.js";
 import type { SkillStore } from "../../skills/store.js";
 import type { RepoSkillService } from "../../skills/repo-skill-service.js";
 import type { RepositoryStore } from "../../repos/repository-store.js";
+import type { RefinementStore } from "../../refinement/store.js";
 import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../../config.js";
 import { sendJson } from "./response-helpers.js";
 import { requireAdminJson, requireAdminText } from "./admin-auth.js";
@@ -44,6 +47,7 @@ const missingDependencyErrors = {
 	repoSkillService: "Repo skill service not configured",
 	startIssueSession: "Session executor not configured",
 	repositoryStore: "Repository store not configured",
+	refinementStore: "Refinement store not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
 
 export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
@@ -168,6 +172,9 @@ export interface AdminRouterDeps {
 	skillStore?: SkillStore;
 	repoSkillService?: RepoSkillService;
 	repositoryStore?: RepositoryStore;
+	refinementStore?: RefinementStore;
+	getRefinementLog?: GetRefinementLog;
+	listRefinementAttempts?: ListRefinementAttempts;
 	onOnboardingComplete?: () => void | Promise<void>;
 	adminPath?: string;
 	adminDefaultPage?: string;
