@@ -2,7 +2,7 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { hasYeetomaticVisibleLabel, isStopCommand } from "../../domain/workflow/policy.js";
+import { hasYeetomaticVisibleLabel, isIssueRefinementCommand, isStopCommand } from "../../domain/workflow/policy.js";
 import {
 	issueSessionKey,
 	startIssueExecution,
@@ -13,6 +13,7 @@ import {
 	routePRTimelineComment,
 } from "./workflow-helpers.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
+import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
 
 export interface CommentEventPayload {
 	action: string;
@@ -46,6 +47,7 @@ export class HandleIssueComment {
 			githubUsername: string;
 			adminGithubUsername?: string;
 			executor: ExecuteSessionDeps;
+			refinement?: HandleIssueRefinement;
 			prReview?: { execute: (payload: import("./handle-pr-review.js").PRReviewPayload) => Promise<void> };
 		},
 	) {
@@ -68,6 +70,11 @@ export class HandleIssueComment {
 
 		if (payload.comment.user.type === "Bot") {
 			process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: bot comment\n`);
+			return;
+		}
+
+		if (isIssueRefinementCommand(payload.comment.body) && this.deps.refinement) {
+			await this.deps.refinement.execute(payload);
 			return;
 		}
 

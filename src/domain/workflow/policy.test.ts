@@ -7,6 +7,7 @@ import {
 	shouldIgnoreIssueEvent,
 	shouldIgnoreCommentEvent,
 	isStopCommand,
+	isIssueRefinementCommand,
 	canPause,
 	canResume,
 	canRestart,
@@ -271,6 +272,26 @@ describe("shouldIgnoreCommentEvent", () => {
 			"yeetomatic-bot",
 		);
 		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+	});
+});
+
+describe("isIssueRefinementCommand", () => {
+	it("accepts the exact command", () => {
+		expect(isIssueRefinementCommand("/yeetomatic issue-refinement")).toBe(true);
+	});
+
+	it("is case-insensitive", () => {
+		expect(isIssueRefinementCommand("/Yeetomatic Issue-Refinement")).toBe(true);
+	});
+
+	it("rejects suffixes and arguments", () => {
+		expect(isIssueRefinementCommand("/yeetomatic issue-refinement please")).toBe(false);
+		expect(isIssueRefinementCommand("/yeetomatic issue-refinement --verbose")).toBe(false);
+	});
+
+	it("rejects embedded commands", () => {
+		expect(isIssueRefinementCommand("Please run /yeetomatic issue-refinement")).toBe(false);
+		expect(isIssueRefinementCommand("`/yeetomatic issue-refinement`")).toBe(false);
 	});
 });
 

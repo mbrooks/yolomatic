@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult } from "./results.js";
+import { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult } from "./results.js";
 
 describe("parseExecutionResult", () => {
 	it("parses working status", () => {
@@ -171,5 +171,42 @@ describe("getLastAssistantText", () => {
 			messages: [{ role: "assistant", content: [{ type: "thinking", thinking: "still thinking" }] }],
 		};
 		expect(getLastAssistantText(session)).toBe("still thinking");
+	});
+});
+
+describe("parseRefinementResult", () => {
+	it("parses a valid JSON refinement result", () => {
+		const raw = JSON.stringify({
+			proposedTaskBody: "## Summary\nRefined.",
+			summary: "Clarified requirements.",
+			investigation: "Read README.",
+		});
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTaskBody).toBe("## Summary\nRefined.");
+		expect(result!.summary).toBe("Clarified requirements.");
+	});
+
+	it("parses a fenced JSON refinement result", () => {
+		const raw = "```json\n" + JSON.stringify({ proposedTaskBody: "Body", summary: "S", investigation: "I" }) + "\n```";
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTaskBody).toBe("Body");
+	});
+
+	it("falls back to heuristic extraction", () => {
+		const raw = "## Proposed Task\nRefined body.\n## Summary\nBetter description.\n## Investigation\nRead code.";
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTaskBody).toBe("Refined body.");
+		expect(result!.summary).toBe("Better description.");
+	});
+
+	it("returns null for empty input", () => {
+		expect(parseRefinementResult("")).toBeNull();
+	});
+
+	it("returns null for JSON missing required fields", () => {
+		expect(parseRefinementResult(JSON.stringify({ summary: "only summary" }))).toBeNull();
 	});
 });

@@ -43,6 +43,44 @@ export interface PRReviewComment {
 	line?: number;
 }
 
+export function buildIssueRefinementPrompt(state: SessionState, skillContent?: string): string {
+	const skillSection = skillContent
+		? [
+				"Repository skill instructions (follow these):",
+				"---",
+				skillContent.trim(),
+				"---",
+				"",
+		  ]
+		: [
+				"No repository `issue-refinement` skill was found. Use Yeetomatic's built-in defaults below.",
+				"",
+		  ];
+
+	return [
+		`You are refining GitHub issue #${state.issueNumber} in ${state.owner}/${state.repo}.`,
+		`Workspace: ${state.workspacePath}`,
+		"",
+		"Your goal is to investigate the issue and produce a more complete Proposed Task body.",
+		"You may inspect repository files, make temporary experimental edits, run the application and tests, and use the network to validate your conclusions.",
+		"Do NOT commit, push, create a pull request, or modify any GitHub state. Discard all experimental changes when you finish.",
+		"",
+		"Return your result as a JSON object with exactly these fields:",
+		'- "proposedTaskBody": the complete Markdown body to replace the issue body',
+		'- "summary": a concise explanation of what you clarified',
+		'- "investigation": relevant files, commands, tests, and observations',
+		"",
+		"The proposed task body should be self-contained and use sections such as Summary, Requirements, Acceptance criteria, and Out of scope when appropriate.",
+		"",
+		...skillSection,
+		"Original issue title:",
+		state.title,
+		"",
+		"Original issue body:",
+		state.body.trim() || "(no description provided)",
+	].join("\n");
+}
+
 export function buildPRReviewPrompt(state: SessionState, comments: PRReviewComment[], reviewBody?: string): string {
 	const lines = [
 		`PR review feedback received for PR associated with issue #${state.issueNumber} in ${state.owner}/${state.repo}.`,

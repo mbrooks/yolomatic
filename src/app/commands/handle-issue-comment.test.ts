@@ -80,8 +80,8 @@ describe("HandleIssueComment", () => {
 			setDraining: vi.fn(),
 		};
 		const github = {
-			postComment: vi.fn(async () => {}),
-			postPRComment: vi.fn(async () => {}),
+			postComment: vi.fn(async () => 1),
+			postPRComment: vi.fn(async () => 1),
 			addLabels: vi.fn(async () => {}),
 			removeLabel: vi.fn(async () => {}),
 			getPullRequest: vi.fn(async () => ({
@@ -104,6 +104,8 @@ describe("HandleIssueComment", () => {
 			listPendingInvitations: vi.fn(),
 			acceptInvitation: vi.fn(),
 			updateIssueAssignees: vi.fn(),
+			closeIssue: vi.fn(),
+			updateIssueBody: vi.fn(),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		};

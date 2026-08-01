@@ -58,7 +58,7 @@ describe("workflow helpers", () => {
 		const github = {
 			removeLabel: vi.fn(),
 			addLabels: vi.fn(),
-			postComment: vi.fn(),
+			postComment: vi.fn(async () => 1),
 		};
 
 		await markIssueWorking(github as never, "mbrooks", "yeetomatic", 56, "Picked up by Yeetomatic. Working on it...");
@@ -73,7 +73,7 @@ describe("workflow helpers", () => {
 			cancelSession: vi.fn(),
 		};
 		const github = {
-			postComment: vi.fn(),
+			postComment: vi.fn(async () => 1),
 			removeLabel: vi.fn(),
 			addLabels: vi.fn(),
 		};
@@ -94,7 +94,7 @@ describe("workflow helpers", () => {
 			cancelSession: vi.fn(),
 		};
 		const github = {
-			postComment: vi.fn(),
+			postComment: vi.fn(async () => 1),
 			removeLabel: vi.fn(),
 			addLabels: vi.fn(),
 		};
@@ -284,7 +284,7 @@ describe("workflow helpers", () => {
 				updateStatus: vi.fn(),
 			};
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 
 			const result = await handleDrainingMode(tasks as never, sessions as never, github as never, makeSession());
@@ -302,7 +302,7 @@ describe("workflow helpers", () => {
 				updateStatus: vi.fn(),
 			};
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 
 			const result = await handleDrainingMode(tasks as never, sessions as never, github as never, makeSession({ status: "working" }));
@@ -331,7 +331,7 @@ describe("workflow helpers", () => {
 				updateStatus: vi.fn(),
 			};
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 
 			const result = await handleDrainingMode(
@@ -370,7 +370,7 @@ describe("workflow helpers", () => {
 			const github = {
 				removeLabel: vi.fn(),
 				addLabels: vi.fn(),
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 			const session = makeSession({ status: "pending" });
 
@@ -396,7 +396,7 @@ describe("workflow helpers", () => {
 			const github = {
 				removeLabel: vi.fn(),
 				addLabels: vi.fn(),
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 			const session = makeSession({ status: "pending" });
 
@@ -418,7 +418,7 @@ describe("workflow helpers", () => {
 	describe("handleAdminStop", () => {
 		it("posts an admin-only message when sender is not an admin", async () => {
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 			const tasks = {
 				cancel: vi.fn(() => false),
@@ -446,7 +446,7 @@ describe("workflow helpers", () => {
 
 		it("passes through to stopSessionByAdmin when sender is an admin", async () => {
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 				removeLabel: vi.fn(),
 				addLabels: vi.fn(),
 			};
@@ -477,7 +477,7 @@ describe("workflow helpers", () => {
 
 		it("returns stopping when an active task is cancelled", async () => {
 			const github = {
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 			};
 			const tasks = {
 				cancel: vi.fn(() => true),
@@ -617,7 +617,7 @@ describe("workflow helpers", () => {
 			};
 			const github = {
 				initializeEmptyRepo: vi.fn(),
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 				removeLabel: vi.fn(),
 				addLabels: vi.fn(),
 			};
@@ -716,7 +716,7 @@ describe("workflow helpers", () => {
 				getPullRequest:
 					overrides?.getPullRequest ??
 					vi.fn(async () => ({ head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false })),
-				postComment: vi.fn(),
+				postComment: vi.fn(async () => 1),
 				removeLabel: vi.fn(),
 				addLabels: vi.fn(),
 			};

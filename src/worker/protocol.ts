@@ -1,4 +1,4 @@
-import type { ExecutionResult } from "../executor/results.js";
+import type { ExecutionResult, RefinementResult } from "../executor/results.js";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
 
 export const WORKER_PROTOCOL_VERSION = 1;
@@ -14,7 +14,7 @@ export interface WorkerSessionState {
 }
 
 export interface WorkerPromptPayload {
-	kind: "issue" | "comment" | "pr-review" | "override";
+	kind: "issue" | "comment" | "pr-review" | "override" | "issue-refinement";
 	text: string;
 }
 
@@ -56,7 +56,7 @@ export interface WorkerControlPayload {
 }
 
 export interface WorkerCompletePayload {
-	result: ExecutionResult;
+	result: ExecutionResult | RefinementResult;
 }
 
 export interface WorkerErrorPayload {

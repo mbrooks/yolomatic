@@ -5,17 +5,23 @@ import type { SessionManager } from "../session/manager.js";
 import type { SessionState } from "../session/store.js";
 import type { WorkspaceManager } from "../workspace/manager.js";
 import { TaskController } from "../task-controller.js";
+import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 
 import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.js";
 import { systemClock } from "../ports/clock.js";
 import { HandleIssueEvent } from "../app/commands/handle-issue-event.js";
 import { HandleIssueComment } from "../app/commands/handle-issue-comment.js";
+import { HandleIssueRefinement } from "../app/commands/handle-issue-refinement.js";
 import { HandlePRReview } from "../app/commands/handle-pr-review.js";
 import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-session.js";
 import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
 import type { GitHubEvent, GitHubEventStateStore } from "../github-events/model.js";
 import { repoModeIncludesPolling, repoModeIncludesWebhook, type RepoGitHubEventMode } from "../repos/repository.js";
+import { RefinementStore } from "../refinement/store.js";
+import { RepositoryStore } from "../repos/repository-store.js";
+import path from "node:path";
+import { repoKey } from "../repos/repository.js";
 
 export interface WebhookHandlers {
 	handleGitHubEvent?(event: GitHubEvent): Promise<void>;
@@ -45,6 +51,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			taskController?: TaskController;
 			adminGithubUsername?: string;
 			eventStore?: GitHubEventStateStore;
+			memoryDir?: string;
+			repositoryStore?: RepositoryStore;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -52,6 +60,27 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const executor = deps.executor;
 		const tasks = deps.taskController ?? new TaskController();
 		const github = new GitHubServiceAdapter({ githubToken: deps.githubToken, octokit: deps.octokit });
+
+		const refinementStore = deps.memoryDir
+			? new RefinementStore(path.join(deps.memoryDir, "refinement.sqlite"))
+			: new RefinementStore(path.join(process.cwd(), "memory", "refinement.sqlite"));
+		const isRepoManaged = (owner: string, repo: string) => {
+			if (!deps.repositoryStore) return true;
+			return !!deps.repositoryStore.getSync(owner, repo);
+		};
+		const refinement = new HandleIssueRefinement({
+			refinementStore,
+			github,
+			tasks,
+			workspaces,
+			executor: deps.executor as DockerWorkerExecutor,
+			clock: systemClock,
+			adminGithubUsername: deps.adminGithubUsername,
+			githubUsername: deps.githubUsername,
+			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
+			isRepoManaged,
+		});
 
 		const execDeps = {
 			sessions,
@@ -77,6 +106,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubUsername: deps.githubUsername,
 			selfReportEnabled: deps.selfReportEnabled,
 			executor: execDeps,
+			refinement,
 			inFlight: this.inFlight,
 		});
 
@@ -99,6 +129,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			githubUsername: deps.githubUsername,
 			adminGithubUsername: deps.adminGithubUsername,
 			executor: execDeps,
+			refinement,
 			prReview: this.handlePRReviewCmd,
 		});
 
