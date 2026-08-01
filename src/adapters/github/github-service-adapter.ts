@@ -6,9 +6,18 @@ import type {
 	PullRequestInfo,
 	ReviewComment,
 } from "../../ports/github-service.js";
+import type {
+	GatewayIssueComment,
+	GatewayIssueDetail,
+	GatewayIssueUpdateFields,
+	GatewayPullRequestDetail,
+	GatewayPullRequestSummary,
+	GatewayPullRequestUpdateFields,
+	GitHubGatewayService,
+} from "../../ports/github-gateway-service.js";
 import { createOctokit } from "./octokit.js";
 
-export class GitHubServiceAdapter implements GitHubService {
+export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService {
 	private readonly octokit: Octokit;
 
 	constructor(options: { githubToken: string; octokit?: Octokit }) {
@@ -332,6 +341,169 @@ export class GitHubServiceAdapter implements GitHubService {
 			return null;
 		} catch {
 			return null;
+		}
+	}
+
+	async getIssueDetail(owner: string, repo: string, issueNumber: number): Promise<GatewayIssueDetail | null> {
+		try {
+			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });
+			return {
+				number: data.number,
+				title: data.title,
+				body: data.body ?? "",
+				state: data.state === "closed" ? "closed" : "open",
+				labels: data.labels
+					.map((label) => (typeof label === "string" ? label : label.name ?? ""))
+					.filter(Boolean),
+				assignees: data.assignees?.map((a) => a.login).filter(Boolean) ?? [],
+				html_url: data.html_url,
+				created_at: data.created_at,
+				updated_at: data.updated_at,
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	async listIssueComments(owner: string, repo: string, issueNumber: number): Promise<GatewayIssueComment[]> {
+		try {
+			const { data } = await this.octokit.issues.listComments({
+				owner,
+				repo,
+				issue_number: issueNumber,
+				per_page: 100,
+			});
+			return data.map((comment) => ({
+				id: comment.id,
+				body: comment.body ?? "",
+				author: comment.user?.login ?? "unknown",
+				created_at: comment.created_at,
+				updated_at: comment.updated_at,
+				html_url: comment.html_url,
+			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async updateIssue(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		fields: GatewayIssueUpdateFields,
+	): Promise<void> {
+		const update: Record<string, unknown> = {};
+		if (fields.title !== undefined) update.title = fields.title;
+		if (fields.body !== undefined) update.body = fields.body;
+		if (fields.state !== undefined) update.state = fields.state;
+		if (fields.assignees !== undefined) update.assignees = fields.assignees;
+		if (fields.labels !== undefined) update.labels = fields.labels;
+		if (Object.keys(update).length === 0) return;
+		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, ...update });
+	}
+
+	async setLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
+		try {
+			await this.octokit.issues.setLabels({ owner, repo, issue_number: issueNumber, labels });
+		} catch (error) {
+			const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
+			if (status === 404 && labels.length === 0) {
+				// Setting an empty label list on an unlabeled issue 404s; treat as success.
+				return;
+			}
+			throw error;
+		}
+	}
+
+	async getPullRequestDetail(owner: string, repo: string, prNumber: number): Promise<GatewayPullRequestDetail | null> {
+		try {
+			const { data } = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
+			return {
+				number: data.number,
+				title: data.title,
+				body: data.body ?? "",
+				state: data.state === "closed" ? "closed" : "open",
+				merged: data.merged ?? false,
+				head_ref: data.head?.ref ?? "",
+				base_ref: data.base?.ref ?? "",
+				html_url: data.html_url,
+				created_at: data.created_at,
+				updated_at: data.updated_at,
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	async listPullRequestComments(owner: string, repo: string, prNumber: number): Promise<GatewayIssueComment[]> {
+		return this.listIssueComments(owner, repo, prNumber);
+	}
+
+	async listPullRequestReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]> {
+		try {
+			const { data } = await this.octokit.pulls.listReviewComments({
+				owner,
+				repo,
+				pull_number: prNumber,
+				per_page: 100,
+			});
+			return data.map((rc) => ({
+				id: rc.id,
+				body: rc.body ?? "",
+				user: rc.user ? { login: rc.user.login } : undefined,
+				path: rc.path,
+				line: rc.line,
+			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async listPullRequestsForHead(
+		owner: string,
+		repo: string,
+		head: string,
+		state: "open" | "closed" | "all",
+	): Promise<GatewayPullRequestSummary[]> {
+		try {
+			const { data } = await this.octokit.pulls.list({
+				owner,
+				repo,
+				head,
+				state,
+				per_page: 100,
+			});
+			return data.map((pr) => ({
+				number: pr.number,
+				title: pr.title,
+				html_url: pr.html_url,
+				head_ref: pr.head?.ref ?? "",
+				base_ref: pr.base?.ref ?? "",
+				state: pr.state,
+				// The list endpoint does not return `merged`; use state as a proxy. The
+				// gateway only uses these summaries for scoping, not for merged status.
+				merged: false,
+			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async updatePullRequest(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		fields: GatewayPullRequestUpdateFields,
+	): Promise<void> {
+		const update: Record<string, unknown> = {};
+		if (fields.title !== undefined) update.title = fields.title;
+		if (fields.body !== undefined) update.body = fields.body;
+		if (fields.state !== undefined) update.state = fields.state;
+		if (Object.keys(update).length > 0) {
+			await this.octokit.pulls.update({ owner, repo, pull_number: prNumber, ...update });
+		}
+		if (fields.labels !== undefined) {
+			await this.setLabels(owner, repo, prNumber, fields.labels);
 		}
 	}
 

@@ -163,6 +163,7 @@ vi.mock("../executor/index.js", () => ({
 }));
 
 import { runWorkerRuntime } from "./runtime.js";
+import { callGitHubGateway } from "./github-gateway-client.js";
 
 describe("runWorkerRuntime", () => {
 	afterEach(() => {
@@ -461,4 +462,124 @@ describe("runWorkerRuntime", () => {
 			}),
 		).rejects.toThrow("Worker RPC connection closed before launch config arrived");
 	});
+
+	it("routes gateway tool calls to the control plane and resolves the tool_response", async () => {
+		const sessionKey = "mbrooks/yeetomatic#77";
+		const seenToolRequests: string[] = [];
+
+		executeWithOverride.mockImplementation(async () => {
+			const data = await callGitHubGateway("get_authenticated_user", {});
+			expect(data).toEqual({ login: "yeetomatic-bot" });
+			return {
+				status: "complete",
+				summary: "done",
+				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+			};
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				if (message.type === "hello") {
+					await sendWorkerWebSocketMessage(
+						server as never,
+						createWorkerMessage("launch_config", sessionKey, "launch-gw", {
+							session: {
+								owner: "mbrooks",
+								repo: "yeetomatic",
+								issueNumber: 77,
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-77",
+								title: "Gateway round trip",
+								body: "Body",
+							},
+							prompt: { kind: "override", text: "custom prompt" },
+						}),
+					);
+					return;
+				}
+				if (message.type === "tool_request") {
+					seenToolRequests.push(message.messageId);
+					await sendWorkerWebSocketMessage(
+						server as never,
+						createWorkerMessage("tool_response", sessionKey, "resp-gw", {
+							requestMessageId: message.messageId,
+							ok: true,
+							data: { login: "yeetomatic-bot" },
+						}),
+					);
+				}
+			});
+		});
+
+		await runWorkerRuntime({
+			wsUrl: "ws://worker.test/session-77",
+			sessionKey,
+			soulPath: "/tmp/SOUL.md",
+		});
+
+		expect(seenToolRequests).toHaveLength(1);
+	});
+
+	it("surfaces gateway scope errors from the control plane as thrown errors", async () => {
+		const sessionKey = "mbrooks/yeetomatic#78";
+
+		executeWithOverride.mockImplementation(async () => {
+			await expect(callGitHubGateway("fetch_pr", { pr_number: 999 })).rejects.toThrow(
+				"GitHub scope error: pr_number 999 is not associated",
+			);
+			return {
+				status: "complete",
+				summary: "done",
+				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+			};
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				if (message.type === "hello") {
+					await sendWorkerWebSocketMessage(
+						server as never,
+						createWorkerMessage("launch_config", sessionKey, "launch-scope", {
+							session: {
+								owner: "mbrooks",
+								repo: "yeetomatic",
+								issueNumber: 78,
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-78",
+								title: "Scope error",
+								body: "Body",
+							},
+							prompt: { kind: "override", text: "custom prompt" },
+						}),
+					);
+					return;
+				}
+				if (message.type === "tool_request") {
+					await sendWorkerWebSocketMessage(
+						server as never,
+						{
+							...createWorkerMessage("tool_response", sessionKey, "resp-scope", {
+								requestMessageId: message.messageId,
+								ok: false,
+								error: "pr_number 999 is not associated",
+							}),
+							payload: {
+								requestMessageId: message.messageId,
+								ok: false,
+								error: "pr_number 999 is not associated",
+								scopeError: true,
+							},
+						} as WorkerProtocolMessage<"tool_response">,
+					);
+				}
+			});
+		});
+
+		await runWorkerRuntime({
+			wsUrl: "ws://worker.test/session-78",
+			sessionKey,
+			soulPath: "/tmp/SOUL.md",
+		});
+	});
+
 });
