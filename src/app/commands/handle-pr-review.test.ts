@@ -55,8 +55,8 @@ describe("HandlePRReview", () => {
 			commitAndPushPath: vi.fn(async () => true),
 			hasChanges: vi.fn(),
 			getWorktreePath: vi.fn(),
-			getGitStatus: vi.fn(),
-			getGitDiff: vi.fn(),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
 		};
 		const executor = {
 			execute: vi.fn(),
@@ -97,6 +97,7 @@ describe("HandlePRReview", () => {
 			github: github as never,
 			tasks: tasks as never,
 			githubUsername: "yeetomatic-bot",
+			selfReportEnabled: false,
 		});
 
 		return { handler, sessions, workspaces, executor, github, tasks };
@@ -306,6 +307,73 @@ describe("HandlePRReview", () => {
 			99,
 			expect.stringContaining("iteration complete"),
 		);
+	});
+
+	it("uses the PR head captured before execution as a guarded push lease", async () => {
+		const { handler, sessions, workspaces, github } = createHandler();
+		const expectedRemoteHead = "a".repeat(40);
+		sessions.get.mockResolvedValue(makeSession());
+		github.getPullRequest.mockResolvedValue({
+			head: { ref: "yeetomatic/issue-56", sha: expectedRemoteHead },
+			state: "open",
+			merged: false,
+		});
+
+		await handler.execute({
+			action: "created",
+			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+			comment: { id: 1, body: "Rebase this branch onto main", user: { login: "user" } },
+		});
+
+		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
+			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			"yeetomatic/issue-56",
+			"Yeetomatic: Fix the typo",
+			undefined,
+			expectedRemoteHead,
+		);
+	});
+
+	it("marks the session failed and reports diagnostics when PR delivery rejects", async () => {
+		const { handler, sessions, workspaces, github, tasks } = createHandler();
+		const expectedRemoteHead = "b".repeat(40);
+		sessions.get.mockResolvedValue(makeSession());
+		github.getPullRequest.mockResolvedValue({
+			head: { ref: "yeetomatic/issue-56", sha: expectedRemoteHead },
+			state: "open",
+			merged: false,
+		});
+		workspaces.commitAndPushPath.mockRejectedValue(
+			new Error("git push rejected: non-fast-forward"),
+		);
+
+		await expect(
+			handler.execute({
+				action: "created",
+				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				sender: { login: "user" },
+				comment: { id: 1, body: "Resolve the branch conflicts", user: { login: "user" } },
+			}),
+		).resolves.toBeUndefined();
+
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
+		expect(sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "complete");
+		expect(github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			99,
+			expect.stringContaining("Yeetomatic delivery failed."),
+		);
+		expect(github.addLabels).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			56,
+			["yeetomatic-working", "yeetomatic-delivery-failed"],
+		);
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Symbol));
 	});
 
 	it("falls back to the issue branch when the session has no stored branch", async () => {

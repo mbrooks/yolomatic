@@ -4,11 +4,11 @@ import type { ExecutionService, LiveExecutionSession } from "../../ports/executi
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import { classifyComments } from "../../pr-review/classifier.js";
-import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { extractIssueNumberFromBranch, validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import { isExecutionEnvironmentBlocker, isRateLimitError } from "../../executor/index.js";
 import { issueSessionKey, queueResumeOnBoot } from "./workflow-helpers.js";
+import { ExecuteSessionReporter } from "./execute-session-reporter.js";
 
 export interface PRReviewPayload {
 	action: string;
@@ -26,6 +26,7 @@ export interface PRReviewPayload {
 
 export class HandlePRReview {
 	private inFlight = new Set<string>();
+	private readonly reporter: ExecuteSessionReporter;
 
 	constructor(
 		private readonly deps: {
@@ -35,8 +36,16 @@ export class HandlePRReview {
 			github: GitHubService;
 			tasks: TaskControlService;
 			githubUsername: string;
+			selfReportEnabled: boolean;
 		},
-	) {}
+	) {
+		this.reporter = new ExecuteSessionReporter({
+			github: deps.github,
+			workspaces: deps.workspaces,
+			sessions: deps.sessions,
+			selfReportEnabled: deps.selfReportEnabled,
+		});
+	}
 
 	async execute(payload: PRReviewPayload): Promise<void> {
 		if (payload.action !== "created" && payload.action !== "submitted" && payload.action !== "edited") {
@@ -232,8 +241,7 @@ export class HandlePRReview {
 			return;
 		}
 
-		const worktreePath = state.workspacePath;
-		const branchName = state.branch ?? `yeetomatic/issue-${issueNumber}`;
+		const expectedRemoteHead = (await this.deps.github.getPullRequest(owner, repo, prNumber))?.head.sha;
 		let result: ExecutionResult;
 		try {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
@@ -305,100 +313,28 @@ export class HandlePRReview {
 
 		await this.deps.sessions.incrementIterationCount(owner, repo, issueNumber);
 
-		if (result.status === "cancelled") {
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "cancelled");
-			await this.deps.github.postPRComment(
+		try {
+			await this.reporter.handleExecutionResult({
 				owner,
 				repo,
-				prNumber,
-				[
-					"Task cancelled by admin.",
-					"",
-					result.summary || "Yeetomatic has stopped working on this review.",
-					"",
-					"Yeetomatic is idle and ready for the next task.",
-				].join("\n"),
-			);
-			return;
-		}
-
-		if (result.status === "complete") {
-			const pushed = await this.deps.workspaces.commitAndPushPath(
-				worktreePath,
-				branchName,
-				generateCommitMessage(state.labels, issueNumber, result.summary),
-			);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
-			if (pushed) {
-				await this.deps.github.postPRComment(
-					owner,
-					repo,
-					prNumber,
-					[
-						"**Yeetomatic iteration complete.**",
-						"",
-						"Changes pushed to the PR branch.",
-						"",
-						"Summary:",
-						result.summary || "No summary provided.",
-					].join("\n"),
-				);
-			} else {
-				await this.deps.github.postPRComment(
-					owner,
-					repo,
-					prNumber,
-					[
-						"**Yeetomatic iteration complete.**",
-						"",
-						"No changes were needed.",
-						"",
-						"Summary:",
-						result.summary || "No summary provided.",
-					].join("\n"),
-				);
+				sessionIssueNumber: issueNumber,
+				target: { kind: "pull_request", number: prNumber },
+				result,
+				context: "Addressing PR review feedback",
+				state,
+				expectedRemoteHead,
+			});
+		} catch (error) {
+			if (result.status !== "complete") {
+				throw error;
 			}
-		} else if (result.status === "waiting-feedback") {
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "waiting-feedback");
-			await this.deps.github.postPRComment(
+			await this.reporter.handleDeliveryFailure(
 				owner,
 				repo,
-				prNumber,
-				[
-					"Need clarification:",
-					result.summary || "Yeetomatic needs more information before continuing.",
-				].join("\n\n"),
-			);
-		} else if (result.status === "failed") {
-			const message = result.summary;
-			if (isRateLimitError(message)) {
-				await this.deps.github.postPRComment(
-					owner,
-					repo,
-					prNumber,
-					[
-						"**Build failed**",
-						"",
-						"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
-						"",
-						`Error: ${message}`,
-					].join("\n"),
-				);
-			} else {
-				await this.deps.github.postPRComment(owner, repo, prNumber, `**Yeetomatic failed.**\n\nError: ${message}`);
-			}
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-		} else {
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
-			await this.deps.github.postPRComment(
-				owner,
-				repo,
-				prNumber,
-				[
-					"Yeetomatic is still working on the review feedback.",
-					"",
-					result.summary || "Execution is in progress.",
-				].join("\n"),
+				issueNumber,
+				state,
+				error,
+				{ kind: "pull_request", number: prNumber },
 			);
 		}
 	}
