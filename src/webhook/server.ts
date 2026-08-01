@@ -10,6 +10,7 @@ import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
 import type { RepoSkillService } from "../skills/repo-skill-service.js";
 import type { RepositoryStore } from "../repos/repository-store.js";
+import type { RefinementStore } from "../refinement/store.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 import type { WorkerRpcServer } from "../worker/rpc-server.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
@@ -53,6 +54,7 @@ export function createWebhookServer(
 	repoSkillService?: RepoSkillService,
 	executor?: ExecutionService,
 	workerRpcServer?: WorkerRpcServer,
+	refinementStore?: RefinementStore,
 ) {
 	const adminPath = options.adminPath ?? DEFAULT_ADMIN_PATH;
 	const adminDefaultPage = options.adminDefaultPage ?? DEFAULT_ADMIN_DEFAULT_PAGE;
@@ -72,6 +74,7 @@ export function createWebhookServer(
 		options.repositoryStore,
 		adminPath,
 		adminDefaultPage,
+		refinementStore,
 	);
 
 	serverDeps.skillStore = skillStore;

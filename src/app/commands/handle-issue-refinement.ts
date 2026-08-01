@@ -5,6 +5,7 @@ import type { Clock } from "../../ports/clock.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
+import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
 import { isAdmin, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
@@ -101,6 +102,7 @@ export class HandleIssueRefinement {
 		process.stdout.write(`[refinement] posting instructions for ${owner}/${repo}#${issueNumber}\n`);
 		const commentId = await this.deps.github.postComment(owner, repo, issueNumber, ISSUE_REFINEMENT_INSTRUCTIONS);
 		this.deps.refinementStore.recordInstructionComment(owner, repo, issueNumber, commentId);
+		this.log(owner, repo, issueNumber, "info", "Posted issue-refinement instructions");
 	}
 
 	async execute(payload: IssueRefinementEventPayload): Promise<void> {
@@ -116,6 +118,7 @@ export class HandleIssueRefinement {
 		}
 
 		process.stdout.write(`[refinement] command received for ${owner}/${repo}#${issueNumber}\n`);
+		this.log(owner, repo, issueNumber, "info", `Refinement command received from @${payload.sender.login}`);
 
 		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(`[refinement] ignored: comment from ${this.deps.githubUsername}\n`);
@@ -152,6 +155,7 @@ export class HandleIssueRefinement {
 			(await this.deps.github.isCollaborator(owner, repo, payload.sender.login));
 		if (!authorized) {
 			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository collaborator\n`);
+			this.log(owner, repo, issueNumber, "warn", `Refinement rejected: @${payload.sender.login} is not a repository collaborator`);
 			await this.deps.github.postComment(owner, repo, issueNumber, "Only repository collaborators can run issue refinement.");
 			return;
 		}
@@ -164,6 +168,7 @@ export class HandleIssueRefinement {
 
 		if (this.deps.tasks.isActive(key)) {
 			process.stdout.write(`[refinement] ignored: ${key} has an active implementation task\n`);
+			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: an implementation task is active");
 			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation.");
 			return;
 		}
@@ -177,12 +182,14 @@ export class HandleIssueRefinement {
 		if (registration === null) {
 			this.inFlight.delete(key);
 			process.stdout.write(`[refinement] ignored: ${key} task key is already claimed\n`);
+			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: task key is already claimed");
 			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation.");
 			return;
 		}
 
 		process.stdout.write(`[refinement] starting for ${owner}/${repo}#${issueNumber}\n`);
 		await this.deps.github.postComment(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT);
+		this.log(owner, repo, issueNumber, "info", "Refinement started");
 
 		let attemptId: string | undefined;
 		let worktreePath: string | undefined;
@@ -210,14 +217,24 @@ export class HandleIssueRefinement {
 				instructionSource: "prompt-defaults",
 				state: "running",
 			}).id;
+			this.log(owner, repo, issueNumber, "info", "Created refinement attempt", { attemptId });
 
 			worktreePath = await this.deps.workspaces.createRefinementWorktree!(owner, repo, issueNumber);
+			this.log(owner, repo, issueNumber, "info", "Prepared refinement worktree", { worktreePath });
 
 			const skillInfo = await this.resolveSkill(owner, repo, worktreePath);
 			this.deps.refinementStore.updateAttempt(attemptId, {
 				instructionSource: skillInfo.source,
 				repoCommit: skillInfo.commit,
 			});
+			this.log(
+				owner,
+				repo,
+				issueNumber,
+				"info",
+				skillInfo.source === "repository-skill" ? "Using repository issue-refinement skill" : "Using built-in issue-refinement prompt defaults",
+				skillInfo.commit ? { commit: skillInfo.commit } : undefined,
+			);
 
 			const state = this.buildSessionState(owner, repo, issueNumber, title, body, worktreePath);
 			const result = await this.deps.executor.executeRefinement(state, skillInfo.content);
@@ -227,28 +244,36 @@ export class HandleIssueRefinement {
 				summary: result.summary,
 				investigation: result.investigation,
 			});
+			this.log(owner, repo, issueNumber, "info", "Refinement worker returned a proposed task", {
+				summary: result.summary,
+				bodyLength: result.proposedTaskBody.length,
+			});
 
 			const currentIssue = await this.deps.github.getIssue(owner, repo, issueNumber);
 			if (!currentIssue || currentIssue.state === "closed") {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: "issue closed during refinement" });
+				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue closed during refinement");
 				await this.deps.github.postComment(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yeetomatic issue-refinement` again.");
 				return;
 			}
 			const currentFingerprint = fingerprintBody(currentIssue.body ?? "");
 			if (currentFingerprint !== fingerprint) {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: "issue body changed during refinement" });
+				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue body changed during refinement");
 				await this.deps.github.postComment(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yeetomatic issue-refinement` again.");
 				return;
 			}
 
 			if (result.proposedTaskBody.length > 65535) {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: "proposed task body exceeds GitHub size limit" });
+				this.log(owner, repo, issueNumber, "warn", "Refinement failed: proposed task body exceeds GitHub size limit");
 				await this.deps.github.postComment(owner, repo, issueNumber, "Refinement produced a body that is too large for GitHub. Please run the command again with a narrower request.");
 				return;
 			}
 
 			await this.deps.github.updateIssueBody(owner, repo, issueNumber, result.proposedTaskBody);
 			this.deps.refinementStore.updateAttempt(attemptId, { state: "applied" });
+			this.log(owner, repo, issueNumber, "info", "Applied refined issue body");
 			await this.deps.github.postComment(
 				owner,
 				repo,
@@ -261,13 +286,16 @@ export class HandleIssueRefinement {
 			if (attemptId) {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: message });
 			}
+			this.log(owner, repo, issueNumber, "error", `Refinement failed: ${message}`);
 			await this.deps.github.postComment(owner, repo, issueNumber, `Refinement failed: ${message}`);
 		} finally {
 			this.deps.tasks.unregister(key, registration);
 			this.inFlight.delete(key);
 			if (worktreePath) {
 				await this.deps.workspaces.removeRefinementWorktree!(worktreePath);
+				this.log(owner, repo, issueNumber, "info", "Removed refinement worktree");
 			}
+			this.log(owner, repo, issueNumber, "info", "Refinement finished");
 		}
 	}
 
@@ -276,6 +304,17 @@ export class HandleIssueRefinement {
 		const repo = payload.repository.name;
 		const issueNumber = payload.issue.number;
 		return { owner, repo, issueNumber, key: issueSessionKey(owner, repo, issueNumber) };
+	}
+
+	private log(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		level: SessionLogEntry["level"],
+		message: string,
+		details?: Record<string, unknown>,
+	): void {
+		recordSessionLog(issueSessionKey(owner, repo, issueNumber), { level, message, details });
 	}
 
 	private isEligibleForInstructions(payload: IssueRefinementInstructionPayload): boolean {

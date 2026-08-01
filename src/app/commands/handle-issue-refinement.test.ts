@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { HandleIssueRefinement, ISSUE_REFINEMENT_INSTRUCTIONS, ISSUE_REFINEMENT_STARTING_COMMENT } from "./handle-issue-refinement.js";
 import { RefinementStore } from "../../refinement/store.js";
+import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 
 describe("HandleIssueRefinement", () => {
@@ -22,6 +23,7 @@ describe("HandleIssueRefinement", () => {
 		tasks = createTasksMock();
 		workspaces = createWorkspacesMock(tmpDir);
 		executor = createExecutorMock();
+		_resetSessionLogs();
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
 			github: github as never,
@@ -39,6 +41,7 @@ describe("HandleIssueRefinement", () => {
 
 	afterEach(async () => {
 		await rm(tmpDir, { recursive: true, force: true });
+		_resetSessionLogs();
 	});
 
 	function createInstructionPayload(overrides?: Record<string, unknown>) {
@@ -84,6 +87,8 @@ describe("HandleIssueRefinement", () => {
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_INSTRUCTIONS);
 		const record = store.getInstructionComment("mbrooks", "yeetomatic", 1);
 		expect(record).not.toBeNull();
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(true);
 	});
 
 	it("does not post instructions twice for the same issue", async () => {
@@ -121,6 +126,68 @@ describe("HandleIssueRefinement", () => {
 		expect(attempt!.state).toBe("applied");
 	});
 
+	it("records activity logs for a successful refinement", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const messages = logs.map((l) => l.message);
+		expect(messages).toContain("Refinement command received from @admin");
+		expect(messages).toContain("Refinement started");
+		expect(messages).toContain("Created refinement attempt");
+		expect(messages).toContain("Refinement worker returned a proposed task");
+		expect(messages).toContain("Applied refined issue body");
+		expect(messages).toContain("Refinement finished");
+		expect(messages.some((m) => m.startsWith("Refinement rejected"))).toBe(false);
+	});
+
+	it("records a warning activity log when a non-owner runs refinement", async () => {
+		await handler.execute(
+			createCommandPayload({
+				sender: { login: "user" },
+				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
+			}) as never,
+		);
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.level === "warn" && l.message.includes("not a repository collaborator"))).toBe(true);
+		expect(logs.some((l) => l.message === "Refinement started")).toBe(false);
+	});
+
+	it("records a warning activity log when an implementation task is active", async () => {
+		tasks.isActive.mockReturnValue(true);
+		await handler.execute(createCommandPayload() as never);
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.level === "warn" && l.message.includes("implementation task is active"))).toBe(true);
+	});
+
+	it("records an error activity log when the worker fails", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockRejectedValue(new Error("worker crashed"));
+		await handler.execute(createCommandPayload() as never);
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.level === "error" && l.message.startsWith("Refinement failed"))).toBe(true);
+	});
+
+	it("records a stale activity log when the issue body changes during refinement", async () => {
+		github.getIssue
+			.mockResolvedValueOnce({ state: "open", body: "Body" })
+			.mockResolvedValueOnce({ state: "open", body: "Modified body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+		await handler.execute(createCommandPayload() as never);
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.level === "warn" && l.message.includes("marked stale"))).toBe(true);
+		expect(logs.some((l) => l.message === "Applied refined issue body")).toBe(false);
+	});
 	it("rejects refinement from non-admin users", async () => {
 		await handler.execute(
 			createCommandPayload({

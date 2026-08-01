@@ -1697,3 +1697,69 @@ a:hover {
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Refinement activity panel */
+.status-badge.applied {
+	color: var(--green);
+}
+
+.status-badge.running {
+	color: var(--yellow);
+}
+
+.status-badge.stale {
+	color: var(--yellow);
+}
+
+.status-badge.instructed {
+	color: var(--muted);
+}
+
+.refinement-attempts {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.refinement-attempt {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.35rem 0.5rem;
+}
+
+.refinement-attempt-requester {
+	font-size: 0.8rem;
+}
+
+.refinement-attempt-time {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
+.refinement-attempt-source {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--muted);
+	font-size: 0.7rem;
+	padding: 0.05rem 0.3rem;
+}
+
+.refinement-attempt-summary {
+	flex-basis: 100%;
+	font-size: 0.8rem;
+	margin-top: 0.15rem;
+}
+
+.refinement-attempt-reason {
+	color: var(--red);
+	flex-basis: 100%;
+	font-size: 0.75rem;
+	margin-top: 0.1rem;
+}

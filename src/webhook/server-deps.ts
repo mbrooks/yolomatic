@@ -6,6 +6,8 @@ import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-s
 import { GetAdminStatus } from "../app/queries/get-admin-status.js";
 import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
+import { GetRefinementLog } from "../app/queries/get-refinement-log.js";
+import { ListRefinementAttempts } from "../app/queries/list-refinement-attempts.js";
 import { RunSessionCommand } from "../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
@@ -17,6 +19,7 @@ import type { GitHubService } from "../ports/github-service.js";
 import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { RepositoryStore } from "../repos/repository-store.js";
+import type { RefinementStore } from "../refinement/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 
@@ -60,6 +63,7 @@ export function createWebhookServerDeps(
 	repositoryStore?: RepositoryStore,
 	adminPath: string = DEFAULT_ADMIN_PATH,
 	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
+	refinementStore?: RefinementStore,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -81,6 +85,9 @@ export function createWebhookServerDeps(
 		adminAssetsDir,
 		settingsStore,
 		repositoryStore,
+		refinementStore,
+		getRefinementLog: refinementStore ? new GetRefinementLog(refinementStore) : undefined,
+		listRefinementAttempts: refinementStore ? new ListRefinementAttempts(refinementStore) : undefined,
 		cleanupCommand: new CleanupOldSessions(sessionRepo, workspaceService),
 		adminPath,
 		adminDefaultPage,
