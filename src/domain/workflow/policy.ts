@@ -128,6 +128,10 @@ export function shouldIgnoreCommentEvent(
 	return { ignore: false, isMentioned, isCreatedByYeetomatic };
 }
 
+export function isIssueRefinementCommand(commentBody: string): boolean {
+	return commentBody.trim().toLowerCase() === "/yeetomatic issue-refinement";
+}
+
 export function isStopCommand(commentBody: string): boolean {
 	return commentBody.trim().toLowerCase() === "/yeetomatic stop";
 }

@@ -14,14 +14,14 @@ import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { SessionState } from "../session/store.js";
 import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-import { getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
+import { getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
-export { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, type ExecutionResult } from "./results.js";
+export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
+export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
@@ -63,6 +63,21 @@ export class PiAgentExecutor implements ExecutionService {
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		return this.run(state, undefined, undefined, abortSignal, onSessionCreated, overridePrompt, onActivity);
+	}
+
+	async executeRefinement(
+		state: SessionState,
+		overridePrompt: string,
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
+		onActivity?: () => void,
+	): Promise<RefinementResult> {
+		const result = await this.executeWithOverride(state, overridePrompt, abortSignal, onSessionCreated, onActivity);
+		const parsed = parseRefinementResult(result.rawResponse);
+		if (!parsed) {
+			throw new Error("Worker did not return a parseable refinement result.");
+		}
+		return parsed;
 	}
 
 	private async run(

@@ -3,8 +3,9 @@ import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import type { ExecutionResult } from "./results.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
+import type { ExecutionResult, RefinementResult } from "./results.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
+import { parseRefinementResult } from "./results.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
@@ -67,7 +68,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		const prompt = comment ? buildFeedbackPrompt(comment) : buildIssuePrompt(state);
-		return this.runWorker(state, { kind: comment ? "comment" : "issue", text: prompt }, abortSignal, onSessionCreated, onActivity);
+		return this.runWorker(state, { kind: comment ? "comment" : "issue", text: prompt }, abortSignal, onSessionCreated, onActivity) as Promise<ExecutionResult>;
 	}
 
 	executePRReview(
@@ -78,20 +79,37 @@ export class DockerWorkerExecutor implements ExecutionService {
 		onActivity?: () => void,
 	): Promise<ExecutionResult> {
 		const prompt = buildPRReviewPrompt(state, prReview.comments, prReview.reviewBody);
-		return this.runWorker(state, { kind: "pr-review", text: prompt }, abortSignal, onSessionCreated, onActivity);
+		return this.runWorker(state, { kind: "pr-review", text: prompt }, abortSignal, onSessionCreated, onActivity) as Promise<ExecutionResult>;
+	}
+
+	executeRefinement(
+		state: SessionState,
+		repoSkillContent: string | undefined,
+		abortSignal?: AbortSignal,
+		onSessionCreated?: (session: LiveExecutionSession) => void,
+		onActivity?: () => void,
+	): Promise<RefinementResult> {
+		const prompt = buildIssueRefinementPrompt(state, repoSkillContent);
+		return this.runWorker(
+			state,
+			{ kind: "issue-refinement", text: prompt },
+			abortSignal,
+			onSessionCreated,
+			onActivity,
+		) as Promise<RefinementResult>;
 	}
 
 	private async runWorker(
 		state: SessionState,
-		prompt: { kind: "issue" | "comment" | "pr-review"; text: string },
+		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
-	): Promise<ExecutionResult> {
+	): Promise<ExecutionResult | RefinementResult> {
 		await this.ensureWorkerImage();
 
 		const sessionKey = buildSessionKey(state.owner, state.repo, state.issueNumber);
-		const containerName = this.buildContainerName(state);
+		const containerName = this.buildContainerName(state, prompt.kind);
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
 		await this.validateLaunch(state.workspacePath);
 
@@ -129,14 +147,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 	private async runWorkerAttempt(
 		state: SessionState,
-		prompt: { kind: "issue" | "comment" | "pr-review"; text: string },
+		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
 		sessionKey: string,
 		containerName: string,
 		workspacePathInWorker: string,
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
-	): Promise<ExecutionResult> {
+	): Promise<ExecutionResult | RefinementResult> {
 		const pendingConnection = this.options.workerRpcServer.createPendingConnection(sessionKey);
 		const workerSessionUrl = this.buildWorkerSessionUrl(sessionKey, pendingConnection.token);
 
@@ -185,9 +203,9 @@ export class DockerWorkerExecutor implements ExecutionService {
 			await sendMessage(message, true);
 		};
 
-		let executionResolve!: (result: ExecutionResult) => void;
+		let executionResolve!: (result: ExecutionResult | RefinementResult) => void;
 		let executionReject!: (error: Error) => void;
-		const executionPromise = new Promise<ExecutionResult>((resolve, reject) => {
+		const executionPromise = new Promise<ExecutionResult | RefinementResult>((resolve, reject) => {
 			executionResolve = resolve;
 			executionReject = reject;
 		});
@@ -370,7 +388,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	private async handleWorkerMessage(
 		message: AnyWorkerProtocolMessage,
 		state: SessionState,
-		prompt: { kind: "issue" | "comment" | "pr-review"; text: string },
+		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
 		sessionKey: string,
 		workspacePathInWorker: string,
 		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
@@ -378,7 +396,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		pendingAcks: Map<string, { resolve: () => void; reject: (error: Error) => void }>,
 		onSessionCreated: ((session: LiveExecutionSession) => void) | undefined,
 		onActivity: (() => void) | undefined,
-		onComplete: (result: ExecutionResult) => void,
+		onComplete: (result: ExecutionResult | RefinementResult) => void,
 		onError: (error: Error) => void,
 	): Promise<void> {
 		switch (message.type) {
@@ -429,7 +447,26 @@ export class DockerWorkerExecutor implements ExecutionService {
 			}
 
 			case "complete": {
-				onComplete((message.payload as WorkerCompletePayload).result);
+				const payload = message.payload as WorkerCompletePayload;
+				if (prompt.kind === "issue-refinement") {
+					const raw = payload.result as Partial<RefinementResult>;
+					const refined = parseRefinementResult(
+						typeof raw.proposedTaskBody === "string"
+							? JSON.stringify({
+									proposedTaskBody: raw.proposedTaskBody,
+									summary: raw.summary ?? "",
+									investigation: raw.investigation ?? "",
+							  })
+							: "",
+					);
+					if (!refined) {
+						onError(new Error("Worker returned an invalid refinement result."));
+						return;
+					}
+					onComplete(refined);
+					return;
+				}
+				onComplete(payload.result as ExecutionResult);
 				return;
 			}
 
@@ -646,8 +683,9 @@ export class DockerWorkerExecutor implements ExecutionService {
 		await this.imageReady;
 	}
 
-	private buildContainerName(state: SessionState): string {
-		return `yeetomatic-session-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
+	private buildContainerName(state: SessionState, kind?: string): string {
+		const prefix = kind === "issue-refinement" ? "yeetomatic-refinement" : "yeetomatic-session";
+		return `${prefix}-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
 	}
 
 	private createMessageIdFactory(): () => string {

@@ -137,6 +137,50 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_repositories_owner_repo ON repositories(owner, repo)`);
 		},
 	},
+	{
+		id: 7,
+		name: "create_refinement_tables",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS refinement_attempts (
+					id TEXT PRIMARY KEY,
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					issue_number INTEGER NOT NULL,
+					instruction_comment_id INTEGER,
+					command_comment_id INTEGER,
+					requester TEXT NOT NULL,
+					original_title TEXT NOT NULL,
+					original_body TEXT NOT NULL,
+					original_body_fingerprint TEXT NOT NULL,
+					proposed_task_body TEXT,
+					summary TEXT,
+					investigation TEXT,
+					instruction_source TEXT NOT NULL,
+					repo_commit TEXT,
+					state TEXT NOT NULL,
+					failure_reason TEXT,
+					delivery_id TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_refinement_attempts_owner_repo ON refinement_attempts(owner, repo)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_refinement_attempts_issue ON refinement_attempts(owner, repo, issue_number)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_refinement_attempts_delivery_id ON refinement_attempts(delivery_id)`);
+
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS refinement_instructions (
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					issue_number INTEGER NOT NULL,
+					comment_id INTEGER NOT NULL,
+					created_at TEXT NOT NULL,
+					PRIMARY KEY (owner, repo, issue_number)
+				)
+			`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

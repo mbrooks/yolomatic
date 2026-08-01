@@ -15,12 +15,14 @@ export class GitHubServiceAdapter implements GitHubService {
 		this.octokit = options.octokit ?? createOctokit(options.githubToken);
 	}
 
-	async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
-		await this.octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body });
+	async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<number> {
+		const response = await this.octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body });
+		return response.data.id;
 	}
 
-	async postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<void> {
-		await this.octokit.issues.createComment({ owner, repo, issue_number: prNumber, body });
+	async postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<number> {
+		const response = await this.octokit.issues.createComment({ owner, repo, issue_number: prNumber, body });
+		return response.data.id;
 	}
 
 	async addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
@@ -100,10 +102,10 @@ export class GitHubServiceAdapter implements GitHubService {
 		return data.map((pr) => ({ number: pr.number, html_url: pr.html_url }));
 	}
 
-	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string } | null> {
+	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; body?: string } | null> {
 		try {
 			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });
-			return { state: data.state };
+			return { state: data.state, body: data.body ?? undefined };
 		} catch {
 			return null;
 		}
@@ -264,6 +266,10 @@ export class GitHubServiceAdapter implements GitHubService {
 
 	async closeIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
 		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, state: "closed" });
+	}
+
+	async updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
+		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, body });
 	}
 
 	async getAuthenticatedUser(): Promise<{ login: string } | null> {

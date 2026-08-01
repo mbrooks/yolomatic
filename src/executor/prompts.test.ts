@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFeedbackPrompt, buildIssuePrompt, buildPRReviewPrompt } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt } from "./prompts.js";
 
 describe("buildIssuePrompt", () => {
 	it("includes issue metadata", () => {
@@ -125,5 +125,51 @@ describe("buildPRReviewPrompt", () => {
 		expect(prompt).toContain("commit");
 		expect(prompt).toContain("Do NOT push");
 		expect(prompt).toContain("control plane owns delivery");
+	});
+});
+
+describe("buildIssueRefinementPrompt", () => {
+	it("includes issue metadata and asks for JSON output", () => {
+		const state = {
+			issueNumber: 7,
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			workspacePath: "/tmp/ws",
+			title: "Refine me",
+			body: "Original body",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state);
+		expect(prompt).toContain("issue #7");
+		expect(prompt).toContain("Refine me");
+		expect(prompt).toContain("Original body");
+		expect(prompt).toContain("proposedTaskBody");
+		expect(prompt).toContain("Do NOT commit");
+	});
+
+	it("includes repository skill content when provided", () => {
+		const state = {
+			issueNumber: 8,
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			workspacePath: "/tmp/ws",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state, "Skill instructions");
+		expect(prompt).toContain("Skill instructions");
+		expect(prompt).toContain("Repository skill instructions");
+	});
+
+	it("falls back text when no skill is provided", () => {
+		const state = {
+			issueNumber: 9,
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			workspacePath: "/tmp/ws",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state);
+		expect(prompt).toContain("built-in");
 	});
 });

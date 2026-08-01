@@ -6,6 +6,7 @@ Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launc
 
 ## Features
 
+- **Issue refinement** — authorized maintainers can run `/yeetomatic issue-refinement` to launch a disposable worker that investigates a new issue and replaces its body with a more complete Proposed Task, without starting implementation.
 - **Issue-to-PR automation** — creates a `yeetomatic/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
 - **GitHub-native collaboration** — responds to issue updates, comments, PR reviews, and inline review comments.
 - **Multi-repository support** — manages each repository, worktree, and issue session independently.
@@ -122,6 +123,20 @@ The configured admin GitHub user can stop an issue from GitHub by commenting:
 /yeetomatic stop
 ```
 
+## Issue Refinement
+
+An authorized maintainer can ask Yeetomatic to investigate a newly opened issue and replace its body with a more complete Proposed Task. When an eligible issue is opened, Yeetomatic posts a static comment explaining the command. To start refinement, comment exactly:
+
+```text
+/yeetomatic issue-refinement
+```
+
+Refinement launches the same disposable Docker worker used for implementation, but in a temporary worktree. The worker may inspect the repository, make experimental edits, run the application and tests, and use the network. When it succeeds, Yeetomatic automatically replaces the issue body with the returned Proposed Task; the title, implementation session, and PR workflow remain untouched. The original body and refinement provenance are stored in the refinement history for audit and recovery.
+
+Refinement behavior can be customized by adding `.pi/skills/issue-refinement/SKILL.md` to the target repository. If the skill is missing, Yeetomatic falls back to built-in prompt defaults. A present skill that cannot be read or executed produces a failed refinement attempt rather than silently switching instructions.
+
+Refinement and implementation cannot overlap on the same issue, and refinement never commits, pushes, or opens a pull request.
+
 Sessions can also be paused, resumed, restarted, archived, or deleted from the admin dashboard when their current state permits it.
 
 ## Issue Management Architecture
@@ -136,12 +151,15 @@ flowchart TD
     POL[Poller<br/>src/github-events/polling.ts]
     HIE[HandleIssueEvent<br/>src/app/commands/handle-issue-event.ts]
     HIC[HandleIssueComment<br/>src/app/commands/handle-issue-comment.ts]
+    HIR[HandleIssueRefinement<br/>src/app/commands/handle-issue-refinement.ts]
     HPR[HandlePRReview<br/>src/app/commands/handle-pr-review.ts]
     POLICY[Workflow Policy<br/>src/domain/workflow/policy.ts]
+    RS[("Refinement Store<br/>memory/refinement.sqlite")]
     SM[Session Manager<br/>src/session/manager.ts]
     SS[("Session Store<br/>sessions/github-{owner}-{repo}/issue-{number}.jsonl")]
     WM[Workspace Manager<br/>src/workspace/manager.ts]
     WT[("Git Worktree<br/>WORKSPACES_DIR/{owner}-{repo}/.worktrees/issue-{n}")]
+    RT[("Refinement Worktree<br/>WORKSPACES_DIR/{owner}-{repo}/.worktrees/refinement/issue-{n}")]
     TC[Task Controller<br/>src/task-controller.ts]
     ES[Execution Service / Worker<br/>src/executor/index.ts]
     REP[Reporter<br/>src/app/commands/execute-session-reporter.ts]
@@ -157,18 +175,23 @@ flowchart TD
     POL --> PD
     PD -->|issue| HIE
     PD -->|issue_comment| HIC
+    PD -->|issue_comment /yeetomatic issue-refinement| HIR
     PD -->|pull_request_review*| HPR
 
     HIE --> POLICY
     HIC --> POLICY
+    HIR --> POLICY
     HPR --> POLICY
 
     HIE -->|ensureSessionExists| SM
     HIC -->|ensureSessionExists| SM
+    HIR -->|temporary worktree| WM
     HPR -->|resume session| SM
     SM --> SS
     SM -->|createOrGetWorktree| WM
     WM --> WT
+    WM -->|temporary refinement worktree| RT
+    HIR --> RS
 
     HIE -->|startIssueExecution| TC
     HIC -->|startIssueExecution| TC
@@ -183,6 +206,7 @@ flowchart TD
     DEL --> GH_API
     HIE --> GH_API
     HIC --> GH_API
+    HIR --> GH_API
     HPR --> GH_API
     GH_API --> LABELS
     GH_API -->|postComment| GH
@@ -191,9 +215,9 @@ flowchart TD
 Walkthrough of each numbered stage:
 
 1. **Inbound events.** GitHub sends `issues`, `issue_comment`, `pull_request_review`, and `pull_request_review_comment` webhooks to `src/webhook/server.ts`. The dispatcher can also receive events from the poller (`src/github-events/polling.ts`) for repositories configured in polling mode.
-2. **Dispatch.** `src/github-events/dispatcher.ts` routes each event to the appropriate command: `HandleIssueEvent`, `HandleIssueComment`, or `HandlePRReview`.
-3. **Policy gate.** Each command consults `src/domain/workflow/policy.ts` to decide whether to ignore the event (wrong sender, bot comment, no Yeetomatic label/assignment, do-not-work labels, etc.).
-4. **Session + workspace.** `src/session/manager.ts` and `src/workspace/manager.ts` ensure a persistent session exists and that the per-issue git worktree is created under `WORKSPACES_DIR/{owner}-{repo}`.
+2. **Dispatch.** `src/github-events/dispatcher.ts` routes each event to the appropriate command: `HandleIssueEvent`, `HandleIssueComment`, `HandleIssueRefinement`, or `HandlePRReview`. The refinement command is detected from the exact `/yeetomatic issue-refinement` comment before normal comment handling.
+3. **Policy gate.** Each command consults `src/domain/workflow/policy.ts` to decide whether to ignore the event (wrong sender, bot comment, no Yeetomatic label/assignment, do-not-work labels, unauthorized refinement command, etc.).
+4. **Session + workspace.** `src/session/manager.ts` and `src/workspace/manager.ts` ensure a persistent session exists and that the per-issue git worktree is created under `WORKSPACES_DIR/{owner}-{repo}`. Refinement uses a separate temporary worktree that is discarded after the run.
 5. **Execution.** `TaskController` registers the run, then the `ExecutionService` (or an isolated worker container in the proposed design) runs the agent in the worktree.
 6. **Result reporting.** `ExecuteSessionReporter` translates the agent result (`complete`, `waiting-feedback`, `failed`, `cancelled`, `working`) into issue comments and workflow labels (`yeetomatic-working`, `yeetomatic-feedback-required`, `yeetomatic-failed`, `yeetomatic-cancelled`).
 7. **Delivery.** `ExecuteSessionDelivery` commits and pushes the branch, creates or reuses a PR, and applies the `yeetomatic-pr-created` label when work is complete.

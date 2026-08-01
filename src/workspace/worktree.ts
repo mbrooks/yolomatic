@@ -259,9 +259,17 @@ export class WorktreeManager {
 		}
 	}
 
-	private async worktreeExists(bareRepoPath: string, expectedPath: string): Promise<boolean> {
+	async worktreeExists(bareRepoPath: string, expectedPath: string): Promise<boolean> {
 		const worktrees = await this.getWorktreeList(bareRepoPath);
 		return worktrees.some((worktree) => worktree.path === expectedPath);
+	}
+
+	async removeWorktreeByPath(bareRepoPath: string, worktreePath: string): Promise<void> {
+		await this.performSafeRemoval(
+			worktreePath,
+			bareRepoPath,
+			`Yeetomatic auto-stash before cleanup of ${path.basename(worktreePath)}`,
+		);
 	}
 
 	private async pruneWorktrees(bareRepoPath: string): Promise<void> {

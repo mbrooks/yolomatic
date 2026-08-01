@@ -1,10 +1,11 @@
 import type { WorkspaceConfig } from "./config.js";
 import type { WorkspaceService } from "../ports/workspace-service.js";
 import { mkdir } from "node:fs/promises";
+import path from "node:path";
 
 import { BareRepoManager } from "./bare-repo.js";
 import { type CommandRunner, createCommandRunner, GitCommandRunner } from "./git-runner.js";
-import { getBareRepoPath, getBranchName, getRepoKey, getWorktreePath } from "./paths.js";
+import { getBareRepoPath, getBranchName, getRepoKey, getWorktreePath, normalizeSegment } from "./paths.js";
 import { WorktreeManager } from "./worktree.js";
 
 export type { CommandRunner } from "./git-runner.js";
@@ -83,6 +84,38 @@ export class WorkspaceManager implements WorkspaceService {
 
 		await this.git.runAuthenticated(["push", "origin", branchName], { cwd: worktreePath });
 		return true;
+	}
+
+	async createRefinementWorktree(owner: string, repo: string, issueNumber: number): Promise<string> {
+		const normalizedOwner = normalizeSegment(owner, "owner");
+		const normalizedRepo = normalizeSegment(repo, "repo");
+		await mkdir(this.config.workspacesDir, { recursive: true });
+		const bareRepoPath = await this.bareRepos.ensureBareRepo(normalizedOwner, normalizedRepo);
+		const basePath = this.worktrees.getWorktreePath(normalizedOwner, normalizedRepo, issueNumber);
+		const refinementPath = path.join(path.dirname(basePath), "refinement", `issue-${issueNumber}`);
+		const branchName = `yeetomatic/refinement-issue-${issueNumber}`;
+		const defaultBranch = this.config.resolveDefaultBranch?.(normalizedOwner, normalizedRepo) ?? this.config.defaultBranch ?? "main";
+
+		if (await this.worktrees.worktreeExists(bareRepoPath, refinementPath)) {
+			await this.worktrees.removeWorktreeByPath(bareRepoPath, refinementPath);
+		}
+
+		await this.bareRepos.fetchOrigin(bareRepoPath);
+		const baseRef = `origin/${defaultBranch}`;
+		await this.git.run("git", ["worktree", "add", "-B", branchName, refinementPath, baseRef], { cwd: bareRepoPath }).catch(async () => {
+			await this.git.run("git", ["worktree", "add", "-B", branchName, refinementPath, defaultBranch], { cwd: bareRepoPath }).catch(async () => {
+				await this.git.run("git", ["worktree", "add", refinementPath, defaultBranch], { cwd: bareRepoPath });
+			});
+		});
+
+		const sanitizedUrl = `https://github.com/${normalizedOwner}/${normalizedRepo}.git`;
+		await this.git.run("git", ["remote", "set-url", "origin", sanitizedUrl], { cwd: refinementPath }).catch(() => undefined);
+		return refinementPath;
+	}
+
+	async removeRefinementWorktree(worktreePath: string): Promise<void> {
+		const bareRepoPath = path.dirname(path.dirname(path.dirname(worktreePath)));
+		await this.worktrees.removeWorktreeByPath(bareRepoPath, worktreePath);
 	}
 
 	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {

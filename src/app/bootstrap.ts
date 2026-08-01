@@ -127,6 +127,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		taskController,
 		adminGithubUsername: config.adminGithubUsername,
 		eventStore,
+		memoryDir: config.memoryDir,
+		repositoryStore,
 	});
 
 	const staleDetector = new StaleSessionDetector(
