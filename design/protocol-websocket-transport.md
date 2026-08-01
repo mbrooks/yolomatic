@@ -40,7 +40,7 @@ Example:
 
 Illustrative URL:
 
-- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token>`
 
 In Docker Compose, the worker can share the Yeetomatic container network namespace and use loopback. In other deployments, Yeetomatic may provide a different worker-reachable base URL such as `host.docker.internal`.
 

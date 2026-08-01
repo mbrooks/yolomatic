@@ -134,7 +134,7 @@ The worker does not need a runtime mount for RPC.
 
 Instead, Yeetomatic passes a session URL such as:
 
-- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token>`
 
 In the Docker Compose deployment, workers share the Yeetomatic container network namespace, so loopback is the correct control-plane address from the worker's perspective.
 
