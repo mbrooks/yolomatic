@@ -16,6 +16,18 @@ vi.mock("../../api/issues.js", async () => {
 	};
 });
 
+vi.mock("../../api/refinements.js", () => ({
+	fetchRefinementLog: async () => ({ available: false, logs: [] }),
+	fetchRefinementAttempts: async () => ({ attempts: [] }),
+}));
+
+vi.mock("../../api/websocket.js", () => ({
+	webSocketManager: {
+		subscribeLog: () => () => {},
+		onStatusChange: () => () => {},
+	},
+}));
+
 const mockIssue = {
 	number: 1,
 	title: "Bug report",

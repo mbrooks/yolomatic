@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { OpenIssue } from "../../api/issues.js";
 import { assignIssue, startIssueSession, closeIssue, markIssueDoNotWork } from "../../api/issues.js";
+import { RefinementPanel } from "./RefinementPanel.js";
 
 export function IssueDetail({
 	selected,
@@ -213,6 +214,8 @@ export function IssueDetail({
 					)}
 				</div>
 			</div>
+
+			<RefinementPanel owner={owner} repo={repo} issueNumber={selected.number} />
 		</div>
 	);
 }

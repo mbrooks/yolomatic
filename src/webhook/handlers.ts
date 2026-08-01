@@ -53,6 +53,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			eventStore?: GitHubEventStateStore;
 			memoryDir?: string;
 			repositoryStore?: RepositoryStore;
+			refinementStore?: RefinementStore;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -61,9 +62,11 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const tasks = deps.taskController ?? new TaskController();
 		const github = new GitHubServiceAdapter({ githubToken: deps.githubToken, octokit: deps.octokit });
 
-		const refinementStore = deps.memoryDir
-			? new RefinementStore(path.join(deps.memoryDir, "refinement.sqlite"))
-			: new RefinementStore(path.join(process.cwd(), "memory", "refinement.sqlite"));
+		const refinementStore =
+			deps.refinementStore ??
+			(deps.memoryDir
+				? new RefinementStore(path.join(deps.memoryDir, "refinement.sqlite"))
+				: new RefinementStore(path.join(process.cwd(), "memory", "refinement.sqlite")));
 		const isRepoManaged = (owner: string, repo: string) => {
 			if (!deps.repositoryStore) return true;
 			return !!deps.repositoryStore.getSync(owner, repo);
