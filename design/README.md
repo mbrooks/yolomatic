@@ -1,6 +1,7 @@
-# Worker Session Design
+# Design Documentation
 
-This folder describes the worker-session runtime currently implemented by Yeetomatic:
+This folder describes the GitHub workflow and worker-session runtime currently
+implemented by Yeetomatic:
 
 - Yeetomatic remains the deterministic control plane.
 - A disposable worker container runs the full LLM agent for each issue execution.
@@ -10,6 +11,8 @@ This folder describes the worker-session runtime currently implemented by Yeetom
 
 ## Documents
 
+- [github-workflow.md](github-workflow.md): end-to-end GitHub event, issue,
+  feedback, delivery, and PR iteration workflow
 - [architecture.md](architecture.md): system overview, trust boundaries, and lifecycle
 - [protocol-launch.md](protocol-launch.md): how Yeetomatic starts a worker session and exposes the worker session URL
 - [protocol-websocket-transport.md](protocol-websocket-transport.md): transport, session isolation, reconnect, and shutdown rules
