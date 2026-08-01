@@ -6,7 +6,7 @@ import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { issueSessionKey } from "./workflow-helpers.js";
-import { isAdmin, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import { isAdmin, isAdminPermission, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { statSync } from "node:fs";
@@ -145,9 +145,12 @@ export class HandleIssueRefinement {
 			return;
 		}
 
-		if (!isAdmin(payload.sender.login, this.deps.adminGithubUsername)) {
-			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not admin\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Only admins can run issue refinement.");
+		const authorized =
+			isAdmin(payload.sender.login, this.deps.adminGithubUsername) ||
+			isAdminPermission(await this.deps.github.getCollaboratorPermissionLevel(owner, repo, payload.sender.login));
+		if (!authorized) {
+			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository owner\n`);
+			await this.deps.github.postComment(owner, repo, issueNumber, "Only repository owners can run issue refinement.");
 			return;
 		}
 

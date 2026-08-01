@@ -14,6 +14,7 @@ import {
 	canDelete,
 	formatUptime,
 	DO_NOT_WORK_LABELS,
+	isAdminPermission,
 } from "./policy.js";
 
 describe("hasLabel", () => {
@@ -72,6 +73,24 @@ describe("isAdmin", () => {
 
 	it("returns false for mismatch", () => {
 		expect(isAdmin("user", "admin")).toBe(false);
+	});
+});
+
+describe("isAdminPermission", () => {
+	it("returns true for admin permission", () => {
+		expect(isAdminPermission("admin")).toBe(true);
+	});
+
+	it("returns false for non-admin permissions", () => {
+		expect(isAdminPermission("maintain")).toBe(false);
+		expect(isAdminPermission("write")).toBe(false);
+		expect(isAdminPermission("triage")).toBe(false);
+		expect(isAdminPermission("read")).toBe(false);
+	});
+
+	it("returns false for null or undefined", () => {
+		expect(isAdminPermission(null)).toBe(false);
+		expect(isAdminPermission(undefined)).toBe(false);
 	});
 });
 

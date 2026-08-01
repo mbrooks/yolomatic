@@ -312,6 +312,29 @@ export class GitHubServiceAdapter implements GitHubService {
 		}
 	}
 
+	async getCollaboratorPermissionLevel(
+		owner: string,
+		repo: string,
+		username: string,
+	): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> {
+		try {
+			const { data } = await this.octokit.repos.getCollaboratorPermissionLevel({ owner, repo, username });
+			const permission = data?.permission;
+			if (
+				permission === "admin" ||
+				permission === "maintain" ||
+				permission === "write" ||
+				permission === "triage" ||
+				permission === "read"
+			) {
+				return permission;
+			}
+			return null;
+		} catch {
+			return null;
+		}
+	}
+
 	private normalizeVisibility(
 		visibility: unknown,
 		isPrivate: unknown,

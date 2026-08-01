@@ -120,6 +120,7 @@ function makeCommand(
 		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
+		getCollaboratorPermissionLevel: vi.fn(async () => null),
 	};
 	const tasks: TaskControlService = overrides?.tasks ?? {
 		cancel: vi.fn(() => false),
