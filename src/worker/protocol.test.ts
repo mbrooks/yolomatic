@@ -4,7 +4,7 @@ import { WORKER_PROTOCOL_VERSION, createWorkerMessage } from "./protocol.js";
 
 describe("worker protocol", () => {
 	it("creates typed protocol envelopes", () => {
-		const message = createWorkerMessage("complete", "mbrooks/tars#418", "msg-9", {
+		const message = createWorkerMessage("complete", "mbrooks/yeetomatic#418", "msg-9", {
 			result: {
 				status: "complete",
 				summary: "done",
@@ -15,7 +15,7 @@ describe("worker protocol", () => {
 		expect(message).toEqual({
 			type: "complete",
 			protocolVersion: WORKER_PROTOCOL_VERSION,
-			sessionKey: "mbrooks/tars#418",
+			sessionKey: "mbrooks/yeetomatic#418",
 			messageId: "msg-9",
 			payload: {
 				result: {

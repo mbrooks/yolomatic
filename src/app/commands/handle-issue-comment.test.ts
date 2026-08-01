@@ -7,7 +7,7 @@ describe("HandleIssueComment", () => {
 		const sessions = {
 			get: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -24,7 +24,7 @@ describe("HandleIssueComment", () => {
 			archive: vi.fn(),
 			createSession: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -37,7 +37,7 @@ describe("HandleIssueComment", () => {
 			})),
 			updateStatus: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -140,29 +140,29 @@ describe("HandleIssueComment", () => {
 		const { handler, sessions, github, prReview } = createHandler();
 		sessions.findSessionByPR.mockResolvedValue({
 			issueNumber: 56,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete",
-			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/tars/pull/99",
+			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
 		} as never);
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
 			comment: { id: 1, body: "Please regenerate this", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "tars", 99);
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		expect(prReview.execute).toHaveBeenCalledWith(
 			expect.objectContaining({
 				pull_request: expect.objectContaining({
@@ -179,13 +179,13 @@ describe("HandleIssueComment", () => {
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
 			comment: { id: 1, body: "Please regenerate this", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		expect(prReview.execute).not.toHaveBeenCalled();
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
@@ -205,11 +205,11 @@ describe("HandleIssueComment", () => {
 				assignee: { login: "yeetomatic-bot" },
 			},
 			comment: { id: 1, body: "Please update", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Yeetomatic is busy. Comment could not be steered.");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic is busy. Comment could not be steered.");
 	});
 
 	it("queues feedback during draining mode", async () => {
@@ -226,14 +226,14 @@ describe("HandleIssueComment", () => {
 				assignee: { login: "yeetomatic-bot" },
 			},
 			comment: { id: 1, body: "Please update", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(sessions.updateStatus).toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			42,
 			"Deploy in progress. Feedback will be processed after restart.",
 		);
@@ -245,7 +245,7 @@ describe("HandleIssueComment", () => {
 			action: "edited",
 			issue: { number: 42 },
 			comment: { id: 1, body: "hi", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -258,7 +258,7 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "hi", user: { login: "yeetomatic-bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "yeetomatic-bot" },
 		});
 
@@ -271,7 +271,7 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "hi", user: { login: "other-bot", type: "Bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-bot" },
 		});
 
@@ -284,11 +284,11 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "/yeetomatic stop", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Only admins can stop Yeetomatic.");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Only admins can stop Yeetomatic.");
 	});
 
 	it("handles admin stop from an admin with an active task", async () => {
@@ -298,11 +298,11 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Stopping Yeetomatic...");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Stopping Yeetomatic...");
 	});
 
 	it("ignores comments that do not pass the policy gate", async () => {
@@ -311,7 +311,7 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [], assignee: null, assignees: [], user: { login: "someone" } },
 			comment: { id: 1, body: "hello world", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -331,7 +331,7 @@ describe("HandleIssueComment", () => {
 				user: { login: "yeetomatic-bot" },
 			},
 			comment: { id: 1, body: "@yeetomatic-bot please continue", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -348,12 +348,12 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [], assignee: { login: "yeetomatic-bot" }, assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { id: 1, body: "@yeetomatic-bot please help", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 42, ["yeetomatic"]);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 42, "Steering comment received.");
+		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic"]);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Steering comment received.");
 	});
 
 	it("ignores comments on issues created by Yeetomatic when Yeetomatic is not assigned", async () => {
@@ -368,7 +368,7 @@ describe("HandleIssueComment", () => {
 				user: { login: "yeetomatic-bot" },
 			},
 			comment: { id: 1, body: "@yeetomatic-bot following up", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -379,18 +379,18 @@ describe("HandleIssueComment", () => {
 
 	it("posts a paused message when the session is paused", async () => {
 		const { handler, github, sessions } = createHandler();
-		sessions.get.mockResolvedValue({ status: "paused", owner: "mbrooks", repo: "tars", issueNumber: 42, workspacePath: "/tmp/ws/issue-42" } as never);
+		sessions.get.mockResolvedValue({ status: "paused", owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, workspacePath: "/tmp/ws/issue-42" } as never);
 		await handler.execute({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "please update", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			42,
 			"Yeetomatic is paused on this issue. It will resume when unpaused.",
 		);
@@ -402,13 +402,13 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
 			comment: { id: 1, body: "please update", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			42,
 			"Feedback received. Resuming work.",
 		);
@@ -419,9 +419,9 @@ describe("HandleIssueComment", () => {
 		github.getPullRequest.mockResolvedValue(null as never);
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
 			comment: { id: 1, body: "please update", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -434,12 +434,12 @@ describe("HandleIssueComment", () => {
 		tasks.cancel.mockReturnValue(true);
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
 			comment: { id: 1, body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Stopping Yeetomatic...");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Stopping Yeetomatic...");
 	});
 });

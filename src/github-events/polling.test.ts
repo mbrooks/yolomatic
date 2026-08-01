@@ -32,7 +32,7 @@ import type { AccessibleRepo } from "../ports/github-service.js";
 
 function makeGithub(overrides = {}) {
 	return {
-		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" }] as AccessibleRepo[]),
+		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }] as AccessibleRepo[]),
 		listIssuesUpdatedSince: vi.fn(async () => []),
 		listIssueEventsSince: vi.fn(async () => []),
 		listIssueCommentsSince: vi.fn(async () => []),
@@ -54,9 +54,9 @@ describe("tickGitHubPolling", () => {
 	it("checks subject due status from last checked time", () => {
 		const now = new Date("2026-06-04T12:00:00.000Z");
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-03T11:00:00.000Z",
@@ -112,7 +112,7 @@ describe("tickGitHubPolling", () => {
 			dispatch,
 		});
 
-		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "tars", "2026-06-01T11:58:00.000Z");
+		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yeetomatic", "2026-06-01T11:58:00.000Z");
 		expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
 			type: "issue",
 			payload: expect.objectContaining({ action: "opened" }),
@@ -166,22 +166,22 @@ describe("tickGitHubPolling", () => {
 			user: { login: "human" },
 		};
 
-		expect(normalizePolledIssue("mbrooks", "tars", issue, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "issue" }));
-		expect(normalizePolledIssue("mbrooks", "tars", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("edited");
-		expect(normalizePolledIssueTimelineEvent("mbrooks", "tars", {
+		expect(normalizePolledIssue("mbrooks", "yeetomatic", issue, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "issue" }));
+		expect(normalizePolledIssue("mbrooks", "yeetomatic", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("edited");
+		expect(normalizePolledIssueTimelineEvent("mbrooks", "yeetomatic", {
 			id: 3,
 			event: "assigned",
 			created_at: "2026-06-01T12:00:00.000Z",
 			actor: { login: "human" },
 			issue,
 		})).toEqual(expect.objectContaining({ type: "issue" }));
-		expect(normalizePolledIssueTimelineEvent("mbrooks", "tars", {
+		expect(normalizePolledIssueTimelineEvent("mbrooks", "yeetomatic", {
 			id: 4,
 			event: "labeled",
 			created_at: "2026-06-01T12:00:00.000Z",
 			issue,
 		})).toBeNull();
-		expect(normalizePolledIssueComment("mbrooks", "tars", {
+		expect(normalizePolledIssueComment("mbrooks", "yeetomatic", {
 			id: 5,
 			body: "Comment",
 			created_at: "2026-06-01T12:00:00.000Z",
@@ -189,9 +189,9 @@ describe("tickGitHubPolling", () => {
 			user: { login: "human", type: "User" },
 			issue: { ...issue, pull_request: { url: "https://api.github.com/pr" } },
 		})).toEqual(expect.objectContaining({ type: "issue_comment" }));
-		expect(normalizePolledPullRequest("mbrooks", "tars", pr, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "pull_request" }));
-		expect(normalizePolledPullRequest("mbrooks", "tars", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("synchronize");
-		expect(normalizePolledPRReview("mbrooks", "tars", {
+		expect(normalizePolledPullRequest("mbrooks", "yeetomatic", pr, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "pull_request" }));
+		expect(normalizePolledPullRequest("mbrooks", "yeetomatic", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("synchronize");
+		expect(normalizePolledPRReview("mbrooks", "yeetomatic", {
 			id: 6,
 			body: "Review",
 			state: "commented",
@@ -199,7 +199,7 @@ describe("tickGitHubPolling", () => {
 			user: { login: "reviewer" },
 			pull_request: pr,
 		})).toEqual(expect.objectContaining({ type: "pull_request_review" }));
-		expect(normalizePolledPRReviewComment("mbrooks", "tars", {
+		expect(normalizePolledPRReviewComment("mbrooks", "yeetomatic", {
 			id: 7,
 			body: "Fix",
 			created_at: "2026-06-01T12:00:00.000Z",
@@ -216,7 +216,7 @@ describe("tickGitHubPolling", () => {
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
 				{ owner: "mbrooks", repo: "bad", fullName: "mbrooks/bad", visibility: "private" },
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async (_owner: string, repo: string) => {
 				if (repo === "bad") throw new Error("boom");
@@ -314,9 +314,9 @@ describe("tickGitHubPolling", () => {
 
 	it("checks due issue subjects and marks them checked", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -387,16 +387,16 @@ describe("tickGitHubPolling", () => {
 			dispatch,
 		});
 
-		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "tars", "2026-06-01T11:58:00.000Z");
+		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yeetomatic", "2026-06-01T11:58:00.000Z");
 		expect(dispatch).toHaveBeenCalledTimes(3);
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/tars:issue:1", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:issue:1", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("checks due PR subjects and ignores subjects that are not due", async () => {
 		const due: GitHubPollSubject = {
-			subjectKey: "mbrooks/tars:pull_request:4",
+			subjectKey: "mbrooks/yeetomatic:pull_request:4",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "pull_request",
 			number: 4,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -405,7 +405,7 @@ describe("tickGitHubPolling", () => {
 		};
 		const notDue: GitHubPollSubject = {
 			...due,
-			subjectKey: "mbrooks/tars:issue:9",
+			subjectKey: "mbrooks/yeetomatic:issue:9",
 			subjectType: "issue",
 			number: 9,
 			lastActivityAt: "2026-06-04T11:59:00.000Z",
@@ -457,14 +457,14 @@ describe("tickGitHubPolling", () => {
 		expect(github.listPullRequestsUpdatedSince).toHaveBeenCalledTimes(1);
 		expect(github.listIssuesUpdatedSince).not.toHaveBeenCalled();
 		expect(dispatch).toHaveBeenCalledTimes(3);
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/tars:pull_request:4", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:pull_request:4", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("marks due subjects checked even when a subject check fails", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -484,7 +484,7 @@ describe("tickGitHubPolling", () => {
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch: vi.fn(),
 		});
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/tars:issue:1", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:issue:1", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("starts and stops the polling interval", () => {
@@ -531,7 +531,7 @@ describe("tickGitHubPolling", () => {
 		const store = makeStore("2026-06-01T12:00:00.000Z");
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
 			]),
 		});
 		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
@@ -548,7 +548,7 @@ describe("tickGitHubPolling", () => {
 			});
 
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick started at 2026-06-01T12:00:00.000Z\n"));
-			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking mbrooks/tars (lastEventReceivedAt=2026-06-01T12:00:00.000Z, since=2026-06-01T11:58:00.000Z)\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking mbrooks/yeetomatic (lastEventReceivedAt=2026-06-01T12:00:00.000Z, since=2026-06-01T11:58:00.000Z)\n"));
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick completed: 0 events dispatched\n"));
 		} finally {
 			writeSpy.mockRestore();
@@ -580,9 +580,9 @@ describe("tickGitHubPolling", () => {
 
 	it("logs effective interval when checking due polling subjects", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -608,7 +608,7 @@ describe("tickGitHubPolling", () => {
 				dispatch: vi.fn(),
 			});
 
-			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking subject mbrooks/tars:issue:1 (effective interval=3600000ms)\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking subject mbrooks/yeetomatic:issue:1 (effective interval=3600000ms)\n"));
 		} finally {
 			writeSpy.mockRestore();
 		}
@@ -620,7 +620,7 @@ describe("tickGitHubPolling", () => {
 			const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
 			const github = makeGithub({
 				listAccessibleRepositories: vi.fn(async () => [
-					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
 					{ owner: "mbrooks", repo: "webhook-only", fullName: "mbrooks/webhook-only", visibility: "private" },
 				] as AccessibleRepo[]),
 			});
@@ -637,7 +637,7 @@ describe("tickGitHubPolling", () => {
 				await vi.advanceTimersByTimeAsync(0);
 
 				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] Starting GitHub polling (base interval=60000ms)\n"));
-				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/tars (mode=both, base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yeetomatic (mode=both, base interval=60000ms)\n"));
 				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] skipping mbrooks/webhook-only (mode=webhook)\n"));
 			} finally {
 				stopGitHubPolling();
@@ -660,7 +660,7 @@ describe("tickGitHubPolling", () => {
 				});
 				await vi.advanceTimersByTimeAsync(0);
 
-				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/tars (mode=polling, base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yeetomatic (mode=polling, base interval=60000ms)\n"));
 			} finally {
 				stopGitHubPolling();
 				writeSpy.mockRestore();

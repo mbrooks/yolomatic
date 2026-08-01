@@ -25,8 +25,8 @@ describe("GetAdminStatus", () => {
 	it("returns online when no sessions are working or waiting feedback", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => [
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "pending" }),
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 2, status: "complete" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "pending" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "complete" }),
 			]),
 		} as unknown as SessionRepository;
 		const stale: StaleSessionService = {
@@ -56,7 +56,7 @@ describe("GetAdminStatus", () => {
 	it("returns busy when a session is working", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => [
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
 			]),
 		} as unknown as SessionRepository;
 		const stale: StaleSessionService = {
@@ -83,8 +83,8 @@ describe("GetAdminStatus", () => {
 	it("returns repo summaries", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => [
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 2, status: "complete" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "complete" }),
 				makeState({ owner: "mbrooks", repo: "case", issueNumber: 3, status: "pending" }),
 			]),
 		} as unknown as SessionRepository;
@@ -107,7 +107,7 @@ describe("GetAdminStatus", () => {
 		if (result.success) {
 			expect(result.data.repos).toHaveLength(2);
 			expect(result.data.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" });
-			expect(result.data.repos[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" });
+			expect(result.data.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" });
 		}
 	});
 
@@ -227,7 +227,7 @@ describe("GetAdminStatus", () => {
 	it("merges configured onboarding repos into inventory", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => [
-				makeState({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
+				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
 			]),
 		} as unknown as SessionRepository;
 		const stale: StaleSessionService = {
@@ -244,7 +244,7 @@ describe("GetAdminStatus", () => {
 			setDraining: vi.fn(),
 		};
 		const managed: Repository[] = [
-			{ id: "mbrooks/tars", owner: "mbrooks", repo: "tars", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
+			{ id: "mbrooks/yeetomatic", owner: "mbrooks", repo: "yeetomatic", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
 			{ id: "mbrooks/new-repo", owner: "mbrooks", repo: "new-repo", fullName: null, visibility: null, githubEventMode: null, defaultBranch: null, createdAt: "", updatedAt: "" },
 		];
 		const repositoryStore = {
@@ -256,7 +256,7 @@ describe("GetAdminStatus", () => {
 		if (result.success) {
 			expect(result.data.repos).toEqual([
 				{ owner: "mbrooks", repo: "new-repo", sessionCount: 0, activeCount: 0, lastActivity: null },
-				{ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" },
+				{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" },
 			]);
 		}
 	});
@@ -266,7 +266,7 @@ describe("GetAdminStatus", () => {
 			getAll: vi.fn(async () => [
 				makeState({
 					owner: "mbrooks",
-					repo: "tars",
+					repo: "yeetomatic",
 					issueNumber: 1,
 					status: "working",
 					taskStartedAt: "2026-01-01T00:00:00Z",
@@ -305,7 +305,7 @@ describe("GetAdminStatus", () => {
 			getAll: vi.fn(async () => [
 				makeState({
 					owner: "mbrooks",
-					repo: "tars",
+					repo: "yeetomatic",
 					issueNumber: 1,
 					status: "working",
 					title: "Fix the thing",
@@ -344,7 +344,7 @@ describe("GetAdminStatus", () => {
 			getAll: vi.fn(async () => [
 				makeState({
 					owner: "mbrooks",
-					repo: "tars",
+					repo: "yeetomatic",
 					issueNumber: 1,
 					status: "working",
 					title: "Fix the thing",
@@ -389,7 +389,7 @@ describe("GetAdminStatus", () => {
 			getAll: vi.fn(async () => [
 				makeState({
 					owner: "mbrooks",
-					repo: "tars",
+					repo: "yeetomatic",
 					issueNumber: 1,
 					status: "working",
 					title: undefined as unknown as string,

@@ -29,7 +29,7 @@ function mockLogResponse(overrides: Record<string, unknown> = {}) {
 function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 1,
 		status,
 		title: null,
@@ -95,7 +95,7 @@ describe("useSessionLog websocket", () => {
 			await Promise.resolve();
 		});
 
-		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "tars", 1, expect.any(Function));
+		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, expect.any(Function));
 	});
 
 	it("appends log entries received via websocket", async () => {

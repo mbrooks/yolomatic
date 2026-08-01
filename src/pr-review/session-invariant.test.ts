@@ -10,13 +10,13 @@ import {
 function session(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		issueNumber: 56,
-		repo: "tars",
+		repo: "yeetomatic",
 		owner: "mbrooks",
 		title: "Title",
 		body: "Body",
 		status: "complete",
-		sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-56.jsonl",
-		workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-56",
+		sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
+		workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
 		lastActivity: new Date().toISOString(),
 		seeded: true,
 		...overrides,

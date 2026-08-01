@@ -58,7 +58,7 @@ describe("navigate", () => {
 
 describe("useRoute", () => {
 	beforeEach(() => {
-		window.location.hash = "#/repos/mbrooks/tars";
+		window.location.hash = "#/repos/mbrooks/yeetomatic";
 	});
 
 	afterEach(() => {
@@ -67,7 +67,7 @@ describe("useRoute", () => {
 
 	it("returns current route from hash", () => {
 		const { result } = renderHook(() => useRoute());
-		expect(result.current).toEqual(expect.objectContaining({ screen: "repo", owner: "mbrooks", repo: "tars" }));
+		expect(result.current).toEqual(expect.objectContaining({ screen: "repo", owner: "mbrooks", repo: "yeetomatic" }));
 	});
 });
 
@@ -81,50 +81,50 @@ describe("parseHash", () => {
 	});
 
 	it("parses repo detail (default tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: undefined,
 			tab: "sessions",
 		});
 	});
 
 	it("parses repo detail (sessions tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars/sessions")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/sessions")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: undefined,
 			tab: "sessions",
 		});
 	});
 
 	it("parses repo detail with issue number", () => {
-		expect(parseHash("#/repos/mbrooks/tars/140")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/140")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 140,
 			tab: "sessions",
 		});
 	});
 
 	it("parses repo detail with sessions tab and issue number", () => {
-		expect(parseHash("#/repos/mbrooks/tars/sessions/140")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/sessions/140")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 140,
 			tab: "sessions",
 		});
 	});
 
 	it("parses repo detail with skills tab and issue number", () => {
-		expect(parseHash("#/repos/mbrooks/tars/skills/140")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/skills/140")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 140,
 			tab: "skills",
 		});
@@ -139,7 +139,7 @@ describe("parseHash", () => {
 	});
 
 	it("parses new-issue view with owner and repo", () => {
-		expect(parseHash("#/new-issue/mbrooks/tars")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "tars" });
+		expect(parseHash("#/new-issue/mbrooks/yeetomatic")).toEqual({ screen: "new-issue", owner: "mbrooks", repo: "yeetomatic" });
 	});
 
 	it("defaults to dashboard for unknown", () => {
@@ -147,20 +147,20 @@ describe("parseHash", () => {
 	});
 
 	it("parses repo detail (issues tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars/issues")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/issues")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: undefined,
 			tab: "issues",
 		});
 	});
 
 	it("parses repo detail (settings tab)", () => {
-		expect(parseHash("#/repos/mbrooks/tars/settings")).toEqual({
+		expect(parseHash("#/repos/mbrooks/yeetomatic/settings")).toEqual({
 			screen: "repo",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: undefined,
 			tab: "settings",
 		});
@@ -203,59 +203,59 @@ describe("buildHash", () => {
 
 	it("builds repo detail (sessions default)", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "sessions" }),
+		).toBe("#/repos/mbrooks/yeetomatic");
 	});
 
 	it("builds repo detail with issues tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" }),
-		).toBe("#/repos/mbrooks/tars/issues");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "issues" }),
+		).toBe("#/repos/mbrooks/yeetomatic/issues");
 	});
 
 	it("builds repo detail with explicit sessions tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "sessions" }),
+		).toBe("#/repos/mbrooks/yeetomatic");
 	});
 
 	it("builds repo detail with issue number (sessions default)", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/tars/140");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "sessions" }),
+		).toBe("#/repos/mbrooks/yeetomatic/140");
 	});
 
 	it("builds repo detail with issues tab and issue number", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "issues" }),
-		).toBe("#/repos/mbrooks/tars/issues/140");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "issues" }),
+		).toBe("#/repos/mbrooks/yeetomatic/issues/140");
 	});
 
 	it("builds repo detail with skills tab and issue number", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "skills" }),
-		).toBe("#/repos/mbrooks/tars/skills/140");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "skills" }),
+		).toBe("#/repos/mbrooks/yeetomatic/skills/140");
 	});
 
 	it("builds new-issue view with owner and repo", () => {
-		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "tars" })).toBe("#/new-issue/mbrooks/tars");
+		expect(buildHash({ screen: "new-issue", owner: "mbrooks", repo: "yeetomatic" })).toBe("#/new-issue/mbrooks/yeetomatic");
 	});
 
 	it("round-trips issues tab", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "issues" as const });
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "issues" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "issues" }));
 	});
 
 	it("builds repo detail with skills tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" }),
-		).toBe("#/repos/mbrooks/tars/skills");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "skills" }),
+		).toBe("#/repos/mbrooks/yeetomatic/skills");
 	});
 
 	it("builds repo detail with settings tab", () => {
 		expect(
-			buildHash({ screen: "repo", owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "settings" }),
-		).toBe("#/repos/mbrooks/tars/settings");
+			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "settings" }),
+		).toBe("#/repos/mbrooks/yeetomatic/settings");
 	});
 
 	it("builds settings root", () => {
@@ -271,22 +271,22 @@ describe("buildHash", () => {
 	});
 
 	it("round-trips skills tab", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "skills" as const });
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "skills" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "skills" }));
 	});
 
 	it("round-trips settings tab", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: undefined, tab: "settings" as const });
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "yeetomatic", issueNumber: undefined, tab: "settings" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "settings" }));
 	});
 
 	it("round-trips sessions tab with issue number", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "sessions" as const });
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "sessions" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "sessions", issueNumber: 140 }));
 	});
 
 	it("round-trips skills tab with issue number", () => {
-		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "tars", issueNumber: 140, tab: "skills" as const });
+		const hash = buildHash({ screen: "repo" as const, owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "skills" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "repo", tab: "skills", issueNumber: 140 }));
 	});
 
