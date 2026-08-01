@@ -1,6 +1,15 @@
-# Yeetomatic
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/yeetomatic-logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/yeetomatic-logo-light.png">
+    <img src="assets/yeetomatic-logo-light.png" alt="Yeetomatic logo" width="280">
+  </picture>
 
-Yeetomatic is a self-hosted coding agent that turns GitHub issues into pull requests in a safe and secure way.
+  <h1>Yeetomatic</h1>
+  <p><strong>Task Automation &amp; Response System</strong></p>
+</div>
+
+Yeetomatic is a self-hosted coding agent that turns GitHub issues into pull requests with isolated execution and protected credentials.
 
 Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through design, implementation, feedback, and PR delivery.
 
