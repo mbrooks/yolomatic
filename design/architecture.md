@@ -1,5 +1,9 @@
 # Architecture
 
+Status: as-built design
+
+Last verified: 2026-08-01 against `github/main` at `26171605efdd`
+
 ## Summary
 
 Yeetomatic runs as a control plane and launches a separate worker container for each issue execution. The worker owns agent execution and code changes. Yeetomatic owns everything deterministic before and after the run.
@@ -82,16 +86,17 @@ Yeetomatic may keep:
 - Docker socket access
 - admin HTTP surface
 
-The LLM should not run here anymore.
+The LLM does not run in the control-plane process.
 
 ### Worker Container
 
 The worker gets:
 
-- one read-write bind mount of the full workspace tree
+- one read-write mount of the full workspace tree, backed by either a Docker
+  volume or host bind mount
 - internet access
-- a clean Debian-based filesystem per session
-- model credentials only
+- a fresh writable container filesystem per execution
+- only the explicitly forwarded model/session environment variables
 - a session-specific WebSocket URL for the control-plane connection
 
 The worker does not get:
@@ -101,6 +106,7 @@ The worker does not get:
 - Yeetomatic memory DB
 - Yeetomatic admin credentials
 - Docker socket
+- control-plane runtime and memory volumes
 - a mounted LLM session directory
 - direct access to Yeetomatic source checkout unless it is under the workspace mount
 
@@ -113,12 +119,14 @@ Important caveat:
 
 The worker mount model is:
 
-- host: `WORKSPACES_DIR`
+- source: the configured `worker_workspace_mount_source`, resolved to the
+  control-plane container's actual workspace volume or bind source when
+  possible
 - container: `WORKSPACES_DIR` at the same absolute path used by Yeetomatic
 
 Yeetomatic passes the primary worktree path separately, for example:
 
-- `/app/workspaces/mbrooks-tars/.worktrees/issue-395`
+- `/app/workspaces/mbrooks-yeetomatic/.worktrees/issue-395`
 
 All other repos under that shared workspace root are available for reference and ad hoc local work. This intentionally favors simplicity over fine-grained isolation.
 
@@ -126,34 +134,72 @@ The worker does not need a runtime mount for RPC.
 
 Instead, Yeetomatic passes a session URL such as:
 
-- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token>`
 
 In the Docker Compose deployment, workers share the Yeetomatic container network namespace, so loopback is the correct control-plane address from the worker's perspective.
 
+In deployments without `container:*` networking, Yeetomatic adds
+`host.docker.internal:host-gateway` and rewrites a loopback `OLLAMA_HOST` to
+`host.docker.internal`. An explicit worker Ollama URL takes precedence.
+
 ## Process Model
 
-One worker container is created per issue session.
+One worker container is created per execution attempt. Feedback and restart
+resumption can create later worker containers for the same durable issue
+session.
 
 - The worker may start background processes inside the container if needed.
 - Those processes live only as long as the container lives.
-- Cancelling the session kills the container and therefore all child processes.
+- Cancelling first asks the worker to abort the agent. After that control
+  acknowledgement succeeds or fails, Yeetomatic arms a five-second
+  `docker stop` fallback for the container and its child processes.
 
 This keeps cleanup simple and prevents detached processes from surviving outside the session boundary.
+
+## Docker Worker Management
+
+The current host-side implementation manages worker containers as follows:
+
+- Before the first launch in a control-plane process, it builds the Dockerfile
+  `worker` target and tags the configured worker image. One shared promise
+  serializes that build; Docker layer caching avoids rebuilding unchanged
+  layers.
+- A session receives a deterministic Docker name in the form
+  `yeetomatic-session-{owner}-{repo}-{issueNumber}`, normalized to Docker-safe
+  characters.
+- The launch uses `docker run --rm`, so a normally exiting or stopped worker is
+  removed by Docker.
+- Workers do not receive a Docker restart policy. A control-plane restart does
+  not adopt or reconcile an existing worker container.
+- If launch fails because that deterministic name is already in use,
+  Yeetomatic inspects the conflicting container. It removes and retries only
+  containers in `created`, `dead`, or `exited` state. A running or unknown
+  container is preserved and the launch fails closed.
+- Conflict recovery allows three retries after the initial launch attempt.
+- Docker stdout and stderr are retained as bounded diagnostic tails. If the
+  container exits before sending `complete`, the execution fails with its exit
+  information and available output.
+
+There is no independent Docker worker scheduler or reconciliation loop. The
+session executor owns each `docker run` child process for the duration of that
+execution.
 
 ## Session Lifecycle
 
 1. Yeetomatic receives or resumes an issue session.
 2. Yeetomatic prepares the primary worktree.
-3. Yeetomatic creates a per-session WebSocket reservation and token.
-4. Yeetomatic launches a fresh worker container with the workspace mount and session URL.
-5. The worker connects and sends `hello`.
-6. Yeetomatic verifies the session key matches the reserved session and replies with `launch_config`.
-7. The worker runs the agent against the primary worktree.
-8. The worker streams `event_batch` and `heartbeat` messages during execution.
-9. Yeetomatic may send `control` messages such as `pause`, `stop`, or `steer`.
-10. The worker sends one terminal `complete` message.
-11. Yeetomatic stores logs, updates session state, and handles delivery.
-12. Yeetomatic removes the worker container and clears the session reservation.
+3. Yeetomatic ensures the worker image is ready.
+4. Yeetomatic creates a per-attempt WebSocket reservation and token.
+5. Yeetomatic launches a fresh worker container with the workspace mount and session URL.
+6. The worker connects and sends `hello`.
+7. Yeetomatic verifies the session key matches the reserved session and replies with `launch_config`.
+8. The worker acknowledges the launch and runs the agent against the primary worktree.
+9. The worker streams `event_batch` and `heartbeat` messages during execution.
+10. Yeetomatic may send `control` messages such as `pause`, `stop`, or `steer`.
+11. The worker sends one terminal `complete` message.
+12. Yeetomatic stores logs, updates session state, and handles delivery.
+13. The worker exits, Docker removes the `--rm` container, and Yeetomatic
+    closes the connection and disposes the reservation.
 
 ## Logging Model
 
@@ -167,11 +213,11 @@ This keeps the existing admin log views conceptually intact while avoiding stdou
 
 ## Session Persistence
 
-The worker should be treated as a stateless execution runtime.
+The worker is treated as a stateless execution runtime.
 
 - Yeetomatic owns persisted transcript and session history.
-- The worker should not mount or write the long-lived LLM session directory used by Yeetomatic today.
-- Assistant responses, reasoning summaries, tool activity, steering inputs, and terminal results should be streamed back over the WebSocket session.
+- The worker does not mount or write the long-lived LLM session directory used by Yeetomatic today.
+- Assistant responses, reasoning summaries, tool activity, steering inputs, and terminal results are streamed back over the WebSocket session.
 
 If Yeetomatic later needs resumable execution, it should derive restart context from centrally persisted session history rather than a worker-owned on-disk session folder.
 
