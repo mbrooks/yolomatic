@@ -39,7 +39,7 @@ function makeDeps(overrides?: {
 	} as unknown as SessionRepository;
 
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 })),
 		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
@@ -67,7 +67,7 @@ function makeDeps(overrides?: {
 		postPRComment: vi.fn(),
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
-		fileSelfReport: overrides?.fileSelfReport ? vi.fn(overrides.fileSelfReport) : vi.fn(async () => "https://github.com/mbrooks/tars/issues/999"),
+		fileSelfReport: overrides?.fileSelfReport ? vi.fn(overrides.fileSelfReport) : vi.fn(async () => "https://github.com/mbrooks/yeetomatic/issues/999"),
 		listReviewComments: vi.fn(async () => []),
 		listLabels: vi.fn(async () => []),
 		getIssueTemplates: vi.fn(async () => []),
@@ -100,7 +100,7 @@ function makeDeps(overrides?: {
 
 const state: SessionState = {
 	owner: "mbrooks",
-	repo: "tars",
+	repo: "yeetomatic",
 	issueNumber: 1,
 	title: "Test",
 	body: "Body",
@@ -130,7 +130,7 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state, "Please retry");
 
-		expect(deps.tasks.steer).toHaveBeenCalledWith("mbrooks/tars#1", "Please retry");
+		expect(deps.tasks.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#1", "Please retry");
 		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(deps.executor.execute).not.toHaveBeenCalled();
 		expect(deps.tasks.unregister).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe("ExecuteSession", () => {
 			commitAndPush: vi.fn(async () => {
 				throw new Error(
 					"Command failed: git push origin yeetomatic/issue-1\n" +
-					"To https://github.com/mbrooks/tars.git\n" +
+					"To https://github.com/mbrooks/yeetomatic.git\n" +
 					" ! [remote rejected] yeetomatic/issue-1 -> yeetomatic/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				);
 			}),
@@ -168,11 +168,11 @@ describe("ExecuteSession", () => {
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Yeetomatic delivery failed"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
 	});
 
 	it("falls back to git_worktree_failure for other push errors", async () => {
@@ -224,16 +224,16 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Delivery diagnostics"),
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
 	});
 
 	it("posts 'PR created' comment when a new PR is created", async () => {
 		const deps = makeDeps({
-			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" })),
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
 		});
 
 		const execute = new ExecuteSession({
@@ -252,11 +252,11 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
-			expect.stringContaining("PR created: https://github.com/mbrooks/tars/pull/42"),
+			expect.stringContaining("PR created: https://github.com/mbrooks/yeetomatic/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("posts 'PR already exists' comment when PR already exists", async () => {
@@ -266,7 +266,7 @@ describe("ExecuteSession", () => {
 			}),
 		});
 		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
-			{ number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" },
+			{ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" },
 		]);
 
 		const execute = new ExecuteSession({
@@ -285,11 +285,11 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
-			expect.stringContaining("PR already exists: https://github.com/mbrooks/tars/pull/42"),
+			expect.stringContaining("PR already exists: https://github.com/mbrooks/yeetomatic/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("includes PAT scope hint in delivery failure comment", async () => {
@@ -297,7 +297,7 @@ describe("ExecuteSession", () => {
 			commitAndPush: vi.fn(async () => {
 				throw new Error(
 					"Command failed: git push origin yeetomatic/issue-1\n" +
-					"To https://github.com/mbrooks/tars.git\n" +
+					"To https://github.com/mbrooks/yeetomatic.git\n" +
 					" ! [remote rejected] yeetomatic/issue-1 -> yeetomatic/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				);
 			}),
@@ -319,7 +319,7 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("missing the `workflow` scope"),
 		);
@@ -346,11 +346,11 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.any(Object));
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed", expect.any(Object));
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Yeetomatic stopped before execution"),
 		);
@@ -379,11 +379,11 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "waiting-feedback");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-feedback-required"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "waiting-feedback");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-feedback-required"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Need clarification:"),
 		);
@@ -411,8 +411,8 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "cancelled");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-cancelled"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "cancelled");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-cancelled"]);
 	});
 
 	it("handles working status continuation", async () => {
@@ -437,8 +437,8 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "working");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "working");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-working"]);
 	});
 
 	it("handles failed status from executor for rate-limit errors", async () => {
@@ -463,11 +463,11 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("**Build failed**"),
 		);
@@ -500,11 +500,11 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).not.toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Yeetomatic is still working on this issue."),
 		);
@@ -529,7 +529,7 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.markSeeded).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(deps.sessions.markSeeded).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("does not mark seeded when resuming from comment", async () => {
@@ -576,7 +576,7 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
 	});
 
 	it("self-reports on fatal system error when enabled", async () => {
@@ -619,8 +619,8 @@ describe("ExecuteSession", () => {
 		await execute.run(state);
 
 		expect(deps.github.fileSelfReport).toHaveBeenCalled();
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
 	});
 
 	it("posts failure comment on fatal system error when self-report is disabled", async () => {
@@ -663,8 +663,8 @@ describe("ExecuteSession", () => {
 		await expect(execute.run(state)).rejects.toThrow(error);
 
 		expect(deps.github.fileSelfReport).not.toHaveBeenCalled();
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
 	});
 
 	it("rethrows non-fatal execution errors", async () => {
@@ -690,7 +690,7 @@ describe("ExecuteSession", () => {
 		});
 
 		await expect(execute.run(state)).rejects.toThrow("executor blew up");
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
 		expect(deps.tasks.unregister).toHaveBeenCalled();
 	});
 
@@ -719,7 +719,7 @@ describe("ExecuteSession", () => {
 		});
 
 		await expect(execute.run(state)).rejects.toThrow("executor blew up");
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
 		expect(deps.tasks.unregister).toHaveBeenCalled();
 		process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED = prev;
 	});
@@ -753,11 +753,11 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-cancelled"]);
+		expect(deps.sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-cancelled"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("Task cancelled by admin"),
 		);
@@ -788,7 +788,7 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.any(Object));
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed", expect.any(Object));
 		expect(deps.executor.execute).not.toHaveBeenCalled();
 	});
 
@@ -838,9 +838,9 @@ describe("ExecuteSession", () => {
 		await execute.run(state);
 
 		expect(deps.executor.execute).not.toHaveBeenCalled();
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("credential cleanup failed") }));
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, expect.stringContaining("Yeetomatic stopped before execution"));
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("credential cleanup failed") }));
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, expect.stringContaining("Yeetomatic stopped before execution"));
 	});
 
 	it("calls updatePullRequestBranch and retries when syncWorktree diverges for a PR session", async () => {
@@ -870,7 +870,7 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 		expect(deps.workspaces.syncWorktree).toHaveBeenCalledTimes(2);
 		expect(deps.executor.execute).toHaveBeenCalled();
 	});
@@ -898,7 +898,7 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.updatePullRequestBranch).not.toHaveBeenCalled();
 		expect(deps.executor.execute).not.toHaveBeenCalled();
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("diverged") }));
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("diverged") }));
 	});
 
 	it("fails the session when update-branch cannot resolve the divergence", async () => {
@@ -929,9 +929,9 @@ describe("ExecuteSession", () => {
 
 		await execute.run(state);
 
-		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 		expect(deps.executor.execute).not.toHaveBeenCalled();
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("merge conflict") }));
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("merge conflict") }));
 	});
 
 	it("records task execution start and finish timestamps", async () => {
@@ -952,7 +952,7 @@ describe("ExecuteSession", () => {
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"working",
 			expect.objectContaining({
@@ -962,7 +962,7 @@ describe("ExecuteSession", () => {
 		);
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"working",
 			expect.objectContaining({
@@ -1005,7 +1005,7 @@ describe("ExecuteSession", () => {
 		expect(activityCallback).toBeDefined();
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"working",
 			expect.objectContaining({ lastActivity: expect.any(String) }),

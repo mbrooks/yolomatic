@@ -32,7 +32,7 @@ describe("WorkspaceManager", () => {
 
 	it("initializes a repo by cloning the bare repository", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-init-repo-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
@@ -41,7 +41,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.initializeRepo("mbrooks", "tars");
+		await manager.initializeRepo("mbrooks", "yeetomatic");
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "clone",
@@ -54,7 +54,7 @@ describe("WorkspaceManager", () => {
 
 	it("fetches existing bare repo during initializeRepo instead of cloning", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-init-repo-valid-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
@@ -65,7 +65,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.initializeRepo("mbrooks", "tars");
+		await manager.initializeRepo("mbrooks", "yeetomatic");
 
 		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin",
@@ -81,7 +81,7 @@ describe("WorkspaceManager", () => {
 
 	it("creates worktree by cloning bare repo and adding worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
@@ -95,7 +95,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(worktree.branch).toBe("yeetomatic/issue-42");
 		expect(worktree.path).toBe(path.join(bareRepoPath, ".worktrees", "issue-42"));
@@ -117,7 +117,7 @@ describe("WorkspaceManager", () => {
 
 	it("fetches existing bare repo instead of cloning when directory is valid", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-valid-bare-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -144,7 +144,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(worktree.branch).toBe("yeetomatic/issue-42");
 
@@ -162,7 +162,7 @@ describe("WorkspaceManager", () => {
 
 	it("re-clones when bare repo directory exists but is not a valid git repository", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-corrupted-bare-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -189,7 +189,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(worktree.branch).toBe("yeetomatic/issue-42");
 
@@ -206,7 +206,7 @@ describe("WorkspaceManager", () => {
 
 	it("returns existing worktree if already created", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		let worktreeCreated = false;
@@ -238,7 +238,7 @@ describe("WorkspaceManager", () => {
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
 		// First call creates the worktree
-		const worktree1 = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree1 = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -247,7 +247,7 @@ describe("WorkspaceManager", () => {
 		);
 
 		// Second call returns existing
-		const worktree2 = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree2 = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 		expect(worktree2.path).toBe(worktreePath);
 		expect(worktree2.branch).toBe("yeetomatic/issue-42");
 
@@ -260,7 +260,7 @@ describe("WorkspaceManager", () => {
 
 	it("creates worktree from existing branch if branch already exists", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-existing-branch-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
@@ -279,7 +279,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(worktree.branch).toBe("yeetomatic/issue-42");
 		expect(runCommand).toHaveBeenCalledWith(
@@ -301,14 +301,14 @@ describe("WorkspaceManager", () => {
 		const syncSpy = vi.fn(async () => undefined);
 		vi.spyOn(manager as unknown as { worktrees: { syncWorktree: typeof syncSpy } }, "worktrees", "get").mockReturnValue({ syncWorktree: syncSpy });
 
-		await manager.syncWorktree("mbrooks", "tars", 42);
+		await manager.syncWorktree("mbrooks", "yeetomatic", 42);
 
-		expect(syncSpy).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(syncSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 	});
 
 	it("commits and pushes from worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-"));
-		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				const error = new Error("changes exist") as Error & { code?: number };
@@ -319,7 +319,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yeetomatic"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
@@ -450,12 +450,12 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(false);
+		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(false);
 	});
 
 	it("pushes when there are no new changes but commits already exist on branch", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-existing-commits-"));
-		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				return { stdout: "", stderr: "" };
@@ -467,7 +467,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "tars", 42)).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -491,12 +491,12 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.commitAndPush("mbrooks", "tars", 42)).rejects.toThrow("Authentication failed");
+		await expect(manager.commitAndPush("mbrooks", "yeetomatic", 42)).rejects.toThrow("Authentication failed");
 	});
 
 	it("commits with a custom message when provided", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-msg-"));
-		const worktreePath = path.join(root, "mbrooks-tars", ".worktrees", "issue-42");
+		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				const error = new Error("changes exist") as Error & { code?: number };
@@ -507,7 +507,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "tars", 42, "feat: Add widget support")).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42, "feat: Add widget support")).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -518,7 +518,7 @@ describe("WorkspaceManager", () => {
 
 	it("removes worktree if it exists", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-remove-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
@@ -535,7 +535,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.removeWorktree("mbrooks", "tars", 42);
+		await manager.removeWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", worktreePath], {
 			cwd: bareRepoPath,
@@ -544,7 +544,7 @@ describe("WorkspaceManager", () => {
 
 	it("prunes stale worktrees before adding new worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-prune-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
@@ -565,7 +565,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		// Verify prune and fetch are called before add
 		const calls = (runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
@@ -581,7 +581,7 @@ describe("WorkspaceManager", () => {
 
 	it("throws diagnostic error when worktree add fails", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-error-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
@@ -602,17 +602,17 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
 			"[workspace] ERROR: Cannot create worktree for yeetomatic/issue-42",
 		);
-		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
 			"git worktree prune",
 		);
 	});
 
 	it("updates the default branch before creating a new worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-fetch-default-branch-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "show-ref") {
@@ -633,7 +633,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -649,7 +649,7 @@ describe("WorkspaceManager", () => {
 
 	it("falls back to bare HEAD when remote refs are unavailable", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-head-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
@@ -679,7 +679,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 42);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -690,7 +690,7 @@ describe("WorkspaceManager", () => {
 
 	it("throws EmptyRepositoryError when no refs exist at all", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-empty-repo-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				const error = new Error(`fatal: Needed a single revision: ${args[2]}`) as Error & { code?: number };
@@ -715,15 +715,15 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(EmptyRepositoryError);
-		await expect(manager.createOrGetWorktree("mbrooks", "tars", 42)).rejects.toThrow(
+		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(EmptyRepositoryError);
+		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
 			"The repository appears to be empty",
 		);
 	});
 
 	it("does nothing when removing a non-existent worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-remove-missing-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-99");
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
@@ -734,7 +734,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.removeWorktree("mbrooks", "tars", 99);
+		await manager.removeWorktree("mbrooks", "yeetomatic", 99);
 		// git worktree remove should NOT be called
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -764,7 +764,7 @@ describe("WorkspaceManager", () => {
 
 	it("evicts oldest worktree when limit is reached with FIFO", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-fifo-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -819,7 +819,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -831,7 +831,7 @@ describe("WorkspaceManager", () => {
 
 	it("evicts least recently used worktree with LRU", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-lru-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -886,7 +886,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -898,7 +898,7 @@ describe("WorkspaceManager", () => {
 
 	it("updates mtime of existing worktree when returned to track LRU", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-lru-touch-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -920,7 +920,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 1);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 1);
 
 		const afterStat = await stat(worktree1);
 		expect(afterStat.mtimeMs).toBeGreaterThanOrEqual(beforeStat.mtimeMs);
@@ -928,7 +928,7 @@ describe("WorkspaceManager", () => {
 
 	it("stashes uncommitted changes before evicting a worktree", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-stash-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -988,7 +988,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
 
 		const stashCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "stash" && args[1] === "push",
@@ -1000,7 +1000,7 @@ describe("WorkspaceManager", () => {
 
 	it("logs eviction to stdout", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-log-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -1042,13 +1042,13 @@ describe("WorkspaceManager", () => {
 
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
 
 		expect(writeSpy).toHaveBeenCalledWith(
 			expect.stringContaining("[workspace] Evicted worktree"),
 		);
 		expect(writeSpy).toHaveBeenCalledWith(
-			expect.stringContaining("mbrooks/tars"),
+			expect.stringContaining("mbrooks/yeetomatic"),
 		);
 
 		writeSpy.mockRestore();
@@ -1056,7 +1056,7 @@ describe("WorkspaceManager", () => {
 
 	it("does not evict when under the worktree limit", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-no-evict-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -1093,7 +1093,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "tars", 3);
+		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",

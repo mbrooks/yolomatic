@@ -16,7 +16,7 @@ const mockedAddRepo = vi.mocked(addRepo);
 function makeRepo(overrides: Partial<RepoSummary> = {}): RepoSummary {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		sessionCount: 1,
 		activeCount: 0,
 		lastActivity: "2026-01-01T00:00:00Z",
@@ -48,12 +48,12 @@ describe("RepoInventoryScreen", () => {
 
 	it("renders repo rows", () => {
 		const repos = [
-			makeRepo({ owner: "mbrooks", repo: "tars", sessionCount: 2 }),
+			makeRepo({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2 }),
 			makeRepo({ owner: "octocat", repo: "hello-world", sessionCount: 0 }),
 		];
 		render(<RepoInventoryScreen {...defaultProps} repos={repos} />);
 
-		expect(screen.getByText("mbrooks/tars")).not.toBeNull();
+		expect(screen.getByText("mbrooks/yeetomatic")).not.toBeNull();
 		expect(screen.getByText("octocat/hello-world")).not.toBeNull();
 	});
 
@@ -62,8 +62,8 @@ describe("RepoInventoryScreen", () => {
 		const repos = [makeRepo()];
 		render(<RepoInventoryScreen {...defaultProps} repos={repos} onSelectRepo={onSelectRepo} />);
 
-		fireEvent.click(screen.getByText("mbrooks/tars"));
-		expect(onSelectRepo).toHaveBeenCalledWith("mbrooks", "tars");
+		fireEvent.click(screen.getByText("mbrooks/yeetomatic"));
+		expect(onSelectRepo).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 	});
 
 	it("opens a modal containing the add repository form when Add Repository is clicked", () => {

@@ -9,12 +9,12 @@ describe("GitHubEvent model", () => {
 			type: "issue",
 			source: "webhook",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			occurredAt: "2026-06-01T00:00:00.000Z",
 			payload: {
 				action: "opened",
 				issue: { number: 1, title: "Issue", body: "", labels: [], assignees: [] },
-				repository: { name: "tars", owner: { login: "mbrooks" } },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
 		};

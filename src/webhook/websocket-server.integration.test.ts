@@ -153,7 +153,7 @@ describe("createAdminWebSocketServer", () => {
 			});
 		});
 
-		client.send(JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 }));
+		client.send(JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 }));
 
 		// Wait a tick for subscription to be processed
 		await new Promise((r) => setTimeout(r, 50));
@@ -163,11 +163,11 @@ describe("createAdminWebSocketServer", () => {
 			level: "info",
 			message: "hello",
 		};
-		wsServer.broadcastLog("mbrooks/tars#1", entry);
+		wsServer.broadcastLog("mbrooks/yeetomatic#1", entry);
 
 		const msg = (await messagePromise) as { type: string; sessionKey: string; entry: SessionLogEntry };
 		expect(msg.type).toBe("log-entry");
-		expect(msg.sessionKey).toBe("mbrooks/tars#1");
+		expect(msg.sessionKey).toBe("mbrooks/yeetomatic#1");
 		expect(msg.entry.message).toBe("hello");
 
 		client.close();
@@ -197,7 +197,7 @@ describe("createAdminWebSocketServer", () => {
 		const received = vi.fn();
 		client.on("message", received);
 
-		wsServer.broadcastLog("mbrooks/tars#1", {
+		wsServer.broadcastLog("mbrooks/yeetomatic#1", {
 			timestamp: "2025-01-01T00:00:00.000Z",
 			level: "info",
 			message: "hello",

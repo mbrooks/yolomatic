@@ -3,10 +3,10 @@ import { EmptyRepositoryError, WorktreeBranchDivergedError } from "./errors.js";
 
 describe("EmptyRepositoryError", () => {
 	it("has the correct name and message", () => {
-		const error = new EmptyRepositoryError("/tmp/workspaces/mbrooks-tars");
+		const error = new EmptyRepositoryError("/tmp/workspaces/mbrooks-yeetomatic");
 		expect(error.name).toBe("EmptyRepositoryError");
 		expect(error.message).toContain("Cannot resolve base branch");
-		expect(error.message).toContain("/tmp/workspaces/mbrooks-tars");
+		expect(error.message).toContain("/tmp/workspaces/mbrooks-yeetomatic");
 		expect(error.message).toContain("appears to be empty");
 	});
 

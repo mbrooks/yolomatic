@@ -46,7 +46,7 @@ describe("PiAgentExecutor", () => {
 	function makeState(issueNumber = 1) {
 		return {
 			issueNumber,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -120,7 +120,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 1,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -179,7 +179,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 101,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -234,7 +234,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 2,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -285,7 +285,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 3,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -311,7 +311,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 4,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -354,7 +354,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 6,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -399,7 +399,7 @@ describe("PiAgentExecutor", () => {
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 5,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",

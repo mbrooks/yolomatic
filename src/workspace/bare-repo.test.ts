@@ -21,7 +21,7 @@ function createConfig(workspacesDir: string): WorkspaceConfig {
 describe("BareRepoManager", () => {
 	it("clones a bare repo when no cached repo exists", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-clone-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "clone") {
 				return { stdout: "", stderr: "" };
@@ -31,17 +31,17 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("reclones when an existing path is not a valid git repository", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-invalid-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -55,17 +55,17 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("reclones an existing bare repo when refresh hits a lock-permission error", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-refresh-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -86,7 +86,7 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -95,14 +95,14 @@ describe("BareRepoManager", () => {
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/tars.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("rethrows non-recoverable refresh failures for an existing bare repo", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-refresh-fail-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -116,7 +116,7 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "tars")).rejects.toThrow("repository 'origin' not found");
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).rejects.toThrow("repository 'origin' not found");
 		expect(runCommand).not.toHaveBeenCalledWith(
 			"git",
 			expect.arrayContaining(["clone"]),
@@ -126,7 +126,7 @@ describe("BareRepoManager", () => {
 
 	it("replaces legacy credential-bearing remotes before fetching", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-sanitize-"));
-		const bareRepoPath = path.join(root, "mbrooks-tars");
+		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -137,11 +137,11 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await bareRepos.ensureBareRepo("mbrooks", "tars");
+		await bareRepos.ensureBareRepo("mbrooks", "yeetomatic");
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["remote", "set-url", "origin", "https://github.com/mbrooks/tars.git"],
+			["remote", "set-url", "origin", "https://github.com/mbrooks/yeetomatic.git"],
 			{ cwd: bareRepoPath },
 		);
 		const remoteUpdateIndex = (runCommand as ReturnType<typeof vi.fn>).mock.calls.findIndex(

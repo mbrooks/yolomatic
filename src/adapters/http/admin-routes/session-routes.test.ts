@@ -71,11 +71,11 @@ describe("handleSessionRoutes", () => {
 	it("returns 404 for unmatched session GET paths", async () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/tars/1", "GET"),
+			request("/api/sessions/mbrooks/yeetomatic/1", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1"),
-			"/api/sessions/mbrooks/tars/1",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1"),
+			"/api/sessions/mbrooks/yeetomatic/1",
 		);
 
 		expect(handled).toBe(true);
@@ -95,11 +95,11 @@ describe("handleSessionRoutes", () => {
 			} as unknown as AdminRouterDeps["getSessionLog"],
 		};
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/tars/1/log", "GET"),
+			request("/api/sessions/mbrooks/yeetomatic/1/log", "GET"),
 			res,
 			okDeps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/log"),
-			"/api/sessions/mbrooks/tars/1/log",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/log"),
+			"/api/sessions/mbrooks/yeetomatic/1/log",
 		);
 
 		expect(handled).toBe(true);
@@ -120,11 +120,11 @@ describe("handleSessionRoutes", () => {
 			} as unknown as AdminRouterDeps["getSessionLog"],
 		};
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/tars/1/log", "GET"),
+			request("/api/sessions/mbrooks/yeetomatic/1/log", "GET"),
 			res,
 			failDeps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/log"),
-			"/api/sessions/mbrooks/tars/1/log",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/log"),
+			"/api/sessions/mbrooks/yeetomatic/1/log",
 		);
 
 		expect(handled).toBe(true);
@@ -136,14 +136,14 @@ describe("handleSessionRoutes", () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/tars/1/commands",
+				"/api/sessions/mbrooks/yeetomatic/1/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/commands"),
-			"/api/sessions/mbrooks/tars/1/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/commands"),
+			"/api/sessions/mbrooks/yeetomatic/1/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -164,14 +164,14 @@ describe("handleSessionRoutes", () => {
 		};
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/tars/1/commands",
+				"/api/sessions/mbrooks/yeetomatic/1/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			failDeps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/commands"),
-			"/api/sessions/mbrooks/tars/1/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/commands"),
+			"/api/sessions/mbrooks/yeetomatic/1/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -192,14 +192,14 @@ describe("handleSessionRoutes", () => {
 
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/tars/1/commands",
+				"/api/sessions/mbrooks/yeetomatic/1/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			throwingDeps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/commands"),
-			"/api/sessions/mbrooks/tars/1/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/commands"),
+			"/api/sessions/mbrooks/yeetomatic/1/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -210,14 +210,14 @@ describe("handleSessionRoutes", () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/tars/1/commands",
+				"/api/sessions/mbrooks/yeetomatic/1/commands",
 				"POST",
 				JSON.stringify({ payload: { reason: "none" } }),
 			),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/tars/1/commands"),
-			"/api/sessions/mbrooks/tars/1/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/commands"),
+			"/api/sessions/mbrooks/yeetomatic/1/commands",
 		);
 
 		expect(handled).toBe(true);

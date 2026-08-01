@@ -27,9 +27,9 @@ describe("repository helpers", () => {
 	describe("resolveRepoGitHubEventMode", () => {
 		it("returns the per-repo override when set", () => {
 			const repo = {
-				id: "mbrooks/tars",
+				id: "mbrooks/yeetomatic",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				fullName: null,
 				visibility: null,
 				githubEventMode: "polling" as RepoGitHubEventMode,
@@ -42,9 +42,9 @@ describe("repository helpers", () => {
 
 		it("falls back to the global mode when the override is null", () => {
 			const repo = {
-				id: "mbrooks/tars",
+				id: "mbrooks/yeetomatic",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				fullName: null,
 				visibility: null,
 				githubEventMode: null,
@@ -64,9 +64,9 @@ describe("repository helpers", () => {
 	describe("resolveRepoDefaultBranch", () => {
 		it("returns the per-repo override when set", () => {
 			const repo = {
-				id: "mbrooks/tars",
+				id: "mbrooks/yeetomatic",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				fullName: null,
 				visibility: null,
 				githubEventMode: null,
@@ -79,9 +79,9 @@ describe("repository helpers", () => {
 
 		it("falls back to the global default when the override is null", () => {
 			const repo = {
-				id: "mbrooks/tars",
+				id: "mbrooks/yeetomatic",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				fullName: null,
 				visibility: null,
 				githubEventMode: null,
@@ -115,8 +115,8 @@ describe("repository helpers", () => {
 
 	describe("repoKey", () => {
 		it("lowercases the owner/repo pair for a stable identifier", () => {
-			expect(repoKey("Mbrooks", "Tars")).toBe("mbrooks/tars");
-			expect(repoKey("mbrooks", "tars")).toBe("mbrooks/tars");
+			expect(repoKey("Mbrooks", "Yeetomatic")).toBe("mbrooks/yeetomatic");
+			expect(repoKey("mbrooks", "yeetomatic")).toBe("mbrooks/yeetomatic");
 		});
 	});
 });

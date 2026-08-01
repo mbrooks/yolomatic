@@ -39,12 +39,12 @@ describe("GitHubEventStore", () => {
 			type: "pull_request",
 			source: "polling",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			occurredAt: "2026-06-01T00:00:00.000Z",
 			payload: {
 				action: "opened",
 				pull_request: { number: 1, head: { ref: "branch" }, state: "open", merged: false },
-				repository: { name: "tars", owner: { login: "mbrooks" } },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
 		});
@@ -54,9 +54,9 @@ describe("GitHubEventStore", () => {
 	it("persists polling subject backoff state", () => {
 		const store = new GitHubEventStore(TEST_DB);
 		store.upsertPollingSubject({
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T00:00:00.000Z",
@@ -65,9 +65,9 @@ describe("GitHubEventStore", () => {
 		});
 
 		expect(store.listPollingSubjects()).toEqual([{
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T00:00:00.000Z",
@@ -75,13 +75,13 @@ describe("GitHubEventStore", () => {
 			createdAt: "2026-06-01T00:00:00.000Z",
 		}]);
 
-		store.markPollingSubjectChecked("mbrooks/tars:issue:1", "2026-06-01T00:05:00.000Z");
+		store.markPollingSubjectChecked("mbrooks/yeetomatic:issue:1", "2026-06-01T00:05:00.000Z");
 		expect(store.listPollingSubjects()[0]?.lastCheckedAt).toBe("2026-06-01T00:05:00.000Z");
 
 		store.upsertPollingSubject({
-			subjectKey: "mbrooks/tars:issue:1",
+			subjectKey: "mbrooks/yeetomatic:issue:1",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T01:00:00.000Z",

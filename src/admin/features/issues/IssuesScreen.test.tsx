@@ -55,7 +55,7 @@ describe("IssuesScreen", () => {
 		render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -69,7 +69,7 @@ describe("IssuesScreen", () => {
 		render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -83,7 +83,7 @@ describe("IssuesScreen", () => {
 		const { rerender } = render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -100,7 +100,7 @@ describe("IssuesScreen", () => {
 		rerender(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,

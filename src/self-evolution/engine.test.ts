@@ -7,7 +7,7 @@ import { Validator } from "./validator.js";
 
 function makeGithub() {
 	return {
-		createIssue: vi.fn(async () => ({ number: 1, html_url: "https://github.com/mbrooks/tars/issues/1" })),
+		createIssue: vi.fn(async () => ({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/issues/1" })),
 		postComment: vi.fn(),
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
@@ -31,7 +31,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: "/tmp/repo",
-			selfReportRepo: { owner: "mbrooks", repo: "tars" },
+			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
 		});
 
 		const error = new Error("JSON parse error");
@@ -45,7 +45,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: "/tmp/repo",
-			selfReportRepo: { owner: "mbrooks", repo: "tars" },
+			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
 		});
 
 		const error = new Error("Random code error");
@@ -54,7 +54,7 @@ describe("SelfEvolutionEngine", () => {
 
 		expect(github.createIssue).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			expect.stringContaining("Self-evolution patch"),
 			expect.stringContaining("Root Cause Analysis"),
 			["yeetomatic-self-evolution", "bug"],
@@ -72,7 +72,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: dir,
-			selfReportRepo: { owner: "mbrooks", repo: "tars" },
+			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
 		});
 		const validator = new Validator();
 		vi.spyOn(validator, "validate").mockResolvedValue({ ok: true, output: "pass" });
@@ -97,7 +97,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: dir,
-			selfReportRepo: { owner: "mbrooks", repo: "tars" },
+			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
 		});
 		const validator = new Validator();
 		vi.spyOn(validator, "validate").mockResolvedValue({ ok: false, output: "fail" });

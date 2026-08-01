@@ -37,7 +37,7 @@ describe("SessionManager", () => {
 
 		const session = await manager.createSession(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			99,
 			"Title",
 			"Body",
@@ -46,7 +46,7 @@ describe("SessionManager", () => {
 		);
 
 		expect(session.labels).toEqual(["bug", "enhancement"]);
-		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "tars", 99);
+		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "yeetomatic", 99);
 		expect(persisted?.labels).toEqual(["bug", "enhancement"]);
 	});
 
@@ -99,17 +99,17 @@ describe("SessionManager", () => {
 
 		await manager.createSession(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			8,
 			"Add tests",
 			"Increase coverage.",
-			"/tmp/workspaces/mbrooks-tars",
+			"/tmp/workspaces/mbrooks-yeetomatic",
 		);
 
-		const resumed = await manager.resumeSession("mbrooks", "tars", 8, "Some feedback");
+		const resumed = await manager.resumeSession("mbrooks", "yeetomatic", 8, "Some feedback");
 		expect(resumed.status).toBe("working");
 		expect(resumed.issueNumber).toBe(8);
-		expect(resumed.repo).toBe("tars");
+		expect(resumed.repo).toBe("yeetomatic");
 	});
 
 	it("throws when resuming a non-existent session", async () => {
@@ -117,8 +117,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.resumeSession("mbrooks", "tars", 999)).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.resumeSession("mbrooks", "yeetomatic", 999)).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -127,8 +127,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 5, "Title", "Body", "/tmp/ws");
-		const session = await manager.getSession("mbrooks", "tars", 5);
+		await manager.createSession("mbrooks", "yeetomatic", 5, "Title", "Body", "/tmp/ws");
+		const session = await manager.getSession("mbrooks", "yeetomatic", 5);
 		expect(session).not.toBeNull();
 		expect(session?.title).toBe("Title");
 	});
@@ -138,7 +138,7 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		const session = await manager.getSession("mbrooks", "tars", 999);
+		const session = await manager.getSession("mbrooks", "yeetomatic", 999);
 		expect(session).toBeNull();
 	});
 
@@ -147,8 +147,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 6, "Title", "Body", "/tmp/ws");
-		const updated = await manager.updateStatus("mbrooks", "tars", 6, "complete", { summary: "Done." });
+		await manager.createSession("mbrooks", "yeetomatic", 6, "Title", "Body", "/tmp/ws");
+		const updated = await manager.updateStatus("mbrooks", "yeetomatic", 6, "complete", { summary: "Done." });
 		expect(updated.status).toBe("complete");
 		expect(updated.summary).toBe("Done.");
 	});
@@ -158,8 +158,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.updateStatus("mbrooks", "tars", 999, "working")).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.updateStatus("mbrooks", "yeetomatic", 999, "working")).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -168,22 +168,22 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 24, "Title", "Body", "/tmp/ws");
-		const started = await manager.updateStatus("mbrooks", "tars", 24, "working", {
+		await manager.createSession("mbrooks", "yeetomatic", 24, "Title", "Body", "/tmp/ws");
+		const started = await manager.updateStatus("mbrooks", "yeetomatic", 24, "working", {
 			taskStartedAt: "2026-01-01T00:00:00Z",
 			taskFinishedAt: undefined,
 		});
 		expect(started.taskStartedAt).toBe("2026-01-01T00:00:00Z");
 		expect(started.taskFinishedAt).toBeUndefined();
 
-		const finished = await manager.updateStatus("mbrooks", "tars", 24, "working", {
+		const finished = await manager.updateStatus("mbrooks", "yeetomatic", 24, "working", {
 			taskFinishedAt: "2026-01-01T00:01:00Z",
 			totalExecutionTimeMs: 60000,
 		});
 		expect(finished.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
 		expect(finished.totalExecutionTimeMs).toBe(60000);
 
-		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "tars", 24);
+		const persisted = await new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir).get("mbrooks", "yeetomatic", 24);
 		expect(persisted?.taskStartedAt).toBe("2026-01-01T00:00:00Z");
 		expect(persisted?.taskFinishedAt).toBe("2026-01-01T00:01:00Z");
 		expect(persisted?.totalExecutionTimeMs).toBe(60000);
@@ -194,8 +194,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 7, "Title", "Body", "/tmp/ws");
-		const updated = await manager.markSeeded("mbrooks", "tars", 7);
+		await manager.createSession("mbrooks", "yeetomatic", 7, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markSeeded("mbrooks", "yeetomatic", 7);
 		expect(updated.seeded).toBe(true);
 	});
 
@@ -204,8 +204,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.markSeeded("mbrooks", "tars", 999)).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.markSeeded("mbrooks", "yeetomatic", 999)).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -214,10 +214,10 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
-		const updated = await manager.associatePR("mbrooks", "tars", 10, 99, "https://github.com/mbrooks/tars/pull/99");
+		await manager.createSession("mbrooks", "yeetomatic", 10, "Title", "Body", "/tmp/ws");
+		const updated = await manager.associatePR("mbrooks", "yeetomatic", 10, 99, "https://github.com/mbrooks/yeetomatic/pull/99");
 		expect(updated.prNumber).toBe(99);
-		expect(updated.prUrl).toBe("https://github.com/mbrooks/tars/pull/99");
+		expect(updated.prUrl).toBe("https://github.com/mbrooks/yeetomatic/pull/99");
 	});
 
 	it("throws when associating PR with a non-existent session", async () => {
@@ -225,8 +225,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.associatePR("mbrooks", "tars", 999, 1, "url")).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.associatePR("mbrooks", "yeetomatic", 999, 1, "url")).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -235,12 +235,12 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 10, "Title", "Body", "/tmp/ws");
-		await manager.associatePR("mbrooks", "tars", 10, 99, "https://github.com/mbrooks/tars/pull/99");
+		await manager.createSession("mbrooks", "yeetomatic", 10, "Title", "Body", "/tmp/ws");
+		await manager.associatePR("mbrooks", "yeetomatic", 10, 99, "https://github.com/mbrooks/yeetomatic/pull/99");
 
-		const found = await manager.findSessionByPR("mbrooks", "tars", 99);
+		const found = await manager.findSessionByPR("mbrooks", "yeetomatic", 99);
 		expect(found?.issueNumber).toBe(10);
-		await expect(manager.findSessionByPR("mbrooks", "tars", 100)).resolves.toBeNull();
+		await expect(manager.findSessionByPR("mbrooks", "yeetomatic", 100)).resolves.toBeNull();
 	});
 
 	it("increments iteration count on an existing session", async () => {
@@ -248,10 +248,10 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 11, "Title", "Body", "/tmp/ws");
-		const first = await manager.incrementIterationCount("mbrooks", "tars", 11);
+		await manager.createSession("mbrooks", "yeetomatic", 11, "Title", "Body", "/tmp/ws");
+		const first = await manager.incrementIterationCount("mbrooks", "yeetomatic", 11);
 		expect(first.iterationCount).toBe(1);
-		const second = await manager.incrementIterationCount("mbrooks", "tars", 11);
+		const second = await manager.incrementIterationCount("mbrooks", "yeetomatic", 11);
 		expect(second.iterationCount).toBe(2);
 	});
 
@@ -260,8 +260,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.incrementIterationCount("mbrooks", "tars", 999)).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.incrementIterationCount("mbrooks", "yeetomatic", 999)).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -270,8 +270,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 12, "Title", "Body", "/tmp/ws");
-		const updated = await manager.cancelSession("mbrooks", "tars", 12);
+		await manager.createSession("mbrooks", "yeetomatic", 12, "Title", "Body", "/tmp/ws");
+		const updated = await manager.cancelSession("mbrooks", "yeetomatic", 12);
 		expect(updated.status).toBe("cancelled");
 	});
 
@@ -280,16 +280,16 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		const created = await manager.createSession("mbrooks", "tars", 13, "Title", "Body", "/tmp/ws", ["bug"]);
-		await manager.updateStatus("mbrooks", "tars", 13, "failed", {
+		const created = await manager.createSession("mbrooks", "yeetomatic", 13, "Title", "Body", "/tmp/ws", ["bug"]);
+		await manager.updateStatus("mbrooks", "yeetomatic", 13, "failed", {
 			summary: "Boom",
 			prNumber: 7,
-			prUrl: "https://github.com/mbrooks/tars/pull/7",
+			prUrl: "https://github.com/mbrooks/yeetomatic/pull/7",
 			seeded: true,
 			iterationCount: 2,
 		});
 
-		const restarted = await manager.restartSession("mbrooks", "tars", 13);
+		const restarted = await manager.restartSession("mbrooks", "yeetomatic", 13);
 		expect(restarted.status).toBe("pending");
 		expect(restarted.summary).toBeUndefined();
 		expect(restarted.prNumber).toBeUndefined();
@@ -308,9 +308,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 14, "Title", "Body", "/tmp/ws");
-		await manager.cancelSession("mbrooks", "tars", 14);
-		const restarted = await manager.restartSession("mbrooks", "tars", 14);
+		await manager.createSession("mbrooks", "yeetomatic", 14, "Title", "Body", "/tmp/ws");
+		await manager.cancelSession("mbrooks", "yeetomatic", 14);
+		const restarted = await manager.restartSession("mbrooks", "yeetomatic", 14);
 		expect(restarted.status).toBe("pending");
 		expect(restarted.restartedFrom).toBe("cancelled");
 		expect(restarted.restartCount).toBe(1);
@@ -321,13 +321,13 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 15, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 15, "failed");
-		const first = await manager.restartSession("mbrooks", "tars", 15);
+		await manager.createSession("mbrooks", "yeetomatic", 15, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 15, "failed");
+		const first = await manager.restartSession("mbrooks", "yeetomatic", 15);
 		expect(first.restartCount).toBe(1);
 
-		await manager.updateStatus("mbrooks", "tars", 15, "failed");
-		const second = await manager.restartSession("mbrooks", "tars", 15);
+		await manager.updateStatus("mbrooks", "yeetomatic", 15, "failed");
+		const second = await manager.restartSession("mbrooks", "yeetomatic", 15);
 		expect(second.restartCount).toBe(2);
 		expect(second.restartedFrom).toBe("failed");
 	});
@@ -337,8 +337,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.restartSession("mbrooks", "tars", 999)).rejects.toThrow(
-			"No session for mbrooks/tars#999",
+		await expect(manager.restartSession("mbrooks", "yeetomatic", 999)).rejects.toThrow(
+			"No session for mbrooks/yeetomatic#999",
 		);
 	});
 
@@ -347,9 +347,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 16, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 16, "complete");
-		await expect(manager.restartSession("mbrooks", "tars", 16)).rejects.toThrow(
+		await manager.createSession("mbrooks", "yeetomatic", 16, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 16, "complete");
+		await expect(manager.restartSession("mbrooks", "yeetomatic", 16)).rejects.toThrow(
 			"Cannot restart a completed session.",
 		);
 	});
@@ -359,9 +359,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 17, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 17, "working");
-		await expect(manager.restartSession("mbrooks", "tars", 17)).rejects.toThrow(
+		await manager.createSession("mbrooks", "yeetomatic", 17, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 17, "working");
+		await expect(manager.restartSession("mbrooks", "yeetomatic", 17)).rejects.toThrow(
 			"Cannot restart session in 'working' status. Only failed or cancelled sessions can be restarted.",
 		);
 	});
@@ -371,9 +371,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 18, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 18, "working");
-		const paused = await manager.pauseSession("mbrooks", "tars", 18);
+		await manager.createSession("mbrooks", "yeetomatic", 18, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 18, "working");
+		const paused = await manager.pauseSession("mbrooks", "yeetomatic", 18);
 		expect(paused.status).toBe("paused");
 	});
 
@@ -382,8 +382,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 19, "Title", "Body", "/tmp/ws");
-		const paused = await manager.pauseSession("mbrooks", "tars", 19);
+		await manager.createSession("mbrooks", "yeetomatic", 19, "Title", "Body", "/tmp/ws");
+		const paused = await manager.pauseSession("mbrooks", "yeetomatic", 19);
 		expect(paused.status).toBe("paused");
 	});
 
@@ -392,9 +392,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 20, "Title", "Body", "/tmp/ws");
-		await manager.pauseSession("mbrooks", "tars", 20);
-		await expect(manager.pauseSession("mbrooks", "tars", 20)).rejects.toThrow(
+		await manager.createSession("mbrooks", "yeetomatic", 20, "Title", "Body", "/tmp/ws");
+		await manager.pauseSession("mbrooks", "yeetomatic", 20);
+		await expect(manager.pauseSession("mbrooks", "yeetomatic", 20)).rejects.toThrow(
 			"Session is already paused.",
 		);
 	});
@@ -404,9 +404,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 21, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 21, "complete");
-		await expect(manager.pauseSession("mbrooks", "tars", 21)).rejects.toThrow(
+		await manager.createSession("mbrooks", "yeetomatic", 21, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 21, "complete");
+		await expect(manager.pauseSession("mbrooks", "yeetomatic", 21)).rejects.toThrow(
 			"Cannot pause a session in 'complete' status.",
 		);
 	});
@@ -416,9 +416,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 22, "Title", "Body", "/tmp/ws");
-		await manager.pauseSession("mbrooks", "tars", 22);
-		const resumed = await manager.unpauseSession("mbrooks", "tars", 22);
+		await manager.createSession("mbrooks", "yeetomatic", 22, "Title", "Body", "/tmp/ws");
+		await manager.pauseSession("mbrooks", "yeetomatic", 22);
+		const resumed = await manager.unpauseSession("mbrooks", "yeetomatic", 22);
 		expect(resumed.status).toBe("pending");
 	});
 
@@ -427,8 +427,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 23, "Title", "Body", "/tmp/ws");
-		await expect(manager.unpauseSession("mbrooks", "tars", 23)).rejects.toThrow(
+		await manager.createSession("mbrooks", "yeetomatic", 23, "Title", "Body", "/tmp/ws");
+		await expect(manager.unpauseSession("mbrooks", "yeetomatic", 23)).rejects.toThrow(
 			"Cannot resume a session in 'pending' status. Only paused sessions can be resumed.",
 		);
 	});
@@ -438,8 +438,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		expect(manager.getSessionKey("mbrooks", "tars", 30)).toContain("mbrooks");
-		expect(manager.getSessionPath("mbrooks", "tars", 30)).toContain("issue-30");
+		expect(manager.getSessionKey("mbrooks", "yeetomatic", 30)).toContain("mbrooks");
+		expect(manager.getSessionPath("mbrooks", "yeetomatic", 30)).toContain("issue-30");
 	});
 
 	it("implements SessionRepository.get as an alias for getSession", async () => {
@@ -447,10 +447,10 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 31, "Title", "Body", "/tmp/ws");
-		const session = await manager.get("mbrooks", "tars", 31);
+		await manager.createSession("mbrooks", "yeetomatic", 31, "Title", "Body", "/tmp/ws");
+		const session = await manager.get("mbrooks", "yeetomatic", 31);
 		expect(session?.title).toBe("Title");
-		await expect(manager.get("mbrooks", "tars", 999)).resolves.toBeNull();
+		await expect(manager.get("mbrooks", "yeetomatic", 999)).resolves.toBeNull();
 	});
 
 	it("saves, lists, and deletes sessions", async () => {
@@ -458,7 +458,7 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		const created = await manager.createSession("mbrooks", "tars", 32, "Title", "Body", "/tmp/ws");
+		const created = await manager.createSession("mbrooks", "yeetomatic", 32, "Title", "Body", "/tmp/ws");
 		created.status = "working";
 		const saved = await manager.save(created);
 		expect(saved.status).toBe("working");
@@ -466,8 +466,8 @@ describe("SessionManager", () => {
 		const all = await manager.getAll();
 		expect(all.length).toBeGreaterThan(0);
 
-		await manager.delete("mbrooks", "tars", 32);
-		await expect(manager.getSession("mbrooks", "tars", 32)).resolves.toBeNull();
+		await manager.delete("mbrooks", "yeetomatic", 32);
+		await expect(manager.getSession("mbrooks", "yeetomatic", 32)).resolves.toBeNull();
 	});
 
 	it("archives a session", async () => {
@@ -476,9 +476,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		const created = await manager.createSession("mbrooks", "tars", 33, "Title", "Body", "/tmp/ws");
+		const created = await manager.createSession("mbrooks", "yeetomatic", 33, "Title", "Body", "/tmp/ws");
 		await manager.archive(created, archiveDir);
-		await expect(manager.getSession("mbrooks", "tars", 33)).resolves.toBeNull();
+		await expect(manager.getSession("mbrooks", "yeetomatic", 33)).resolves.toBeNull();
 	});
 
 	it("archives a session by owner/repo/issue number", async () => {
@@ -487,9 +487,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 38, "Title", "Body", "/tmp/ws");
-		await manager.archiveSession("mbrooks", "tars", 38, archiveDir);
-		await expect(manager.getSession("mbrooks", "tars", 38)).resolves.toBeNull();
+		await manager.createSession("mbrooks", "yeetomatic", 38, "Title", "Body", "/tmp/ws");
+		await manager.archiveSession("mbrooks", "yeetomatic", 38, archiveDir);
+		await expect(manager.getSession("mbrooks", "yeetomatic", 38)).resolves.toBeNull();
 	});
 
 	it("marks a session complete", async () => {
@@ -497,8 +497,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 34, "Title", "Body", "/tmp/ws");
-		const updated = await manager.markComplete("mbrooks", "tars", 34);
+		await manager.createSession("mbrooks", "yeetomatic", 34, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markComplete("mbrooks", "yeetomatic", 34);
 		expect(updated.status).toBe("complete");
 	});
 
@@ -507,11 +507,11 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 35, "Title", "Body", "/tmp/ws");
-		const existing = await manager.updateStatus("mbrooks", "tars", 35, "working", {
+		await manager.createSession("mbrooks", "yeetomatic", 35, "Title", "Body", "/tmp/ws");
+		const existing = await manager.updateStatus("mbrooks", "yeetomatic", 35, "working", {
 			staleReason: "old",
 		});
-		const updated = await manager.markFailed("mbrooks", "tars", 35, "boom");
+		const updated = await manager.markFailed("mbrooks", "yeetomatic", 35, "boom");
 		expect(updated.status).toBe("failed");
 		expect(updated.staleReason).toBe("boom");
 		expect(updated.summary).toBe("boom");
@@ -522,9 +522,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 36, "Title", "Body", "/tmp/ws");
-		await manager.updateStatus("mbrooks", "tars", 36, "working", { staleReason: "existing" });
-		const updated = await manager.markFailed("mbrooks", "tars", 36);
+		await manager.createSession("mbrooks", "yeetomatic", 36, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yeetomatic", 36, "working", { staleReason: "existing" });
+		const updated = await manager.markFailed("mbrooks", "yeetomatic", 36);
 		expect(updated.staleReason).toBe("existing");
 	});
 
@@ -533,8 +533,8 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await manager.createSession("mbrooks", "tars", 37, "Title", "Body", "/tmp/ws");
-		const updated = await manager.markStale("mbrooks", "tars", 37, "no activity");
+		await manager.createSession("mbrooks", "yeetomatic", 37, "Title", "Body", "/tmp/ws");
+		const updated = await manager.markStale("mbrooks", "yeetomatic", 37, "no activity");
 		expect(updated.staleReason).toBe("no activity");
 		expect(updated.staleDetectedAt).toBeDefined();
 	});
@@ -544,9 +544,9 @@ describe("SessionManager", () => {
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
 		const manager = new SessionManager(sessionsDir, store);
 
-		await expect(manager.markComplete("mbrooks", "tars", 999)).rejects.toThrow("No session");
-		await expect(manager.markFailed("mbrooks", "tars", 999)).rejects.toThrow("No session");
-		await expect(manager.markStale("mbrooks", "tars", 999, "reason")).rejects.toThrow("No session");
-		await expect(manager.cancelSession("mbrooks", "tars", 999)).rejects.toThrow("No session");
+		await expect(manager.markComplete("mbrooks", "yeetomatic", 999)).rejects.toThrow("No session");
+		await expect(manager.markFailed("mbrooks", "yeetomatic", 999)).rejects.toThrow("No session");
+		await expect(manager.markStale("mbrooks", "yeetomatic", 999, "reason")).rejects.toThrow("No session");
+		await expect(manager.cancelSession("mbrooks", "yeetomatic", 999)).rejects.toThrow("No session");
 	});
 });
