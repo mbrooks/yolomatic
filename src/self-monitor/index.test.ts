@@ -105,7 +105,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("returns hardcoded target repo", () => {
-		expect(SelfMonitor.getTargetRepo()).toEqual({ owner: "mbrooks", repo: "tars" });
+		expect(SelfMonitor.getTargetRepo()).toEqual({ owner: "mbrooks", repo: "yeetomatic" });
 	});
 
 	it("sanitizes tokens in output", async () => {

@@ -9,7 +9,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 1,
 			title: "Test",
 			body: "Body",
@@ -22,11 +22,11 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		recordSessionLog("mbrooks/tars#1", { level: "info", message: "Prompt sent" });
-		recordSessionLog("mbrooks/tars#1", { level: "tool", message: "read file" });
+		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "Prompt sent" });
+		recordSessionLog("mbrooks/yeetomatic#1", { level: "tool", message: "read file" });
 
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "tars", 1);
+		const result = await query.execute("mbrooks", "yeetomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -40,7 +40,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 2,
 			title: "Test",
 			body: "Body",
@@ -55,7 +55,7 @@ describe("GetSessionLog", () => {
 		} as unknown as SessionRepository;
 
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "tars", 2);
+		const result = await query.execute("mbrooks", "yeetomatic", 2);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -67,7 +67,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 3,
 			title: "Test",
 			body: "Body",
@@ -80,16 +80,16 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		recordSessionLog("mbrooks/tars#3", { level: "info", message: "old" });
+		recordSessionLog("mbrooks/yeetomatic#3", { level: "info", message: "old" });
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		recordSessionLog("mbrooks/tars#3", { level: "info", message: "new" });
+		recordSessionLog("mbrooks/yeetomatic#3", { level: "info", message: "new" });
 
 		const query = new GetSessionLog(repo);
-		const full = await query.execute("mbrooks", "tars", 3);
+		const full = await query.execute("mbrooks", "yeetomatic", 3);
 		expect(full.success).toBe(true);
 		if (!full.success) return;
 		const since = full.data.logs[0].timestamp;
-		const filtered = await query.execute("mbrooks", "tars", 3, since);
+		const filtered = await query.execute("mbrooks", "yeetomatic", 3, since);
 		expect(filtered.success).toBe(true);
 		if (filtered.success) {
 			expect(filtered.data.logs.length).toBe(1);
@@ -103,7 +103,7 @@ describe("GetSessionLog", () => {
 			get: vi.fn(async () => null),
 		} as unknown as SessionRepository;
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "tars", 999);
+		const result = await query.execute("mbrooks", "yeetomatic", 999);
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("not_found");

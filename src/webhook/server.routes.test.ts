@@ -134,12 +134,12 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 99,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title,
 				body,
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
 				workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -150,13 +150,13 @@ describe("GitHubIssueHandlers", () => {
 					? null
 					: {
 							issueNumber: 99,
-							repo: "tars",
+							repo: "yeetomatic",
 							owner: "mbrooks",
 							title: "Fallback title",
 							body: "Fallback body",
 							status: "pending" as const,
-							sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
-							workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+							sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
+							workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
 							lastActivity: new Date().toISOString(),
 							seeded: false,
 						};
@@ -170,13 +170,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 99,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Fallback title",
 				body: "Fallback body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-99.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -186,10 +186,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
 				branch: "yeetomatic/issue-99",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 99,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -226,18 +226,18 @@ describe("GitHubIssueHandlers", () => {
 				body: "Test body",
 			},
 			comment: { body: "What is the status?", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "mbrooks" },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "tars", 99);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		expect(sessionManager.createSession).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			99,
 			"Test issue",
 			"Test body",
-			"/tmp/workspaces/mbrooks-tars/.worktrees/issue-99",
+			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
 			["yeetomatic-working"],
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -251,20 +251,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -277,13 +277,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 42,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -293,10 +293,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				branch: "yeetomatic/issue-42",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -328,12 +328,12 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "Yeetomatic: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic: Done");
 
 		// Should add yeetomatic-pr-created on complete, not yeetomatic-complete
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
@@ -344,7 +344,7 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.pulls.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				title: "Yeetomatic: Title",
 				body: expect.stringContaining("Fixes #42"),
 				head: "yeetomatic/issue-42",
@@ -357,7 +357,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -368,7 +368,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -379,7 +379,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "LGTM", user: { login: "yeetomatic-bot", type: "Bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "yeetomatic-bot" },
 		});
 
@@ -390,7 +390,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "someone-else" }] },
 			comment: { body: "Help", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -405,20 +405,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -431,13 +431,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 42,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -447,10 +447,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-42",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
 				branch: "yeetomatic/issue-42",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -481,13 +481,13 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Proceed", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "tars", 42, "Yeetomatic: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic: Done");
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 42, "complete");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "complete");
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
 				body: expect.stringContaining("No code changes were necessary."),
@@ -506,7 +506,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		let storedSession: any = null;
@@ -514,13 +514,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -540,13 +540,13 @@ describe("GitHubIssueHandlers", () => {
 				}
 				return {
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -557,10 +557,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -591,14 +591,14 @@ describe("GitHubIssueHandlers", () => {
 		const openedPromise = handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		const assignedPromise = handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "yeetomatic-bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -662,7 +662,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "yeetomatic-bot" },
 		});
 
@@ -673,7 +673,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Update", user: { login: "yeetomatic-bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "yeetomatic-bot" },
 		});
 
@@ -688,7 +688,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		const createdIssues = new Set<number>();
@@ -697,13 +697,13 @@ describe("GitHubIssueHandlers", () => {
 				createdIssues.add(issueNumber);
 				return {
 					issueNumber,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: `/tmp/sessions/github-mbrooks-tars/issue-${issueNumber}.jsonl`,
-					workspacePath: `/tmp/workspaces/mbrooks-tars/.worktrees/issue-${issueNumber}`,
+					sessionPath: `/tmp/sessions/github-mbrooks-yeetomatic/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-${issueNumber}`,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -712,13 +712,13 @@ describe("GitHubIssueHandlers", () => {
 				if (!createdIssues.has(issueNumber)) return null;
 				return {
 					issueNumber,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: `/tmp/sessions/github-mbrooks-tars/issue-${issueNumber}.jsonl`,
-					workspacePath: `/tmp/workspaces/mbrooks-tars/.worktrees/issue-${issueNumber}`,
+					sessionPath: `/tmp/sessions/github-mbrooks-yeetomatic/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-${issueNumber}`,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -732,13 +732,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -748,10 +748,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -782,7 +782,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
@@ -791,7 +791,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(1);
@@ -801,7 +801,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "yeetomatic-bot" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
@@ -811,7 +811,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 3, title: "Test 3", body: "Body", assignee: { login: "other-user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
@@ -821,10 +821,10 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "unassigned",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "pending");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending");
 		expect(octokit.issues.removeLabel).toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Yeetomatic unassigned. Pausing work." }),
@@ -843,13 +843,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 7,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -862,13 +862,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
 				issueNumber: 7,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
 				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -878,10 +878,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
 				branch: "yeetomatic/issue-7",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 7,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -913,7 +913,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 7, labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Hey @yeetomatic-bot can you help?", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -929,7 +929,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 7, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Thanks!", user: { login: "user" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -947,7 +947,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		let storedSession: any = null;
@@ -955,13 +955,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -981,13 +981,13 @@ describe("GitHubIssueHandlers", () => {
 				}
 				return {
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -998,10 +998,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1030,7 +1030,7 @@ describe("GitHubIssueHandlers", () => {
 			handlers.handleIssueEvent({
 				action: "opened",
 				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-				repository: { name: "tars", owner: { login: "mbrooks" } },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 				sender: { login: "other-user" },
 			}),
 		).rejects.toThrow("Boom");
@@ -1054,13 +1054,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1073,13 +1073,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1110,7 +1110,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "unassigned",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1129,13 +1129,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1168,7 +1168,7 @@ describe("GitHubIssueHandlers", () => {
 			handlers.handleIssueEvent({
 				action: "unassigned",
 				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-				repository: { name: "tars", owner: { login: "mbrooks" } },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 				sender: { login: "other-user" },
 			}),
 		).rejects.toThrow();
@@ -1180,31 +1180,31 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/issues/999" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/999" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title,
 				body,
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
 				workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "T",
 				body: "B",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1217,13 +1217,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "T",
 				body: "B",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1231,10 +1231,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1288,7 +1288,7 @@ describe("GitHubIssueHandlers", () => {
 					body: "Body",
 					assignees: [{ login: "yeetomatic-bot" }],
 				},
-				repository: { name: "tars", owner: { login: "mbrooks" } },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			}),
 		).resolves.toBeUndefined();
@@ -1296,7 +1296,7 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				title: expect.stringContaining("Yeetomatic self-report"),
 				labels: ["yeetomatic-self-report", "bug"],
 			}),
@@ -1304,12 +1304,12 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issue_number: 1,
 				body: expect.stringContaining("fatal system error"),
 			}),
 		);
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
 	});
 
 	it("files a self-report when commit and push delivery fails", async () => {
@@ -1318,10 +1318,10 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({})),
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/issues/1000" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/1000" } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
@@ -1423,7 +1423,7 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				title: expect.stringContaining("Yeetomatic self-report"),
 				body: expect.stringContaining("Author identity unknown"),
 				labels: ["yeetomatic-self-report", "bug"],
@@ -1453,13 +1453,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1478,10 +1478,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1516,7 +1516,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1526,7 +1526,7 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"pending",
 			expect.objectContaining({ resumeOnBoot: true }),
@@ -1541,20 +1541,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({})),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/tars/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1567,13 +1567,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1583,10 +1583,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1613,7 +1613,7 @@ describe("GitHubIssueHandlers", () => {
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
 
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1635,13 +1635,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 				resumeOnBoot: true,
@@ -1655,13 +1655,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1672,10 +1672,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1702,7 +1702,7 @@ describe("GitHubIssueHandlers", () => {
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
 
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
 			expect.objectContaining({ labels: ["yeetomatic-working"] }),
@@ -1730,13 +1730,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				resumeOnBoot: true,
@@ -1751,13 +1751,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1768,10 +1768,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				branch: "yeetomatic/issue-1",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1798,7 +1798,7 @@ describe("GitHubIssueHandlers", () => {
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
 
 		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
 			expect.objectContaining({ name: "yeetomatic-feedback-required" }),
@@ -1821,7 +1821,7 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				status: "complete" as const,
 				lastActivity: new Date().toISOString(),
@@ -1851,7 +1851,7 @@ describe("GitHubIssueHandlers", () => {
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "tars", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).not.toHaveBeenCalled();
 	});
@@ -1867,13 +1867,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1922,7 +1922,7 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: { number: 1, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
 			comment: { body: "Proceed", user: { login: "mbrooks" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1932,7 +1932,7 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"waiting-feedback",
 			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["Proceed"] }),
@@ -1960,17 +1960,17 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				prNumber: 99,
-				prUrl: "https://github.com/mbrooks/tars/pull/99",
+				prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
 			})),
 			get(owner: string, repo: string, issueNumber: number) {
 				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
@@ -2022,7 +2022,7 @@ describe("GitHubIssueHandlers", () => {
 				state: "open",
 				merged: false,
 			},
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "LGTM but needs tests", state: "CHANGES_REQUESTED", user: { login: "user" } },
 		});
@@ -2033,7 +2033,7 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"complete",
 			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["LGTM but needs tests"] }),
@@ -2097,7 +2097,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "opened",
 			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2119,7 +2119,7 @@ describe("createWebhookServer", () => {
 			expect.objectContaining({
 				type: "issue",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				payload: expect.objectContaining({ action: "opened" }),
 			}),
 		);
@@ -2141,7 +2141,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "opened",
 			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2225,7 +2225,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "created",
 			comment: { id: 2, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2262,7 +2262,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "submitted",
 			review: { id: 3, submitted_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2455,13 +2455,13 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2504,13 +2504,13 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 89,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Yeetomatic: Add stale session detection",
 					body: "Fixes #86\n\nSummary",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-89",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-89.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-89",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2549,39 +2549,39 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "First",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: "2026-01-01T00:00:00.000Z",
 					createdAt: "2026-01-01T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Second",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 					lastActivity: "2026-01-02T00:00:00.000Z",
 					createdAt: "2026-01-03T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 3,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Third",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
 					lastActivity: "2026-01-03T00:00:00.000Z",
 					createdAt: "2026-01-02T00:00:00.000Z",
 					seeded: false,
@@ -2621,25 +2621,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Old",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: "2026-01-01T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "New",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 					lastActivity: "2026-01-03T00:00:00.000Z",
 					seeded: false,
 				},
@@ -2708,25 +2708,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "One",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Two",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2763,7 +2763,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.repos).toHaveLength(2);
 		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: expect.any(String) });
-		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "tars", sessionCount: 2, activeCount: 1, lastActivity: expect.any(String) });
+		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, lastActivity: expect.any(String) });
 
 		server.close();
 	});
@@ -2805,7 +2805,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(503);
 
@@ -2816,13 +2816,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -2848,7 +2848,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2858,7 +2858,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.cancelled).toBe(true);
 		expect(body.wasActive).toBe(true);
-		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/tars#1");
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
 
 		server.close();
 	});
@@ -2867,13 +2867,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -2899,7 +2899,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2932,7 +2932,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2948,13 +2948,13 @@ describe("createWebhookServer", () => {
 	it("marks a session failed via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const session = {
 			issueNumber: 89,
-			repo: "tars",
+			repo: "yeetomatic",
 			owner: "mbrooks",
 			title: "Yeetomatic: Add stale session detection",
 			body: "Fixes #86\n\nSummary",
 			status: "complete" as const,
-			sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-89.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-89",
+			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-89.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-89",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};
@@ -2975,7 +2975,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/89/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/89/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2998,13 +2998,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 3,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3028,7 +3028,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/3/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/3/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3038,8 +3038,8 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.deleted).toBe(true);
 		expect(body.message).toBe("Session and workspace deleted.");
-		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 3);
-		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "tars", 3);
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3);
+		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3);
 
 		server.close();
 	});
@@ -3048,13 +3048,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 4,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-4.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-4",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-4.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-4",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3074,7 +3074,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/4/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/4/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3107,7 +3107,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3128,7 +3128,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3143,7 +3143,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3154,13 +3154,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3179,7 +3179,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3198,13 +3198,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "paused" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3223,7 +3223,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3241,13 +3241,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 3,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-3.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-3",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3266,7 +3266,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/3/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/3/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3298,7 +3298,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3319,7 +3319,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3330,13 +3330,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "paused" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3355,7 +3355,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3374,13 +3374,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3399,7 +3399,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3431,7 +3431,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3452,7 +3452,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
 		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3463,18 +3463,18 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 5,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "failed" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-5.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-5",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-5.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-5",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				summary: "Boom",
 				prNumber: 7,
-				prUrl: "https://github.com/mbrooks/tars/pull/7",
+				prUrl: "https://github.com/mbrooks/yeetomatic/pull/7",
 				iterationCount: 2,
 			})),
 			set: vi.fn(async (state: import("../session/store.js").SessionState) => state),
@@ -3496,7 +3496,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/5/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/5/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3506,7 +3506,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.restarted).toBe(true);
 		expect(body.status).toBe("pending");
-		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 5);
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 5);
 		expect(mockStore.set).toHaveBeenCalled();
 		const setCall = ((mockStore.set as unknown as ReturnType<typeof vi.fn>).mock.calls as unknown) as Array<[import("../session/store.js").SessionState]>;
 		const updatedState = setCall[0][0];
@@ -3526,13 +3526,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 6,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "cancelled" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-6.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-6",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-6.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-6",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3555,7 +3555,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/6/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/6/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3573,13 +3573,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 7,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-7",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3598,7 +3598,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/7/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/7/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3616,13 +3616,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 8,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-8.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-8",
+				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-8.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-8",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3641,7 +3641,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/8/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/8/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3673,7 +3673,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/tars/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3694,7 +3694,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/tars/1/log",
+			path: "/api/sessions/mbrooks/yeetomatic/1/log",
 		});
 		expect(response.statusCode).toBe(503);
 
@@ -3707,7 +3707,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/tars/1/log" });
+		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yeetomatic/1/log" });
 		expect(response.statusCode).toBe(401);
 		expect(response.body).toBe("Unauthorized");
 
@@ -3732,7 +3732,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/tars/999/log",
+			path: "/api/sessions/mbrooks/yeetomatic/999/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -3746,19 +3746,19 @@ describe("createWebhookServer", () => {
 
 	it("returns log lines when log file exists", async () => {
 		_resetSessionLogs();
-		recordSessionLog("mbrooks/tars#1", { level: "info", message: "prompt" });
-		recordSessionLog("mbrooks/tars#1", { level: "info", message: "response" });
+		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "prompt" });
+		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "response" });
 
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3778,7 +3778,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/tars/1/log",
+				path: "/api/sessions/mbrooks/yeetomatic/1/log",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -3799,13 +3799,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/nonexistent/path/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3824,7 +3824,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/tars/1/log",
+			path: "/api/sessions/mbrooks/yeetomatic/1/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -3840,19 +3840,19 @@ describe("createWebhookServer", () => {
 	it("truncates log when it exceeds 10,000 lines", async () => {
 		_resetSessionLogs();
 		for (let i = 0; i < 5_001; i++) {
-			recordSessionLog("mbrooks/tars#1", { level: "info", message: "line " + i });
+			recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "line " + i });
 		}
 
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3872,7 +3872,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/tars/1/log",
+				path: "/api/sessions/mbrooks/yeetomatic/1/log",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -3895,7 +3895,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/tars/abc/log",
+			path: "/api/sessions/mbrooks/yeetomatic/abc/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -3915,25 +3915,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-tars/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-tars/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -4187,7 +4187,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "created",
 			comment: { id: 4, body: "hello", created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 

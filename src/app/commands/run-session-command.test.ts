@@ -49,7 +49,7 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 function makeState(status: SessionState["status"]): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 1,
 		title: "Test",
 		body: "Body",
@@ -96,34 +96,34 @@ describe("RunSessionCommand", () => {
 		const state = makeState("working");
 		const { command, tasks } = makeCommand(state);
 		(tasks.cancel as ReturnType<typeof vi.fn>).mockReturnValue(true);
-		const result = await command.execute("mbrooks", "tars", 1, "cancel");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "cancel");
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect("cancelled" in result.data && result.data.cancelled).toBe(true);
 		}
-		expect(tasks.cancel).toHaveBeenCalledWith("mbrooks/tars#1");
+		expect(tasks.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
 	});
 
 	it("marks session cancelled when not active", async () => {
 		const state = makeState("working");
 		const { command, repo } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "cancel");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "cancel");
 		expect(result.success).toBe(true);
-		expect(repo.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.cancelSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("pauses a working session", async () => {
 		const state = makeState("working");
 		const { command, repo } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "pause");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "pause");
 		expect(result.success).toBe(true);
-		expect(repo.pauseSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.pauseSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("rejects pausing an already paused session", async () => {
 		const state = makeState("paused");
 		const { command } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "pause");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "pause");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("invalid_state");
@@ -133,15 +133,15 @@ describe("RunSessionCommand", () => {
 	it("resumes a paused session", async () => {
 		const state = makeState("paused");
 		const { command, repo } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "resume");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "resume");
 		expect(result.success).toBe(true);
-		expect(repo.unpauseSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.unpauseSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("rejects resuming a working session", async () => {
 		const state = makeState("working");
 		const { command } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "resume");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "resume");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("invalid_state");
@@ -151,16 +151,16 @@ describe("RunSessionCommand", () => {
 	it("restarts a failed session", async () => {
 		const state = makeState("failed");
 		const { command, repo, workspaces } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "restart");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
 		expect(result.success).toBe(true);
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
-		expect(repo.restartSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(repo.restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("rejects restarting a completed session", async () => {
 		const state = makeState("complete");
 		const { command } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "restart");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("invalid_state");
@@ -170,16 +170,16 @@ describe("RunSessionCommand", () => {
 	it("deletes a terminal session", async () => {
 		const state = makeState("complete");
 		const { command, repo, workspaces } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "delete");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "delete");
 		expect(result.success).toBe(true);
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
-		expect(repo.delete).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(repo.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("rejects deleting a working session", async () => {
 		const state = makeState("working");
 		const { command } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "delete");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "delete");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("invalid_state");
@@ -189,12 +189,12 @@ describe("RunSessionCommand", () => {
 	it("marks session as failed", async () => {
 		const state = makeState("working");
 		const { command, repo } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "mark-failed");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "mark-failed");
 		expect(result.success).toBe(true);
-		expect(repo.markFailed).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.markFailed).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 		expect(repo.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			"failed",
 			expect.objectContaining({ summary: "Marked failed by admin cleanup." }),
@@ -204,15 +204,15 @@ describe("RunSessionCommand", () => {
 	it("marks session as complete", async () => {
 		const state = makeState("working");
 		const { command, repo } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "mark-complete");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "mark-complete");
 		expect(result.success).toBe(true);
-		expect(repo.markComplete).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(repo.markComplete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("archives a session when archiveDir is configured", async () => {
 		const state = makeState("complete");
 		const { command, repo } = makeCommand(state, { archiveDir: "/tmp/archive" });
-		const result = await command.execute("mbrooks", "tars", 1, "archive");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "archive");
 		expect(result.success).toBe(true);
 		expect(repo.save).toHaveBeenCalled();
 		expect(repo.archive).toHaveBeenCalledWith(expect.objectContaining({ archivedAt: expect.any(String) }), "/tmp/archive");
@@ -221,7 +221,7 @@ describe("RunSessionCommand", () => {
 	it("rejects archive when archiveDir is not configured", async () => {
 		const state = makeState("complete");
 		const { command } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "archive");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "archive");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("internal");
@@ -231,16 +231,16 @@ describe("RunSessionCommand", () => {
 	it("prunes a worktree", async () => {
 		const state = makeState("complete");
 		const { command, workspaces } = makeCommand(state);
-		const result = await command.execute("mbrooks", "tars", 1, "prune-worktree");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "prune-worktree");
 		expect(result.success).toBe(true);
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("rejects pruning a dirty worktree without confirmation", async () => {
 		const state = makeState("complete");
 		const { command, workspaces } = makeCommand(state);
 		(workspaces.hasChanges as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-		const result = await command.execute("mbrooks", "tars", 1, "prune-worktree");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "prune-worktree");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("conflict");
@@ -251,14 +251,14 @@ describe("RunSessionCommand", () => {
 		const state = makeState("complete");
 		const { command, workspaces } = makeCommand(state);
 		(workspaces.hasChanges as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-		const result = await command.execute("mbrooks", "tars", 1, "prune-worktree", { confirmDirty: true });
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "prune-worktree", { confirmDirty: true });
 		expect(result.success).toBe(true);
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 1);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 	});
 
 	it("returns not_found when session does not exist", async () => {
 		const { command } = makeCommand(null);
-		const result = await command.execute("mbrooks", "tars", 1, "cancel");
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "cancel");
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("not_found");

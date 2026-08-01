@@ -189,6 +189,6 @@ export class SelfMonitor {
 	}
 
 	static getTargetRepo(): { owner: string; repo: string } {
-		return { owner: "mbrooks", repo: "tars" };
+		return { owner: "mbrooks", repo: "yeetomatic" };
 	}
 }

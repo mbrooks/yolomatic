@@ -21,8 +21,8 @@ describe("worker entrypoint", () => {
 	it("passes required env into the worker runtime", async () => {
 		process.env = {
 			...originalEnv,
-			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23418&token=test",
-			YEETOMATIC_SESSION_KEY: "mbrooks/tars#418",
+			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23418&token=test",
+			YEETOMATIC_SESSION_KEY: "mbrooks/yeetomatic#418",
 			YEETOMATIC_SOUL_PATH: "/app/SOUL.md",
 			npm_package_version: "1.2.3",
 		};
@@ -30,8 +30,8 @@ describe("worker entrypoint", () => {
 		await main();
 
 		expect(runWorkerRuntime).toHaveBeenCalledWith({
-			wsUrl: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23418&token=test",
-			sessionKey: "mbrooks/tars#418",
+			wsUrl: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23418&token=test",
+			sessionKey: "mbrooks/yeetomatic#418",
 			soulPath: "/app/SOUL.md",
 			workerVersion: "1.2.3",
 		});
@@ -40,8 +40,8 @@ describe("worker entrypoint", () => {
 	it("defaults the soul path when none is provided", async () => {
 		process.env = {
 			...originalEnv,
-			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23419&token=test",
-			YEETOMATIC_SESSION_KEY: "mbrooks/tars#419",
+			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23419&token=test",
+			YEETOMATIC_SESSION_KEY: "mbrooks/yeetomatic#419",
 		};
 
 		await main();
@@ -60,7 +60,7 @@ describe("worker entrypoint", () => {
 
 		process.env = {
 			...baseEnv,
-			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23420&token=test",
+			YEETOMATIC_SESSION_WS_URL: "ws://host.docker.internal:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23420&token=test",
 		};
 		await expect(main()).rejects.toThrow("YEETOMATIC_SESSION_KEY is required");
 	});

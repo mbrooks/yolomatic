@@ -86,7 +86,7 @@ describe("webSocketManager", () => {
 
 	it("connects and subscribes to logs", () => {
 		const cb = vi.fn();
-		const unsub = webSocketManager.subscribeLog("mbrooks", "tars", 1, cb);
+		const unsub = webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, cb);
 		expect(sockets).toHaveLength(1);
 		const socket = sockets[0];
 		socket.triggerOpen();
@@ -94,7 +94,7 @@ describe("webSocketManager", () => {
 		expect(socket.url).toBe("ws://localhost:6767/yeetomatic/admin/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
 		expect(socket.sent).toContain(
-			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 }),
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 }),
 		);
 
 		unsub();
@@ -102,13 +102,13 @@ describe("webSocketManager", () => {
 
 	it("receives log entries via websocket", () => {
 		const cb = vi.fn();
-		webSocketManager.subscribeLog("mbrooks", "tars", 1, cb);
+		webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, cb);
 		const socket = sockets[0];
 		socket.triggerOpen();
 
 		socket.triggerMessage({
 			type: "log-entry",
-			sessionKey: "mbrooks/tars#1",
+			sessionKey: "mbrooks/yeetomatic#1",
 			entry: { timestamp: "2025-01-01T00:00:00Z", level: "info", message: "hello" },
 		});
 

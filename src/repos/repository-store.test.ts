@@ -45,15 +45,15 @@ describe("RepositoryStore", () => {
 	});
 
 	it("upserts and retrieves a repository", async () => {
-		const repo = await store.upsert({ owner: "mbrooks", repo: "tars" });
+		const repo = await store.upsert({ owner: "mbrooks", repo: "yeetomatic" });
 		expect(repo.owner).toBe("mbrooks");
-		expect(repo.repo).toBe("tars");
-		expect(repo.id).toBe("mbrooks/tars");
+		expect(repo.repo).toBe("yeetomatic");
+		expect(repo.id).toBe("mbrooks/yeetomatic");
 		expect(repo.createdAt).toBe(repo.updatedAt);
 		expect(repo.githubEventMode).toBeNull();
 		expect(repo.visibility).toBeNull();
 
-		const found = await store.get("mbrooks", "tars");
+		const found = await store.get("mbrooks", "yeetomatic");
 		expect(found).not.toBeNull();
 		expect(found!.id).toBe(repo.id);
 	});
@@ -61,15 +61,15 @@ describe("RepositoryStore", () => {
 	it("upsert updates an existing repository, preserving the id and bumping updated_at", async () => {
 		const original = await store.upsert({
 			owner: "mbrooks",
-			repo: "tars",
-			fullName: "mbrooks/tars",
+			repo: "yeetomatic",
+			fullName: "mbrooks/yeetomatic",
 			visibility: "private",
 		});
 		// Ensure updatedAt differs from createdAt on the second write.
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		const updated = await store.upsert({
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			githubEventMode: "polling",
 			defaultBranch: "develop",
 		});
@@ -84,15 +84,15 @@ describe("RepositoryStore", () => {
 	it("matches owner and repo case-insensitively on get, upsert, and remove", async () => {
 		await store.upsert({
 			owner: "Mbrooks",
-			repo: "Tars",
-			fullName: "mbrooks/tars",
+			repo: "Yeetomatic",
+			fullName: "mbrooks/yeetomatic",
 		});
-		expect(await store.get("mbrooks", "tars")).not.toBeNull();
-		const updated = await store.upsert({ owner: "MBROOKS", repo: "TARS", githubEventMode: "both" });
+		expect(await store.get("mbrooks", "yeetomatic")).not.toBeNull();
+		const updated = await store.upsert({ owner: "MBROOKS", repo: "YEETOMATIC", githubEventMode: "both" });
 		expect(updated.owner).toBe("Mbrooks");
 		expect(updated.githubEventMode).toBe("both");
 		expect(await store.list()).toHaveLength(1);
-		expect(await store.remove("mbrooks", "tars")).toBe(true);
+		expect(await store.remove("mbrooks", "yeetomatic")).toBe(true);
 		expect(await store.list()).toHaveLength(0);
 	});
 
@@ -107,10 +107,10 @@ describe("RepositoryStore", () => {
 	it("lists repositories ordered by owner then repo", async () => {
 		await store.upsert({ owner: "octocat", repo: "zebra" });
 		await store.upsert({ owner: "octocat", repo: "apple" });
-		await store.upsert({ owner: "mbrooks", repo: "tars" });
+		await store.upsert({ owner: "mbrooks", repo: "yeetomatic" });
 		const list = await store.list();
 		expect(list.map((r) => `${r.owner}/${r.repo}`)).toEqual([
-			"mbrooks/tars",
+			"mbrooks/yeetomatic",
 			"octocat/apple",
 			"octocat/zebra",
 		]);
@@ -132,16 +132,16 @@ describe("RepositoryStore", () => {
 	it("persists nullable fields and visibility", async () => {
 		const repo = await store.upsert({
 			owner: "mbrooks",
-			repo: "tars",
-			fullName: "mbrooks/tars",
+			repo: "yeetomatic",
+			fullName: "mbrooks/yeetomatic",
 			visibility: "internal",
 			githubEventMode: "both",
 			defaultBranch: "main",
 		});
-		const found = await store.get("mbrooks", "tars");
+		const found = await store.get("mbrooks", "yeetomatic");
 		expect(found).toEqual(repo);
 		expect(found!.visibility).toBe("internal");
-		expect(found!.fullName).toBe("mbrooks/tars");
+		expect(found!.fullName).toBe("mbrooks/yeetomatic");
 	});
 
 	it("throws when upserting without owner or repo", async () => {

@@ -147,13 +147,13 @@ describe("handleRepoRoutes", () => {
 	it("rejects unauthorized repo issue requests", async () => {
 		const res = response();
 		const handled = await handleRepoRoutes(
-			{ method: "GET", url: "/api/repos/mbrooks/tars/issues", headers: {} } as never,
+			{ method: "GET", url: "/api/repos/mbrooks/yeetomatic/issues", headers: {} } as never,
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/issues",
+			"/api/repos/mbrooks/yeetomatic/issues",
 		);
 
 		expect(handled).toBe(true);
@@ -169,10 +169,10 @@ describe("handleRepoRoutes", () => {
 			githubService.listRelatedIssues.mockResolvedValue([{ number: 1, title: "Old", state: "open" }]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/context", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/context", "GET"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/context",
+				"/api/repos/mbrooks/yeetomatic/context",
 			);
 
 			expect(handled).toBe(true);
@@ -185,10 +185,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/context", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/context", "GET"),
 				res,
 				makeDeps({ githubService: undefined }),
-				"/api/repos/mbrooks/tars/context",
+				"/api/repos/mbrooks/yeetomatic/context",
 			);
 
 			expect(handled).toBe(true);
@@ -200,10 +200,10 @@ describe("handleRepoRoutes", () => {
 			githubService.listLabels.mockRejectedValue(new Error("API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/context", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/context", "GET"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/context",
+				"/api/repos/mbrooks/yeetomatic/context",
 			);
 
 			expect(handled).toBe(true);
@@ -217,14 +217,14 @@ describe("handleRepoRoutes", () => {
 		it("returns open issues", async () => {
 			const res = response();
 			githubService.listOpenIssues.mockResolvedValue([
-				{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+				{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
 			]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/issues", "GET"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues",
+				"/api/repos/mbrooks/yeetomatic/issues",
 			);
 
 			expect(handled).toBe(true);
@@ -236,10 +236,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/issues", "GET"),
 				res,
 				makeDeps({ githubService: undefined }),
-				"/api/repos/mbrooks/tars/issues",
+				"/api/repos/mbrooks/yeetomatic/issues",
 			);
 
 			expect(handled).toBe(true);
@@ -251,10 +251,10 @@ describe("handleRepoRoutes", () => {
 			githubService.listOpenIssues.mockRejectedValue(new Error("API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/issues", "GET"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues",
+				"/api/repos/mbrooks/yeetomatic/issues",
 			);
 
 			expect(handled).toBe(true);
@@ -268,14 +268,14 @@ describe("handleRepoRoutes", () => {
 		it("returns effective repo settings", async () => {
 			const res = response();
 			const repoStore = makeRepoStore([
-				managedRepo("mbrooks", "tars", { githubEventMode: "polling", defaultBranch: "master" }),
+				managedRepo("mbrooks", "yeetomatic", { githubEventMode: "polling", defaultBranch: "master" }),
 			]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/settings", "GET"),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
@@ -289,13 +289,13 @@ describe("handleRepoRoutes", () => {
 
 		it("returns inherited settings when no overrides are set", async () => {
 			const res = response();
-			const repoStore = makeRepoStore([managedRepo("mbrooks", "tars")]);
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yeetomatic")]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/settings", "GET"),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
@@ -309,20 +309,20 @@ describe("handleRepoRoutes", () => {
 
 		it("updates repo settings overrides", async () => {
 			const res = response();
-			const repoStore = makeRepoStore([managedRepo("mbrooks", "tars")]);
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yeetomatic")]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "polling", default_branch: "master" })),
+				request("/api/repos/mbrooks/yeetomatic/settings", "PATCH", JSON.stringify({ github_event_mode: "polling", default_branch: "master" })),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				githubEventMode: "polling",
 				defaultBranch: "master",
 			}));
@@ -333,10 +333,10 @@ describe("handleRepoRoutes", () => {
 			const repoStore = makeRepoStore();
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "bad-mode" })),
+				request("/api/repos/mbrooks/yeetomatic/settings", "PATCH", JSON.stringify({ github_event_mode: "bad-mode" })),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
@@ -349,21 +349,21 @@ describe("handleRepoRoutes", () => {
 		it("clears repo-specific overrides when blank values are submitted", async () => {
 			const res = response();
 			const repoStore = makeRepoStore([
-				managedRepo("mbrooks", "tars", { githubEventMode: "polling", defaultBranch: "master" }),
+				managedRepo("mbrooks", "yeetomatic", { githubEventMode: "polling", defaultBranch: "master" }),
 			]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "", default_branch: "" })),
+				request("/api/repos/mbrooks/yeetomatic/settings", "PATCH", JSON.stringify({ github_event_mode: "", default_branch: "" })),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				githubEventMode: null,
 				defaultBranch: null,
 			}));
@@ -374,17 +374,17 @@ describe("handleRepoRoutes", () => {
 			const repoStore = makeRepoStore();
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "PATCH", JSON.stringify({ github_event_mode: "both" })),
+				request("/api/repos/mbrooks/yeetomatic/settings", "PATCH", JSON.stringify({ github_event_mode: "both" })),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				githubEventMode: "both",
 			}));
 		});
@@ -392,10 +392,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when repositoryStore is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/settings", "GET"),
+				request("/api/repos/mbrooks/yeetomatic/settings", "GET"),
 				res,
 				makeDeps({ repositoryStore: undefined }),
-				"/api/repos/mbrooks/tars/settings",
+				"/api/repos/mbrooks/yeetomatic/settings",
 			);
 
 			expect(handled).toBe(true);
@@ -409,41 +409,41 @@ describe("handleRepoRoutes", () => {
 		it("removes the configured repository from the table", async () => {
 			const res = response();
 			const repoStore = makeRepoStore([
-				managedRepo("mbrooks", "tars"),
+				managedRepo("mbrooks", "yeetomatic"),
 				managedRepo("octocat", "hello-world"),
 			]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars", "DELETE"),
+				request("/api/repos/mbrooks/yeetomatic", "DELETE"),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars",
+				"/api/repos/mbrooks/yeetomatic",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.removed).toBe(true);
-			expect(repoStore.remove).toHaveBeenCalledWith("mbrooks", "tars");
+			expect(repoStore.remove).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 			expect(await repoStore.list()).toEqual([expect.objectContaining({ owner: "octocat", repo: "hello-world" })]);
 		});
 
 		it("matches owner and repo case-insensitively", async () => {
 			const res = response();
-			const repoStore = makeRepoStore([managedRepo("Mbrooks", "Tars")]);
+			const repoStore = makeRepoStore([managedRepo("Mbrooks", "Yeetomatic")]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars", "DELETE"),
+				request("/api/repos/mbrooks/yeetomatic", "DELETE"),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars",
+				"/api/repos/mbrooks/yeetomatic",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.removed).toBe(true);
-			expect(repoStore.remove).toHaveBeenCalledWith("mbrooks", "tars");
+			expect(repoStore.remove).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 		});
 
 		it("returns removed:false when the repository is not configured", async () => {
@@ -451,10 +451,10 @@ describe("handleRepoRoutes", () => {
 			const repoStore = makeRepoStore([managedRepo("octocat", "hello-world")]);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars", "DELETE"),
+				request("/api/repos/mbrooks/yeetomatic", "DELETE"),
 				res,
 				makeDeps({ repositoryStore: repoStore }),
-				"/api/repos/mbrooks/tars",
+				"/api/repos/mbrooks/yeetomatic",
 			);
 
 			expect(handled).toBe(true);
@@ -466,10 +466,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when repositoryStore is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars", "DELETE"),
+				request("/api/repos/mbrooks/yeetomatic", "DELETE"),
 				res,
 				makeDeps({ repositoryStore: undefined }),
-				"/api/repos/mbrooks/tars",
+				"/api/repos/mbrooks/yeetomatic",
 			);
 
 			expect(handled).toBe(true);
@@ -483,10 +483,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ githubService: undefined }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -498,10 +498,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when settingsStore is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ settingsStore: undefined }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -513,10 +513,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when startIssueSession is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ startIssueSession: undefined }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -528,10 +528,10 @@ describe("handleRepoRoutes", () => {
 		it("returns false for invalid issue number (route does not match)", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/abc/assign", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/abc/assign", "POST"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/abc/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/abc/assign",
 			);
 
 			expect(handled).toBe(false);
@@ -543,10 +543,10 @@ describe("handleRepoRoutes", () => {
 				get: vi.fn(() => undefined),
 			};
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps({ settingsStore: noUserStore as unknown as AdminRouterDeps["settingsStore"] }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -558,10 +558,10 @@ describe("handleRepoRoutes", () => {
 		it("returns 400 when title is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ body: "desc", labels: [] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ body: "desc", labels: [] })),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -573,10 +573,10 @@ describe("handleRepoRoutes", () => {
 		it("assigns issue, starts session in background, and returns 202", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] })),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -584,8 +584,8 @@ describe("handleRepoRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.started).toBe(true);
 			expect(body.status).toBe("queued");
-			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["yeetomatic-bot"]);
-			expect(startIssueSession.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
+			expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic-bot"]);
+			expect(startIssueSession.execute).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Bug", "desc", ["bug"]);
 		});
 
 		it("returns 202 even when background session reports a conflict", async () => {
@@ -598,10 +598,10 @@ describe("handleRepoRoutes", () => {
 				})),
 			};
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
 				res,
 				makeDeps({ startIssueSession: conflictSession as unknown as AdminRouterDeps["startIssueSession"] }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -615,10 +615,10 @@ describe("handleRepoRoutes", () => {
 			githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -636,10 +636,10 @@ describe("handleRepoRoutes", () => {
 				}),
 			};
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/assign", "POST", JSON.stringify({ title: "Bug", body: "desc", labels: [] })),
 				res,
 				makeDeps({ startIssueSession: failingSession as unknown as AdminRouterDeps["startIssueSession"] }),
-				"/api/repos/mbrooks/tars/issues/42/assign",
+				"/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			);
 
 			expect(handled).toBe(true);
@@ -653,13 +653,13 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/start-session", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
 					adminUsername: "admin",
 					adminPassword: "secret",
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -671,7 +671,7 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when settingsStore is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/start-session", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
 					adminUsername: "admin",
@@ -682,7 +682,7 @@ describe("handleRepoRoutes", () => {
 						listAccessibleRepositories: vi.fn(async () => []),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -694,7 +694,7 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when startIssueSession is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/start-session", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
 					adminUsername: "admin",
@@ -708,7 +708,7 @@ describe("handleRepoRoutes", () => {
 						get: vi.fn(() => undefined),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -720,7 +720,7 @@ describe("handleRepoRoutes", () => {
 		it("returns 500 when github_username is not set", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/start-session", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
 					adminUsername: "admin",
@@ -737,7 +737,7 @@ describe("handleRepoRoutes", () => {
 						execute: vi.fn(),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -750,7 +750,7 @@ describe("handleRepoRoutes", () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
 				request(
-					"/api/repos/mbrooks/tars/issues/42/start-session",
+					"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 					"POST",
 					JSON.stringify({ body: "test", labels: [] }),
 				),
@@ -770,7 +770,7 @@ describe("handleRepoRoutes", () => {
 						execute: vi.fn(async () => ok({ started: true, status: "working", message: "ok" })),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -786,7 +786,7 @@ describe("handleRepoRoutes", () => {
 			};
 			const handled = await handleRepoRoutes(
 				request(
-					"/api/repos/mbrooks/tars/issues/42/start-session",
+					"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 					"POST",
 					JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 				),
@@ -804,7 +804,7 @@ describe("handleRepoRoutes", () => {
 					},
 					startIssueSession,
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -813,7 +813,7 @@ describe("handleRepoRoutes", () => {
 			expect(body.started).toBe(true);
 			expect(startIssueSession.execute).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				42,
 				"Bug",
 				"desc",
@@ -825,7 +825,7 @@ describe("handleRepoRoutes", () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
 				request(
-					"/api/repos/mbrooks/tars/issues/42/start-session",
+					"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 					"POST",
 					JSON.stringify({ title: "Bug", body: "desc", labels: [] }),
 				),
@@ -849,7 +849,7 @@ describe("handleRepoRoutes", () => {
 						})),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -862,7 +862,7 @@ describe("handleRepoRoutes", () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
 				request(
-					"/api/repos/mbrooks/tars/issues/42/start-session",
+					"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 					"POST",
 					JSON.stringify({ title: "Bug", body: "desc", labels: [] }),
 				),
@@ -884,7 +884,7 @@ describe("handleRepoRoutes", () => {
 						}),
 					},
 				} as never,
-				"/api/repos/mbrooks/tars/issues/42/start-session",
+				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
 
 			expect(handled).toBe(true);
@@ -1056,10 +1056,10 @@ describe("handleRepoRoutes", () => {
 	describe("GET /api/repos/accessible", () => {
 		it("returns accessible repositories and currently configured repos without mutating state", async () => {
 			const res = response();
-			const repoStore = makeRepoStore([managedRepo("mbrooks", "tars")]);
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yeetomatic")]);
 			githubService.getAuthenticatedUser.mockResolvedValue({ login: "testuser" });
 			githubService.listAccessibleRepositories.mockResolvedValue([
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
 				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			]);
 
@@ -1074,8 +1074,8 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.repositories).toHaveLength(2);
-			expect(body.repositories[0].fullName).toBe("mbrooks/tars");
-			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "tars" }]);
+			expect(body.repositories[0].fullName).toBe("mbrooks/yeetomatic");
+			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "yeetomatic" }]);
 			expect(repoStore.upsert).not.toHaveBeenCalled();
 		});
 
@@ -1153,26 +1153,26 @@ describe("handleRepoRoutes", () => {
 			githubService.closeIssue.mockResolvedValue(undefined);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/close", "POST"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/close",
+				"/api/repos/mbrooks/yeetomatic/issues/42/close",
 			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.closed).toBe(true);
-			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "tars", 42);
+			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 		});
 
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/close", "POST"),
 				res,
 				makeDeps({ githubService: undefined }),
-				"/api/repos/mbrooks/tars/issues/42/close",
+				"/api/repos/mbrooks/yeetomatic/issues/42/close",
 			);
 
 			expect(handled).toBe(true);
@@ -1186,10 +1186,10 @@ describe("handleRepoRoutes", () => {
 			githubService.closeIssue.mockRejectedValue(new Error("API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/close", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/close", "POST"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/close",
+				"/api/repos/mbrooks/yeetomatic/issues/42/close",
 			);
 
 			expect(handled).toBe(true);
@@ -1206,10 +1206,10 @@ describe("handleRepoRoutes", () => {
 			githubService.closeIssue.mockResolvedValue(undefined);
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work", "POST"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+				"/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work",
 			);
 
 			expect(handled).toBe(true);
@@ -1217,17 +1217,17 @@ describe("handleRepoRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.closed).toBe(true);
 			expect(body.labeled).toBe(true);
-			expect(githubService.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 42, ["wontfix"]);
-			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "tars", 42);
+			expect(githubService.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["wontfix"]);
+			expect(githubService.closeIssue).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 		});
 
 		it("returns 500 when githubService is missing", async () => {
 			const res = response();
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work", "POST"),
 				res,
 				makeDeps({ githubService: undefined }),
-				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+				"/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work",
 			);
 
 			expect(handled).toBe(true);
@@ -1241,10 +1241,10 @@ describe("handleRepoRoutes", () => {
 			githubService.addLabels.mockRejectedValue(new Error("Label API error"));
 
 			const handled = await handleRepoRoutes(
-				request("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", "POST"),
+				request("/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work", "POST"),
 				res,
 				makeDeps(),
-				"/api/repos/mbrooks/tars/issues/42/mark-do-not-work",
+				"/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work",
 			);
 
 			expect(handled).toBe(true);

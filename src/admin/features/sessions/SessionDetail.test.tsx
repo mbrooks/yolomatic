@@ -28,7 +28,7 @@ import { useSessionLog } from "../../hooks/useSessionLog.js";
 function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 42,
 		status: "working",
 		title: null,
@@ -85,7 +85,7 @@ describe("SessionDetail", () => {
 
 		// Detail title still present after the summary block
 		const title = pane!.querySelector(".detail-title");
-		expect(title?.textContent).toContain("mbrooks/tars#42");
+		expect(title?.textContent).toContain("mbrooks/yeetomatic#42");
 	});
 
 	it("renders the issue title as a link to the GitHub issue", () => {
@@ -99,7 +99,7 @@ describe("SessionDetail", () => {
 		const summaryTitle = summary!.querySelector("a.issue-summary-title");
 		expect(summaryTitle).not.toBeNull();
 		expect(summaryTitle!.textContent).toBe("#42 Fix the flux capacitor");
-		expect(summaryTitle!.getAttribute("href")).toBe("https://github.com/mbrooks/tars/issues/42");
+		expect(summaryTitle!.getAttribute("href")).toBe("https://github.com/mbrooks/yeetomatic/issues/42");
 	});
 
 	it("prefers summary over body for the excerpt", () => {
@@ -121,7 +121,7 @@ describe("SessionDetail", () => {
 
 		const moreLink = screen.getByText("more");
 		expect(moreLink.tagName).toBe("A");
-		expect(moreLink.getAttribute("href")).toBe("https://github.com/mbrooks/tars/issues/42");
+		expect(moreLink.getAttribute("href")).toBe("https://github.com/mbrooks/yeetomatic/issues/42");
 
 		const bodyEl = document.querySelector(".issue-summary-body");
 		expect(bodyEl?.textContent).toContain("x".repeat(300));
@@ -163,7 +163,7 @@ describe("SessionDetail", () => {
 		const titleLink = summary!.querySelector("a.issue-summary-title");
 		expect(titleLink).not.toBeNull();
 		expect(titleLink!.textContent).toBe("#42 Title only");
-		expect(titleLink!.getAttribute("href")).toBe("https://github.com/mbrooks/tars/issues/42");
+		expect(titleLink!.getAttribute("href")).toBe("https://github.com/mbrooks/yeetomatic/issues/42");
 		expect(screen.queryByText("more")).toBeNull();
 	});
 
@@ -176,7 +176,7 @@ describe("SessionDetail", () => {
 		const numberLink = summary!.querySelector("a.issue-summary-title");
 		expect(numberLink).not.toBeNull();
 		expect(numberLink!.textContent).toBe("#42");
-		expect(numberLink!.getAttribute("href")).toBe("https://github.com/mbrooks/tars/issues/42");
+		expect(numberLink!.getAttribute("href")).toBe("https://github.com/mbrooks/yeetomatic/issues/42");
 		expect(screen.getByText(/Some body content here\./)).toBeDefined();
 	});
 
@@ -184,7 +184,7 @@ describe("SessionDetail", () => {
 		const session = makeSession({ title: "Fix the flux capacitor" });
 		render(<SessionDetail selected={session} onMutate={vi.fn()} />);
 
-		expect(screen.getByText("mbrooks/tars#42")).toBeDefined();
+		expect(screen.getByText("mbrooks/yeetomatic#42")).toBeDefined();
 	});
 
 	it("renders an issue link inside the Summary grid", () => {
@@ -193,7 +193,7 @@ describe("SessionDetail", () => {
 
 		const summaryGrid = document.querySelector(".detail-grid");
 		expect(summaryGrid).not.toBeNull();
-		const issueLink = summaryGrid!.querySelector("a[href=\"https://github.com/mbrooks/tars/issues/42\"]");
+		const issueLink = summaryGrid!.querySelector("a[href=\"https://github.com/mbrooks/yeetomatic/issues/42\"]");
 		expect(issueLink).not.toBeNull();
 	});
 

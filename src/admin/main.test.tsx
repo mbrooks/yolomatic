@@ -88,13 +88,13 @@ describe("App", () => {
 				uptime: "1m",
 				draining: false,
 				repos: [
-					{ owner: "mbrooks", repo: "tars", sessionCount: 3, activeCount: 2, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 3, activeCount: 2, lastActivity: new Date().toISOString() },
 					{ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [
 					{
 						owner: "mbrooks",
-						repo: "tars",
+						repo: "yeetomatic",
 						issueNumber: 1,
 						status: "working",
 						title: null,
@@ -113,7 +113,7 @@ describe("App", () => {
 					},
 					{
 						owner: "mbrooks",
-						repo: "tars",
+						repo: "yeetomatic",
 						issueNumber: 2,
 						status: "pending",
 						title: null,
@@ -132,7 +132,7 @@ describe("App", () => {
 					},
 					{
 						owner: "mbrooks",
-						repo: "tars",
+						repo: "yeetomatic",
 						issueNumber: 3,
 						status: "complete",
 						title: null,
@@ -225,7 +225,7 @@ describe("App", () => {
 				sessions: [
 					{
 						owner: "mbrooks",
-						repo: "tars",
+						repo: "yeetomatic",
 						issueNumber: 1,
 						status: "complete",
 						title: null,
@@ -269,7 +269,7 @@ describe("App", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/tars")).not.toBeNull();
+			expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull();
 		});
 	});
 
@@ -302,10 +302,10 @@ describe("App", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByRole("button", { name: /mbrooks\/tars #1/i })).not.toBeNull();
+			expect(screen.queryByRole("button", { name: /mbrooks\/yeetomatic #1/i })).not.toBeNull();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: /mbrooks\/tars #1/i }));
+		fireEvent.click(screen.getByRole("button", { name: /mbrooks\/yeetomatic #1/i }));
 
 		await waitFor(() => {
 			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();
@@ -319,7 +319,7 @@ describe("App", () => {
 				uptime: "1m",
 				draining: true,
 				repos: [
-					{ owner: "mbrooks", repo: "tars", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [],
 			});
@@ -368,7 +368,7 @@ function mockLogResponse(overrides: Record<string, unknown> = {}) {
 function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 1,
 		status,
 		title: null,

@@ -297,9 +297,9 @@ describe("main", () => {
 
 	it("starts polling when a configured repository overrides webhook mode to polling", async () => {
 		const managedRepo = {
-			id: "mbrooks/tars",
+			id: "mbrooks/yeetomatic",
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			fullName: null,
 			visibility: null,
 			githubEventMode: "polling" as const,
@@ -309,7 +309,7 @@ describe("main", () => {
 		};
 		repositoryStoreMock.listSync.mockReturnValue([managedRepo]);
 		repositoryStoreMock.getSync.mockImplementation((owner, repo) =>
-			owner === "mbrooks" && repo === "tars" ? managedRepo : null,
+			owner === "mbrooks" && repo === "yeetomatic" ? managedRepo : null,
 		);
 
 		await main();
@@ -318,7 +318,7 @@ describe("main", () => {
 			shouldPollRepo: expect.any(Function),
 		}));
 		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as { shouldPollRepo: (owner: string, repo: string) => boolean };
-		expect(pollingDeps.shouldPollRepo("mbrooks", "tars")).toBe(true);
+		expect(pollingDeps.shouldPollRepo("mbrooks", "yeetomatic")).toBe(true);
 		expect(pollingDeps.shouldPollRepo("mbrooks", "case")).toBe(false);
 	});
 
@@ -389,7 +389,7 @@ describe("main", () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
 				status: "working",
 				workspacePath: "/tmp/ws",
@@ -408,14 +408,14 @@ describe("main", () => {
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "tars", 42);
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 	});
 
 	it("resumes checkpointed sessions with resumeOnBoot on startup", async () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 43,
 				status: "pending",
 				workspacePath: "/tmp/ws",
@@ -435,7 +435,7 @@ describe("main", () => {
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "tars", 43);
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 43);
 	});
 
 	it("runs stale session detection on startup", async () => {
@@ -446,7 +446,7 @@ describe("main", () => {
 					ageMs: 99999999,
 					session: {
 						owner: "mbrooks",
-						repo: "tars",
+						repo: "yeetomatic",
 						issueNumber: 99,
 						status: "working",
 						staleDetectedAt: null,
@@ -463,7 +463,7 @@ describe("main", () => {
 			markFailed: mockMarkFailed,
 		} as never));
 		await main();
-		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "tars", 99, "interrupted_or_abandoned");
+		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "interrupted_or_abandoned");
 	});
 
 	it("handles stale detection errors gracefully", async () => {
@@ -478,7 +478,7 @@ describe("main", () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 				status: "working",
 				workspacePath: "/tmp/ws",
@@ -638,6 +638,6 @@ describe("noOpHandlers", () => {
 	});
 
 	it("isInFlight returns false", () => {
-		expect(noOpHandlers.isInFlight("mbrooks", "tars", 1)).toBe(false);
+		expect(noOpHandlers.isInFlight("mbrooks", "yeetomatic", 1)).toBe(false);
 	});
 });

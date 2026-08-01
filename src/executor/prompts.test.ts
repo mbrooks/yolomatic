@@ -7,14 +7,14 @@ describe("buildIssuePrompt", () => {
 		const state = {
 			issueNumber: 42,
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
 		} as never;
 		const prompt = buildIssuePrompt(state);
 		expect(prompt).toContain("#42");
-		expect(prompt).toContain("mbrooks/tars");
+		expect(prompt).toContain("mbrooks/yeetomatic");
 		expect(prompt).toContain("/tmp/ws");
 		expect(prompt).toContain("Fix bug");
 		expect(prompt).toContain("Description here");
@@ -53,7 +53,7 @@ describe("buildPRReviewPrompt", () => {
 		const state = {
 			issueNumber: 56,
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
@@ -61,7 +61,7 @@ describe("buildPRReviewPrompt", () => {
 		const prompt = buildPRReviewPrompt(state, [{ body: "Fix typo", user: "reviewer", path: "src/foo.ts", line: 42 }]);
 		expect(prompt).toContain("PR review feedback received");
 		expect(prompt).toContain("issue #56");
-		expect(prompt).toContain("mbrooks/tars");
+		expect(prompt).toContain("mbrooks/yeetomatic");
 		expect(prompt).toContain("yeetomatic/issue-56");
 		expect(prompt).toContain("Fix typo");
 		expect(prompt).toContain("src/foo.ts:42");
@@ -114,7 +114,7 @@ describe("buildPRReviewPrompt", () => {
 		const state = {
 			issueNumber: 56,
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
