@@ -1,18 +1,22 @@
 # Protocol: Session Messages
 
+Status: as-built design
+
+Last verified: 2026-08-01 against `github/main` at `26171605efdd`
+
 ## Purpose
 
 This protocol defines the bidirectional messages used between a worker and Yeetomatic for one issue session.
 
 ## Common Envelope
 
-All messages should include:
+All messages include:
 
 ```json
 {
   "type": "hello",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-1",
   "payload": {}
 }
@@ -57,7 +61,7 @@ The worker starts the session handshake and identifies which session it is claim
 {
   "type": "hello",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-1",
   "payload": {
     "workerVersion": "1.0.0",
@@ -82,20 +86,20 @@ Yeetomatic sends the authoritative launch payload after validating the session i
 {
   "type": "launch_config",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-2",
   "payload": {
     "session": {
       "owner": "mbrooks",
       "repo": "yeetomatic",
       "issueNumber": 395,
-      "workspacePath": "/app/workspaces/mbrooks-tars/.worktrees/issue-395",
+      "workspacePath": "/app/workspaces/mbrooks-yeetomatic/.worktrees/issue-395",
       "title": "Implement worker-based agent sessions",
       "body": "Design and build a new isolated worker runtime."
     },
     "prompt": {
       "kind": "issue",
-      "text": "You are working on GitHub issue #395 in mbrooks/tars.\n..."
+      "text": "You are working on GitHub issue #395 in mbrooks/yeetomatic.\n..."
     },
     "limits": {
       "maxRuntimeSeconds": 7200
@@ -103,6 +107,9 @@ Yeetomatic sends the authoritative launch payload after validating the session i
   }
 }
 ```
+
+`limits.maxRuntimeSeconds` is currently descriptive. The worker and host do not
+enforce it as a deadline.
 
 ## `ack`
 
@@ -120,7 +127,7 @@ Acknowledges receipt and acceptance of a message.
 {
   "type": "ack",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-3",
   "payload": {
     "ackMessageId": "msg-2"
@@ -136,7 +143,9 @@ Worker -> Yeetomatic
 
 ### Purpose
 
-The worker sends structured execution events to Yeetomatic in batches.
+The worker sends structured execution events to Yeetomatic. The current runtime
+emits one `session_log` event per `event_batch`; the array permits future
+coalescing.
 
 ### Example
 
@@ -144,7 +153,7 @@ The worker sends structured execution events to Yeetomatic in batches.
 {
   "type": "event_batch",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-4",
   "payload": {
     "events": [
@@ -175,13 +184,16 @@ Worker -> Yeetomatic
 
 The worker periodically reports liveness while running.
 
+The current interval is five seconds. The host updates session activity but
+does not enforce a heartbeat timeout.
+
 ### Example
 
 ```json
 {
   "type": "heartbeat",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-5",
   "payload": {
     "state": "running",
@@ -225,7 +237,7 @@ Tells the worker to inject a text message into the live agent session.
 {
   "type": "control",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-6",
   "payload": {
     "action": "steer",
@@ -239,16 +251,13 @@ Tells the worker to inject a text message into the live agent session.
 For `steer`:
 
 1. Yeetomatic sends the message.
-2. The worker responds with `ack`.
+2. The worker responds with `ack` before applying the action.
 3. The worker passes the text into the live agent session through the agent's existing steering mechanism.
 4. The worker continues normal event streaming.
 
-If the worker cannot steer the live session, it should send `error` and then either:
-
-- continue without steering, or
-- stop and fail the session
-
-The policy should be explicit in implementation.
+The acknowledgement confirms receipt, not successful application. If steering
+arrives before a live agent session exists or steering otherwise fails, the
+worker sends `error`. The host treats that error as an execution failure.
 
 ## `complete`
 
@@ -266,7 +275,7 @@ The worker sends one terminal execution result to Yeetomatic.
 {
   "type": "complete",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-7",
   "payload": {
     "result": {
@@ -288,7 +297,7 @@ The payload wraps the existing `ExecutionResult`. Allowed `payload.result.status
 - `failed`
 - `cancelled`
 
-These should match the existing `ExecutionResult` shape used by Yeetomatic.
+These match the existing `ExecutionResult` shape used by Yeetomatic.
 
 ### Completion Rules
 
@@ -312,7 +321,7 @@ Reports a protocol-level or session-level error.
 {
   "type": "error",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/tars#395",
+  "sessionKey": "mbrooks/yeetomatic#395",
   "messageId": "msg-8",
   "payload": {
     "message": "Agent session could not accept a steering message."
@@ -325,7 +334,7 @@ Reports a protocol-level or session-level error.
 Yeetomatic translates worker messages like this:
 
 - `event_batch` -> `recordSessionLog` and activity updates for each `session_log` entry
-- `heartbeat` -> liveness tracking and activity updates
+- `heartbeat` -> activity updates; there is no protocol-level heartbeat watchdog
 - `complete` -> `ExecutionResult` handoff into the existing reporting and delivery flow
 
 The `event_batch` stream carries the data Yeetomatic persists centrally, including:
