@@ -24,7 +24,7 @@ Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launc
 ### Start Yeetomatic
 
 ```bash
-git clone https://github.com/mbrooks/tars.git
+git clone https://github.com/mbrooks/yeetomatic.git
 cd yeetomatic
 cp .env.example .env
 docker compose up --build -d
