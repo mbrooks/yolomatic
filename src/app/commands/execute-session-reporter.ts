@@ -86,8 +86,9 @@ export class ExecuteSessionReporter {
 		result: ExecutionResult;
 		context: string;
 		state: SessionState;
+		expectedRemoteHead?: string;
 	}): Promise<void> {
-		const { owner, repo, sessionIssueNumber, target, result, context, state } = args;
+		const { owner, repo, sessionIssueNumber, target, result, context, state, expectedRemoteHead } = args;
 
 		if (target.kind === "issue") {
 			await removeWorkflowLabels(this.deps.github, owner, repo, sessionIssueNumber);
@@ -144,7 +145,15 @@ export class ExecuteSessionReporter {
 
 		if (result.status === "complete") {
 			if (target.kind === "pull_request") {
-				await this.handlePullRequestCompletion(owner, repo, sessionIssueNumber, target.number, state, result);
+				await this.handlePullRequestCompletion(
+					owner,
+					repo,
+					sessionIssueNumber,
+					target.number,
+					state,
+					result,
+					expectedRemoteHead,
+				);
 				return;
 			}
 			throw new Error("Issue completion should be handled by ExecuteSessionDelivery.");
@@ -174,6 +183,7 @@ export class ExecuteSessionReporter {
 		issueNumber: number,
 		state: SessionState,
 		error: unknown,
+		target: ExecutionCommentTarget = { kind: "issue", number: issueNumber },
 	): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
 		const diagnostics = await this.gatherDeliveryDiagnostics(owner, repo, issueNumber, state);
@@ -238,7 +248,7 @@ export class ExecuteSessionReporter {
 			].filter(Boolean).join("\n");
 		}
 
-		await this.deps.github.postComment(owner, repo, issueNumber, commentBody);
+		await this.postComment(target, owner, repo, commentBody);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-feedback-required");
 		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-pr-created");
@@ -336,13 +346,19 @@ export class ExecuteSessionReporter {
 		prNumber: number,
 		state: SessionState,
 		result: ExecutionResult,
+		expectedRemoteHead?: string,
 	): Promise<void> {
 		const branchName = state.branch ?? `yeetomatic/issue-${issueNumber}`;
-		const pushed = await this.deps.workspaces.commitAndPushPath(
-			state.workspacePath,
-			branchName,
-			generateCommitMessage(state.labels, issueNumber, result.summary),
-		);
+		const commitMessage = generateCommitMessage(state.labels, issueNumber, result.summary);
+		const pushed = expectedRemoteHead
+			? await this.deps.workspaces.commitAndPushPath(
+					state.workspacePath,
+					branchName,
+					commitMessage,
+					undefined,
+					expectedRemoteHead,
+				)
+			: await this.deps.workspaces.commitAndPushPath(state.workspacePath, branchName, commitMessage);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
 		if (pushed) {
 			await this.deps.github.postPRComment(

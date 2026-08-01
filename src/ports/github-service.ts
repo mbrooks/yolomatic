@@ -1,5 +1,5 @@
 export interface PullRequestInfo {
-	head: { ref: string };
+	head: { ref: string; sha?: string };
 	state: string;
 	merged: boolean;
 }

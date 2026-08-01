@@ -10,6 +10,15 @@ import { WorktreeManager } from "./worktree.js";
 
 export type { CommandRunner } from "./git-runner.js";
 
+function isNonFastForwardPushError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	const stderr =
+		typeof error === "object" && error !== null && "stderr" in error && typeof error.stderr === "string"
+			? error.stderr
+			: "";
+	return /(non-fast-forward|fetch first|\[rejected\].*non-fast-forward)/iu.test(`${message}\n${stderr}`);
+}
+
 export class WorkspaceManager implements WorkspaceService {
 	private readonly git: GitCommandRunner;
 
@@ -67,6 +76,7 @@ export class WorkspaceManager implements WorkspaceService {
 		branchName: string,
 		message?: string,
 		baseBranch?: string,
+		expectedRemoteHead?: string,
 	): Promise<boolean> {
 		await this.git.ensureGitIdentity(worktreePath);
 		await this.git.run("git", ["add", "-A"], { cwd: worktreePath });
@@ -82,7 +92,25 @@ export class WorkspaceManager implements WorkspaceService {
 			return false;
 		}
 
-		await this.git.runAuthenticated(["push", "origin", branchName], { cwd: worktreePath });
+		try {
+			await this.git.runAuthenticated(["push", "origin", branchName], { cwd: worktreePath });
+		} catch (error) {
+			if (!expectedRemoteHead || !isNonFastForwardPushError(error)) {
+				throw error;
+			}
+			if (!/^[0-9a-f]{40,64}$/iu.test(expectedRemoteHead)) {
+				throw new Error(`Cannot safely update ${branchName}: invalid expected remote head '${expectedRemoteHead}'.`);
+			}
+			await this.git.runAuthenticated(
+				[
+					"push",
+					`--force-with-lease=refs/heads/${branchName}:${expectedRemoteHead}`,
+					"origin",
+					branchName,
+				],
+				{ cwd: worktreePath },
+			);
+		}
 		return true;
 	}
 
