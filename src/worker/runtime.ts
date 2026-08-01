@@ -8,6 +8,7 @@ import { PiAgentExecutor, type RefinementResult } from "../executor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
+import { setGitHubGatewayTransport, type GatewayCallResult } from "./github-gateway-client.js";
 import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
 
 export interface WorkerRuntimeOptions {
@@ -27,6 +28,9 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 	let heartbeat: NodeJS.Timeout | undefined;
 	let logListenerCleanup: (() => void) | undefined;
 	let tempDir: string | undefined;
+
+	const pendingToolResponses = new Map<string, { resolve: (result: GatewayCallResult) => void; reject: (error: Error) => void } | undefined>();
+	const nextToolRequestId = createMessageIdFactory();
 
 	const stopHeartbeat = () => {
 		if (heartbeat) {
@@ -52,6 +56,11 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 	const cleanup = async () => {
 		stopHeartbeat();
 		logListenerCleanup?.();
+		setGitHubGatewayTransport(undefined);
+		for (const pending of pendingToolResponses.values()) {
+			pending?.reject(new Error("Worker session ended before GitHub gateway responded"));
+		}
+		pendingToolResponses.clear();
 		if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
 			ws.close();
 		} else {
@@ -94,10 +103,43 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 		});
 
 		tempDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-"));
+
+		setGitHubGatewayTransport({
+			async call(request) {
+				const requestMessageId = nextToolRequestId();
+				const responsePromise = new Promise<GatewayCallResult>((resolve, reject) => {
+					pendingToolResponses.set(requestMessageId, { resolve, reject });
+				});
+				try {
+					await sendMessage(
+						createWorkerMessage("tool_request", options.sessionKey, requestMessageId, request),
+					);
+				} catch (error) {
+					pendingToolResponses.delete(requestMessageId);
+					throw error instanceof Error ? error : new Error(String(error));
+				}
+				return responsePromise;
+			},
+		});
+
 		const executor = new PiAgentExecutor({ soulPath: options.soulPath });
 
 		ws.on("message", (raw) => {
 			const message = decodeWorkerWebSocketMessage(raw);
+			if (message.type === "tool_response") {
+				const payload = message.payload as import("./protocol.js").WorkerToolResponsePayload;
+				const pending = pendingToolResponses.get(payload.requestMessageId);
+				if (pending) {
+					pendingToolResponses.delete(payload.requestMessageId);
+					pending.resolve({
+						ok: payload.ok,
+						data: payload.data,
+						error: payload.error,
+						scopeError: (payload as { scopeError?: boolean }).scopeError,
+					});
+				}
+				return;
+			}
 			if (message.type !== "control") return;
 			void handleControlMessage(
 				message as WorkerProtocolMessage<"control">,
