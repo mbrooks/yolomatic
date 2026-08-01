@@ -44,6 +44,8 @@ export interface IssueRefinementInstructionPayload {
 	sender: { login: string };
 }
 
+export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yeetomatic. Refining this issue. No implementation session will start.";
+
 export const ISSUE_REFINEMENT_INSTRUCTIONS = [
 	"## Yeetomatic issue refinement",
 	"",
@@ -178,6 +180,9 @@ export class HandleIssueRefinement {
 			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation.");
 			return;
 		}
+
+		process.stdout.write(`[refinement] starting for ${owner}/${repo}#${issueNumber}\n`);
+		await this.deps.github.postComment(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT);
 
 		let attemptId: string | undefined;
 		let worktreePath: string | undefined;
