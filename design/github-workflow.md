@@ -11,6 +11,8 @@ Yeetomatic: how repository activity enters the control plane, how an issue is
 selected and executed, how feedback changes an active or completed session,
 and how completed work is delivered as a pull request.
 
+Proposed behavior is explicitly labeled and is not part of the as-built flow.
+
 The worker transport and container protocol are documented separately in
 [architecture.md](architecture.md) and the protocol documents in this folder.
 This document focuses on orchestration and GitHub behavior.
@@ -195,6 +197,36 @@ to Yeetomatic. Payloads identified as belonging to a closed issue are rejected.
 The issue must also have a Yeetomatic-visible label or the comment must mention
 the configured account or `@yeetomatic`. A mention adds the `yeetomatic` label
 so later comments can pass the label gate.
+
+## Proposed: Pre-Implementation Issue Refinement
+
+Yeetomatic should offer to expand a newly opened issue into a Proposed Task.
+The `issues.opened` path posts static instructions only: it does not invoke a
+model, prepare a worktree, create a session, or interpret the issue body.
+
+Only the configured administrator can start refinement in the first
+implementation, using an exact `/yeetomatic issue-refinement` comment. That
+authenticated command is also approval to run the worker and apply the result.
+The static instructions explain that refinement gives an LLM-driven worker
+repository, shell, test, and network access. Because issue content can influence
+the worker's behavior, they tell the maintainer to verify the issue before
+starting refinement.
+
+Refinement launches a fresh instance of the existing disposable Docker worker
+against a temporary refinement worktree. The worker follows
+`.pi/skills/issue-refinement/SKILL.md` when present; if that skill is absent, it
+follows Yeetomatic's built-in issue-refinement defaults from the prompt. It may
+inspect the application, make experimental changes, and run tests before
+returning a Proposed Task. The control plane verifies that the source issue has
+not changed and automatically replaces its body. The title is unchanged.
+
+Refinement uses the same issue-level task admission key as implementation but
+bypasses normal commit, push, and pull-request delivery. Its temporary changes
+are discarded after the worker exits.
+
+The complete interaction, authorization, persistence, failure, and
+auto-assignment design is specified in
+[issue-refinement.md](issue-refinement.md).
 
 ## Initial Issue Execution
 

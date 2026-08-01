@@ -1,7 +1,7 @@
 # Design Documentation
 
 This folder describes the GitHub workflow and worker-session runtime currently
-implemented by Yeetomatic:
+implemented by Yeetomatic, plus explicitly labeled proposed extensions:
 
 - Yeetomatic remains the deterministic control plane.
 - A disposable worker container runs the full LLM agent for each issue execution.
@@ -13,6 +13,11 @@ implemented by Yeetomatic:
 
 - [github-workflow.md](github-workflow.md): end-to-end GitHub event, issue,
   feedback, delivery, and PR iteration workflow
+- [issue-refinement.md](issue-refinement.md): proposed opt-in workflow for
+  expanding a new issue with the repository's `issue-refinement` skill or
+  Yeetomatic's built-in prompt defaults, reusing the disposable Docker worker
+  for investigation and testing, and automatically replacing the issue body
+  after an authorized `/yeetomatic issue-refinement` command
 - [architecture.md](architecture.md): system overview, trust boundaries, and lifecycle
 - [protocol-launch.md](protocol-launch.md): how Yeetomatic starts a worker session and exposes the worker session URL
 - [protocol-websocket-transport.md](protocol-websocket-transport.md): transport, session isolation, reconnect, and shutdown rules
