@@ -1100,4 +1100,91 @@ describe("WorkspaceManager", () => {
 		);
 		expect(removeCalls).toHaveLength(0);
 	});
+
+	it("creates a refinement worktree on origin default branch", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-"));
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: ".\n", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: `worktree ${path.join(root, "mbrooks-yeetomatic")}\n`, stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "remote" && args[1] === "set-url") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		const refinementPath = await manager.createRefinementWorktree("mbrooks", "yeetomatic", 7);
+
+		expect(refinementPath).toBe(path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-7"));
+		const addCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "add",
+		);
+		expect(addCalls).toHaveLength(1);
+		expect(addCalls[0]![1]).toContain("yeetomatic/refinement-issue-7");
+	});
+
+	it("removes an existing refinement worktree before creating a new one", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-cleanup-"));
+		const refinementPath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-8");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+				return { stdout: ".\n", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: `worktree ${refinementPath}\n`, stderr: "" };
+			}
+			if (args[0] === "fetch") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "add") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			if (args[0] === "remote" && args[1] === "set-url") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.createRefinementWorktree("mbrooks", "yeetomatic", 8);
+
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(1);
+		expect(removeCalls[0]![1]).toContain(refinementPath);
+	});
+
+	it("removes a refinement worktree by path", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-rm-"));
+		const refinementPath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-9");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "worktree" && args[1] === "remove") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await manager.removeRefinementWorktree(refinementPath);
+
+		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
+			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
+		);
+		expect(removeCalls).toHaveLength(1);
+		expect(removeCalls[0]![1]).toContain(refinementPath);
+	});
 });

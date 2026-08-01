@@ -4,7 +4,7 @@ import path from "node:path";
 
 import WebSocket, { type RawData } from "ws";
 
-import { PiAgentExecutor } from "../executor/index.js";
+import { PiAgentExecutor, type RefinementResult } from "../executor/index.js";
 import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
@@ -120,30 +120,56 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 		});
 
 		startHeartbeat();
-		const result = await executor.executeWithOverride(
-			{
-				issueNumber: state.issueNumber,
-				repo: state.repo,
-				owner: state.owner,
-				title: state.title,
-				body: state.body,
-				status: "working",
-				sessionPath: path.join(tempDir, "session.jsonl"),
-				workspacePath: state.workspacePath,
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-				sessionTag: state.sessionTag,
-			},
-			launchConfig.payload.prompt.text,
-			abortController.signal,
-			(session) => {
-				liveSession = session;
-			},
-		);
+		const isRefinement = launchConfig.payload.prompt.kind === "issue-refinement";
+		let refinementResult: RefinementResult | undefined;
+		let executionResult: import("../executor/index.js").ExecutionResult | undefined;
+		if (isRefinement) {
+			refinementResult = await executor.executeRefinement(
+				{
+					issueNumber: state.issueNumber,
+					repo: state.repo,
+					owner: state.owner,
+					title: state.title,
+					body: state.body,
+					status: "working",
+					sessionPath: path.join(tempDir, "session.jsonl"),
+					workspacePath: state.workspacePath,
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+					sessionTag: state.sessionTag,
+				},
+				launchConfig.payload.prompt.text,
+				abortController.signal,
+				(session) => {
+					liveSession = session;
+				},
+			);
+		} else {
+			executionResult = await executor.executeWithOverride(
+				{
+					issueNumber: state.issueNumber,
+					repo: state.repo,
+					owner: state.owner,
+					title: state.title,
+					body: state.body,
+					status: "working",
+					sessionPath: path.join(tempDir, "session.jsonl"),
+					workspacePath: state.workspacePath,
+					lastActivity: new Date().toISOString(),
+					seeded: false,
+					sessionTag: state.sessionTag,
+				},
+				launchConfig.payload.prompt.text,
+				abortController.signal,
+				(session) => {
+					liveSession = session;
+				},
+			);
+		}
 
 		await sendMessage(
 			createWorkerMessage("complete", options.sessionKey, nextMessageId(), {
-				result,
+				result: refinementResult ?? executionResult!,
 			}),
 		);
 	} catch (error) {

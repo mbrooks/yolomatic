@@ -67,8 +67,8 @@ describe("HandlePRReview", () => {
 			})),
 		};
 		const github = {
-			postComment: vi.fn(),
-			postPRComment: vi.fn(),
+			postComment: vi.fn(async () => 1),
+			postPRComment: vi.fn(async () => 1),
 			addLabels: vi.fn(),
 			removeLabel: vi.fn(),
 			getPullRequest: vi.fn(),

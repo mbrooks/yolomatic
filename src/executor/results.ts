@@ -4,6 +4,53 @@ export interface ExecutionResult {
 	rawResponse: string;
 }
 
+export interface RefinementResult {
+	proposedTaskBody: string;
+	summary: string;
+	investigation: string;
+}
+
+export function parseRefinementResult(rawResponse: string): RefinementResult | null {
+	let trimmed = rawResponse.trim();
+	const fencedMatch = /^```(?:json)?\s*\n([\s\S]*?)\n```\s*$/u.exec(trimmed);
+	if (fencedMatch) {
+		trimmed = fencedMatch[1]!.trim();
+	}
+
+	const looksLikeJson = trimmed.startsWith("{") && trimmed.endsWith("}");
+	if (looksLikeJson) {
+		try {
+			const parsed = JSON.parse(trimmed);
+			if (
+				typeof parsed.proposedTaskBody === "string" &&
+				parsed.proposedTaskBody.length > 0 &&
+				typeof parsed.summary === "string" &&
+				typeof parsed.investigation === "string"
+			) {
+				return {
+					proposedTaskBody: parsed.proposedTaskBody,
+					summary: parsed.summary,
+					investigation: parsed.investigation,
+				};
+			}
+			return null;
+		} catch {
+			return null;
+		}
+	}
+
+	const bodyMatch = /##\s*Proposed Task\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
+	const summaryMatch = /##\s*Summary\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
+	const investigationMatch = /##\s*Investigation\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
+	const proposedTaskBody = bodyMatch?.[1]?.trim() ?? trimmed;
+	if (!proposedTaskBody) return null;
+	return {
+		proposedTaskBody,
+		summary: summaryMatch?.[1]?.trim() ?? "Refined issue body.",
+		investigation: investigationMatch?.[1]?.trim() ?? "No investigation notes provided.",
+	};
+}
+
 export function isRateLimitError(message: string): boolean {
 	const lower = message.toLowerCase();
 	return (

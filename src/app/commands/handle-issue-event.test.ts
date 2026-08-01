@@ -74,7 +74,7 @@ function createDeps(overrides?: {
 	};
 
 	const github = {
-		postComment: vi.fn(async () => {}),
+		postComment: vi.fn(async () => 1),
 		addLabels: vi.fn(async () => {}),
 		removeLabel: vi.fn(async () => {}),
 		getPullRequest: vi.fn(async () => null),
@@ -93,6 +93,8 @@ function createDeps(overrides?: {
 		listPendingInvitations: vi.fn(async () => []),
 		acceptInvitation: vi.fn(async () => {}),
 		updateIssueAssignees: vi.fn(async () => {}),
+		closeIssue: vi.fn(async () => {}),
+		updateIssueBody: vi.fn(async () => {}),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 	};
