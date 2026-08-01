@@ -2,7 +2,7 @@
 
 Yeetomatic (Task Automation & Response System) is a self-hosted coding agent that turns GitHub issues into pull requests.
 
-Assign an issue to Yeetomatic—or start it from the admin dashboard—and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through implementation, feedback, and PR delivery.
+Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through implementation, feedback, and PR delivery.
 
 ## Features
 
