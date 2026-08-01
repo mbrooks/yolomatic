@@ -83,6 +83,7 @@ function makeDeps(overrides?: {
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
 		getCollaboratorPermissionLevel: vi.fn(async () => null),
+		isCollaborator: vi.fn(async () => false),
 	};
 
 	const tasks: TaskControlService = {
