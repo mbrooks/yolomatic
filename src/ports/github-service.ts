@@ -71,8 +71,8 @@ export function isPublicVisibility(visibility: RepoVisibility): boolean {
 }
 
 export interface GitHubService {
-	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
-	postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<void>;
+	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<number>;
+	postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<number>;
 	addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void>;
 	removeLabel(owner: string, repo: string, issueNumber: number, label: string): Promise<void>;
 	getPullRequest(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null>;
@@ -90,7 +90,7 @@ export interface GitHubService {
 		repo: string,
 		options: { head: string; base: string; state: string },
 	): Promise<CreatedPR[]>;
-	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string } | null>;
+	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; body?: string } | null>;
 	createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<CreatedIssue>;
 	initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void>;
 	fileSelfReport(title: string, body: string, labels: string[]): Promise<string>;
@@ -104,6 +104,7 @@ export interface GitHubService {
 	acceptInvitation(invitationId: number): Promise<void>;
 	updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void>;
 	closeIssue(owner: string, repo: string, issueNumber: number): Promise<void>;
+	updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 	getRepository(owner: string, repo: string): Promise<RepositoryInfo | null>;

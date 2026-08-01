@@ -8,7 +8,7 @@ import { Validator } from "./validator.js";
 function makeGithub() {
 	return {
 		createIssue: vi.fn(async () => ({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/issues/1" })),
-		postComment: vi.fn(),
+		postComment: vi.fn(async () => 1),
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
 		getPullRequest: vi.fn(),
@@ -21,7 +21,7 @@ function makeGithub() {
 		getIssueTemplates: vi.fn(),
 		listRecentCommits: vi.fn(),
 		listRelatedIssues: vi.fn(),
-		postPRComment: vi.fn(),
+		postPRComment: vi.fn(async () => 1),
 	};
 }
 

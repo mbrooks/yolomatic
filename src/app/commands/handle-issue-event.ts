@@ -13,6 +13,7 @@ import {
 	guardEvent,
 	prepareIssueSession,
 } from "./workflow-helpers.js";
+import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
 
 export interface IssueEventPayload {
 	action: string;
@@ -45,6 +46,7 @@ export class HandleIssueEvent {
 			githubUsername: string;
 			selfReportEnabled: boolean;
 			executor: ExecuteSessionDeps;
+			refinement?: HandleIssueRefinement;
 			inFlight?: Set<string>;
 		},
 	) {
@@ -64,6 +66,10 @@ export class HandleIssueEvent {
 		if (payload.sender.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
 			return;
+		}
+
+		if (this.deps.refinement && payload.action === "opened") {
+			await this.deps.refinement.postInstructions(payload);
 		}
 
 		if (payload.action === "unassigned") {

@@ -38,7 +38,7 @@ function makeDeps(session: SessionState | null) {
 		save: vi.fn(async (s) => s),
 	} as unknown as SessionRepository;
 	const github: GitHubService = {
-		postComment: vi.fn(async () => undefined),
+		postComment: vi.fn(async () => 1),
 	} as unknown as GitHubService;
 	const executor = {} as ExecuteSessionDeps;
 	return { sessions, github, executor };

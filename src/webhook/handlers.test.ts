@@ -58,7 +58,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				get: vi.fn(async () => ({
@@ -1216,5 +1216,56 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(handlers.isInFlight("mbrooks", "yeetomatic", 56)).toBe(false);
 		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 56);
 		expect(handlers.isInFlight("mbrooks", "yeetomatic", 56)).toBe(false);
+	});
+
+	it("considers repos managed when no repositoryStore is provided", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "opened",
+				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yeetomatic-bot" }] },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				sender: { login: "user" },
+			}),
+		).resolves.toBeUndefined();
+	});
+
+	it("considers only registered repos managed when repositoryStore is provided", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const repositoryStore = {
+			getSync: vi.fn((owner: string, repo: string) => (owner === "mbrooks" && repo === "yeetomatic" ? { owner, repo } : null)),
+		};
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			repositoryStore: repositoryStore as never,
+		});
+
+		await expect(
+			handlers.handleIssueEvent({
+				action: "opened",
+				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yeetomatic-bot" }] },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				sender: { login: "user" },
+			}),
+		).resolves.toBeUndefined();
+		expect(repositoryStore.getSync).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 	});
 });

@@ -94,8 +94,8 @@ function makeCommand(
 		getGitDiff: vi.fn(async () => ""),
 	};
 	const github: GitHubService = overrides?.github ?? {
-		postComment: vi.fn(),
-		postPRComment: vi.fn(),
+		postComment: vi.fn(async () => 1),
+		postPRComment: vi.fn(async () => 1),
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
 		getPullRequest: vi.fn(async () => null),
@@ -116,6 +116,7 @@ function makeCommand(
 		acceptInvitation: vi.fn(),
 		updateIssueAssignees: vi.fn(),
 		closeIssue: vi.fn(),
+		updateIssueBody: vi.fn(),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
@@ -162,7 +163,7 @@ describe("StartIssueSession", () => {
 			getGitStatus: vi.fn(),
 			getGitDiff: vi.fn(),
 		} as unknown as WorkspaceService;
-		const github = { updateIssueAssignees: vi.fn() } as unknown as GitHubService;
+		const github = { updateIssueAssignees: vi.fn(), updateIssueBody: vi.fn() } as unknown as GitHubService;
 		const tasks = { isActive: vi.fn(() => false) } as unknown as TaskControlService;
 		const executor = { execute: vi.fn() } as unknown as ExecutionService;
 		const clock: Clock = { now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 };

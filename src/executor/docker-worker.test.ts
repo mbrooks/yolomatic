@@ -814,6 +814,177 @@ describe("DockerWorkerExecutor", () => {
 			await harness.close();
 		}
 	});
+
+	it("launches a refinement worker and parses the refinement result", async () => {
+		const harness = await createHarness(450);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+		});
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					expect((message as WorkerProtocolMessage<"launch_config">).payload.prompt.kind).toBe("issue-refinement");
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/yeetomatic#450", "ack-refine", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/yeetomatic#450", "complete-refine", {
+							result: {
+								proposedTaskBody: "## Summary\nRefined.",
+								summary: "Better description.",
+								investigation: "Read the code.",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			const result = await harness.executor.executeRefinement(makeSessionState(450, harness.workspacePath), undefined);
+			expect(result.proposedTaskBody).toBe("## Summary\nRefined.");
+			expect(result.summary).toBe("Better description.");
+			expect(spawnMock).toHaveBeenCalled();
+			const args = spawnMock.mock.calls[0]![1] as string[];
+			expect(args).toContain("--name");
+			expect(args[args.indexOf("--name") + 1]).toContain("refinement");
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("rejects an invalid refinement result", async () => {
+		const harness = await createHarness(451);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+		});
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/yeetomatic#451", "ack-bad", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/yeetomatic#451", "complete-bad", {
+							result: { proposedTaskBody: "", summary: "", investigation: "" } as any,
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.executeRefinement(makeSessionState(451, harness.workspacePath), undefined);
+			throw new Error("expected refinement to fail");
+		} catch (error) {
+			expect(error instanceof Error ? error.message : String(error)).toMatch(/invalid refinement result/);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("falls back to configured workspace mount source when docker self-inspection fails", async () => {
+		const harness = await createHarness(452);
+		const originalHostname = process.env.HOSTNAME;
+		process.env.HOSTNAME = "some-container";
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "inspect") {
+				callback(new Error("docker not available"), "", "");
+				return;
+			}
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+		});
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/yeetomatic#452", "ack-fallback", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/yeetomatic#452", "complete-fallback", {
+							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			const result = await harness.executor.execute(makeSessionState(452, harness.workspacePath));
+			expect(result.status).toBe("complete");
+		} finally {
+			process.env.HOSTNAME = originalHostname;
+			await harness.close();
+		}
+	});
+
+	it("allows launch when the workspace has no origin remote", async () => {
+		const harness = await createHarness(453);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(new Error("no origin remote"), "", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+		});
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "mbrooks/yeetomatic#453", "ack-noremote", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "mbrooks/yeetomatic#453", "complete-noremote", {
+							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			const result = await harness.executor.execute(makeSessionState(453, harness.workspacePath));
+			expect(result.status).toBe("complete");
+		} finally {
+			await harness.close();
+		}
+	});
 });
 
 async function createHarness(issueNumber: number): Promise<{

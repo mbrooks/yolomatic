@@ -127,7 +127,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		let getSessionCallCount = 0;
@@ -248,7 +248,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -402,7 +402,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -503,7 +503,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -618,7 +618,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -685,7 +685,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -836,7 +836,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -944,7 +944,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -1047,7 +1047,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockRejectedValue({ status: 404 }),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1122,7 +1122,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockRejectedValue({ status: 500 }),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1179,7 +1179,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/999" } })),
 			},
 		};
@@ -1317,7 +1317,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/1000" } })),
 			},
 			pulls: {
@@ -1447,7 +1447,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1538,7 +1538,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
@@ -1628,7 +1628,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1723,7 +1723,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1861,7 +1861,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
 		const sessionManager = {
@@ -1944,7 +1944,7 @@ describe("GitHubIssueHandlers", () => {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
-				createComment: vi.fn(async () => ({})),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
 				get: vi.fn(async () => ({
