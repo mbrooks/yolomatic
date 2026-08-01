@@ -42,8 +42,16 @@ V1 needs these message types:
 - `control`
 - `complete`
 - `error`
+- `tool_request`
+- `tool_response`
 
-That is enough to support launch, logging, liveness, steering, and terminal result handoff.
+That is enough to support launch, logging, liveness, steering, terminal result handoff, and scoped GitHub tool calls.
+
+The `tool_request` / `tool_response` pair is an additive V1 addition: both
+messages reuse the existing envelope and `ack` mechanism, and a worker that
+never sends `tool_request` (or a control plane that never sends
+`tool_response`) remains protocol-compatible. `WORKER_PROTOCOL_VERSION` is
+therefore left at `1`.
 
 ## `hello`
 
@@ -329,6 +337,98 @@ Reports a protocol-level or session-level error.
 }
 ```
 
+## `tool_request`
+
+### Direction
+
+Worker -> Yeetomatic
+
+### Purpose
+
+The worker asks the control plane to perform a scoped GitHub operation on its
+behalf. The disposable worker never receives `GITHUB_TOKEN`; the control-plane
+`WorkerGitHubGateway` validates the request against the live `SessionState`
+(current issue + its associated PRs) and performs the GitHub call through the
+control plane's `GitHubService` instance.
+
+### Example
+
+```json
+{
+  "type": "tool_request",
+  "protocolVersion": 1,
+  "sessionKey": "mbrooks/yeetomatic#395",
+  "messageId": "tool-1",
+  "payload": {
+    "tool": "fetch_issue",
+    "params": { "include_comments": true }
+  }
+}
+```
+
+### Tools
+
+Issue tools (scoped to the session issue; no `owner`/`repo`/`issue_number`
+parameters):
+
+- `get_authenticated_user`
+- `fetch_issue` (`include_comments?: boolean`)
+- `set_comment` (`body`)
+- `set_status` (`state?`, `assignee?`)
+- `set_labels` (`labels?`, `addLabels?`, `removeLabels?`)
+- `update_issue` (`title?`, `body?`, `state?`, `labels?`, `assignees?`)
+
+PR tools (scoped to the session's linked PR or an open PR on the session
+branch `yeetomatic/issue-{n}`; accept an optional in-scope `pr_number`):
+
+- `fetch_pr` (`pr_number?`, `include_comments?`)
+- `set_pr_comment` (`body`, `pr_number?`)
+- `update_pr` (`title?`, `body?`, `state?`, `labels?`, `pr_number?`)
+- `list_pr_review_comments` (`pr_number?`)
+
+Broad discovery tools (`github_query_issues`, `github_assigned_open_issues`)
+and the token-probe form of `github_get_authenticated_user` are intentionally
+not exposed to the worker because they cannot be scoped to the current issue.
+
+### Handling
+
+1. The worker sends `tool_request` over the session WebSocket.
+2. The control plane sends `ack` (acknowledging receipt).
+3. The control plane validates scope and performs the GitHub call (or rejects
+   without a GitHub call for out-of-scope `owner`/`repo`/`issue_number`).
+4. The control plane sends `tool_response` with the result, correlated by
+   `payload.requestMessageId`.
+
+## `tool_response`
+
+### Direction
+
+Yeetomatic -> worker
+
+### Purpose
+
+Carries the result of a `tool_request`. `requestMessageId` correlates the
+response to the originating request so the worker can multiplex concurrent
+calls. `ok: false` with `scopeError: true` indicates the request was rejected
+for targeting an out-of-scope issue or PR; no GitHub operation was performed
+in that case.
+
+### Example
+
+```json
+{
+  "type": "tool_response",
+  "protocolVersion": 1,
+  "sessionKey": "mbrooks/yeetomatic#395",
+  "messageId": "resp-1",
+  "payload": {
+    "requestMessageId": "tool-1",
+    "ok": true,
+    "data": { "issue": { "number": 395 } }
+  }
+}
+```
+
 ## Host Mapping
 
 Yeetomatic translates worker messages like this:
@@ -336,6 +436,7 @@ Yeetomatic translates worker messages like this:
 - `event_batch` -> `recordSessionLog` and activity updates for each `session_log` entry
 - `heartbeat` -> activity updates; there is no protocol-level heartbeat watchdog
 - `complete` -> `ExecutionResult` handoff into the existing reporting and delivery flow
+- `tool_request` -> `ack`, scope-validated `WorkerGitHubGateway` dispatch, and a `tool_response` carrying the result or a scope/error failure
 
 The `event_batch` stream carries the data Yeetomatic persists centrally, including:
 

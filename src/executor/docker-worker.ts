@@ -20,8 +20,11 @@ import {
 	type WorkerControlPayload,
 	type WorkerEventBatchPayload,
 	type WorkerProtocolMessage,
+	type WorkerToolRequestPayload,
+	type WorkerToolResponsePayload,
 } from "../worker/protocol.js";
 import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
+import type { WorkerGitHubGateway } from "../worker/github-gateway.js";
 
 const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.yeetomatic.worker.transport";
@@ -52,6 +55,8 @@ export interface DockerWorkerExecutorOptions {
 	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
 	soulPath: string;
+	/** Scoped GitHub gateway used to serve worker tool_request calls. */
+	githubGateway?: WorkerGitHubGateway;
 }
 
 export class DockerWorkerExecutor implements ExecutionService {
@@ -441,6 +446,17 @@ export class DockerWorkerExecutor implements ExecutionService {
 				return;
 			}
 
+			case "tool_request": {
+				await this.handleToolRequest(
+					message as WorkerProtocolMessage<"tool_request">,
+					state,
+					sessionKey,
+					sendMessage,
+					nextMessageId,
+				);
+				return;
+			}
+
 			case "heartbeat": {
 				onActivity?.();
 				return;
@@ -492,6 +508,73 @@ export class DockerWorkerExecutor implements ExecutionService {
 			});
 			onActivity?.();
 		}
+	}
+
+	private async handleToolRequest(
+		message: WorkerProtocolMessage<"tool_request">,
+		state: SessionState,
+		sessionKey: string,
+		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
+		nextMessageId: () => string,
+	): Promise<void> {
+		const request = message.payload as WorkerToolRequestPayload;
+		// Acknowledge receipt immediately so the worker knows the request was
+		// accepted; the result follows in a separate tool_response.
+		await sendMessage(
+			createWorkerMessage("ack", sessionKey, nextMessageId(), { ackMessageId: message.messageId }),
+		);
+
+		const gateway = this.options.githubGateway;
+		if (!gateway) {
+			await this.sendToolResponse(sendMessage, sessionKey, nextMessageId, message.messageId, {
+				requestMessageId: message.messageId,
+				ok: false,
+				error: "GitHub gateway is not enabled for this control plane",
+			});
+			return;
+		}
+
+		let response: import("../worker/github-gateway.js").GatewayToolResponse;
+		try {
+			response = await gateway.handle(state, { tool: request.tool, params: request.params });
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			response = { ok: false, error: msg };
+		}
+
+		const payload: WorkerToolResponsePayload = {
+			requestMessageId: message.messageId,
+			ok: response.ok,
+			...(response.data !== undefined ? { data: response.data } : {}),
+			...(response.error !== undefined ? { error: response.error } : {}),
+			...(response.scopeError ? { scopeError: true } : {}),
+		};
+
+		recordSessionLog(sessionKey, {
+			level: response.ok ? "tool" : response.scopeError ? "warn" : "error",
+			message: `gateway ${request.tool} ${response.ok ? "done" : response.scopeError ? "scope-rejected" : "failed"}`,
+			details: {
+				type: "worker_gateway_tool",
+				tool: request.tool,
+				ok: response.ok,
+				scopeError: response.scopeError ?? false,
+				error: response.error ?? null,
+			},
+		});
+
+		await this.sendToolResponse(sendMessage, sessionKey, nextMessageId, message.messageId, payload);
+	}
+
+	private async sendToolResponse(
+		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
+		sessionKey: string,
+		nextMessageId: () => string,
+		requestMessageId: string,
+		payload: WorkerToolResponsePayload,
+	): Promise<void> {
+		await sendMessage(
+			createWorkerMessage("tool_response", sessionKey, nextMessageId(), payload),
+		);
 	}
 
 	private async buildDockerRunArgs(containerName: string): Promise<string[]> {

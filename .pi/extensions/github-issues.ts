@@ -1,555 +1,281 @@
 /**
- * GitHub Issues Extension for pi-coding-agent
+ * GitHub Issues Extension for pi-coding-agent (worker/gateway mode)
  *
- * Provides GitHub issue management tools for Yeetomatic and direct pi-agent workflows.
- * 
+ * Provides scoped GitHub issue and pull-request management tools for the
+ * Yeetomatic disposable worker. The worker never receives `GITHUB_TOKEN`;
+ * every tool call is routed over the worker session WebSocket to the
+ * control-plane {@link WorkerGitHubGateway}, which performs the GitHub call on
+ * the worker's behalf and enforces session scope (current issue + its PRs).
+ *
+ * Tools are scoped to the live session: `owner`/`repo`/`issue_number` are not
+ * accepted as parameters because they are implied by the session. PR tools
+ * accept an optional `pr_number` that must match the session's linked PR or an
+ * open PR on the session branch; any other target is rejected by the gateway.
+ *
  * Tools:
- * - github_get_authenticated_user: Get the GitHub username associated with the API token
- * - github_query_issues: Search/query for issues with filters
- * - github_fetch_issue: Get full details of a single issue including comments
- * - github_set_comment: Add a comment to an issue
- * - github_set_status: Update issue state (open/close) and/or assignee
- * - github_set_labels: Add/remove labels on an issue
- * - github_assigned_open_issues: Look up your username and query all open issues assigned to you across all repositories
+ * - github_get_authenticated_user: Get the GitHub user the control plane authenticates as.
+ * - github_fetch_issue: Read the live session issue (title, body, state, labels, assignees) + comments.
+ * - github_set_comment: Add a comment to the live session issue.
+ * - github_set_status: Update the live session issue state (open/closed) and/or assignee.
+ * - github_set_labels: Replace/add/remove labels on the live session issue.
+ * - github_update_issue: Update the live session issue title/body/state/labels/assignees.
+ * - github_fetch_pr: Read the associated PR (metadata + issue-style comments).
+ * - github_set_pr_comment: Add a comment to the associated PR.
+ * - github_update_pr: Update the associated PR title/body/state/labels.
+ * - github_list_pr_review_comments: Read review comments on the associated PR.
  *
- * Requires GITHUB_TOKEN environment variable.
+ * Broad discovery tools (github_query_issues, github_assigned_open_issues) and
+ * the token-probe form of github_get_authenticated_user are intentionally NOT
+ * exposed: they cannot be scoped to the current issue.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { Octokit } from "@octokit/rest";
-import { readFile } from "node:fs/promises";
-import { createOctokit } from "../../src/adapters/github/octokit.js";
+import { callGitHubGateway } from "../../src/worker/github-gateway-client.js";
 
-// GitHub API types for return values
-interface GitHubIssue {
-	number: number;
-	title: string;
-	body: string;
-	labels: Array<{ name: string }>;
-	state: "open" | "closed";
-	created_at: string;
-	updated_at: string;
+
+function ok(text: string, details: Record<string, unknown>): AgentToolResult<unknown> {
+	return { content: [{ type: "text", text }], details };
 }
 
-interface GitHubComment {
-	id: number;
-	body: string;
-	user: { login: string };
-	created_at: string;
-	updated_at: string;
-	html_url: string;
+function fail(action: string, message: string): AgentToolResult<unknown> {
+	return {
+		content: [{ type: "text", text: action ? `Error ${action}: ${message}` : message }],
+		details: { success: false, error: message },
+	};
 }
 
-interface GitHubIssueFull extends GitHubIssue {
-	comments?: GitHubComment[];
-	html_url: string;
-	assignees?: Array<{ login: string }>;
-}
-
-interface GitHubSearchIssue {
-	url: string;
-	repository_url: string;
-	html_url: string;
-	number: number;
-	title: string;
-	state: "open" | "closed";
-	labels: Array<{ name: string }>;
-	created_at: string;
-	updated_at: string;
-	repository: { full_name: string };
-	assignees: Array<{ login: string }>;
-}
-
-function parseDotEnv(content: string): Map<string, string> {
-	const values = new Map<string, string>();
-
-	for (const rawLine of content.split(/\r?\n/u)) {
-		const line = rawLine.trim();
-		if (!line || line.startsWith("#")) {
-			continue;
-		}
-
-		const separatorIndex = line.indexOf("=");
-		if (separatorIndex <= 0) {
-			continue;
-		}
-
-		const key = line.slice(0, separatorIndex).trim();
-		let value = line.slice(separatorIndex + 1).trim();
-
-		if (
-			(value.startsWith('"') && value.endsWith('"')) ||
-			(value.startsWith("'") && value.endsWith("'"))
-		) {
-			value = value.slice(1, -1);
-		}
-
-		values.set(key, value);
-	}
-
-	return values;
-}
-
-async function getGitHubToken(cwd: string): Promise<string | null> {
-	const direct = process.env.GITHUB_TOKEN?.trim();
-	if (direct) {
-		return direct;
-	}
-
-	try {
-		const envFile = await readFile(`${cwd}/.env`, "utf-8");
-		return parseDotEnv(envFile).get("GITHUB_TOKEN")?.trim() ?? null;
-	} catch {
-		return null;
-	}
-}
-
-// Helper to get Octokit instance
-async function getOctokit(cwd: string): Promise<Octokit> {
-	const token = await getGitHubToken(cwd);
-	if (!token) {
-		throw new Error("GITHUB_TOKEN environment variable is not set");
-	}
-	return createOctokit(token);
-}
-
-// Validate owner/repo format
-function validateOwnerRepo(owner: string, repo: string): void {
-	if (!owner || !/^[a-zA-Z0-9_-]+$/.test(owner)) {
-		throw new Error(`Invalid owner: ${owner}`);
-	}
-	if (!repo || !/^[a-zA-Z0-9._-]+$/.test(repo)) {
-		throw new Error(`Invalid repo: ${repo}`);
-	}
+function messageOf(error: unknown): string {
+	return error instanceof Error ? error.message : "Unknown error";
 }
 
 export default function githubIssuesExtension(pi: ExtensionAPI) {
-	// Tool 1: github_get_authenticated_user
 	pi.registerTool({
 		name: "github_get_authenticated_user",
 		label: "GitHub Get Authenticated User",
-		description: "Get the GitHub username and profile info associated with the current API token",
+		description:
+			"Get the GitHub username the control plane authenticates as for this session. No token is exposed to the worker.",
 		parameters: Type.Object({}),
-		async execute(_toolCallId, _params, _signal, _onUpdate, ctx: ExtensionContext) {
+		async execute() {
 			try {
-				const octokit = await getOctokit(ctx.cwd);
-
-				const response = await octokit.users.getAuthenticated();
-
-				const user = {
-					login: response.data.login,
-					name: response.data.name || null,
-					email: response.data.email || null,
-					avatar_url: response.data.avatar_url,
-					html_url: response.data.html_url,
-				};
-
-				return {
-					content: [{
-						type: "text",
-						text: `Authenticated as ${user.login}${user.name ? ` (${user.name})` : ""}`,
-					}],
-					details: { user, success: true },
-				};
+				const user = (await callGitHubGateway("get_authenticated_user", {})) as { login: string } | null;
+				if (!user) return fail("", "Could not determine the authenticated GitHub user.");
+				return ok(`Authenticated as ${user.login}`, { user, success: true });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error fetching authenticated user: ${message}` }],
-					details: { user: null as unknown as { login: string }, success: false, error: message },
-				};
+				return fail("fetching authenticated user", messageOf(error));
 			}
 		},
 	});
 
-	// Tool 2: github_query_issues
-	pi.registerTool({
-		name: "github_query_issues",
-		label: "GitHub Query Issues",
-		description: "Search/query for GitHub issues with filters (owner, repo, state, labels, assignee, etc.)",
-		parameters: Type.Object({
-			owner: Type.String({ description: "GitHub repository owner (username or organization)" }),
-			repo: Type.String({ description: "GitHub repository name" }),
-			state: Type.Optional(Type.Union([
-				Type.Literal("open"),
-				Type.Literal("closed"),
-				Type.Literal("all"),
-			])),
-			labels: Type.Optional(Type.Array(Type.String())),
-			assignee: Type.Optional(Type.String()),
-			creator: Type.Optional(Type.String()),
-			mentioned: Type.Optional(Type.String()),
-			since: Type.Optional(Type.String()),
-			limit: Type.Optional(Type.Number()),
-		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
-			try {
-				validateOwnerRepo(params.owner, params.repo);
-				const octokit = await getOctokit(ctx.cwd);
-
-				const response = await octokit.issues.listForRepo({
-					owner: params.owner,
-					repo: params.repo,
-					state: params.state || "open",
-					labels: params.labels?.join(","),
-					assignee: params.assignee,
-					creator: params.creator,
-					mentioned: params.mentioned,
-					since: params.since,
-					per_page: params.limit || 10,
-				});
-
-				const issues: GitHubIssue[] = response.data.map((issue) => ({
-					number: issue.number,
-					title: issue.title,
-					body: issue.body || "",
-					labels: issue.labels.map((label) => 
-						typeof label === "string" ? { name: label } : { name: label.name || "" }
-					),
-					state: issue.state as "open" | "closed",
-					created_at: issue.created_at,
-					updated_at: issue.updated_at,
-				}));
-
-				return {
-					content: [{
-						type: "text",
-						text: `Found ${issues.length} issue(s) in ${params.owner}/${params.repo}`,
-					}],
-					details: { issues },
-				};
-			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error querying issues: ${message}` }],
-					details: { issues: [] as GitHubIssue[], error: message },
-				};
-			}
-		},
-	});
-
-	// Tool 3: github_fetch_issue
 	pi.registerTool({
 		name: "github_fetch_issue",
 		label: "GitHub Fetch Issue",
-		description: "Get full details of a single GitHub issue including comments",
+		description:
+			"Read the live session issue: title, body, state, labels, assignees, and (by default) comments. Scoped to the current issue; no owner/repo/issue_number parameters.",
 		parameters: Type.Object({
-			owner: Type.String({ description: "GitHub repository owner (username or organization)" }),
-			repo: Type.String({ description: "GitHub repository name" }),
-			issue_number: Type.Number({ description: "Issue number" }),
-			include_comments: Type.Optional(Type.Boolean()),
+			include_comments: Type.Optional(Type.Boolean({ description: "Include issue comments (default: true)" })),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
+		async execute(_toolCallId, params) {
 			try {
-				validateOwnerRepo(params.owner, params.repo);
-				const octokit = await getOctokit(ctx.cwd);
-
-				// Fetch issue details
-				const issueResponse = await octokit.issues.get({
-					owner: params.owner,
-					repo: params.repo,
-					issue_number: params.issue_number,
+				const result = (await callGitHubGateway("fetch_issue", {
+					include_comments: params.include_comments ?? true,
+				})) as { issue: { number: number; title: string }; comments: unknown };
+				return ok(`Fetched issue #${result.issue.number}: ${result.issue.title}`, {
+					issue: result.issue,
+					comments: result.comments,
+					success: true,
 				});
-
-				const issue: GitHubIssueFull = {
-					number: issueResponse.data.number,
-					title: issueResponse.data.title,
-					body: issueResponse.data.body || "",
-					labels: issueResponse.data.labels.map((label) =>
-						typeof label === "string" ? { name: label } : { name: label.name || "" }
-					),
-					state: issueResponse.data.state as "open" | "closed",
-					created_at: issueResponse.data.created_at,
-					updated_at: issueResponse.data.updated_at,
-					assignees: issueResponse.data.assignees?.map((a) => ({ login: a.login })),
-					html_url: issueResponse.data.html_url,
-				};
-
-				// Fetch comments if requested
-				if (params.include_comments !== false) {
-					const commentsResponse = await octokit.issues.listComments({
-						owner: params.owner,
-						repo: params.repo,
-						issue_number: params.issue_number,
-						per_page: 100,
-					});
-
-					issue.comments = commentsResponse.data.map((comment) => ({
-						id: comment.id,
-						body: comment.body || "",
-						user: { login: comment.user?.login || "unknown" },
-						created_at: comment.created_at,
-						updated_at: comment.updated_at,
-						html_url: comment.html_url,
-					}));
-				}
-
-				return {
-					content: [{
-						type: "text",
-						text: `Fetched issue #${issue.number}: ${issue.title}`,
-					}],
-					details: { issue },
-				};
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error fetching issue: ${message}` }],
-					details: { issue: null as unknown as GitHubIssueFull, error: message },
-				};
+				return fail("fetching issue", messageOf(error));
 			}
 		},
 	});
 
-	// Tool 4: github_set_comment
 	pi.registerTool({
 		name: "github_set_comment",
 		label: "GitHub Set Comment",
-		description: "Add a comment to a GitHub issue",
+		description: "Add a comment to the live session issue. Scoped to the current issue.",
 		parameters: Type.Object({
-			owner: Type.String({ description: "GitHub repository owner (username or organization)" }),
-			repo: Type.String({ description: "GitHub repository name" }),
-			issue_number: Type.Number({ description: "Issue number" }),
 			body: Type.String({ description: "Comment text (Markdown supported)" }),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
+		async execute(_toolCallId, params) {
 			try {
-				validateOwnerRepo(params.owner, params.repo);
-				const octokit = await getOctokit(ctx.cwd);
-
-				const response = await octokit.issues.createComment({
-					owner: params.owner,
-					repo: params.repo,
-					issue_number: params.issue_number,
-					body: params.body,
-				});
-
-				return {
-					content: [{
-						type: "text",
-						text: `Comment added to issue #${params.issue_number}`,
-					}],
-					details: {
-						comment_url: response.data.html_url,
-						comment_id: response.data.id,
-						success: true,
-					},
-				};
+				const result = (await callGitHubGateway("set_comment", { body: params.body })) as { comment_id: number };
+				return ok("Comment added to the session issue", { comment_id: result.comment_id, success: true });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error adding comment: ${message}` }],
-					details: { comment_url: "", comment_id: 0, success: false, error: message },
-				};
+				return fail("adding comment", messageOf(error));
 			}
 		},
 	});
 
-	// Tool 5: github_set_status
 	pi.registerTool({
 		name: "github_set_status",
 		label: "GitHub Set Status",
-		description: "Update GitHub issue state (open/close) and/or assignee",
+		description:
+			"Update the live session issue state (open/closed) and/or assignee. Scoped to the current issue.",
 		parameters: Type.Object({
-			owner: Type.String({ description: "GitHub repository owner (username or organization)" }),
-			repo: Type.String({ description: "GitHub repository name" }),
-			issue_number: Type.Number({ description: "Issue number" }),
-			state: Type.Optional(Type.Union([
-				Type.Literal("open"),
-				Type.Literal("closed"),
-			])),
+			state: Type.Optional(Type.Union([Type.Literal("open"), Type.Literal("closed")])),
 			assignee: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
+		async execute(_toolCallId, params) {
 			try {
-				validateOwnerRepo(params.owner, params.repo);
-				const octokit = await getOctokit(ctx.cwd);
-
-				// Build update payload
-				const updatePayload: Record<string, unknown> = {};
-				if (params.state !== undefined) {
-					updatePayload.state = params.state;
-				}
-				if (params.assignee !== undefined) {
-					// GitHub API: empty array to unassign, array with usernames to assign
-					updatePayload.assignees = params.assignee === null ? [] : [params.assignee];
-				}
-
-				const response = await octokit.issues.update({
-					owner: params.owner,
-					repo: params.repo,
-					issue_number: params.issue_number,
-					...updatePayload,
+				const result = (await callGitHubGateway("set_status", {
+					...(params.state !== undefined ? { state: params.state } : {}),
+					...(params.assignee !== undefined ? { assignee: params.assignee } : {}),
+				})) as { state?: string; assignees?: string[] };
+				return ok("Session issue updated", {
+					state: result.state,
+					assignees: result.assignees ?? [],
+					success: true,
 				});
-
-				return {
-					content: [{
-						type: "text",
-						text: `Issue #${params.issue_number} updated`,
-					}],
-					details: {
-						state: response.data.state,
-						assignees: response.data.assignees?.map((a) => a.login) || [],
-						success: true,
-					},
-				};
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error updating issue: ${message}` }],
-					details: { state: "", assignees: [], success: false, error: message },
-				};
+				return fail("updating issue", messageOf(error));
 			}
 		},
 	});
 
-	// Tool 6: github_set_labels
 	pi.registerTool({
 		name: "github_set_labels",
 		label: "GitHub Set Labels",
-		description: "Add/remove labels on a GitHub issue",
+		description:
+			"Replace, add, or remove labels on the live session issue. Scoped to the current issue.",
 		parameters: Type.Object({
-			owner: Type.String({ description: "GitHub repository owner (username or organization)" }),
-			repo: Type.String({ description: "GitHub repository name" }),
-			issue_number: Type.Number({ description: "Issue number" }),
-			labels: Type.Optional(Type.Array(Type.String())),
-			addLabels: Type.Optional(Type.Array(Type.String())),
-			removeLabels: Type.Optional(Type.Array(Type.String())),
+			labels: Type.Optional(Type.Array(Type.String(), { description: "Replace all labels with this array" })),
+			addLabels: Type.Optional(Type.Array(Type.String(), { description: "Add these labels to existing labels" })),
+			removeLabels: Type.Optional(Type.Array(Type.String(), { description: "Remove these labels from existing labels" })),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
+		async execute(_toolCallId, params) {
 			try {
-				validateOwnerRepo(params.owner, params.repo);
-				const octokit = await getOctokit(ctx.cwd);
-
-				let finalLabels: string[];
-
-				if (params.labels !== undefined) {
-					// Replace all labels
-					finalLabels = params.labels;
-				} else {
-					// Get current labels first
-					const issueResponse = await octokit.issues.get({
-						owner: params.owner,
-						repo: params.repo,
-						issue_number: params.issue_number,
-					});
-
-					const currentLabels = issueResponse.data.labels.map((label) =>
-						typeof label === "string" ? label : label.name || ""
-					);
-
-					finalLabels = [...currentLabels];
-
-					// Add labels
-					if (params.addLabels && params.addLabels.length > 0) {
-						for (const label of params.addLabels) {
-							if (!finalLabels.includes(label)) {
-								finalLabels.push(label);
-							}
-						}
-					}
-
-					// Remove labels
-					if (params.removeLabels && params.removeLabels.length > 0) {
-						finalLabels = finalLabels.filter((label) => !params.removeLabels!.includes(label));
-					}
-				}
-
-				// Update labels
-				const response = await octokit.issues.setLabels({
-					owner: params.owner,
-					repo: params.repo,
-					issue_number: params.issue_number,
-					labels: finalLabels,
-				});
-
-				return {
-					content: [{
-						type: "text",
-						text: `Labels updated on issue #${params.issue_number}`,
-					}],
-					details: {
-						labels: response.data.map((label) => label.name),
-						success: true,
-					},
-				};
+				const result = (await callGitHubGateway("set_labels", {
+					...(params.labels !== undefined ? { labels: params.labels } : {}),
+					...(params.addLabels !== undefined ? { addLabels: params.addLabels } : {}),
+					...(params.removeLabels !== undefined ? { removeLabels: params.removeLabels } : {}),
+				})) as { labels: string[] };
+				return ok("Labels updated on the session issue", { labels: result.labels, success: true });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error updating labels: ${message}` }],
-					details: { labels: [], success: false, error: message },
-				};
+				return fail("updating labels", messageOf(error));
 			}
 		},
 	});
 
-	// Tool 7: github_assigned_open_issues
 	pi.registerTool({
-		name: "github_assigned_open_issues",
-		label: "GitHub Assigned Open Issues",
-		description: "Look up your GitHub username and query all open issues across all repositories that are assigned to you",
-		parameters: Type.Object({}),
-		async execute(_toolCallId, _params, _signal, _onUpdate, ctx: ExtensionContext) {
+		name: "github_update_issue",
+		label: "GitHub Update Issue",
+		description:
+			"Update the live session issue title, body, state, labels, and/or assignees. Scoped to the current issue.",
+		parameters: Type.Object({
+			title: Type.Optional(Type.String()),
+			body: Type.Optional(Type.String()),
+			state: Type.Optional(Type.Union([Type.Literal("open"), Type.Literal("closed")])),
+			labels: Type.Optional(Type.Array(Type.String())),
+			assignees: Type.Optional(Type.Array(Type.String())),
+		}),
+		async execute(_toolCallId, params) {
 			try {
-				const octokit = await getOctokit(ctx.cwd);
-
-				// Get authenticated user
-				const userResponse = await octokit.users.getAuthenticated();
-				const username = userResponse.data.login;
-
-				// Search for all open issues assigned to the user across all repos
-				// Using GitHub search API: is:issue is:open assignee:username
-				const searchResponse = await octokit.search.issuesAndPullRequests({
-					q: `is:issue is:open assignee:${username}`,
-					sort: "updated",
-					order: "desc",
-					per_page: 100,
+				await callGitHubGateway("update_issue", {
+					...(params.title !== undefined ? { title: params.title } : {}),
+					...(params.body !== undefined ? { body: params.body } : {}),
+					...(params.state !== undefined ? { state: params.state } : {}),
+					...(params.labels !== undefined ? { labels: params.labels } : {}),
+					...(params.assignees !== undefined ? { assignees: params.assignees } : {}),
 				});
-
-				const issues: GitHubSearchIssue[] = searchResponse.data.items.map((issue) => ({
-					url: issue.url,
-					repository_url: issue.repository_url,
-					html_url: issue.html_url,
-					number: issue.number,
-					title: issue.title,
-					state: issue.state as "open" | "closed",
-					labels: issue.labels.map((label) => ({ name: label.name || "" })),
-					created_at: issue.created_at,
-					updated_at: issue.updated_at,
-					repository: { full_name: issue.repository_url.replace("https://api.github.com/repos/", "") },
-					assignees: issue.assignees?.map((a) => ({ login: a.login })) || [],
-				}));
-
-				// Group by repository for better readability
-				const byRepo = new Map<string, GitHubSearchIssue[]>();
-				for (const issue of issues) {
-					const repo = issue.repository.full_name;
-					if (!byRepo.has(repo)) {
-						byRepo.set(repo, []);
-					}
-					byRepo.get(repo)!.push(issue);
-				}
-
-				let summary = `Found ${issues.length} open issue(s) assigned to ${username}\n\n`;
-				for (const [repo, repoIssues] of byRepo.entries()) {
-					summary += `**${repo}** (${repoIssues.length} issues):\n`;
-					for (const issue of repoIssues) {
-						const labels = issue.labels.length > 0 ? ` [${issue.labels.map(l => l.name).join(", ")}]` : "";
-						summary += `  - #${issue.number}: ${issue.title}${labels}\n    ${issue.html_url}\n`;
-					}
-					summary += "\n";
-				}
-
-				return {
-					content: [{ type: "text", text: summary.trim() }],
-					details: { username, issues, byRepository: Object.fromEntries(byRepo), success: true },
-				};
+				return ok("Session issue updated", { success: true });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				return {
-					content: [{ type: "text", text: `Error fetching assigned issues: ${message}` }],
-					details: { username: "", issues: [], byRepository: {}, success: false, error: message },
-				};
+				return fail("updating issue", messageOf(error));
+			}
+		},
+	});
+
+	pi.registerTool({
+		name: "github_fetch_pr",
+		label: "GitHub Fetch Pull Request",
+		description:
+			"Read the PR associated with the session (metadata + issue-style comments). If pr_number is omitted, the session's linked PR (or the open PR on the session branch) is used.",
+		parameters: Type.Object({
+			pr_number: Type.Optional(Type.Number({ description: "Optional in-scope PR number; defaults to the session's PR" })),
+			include_comments: Type.Optional(Type.Boolean({ description: "Include issue-style PR comments (default: true)" })),
+		}),
+		async execute(_toolCallId, params) {
+			try {
+				const result = (await callGitHubGateway("fetch_pr", {
+					...(params.pr_number !== undefined ? { pr_number: params.pr_number } : {}),
+					include_comments: params.include_comments ?? true,
+				})) as { pr: { number: number; title: string }; comments: unknown };
+				return ok(`Fetched PR #${result.pr.number}: ${result.pr.title}`, {
+					pr: result.pr,
+					comments: result.comments,
+					success: true,
+				});
+			} catch (error) {
+				return fail("fetching pull request", messageOf(error));
+			}
+		},
+	});
+
+	pi.registerTool({
+		name: "github_set_pr_comment",
+		label: "GitHub Set PR Comment",
+		description: "Add a comment to the PR associated with the session.",
+		parameters: Type.Object({
+			body: Type.String({ description: "Comment text (Markdown supported)" }),
+			pr_number: Type.Optional(Type.Number({ description: "Optional in-scope PR number; defaults to the session's PR" })),
+		}),
+		async execute(_toolCallId, params) {
+			try {
+				const result = (await callGitHubGateway("set_pr_comment", {
+					body: params.body,
+					...(params.pr_number !== undefined ? { pr_number: params.pr_number } : {}),
+				})) as { comment_id: number };
+				return ok("Comment added to the session PR", { comment_id: result.comment_id, success: true });
+			} catch (error) {
+				return fail("adding PR comment", messageOf(error));
+			}
+		},
+	});
+
+	pi.registerTool({
+		name: "github_update_pr",
+		label: "GitHub Update Pull Request",
+		description:
+			"Update the PR associated with the session: title, body, state (open/closed), and/or labels. Does not merge or create PRs.",
+		parameters: Type.Object({
+			title: Type.Optional(Type.String()),
+			body: Type.Optional(Type.String()),
+			state: Type.Optional(Type.Union([Type.Literal("open"), Type.Literal("closed")])),
+			labels: Type.Optional(Type.Array(Type.String())),
+			pr_number: Type.Optional(Type.Number({ description: "Optional in-scope PR number; defaults to the session's PR" })),
+		}),
+		async execute(_toolCallId, params) {
+			try {
+				await callGitHubGateway("update_pr", {
+					...(params.title !== undefined ? { title: params.title } : {}),
+					...(params.body !== undefined ? { body: params.body } : {}),
+					...(params.state !== undefined ? { state: params.state } : {}),
+					...(params.labels !== undefined ? { labels: params.labels } : {}),
+					...(params.pr_number !== undefined ? { pr_number: params.pr_number } : {}),
+				});
+				return ok("Session PR updated", { success: true });
+			} catch (error) {
+				return fail("updating pull request", messageOf(error));
+			}
+		},
+	});
+
+	pi.registerTool({
+		name: "github_list_pr_review_comments",
+		label: "GitHub List PR Review Comments",
+		description: "Read code review comments on the PR associated with the session.",
+		parameters: Type.Object({
+			pr_number: Type.Optional(Type.Number({ description: "Optional in-scope PR number; defaults to the session's PR" })),
+		}),
+		async execute(_toolCallId, params) {
+			try {
+				const result = (await callGitHubGateway("list_pr_review_comments", {
+					...(params.pr_number !== undefined ? { pr_number: params.pr_number } : {}),
+				})) as { comments: unknown };
+				return ok("Fetched review comments for the session PR", { comments: result.comments, success: true });
+			} catch (error) {
+				return fail("fetching PR review comments", messageOf(error));
 			}
 		},
 	});

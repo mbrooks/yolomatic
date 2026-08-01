@@ -1,155 +1,106 @@
-# GitHub Issues Extension for pi-coding-agent
+# GitHub Issues Extension for pi-coding-agent (worker/gateway mode)
 
-This extension provides GitHub issue management tools for Yeetomatic and direct pi-agent workflows.
+This extension provides scoped GitHub issue and pull-request management tools for the Yeetomatic **disposable worker**. The worker never receives `GITHUB_TOKEN`; every tool call is routed over the worker session WebSocket to the control-plane `WorkerGitHubGateway`, which performs the GitHub call on the worker's behalf and enforces session scope.
 
-## Installation
+## How it works
 
-The extension is located at `.pi/extensions/github-issues.ts` in this project. It will be auto-loaded by pi when running in this directory.
+1. The worker runtime (`src/worker/runtime.ts`) opens the per-session WebSocket to the control plane and installs a gateway transport (`src/worker/github-gateway-client.ts`).
+2. The pi extension registers tools that call `callGitHubGateway(tool, params)`.
+3. Each call is sent as a `tool_request` protocol message; the control plane acks receipt, validates the request against the live `SessionState`, performs the GitHub operation through the control plane's `GitHubService` (which holds the token), and replies with a `tool_response` carrying the result.
+4. The worker extension never reads `GITHUB_TOKEN`, never builds an Octokit, and never calls the GitHub API directly.
 
-## Requirements
+See `design/protocol-session-messages.md` for the `tool_request` / `tool_response` protocol and `src/worker/github-gateway.ts` for the scoping rules.
 
-- `GITHUB_TOKEN` environment variable must be set with a valid GitHub personal access token
-- Token needs `repo` scope for private repositories, or `public_repo` for public repositories only
+## Scope enforcement
+
+All operations are scoped to the live session:
+
+- **Issue tools** target the session's own issue (`owner`/`repo`/`issueNumber` from `SessionState`). They do not accept `owner`/`repo`/`issue_number` parameters, so the worker cannot attempt an out-of-scope call.
+- **PR tools** target the PR associated with the session: `state.prNumber` when present, plus any other open PR whose head is the session branch `yeetomatic/issue-{issueNumber}` (resolved via `listPullRequestsForHead`). PR tools accept an optional `pr_number` that must match one of these; any other `pr_number` is rejected as a scope error without performing the target GitHub operation.
+
+Requests targeting a different `owner`, `repo`, or `issue_number` are rejected without any GitHub call. Merging PRs, creating PRs, updating PR branches, editing/deleting comments, and pushing code remain control-plane-owned and are **not** exposed.
 
 ## Tools
 
-### github_query_issues
+### `github_get_authenticated_user`
 
-Search/query for issues with filters.
+Get the GitHub user the control plane authenticates as for this session. No token is exposed to the worker. (The token-probe form is removed; this is a scoped gateway call.)
 
-**Parameters:**
-- `owner` (required): GitHub repository owner (username or organization)
-- `repo` (required): GitHub repository name
-- `state` (optional): Filter by state - "open", "closed", or "all" (default: "open")
-- `labels` (optional): Filter by labels (array, must match all)
-- `assignee` (optional): Filter by assignee username
-- `creator` (optional): Filter by issue creator username
-- `mentioned` (optional): Filter by mentioned username
-- `since` (optional): Filter by date (ISO 8601 format: YYYY-MM-DD)
-- `limit` (optional): Maximum number of issues to return (default: 10)
+### `github_fetch_issue`
 
-**Returns:**
-- Array of issues with: number, title, body, labels, state, created_at, updated_at
+Read the live session issue: `title`, `body`, `state`, `labels`, `assignees`, and (by default) comments.
 
-**Example:**
-```
-github_query_issues owner="mariozechner" repo="pi-coding-agent" state="open" labels=["bug"] limit=5
-```
+- `include_comments` (optional, default `true`): include issue comments (author, body, timestamps, `html_url`).
 
-### github_fetch_issue
+### `github_set_comment`
 
-Get full details of a single issue including comments.
+Add a comment to the live session issue.
 
-**Parameters:**
-- `owner` (required): GitHub repository owner
-- `repo` (required): GitHub repository name
-- `issue_number` (required): Issue number
-- `include_comments` (optional): Include comments (default: true)
+- `body` (required): comment text (Markdown supported).
 
-**Returns:**
-- Issue object with full body, labels, assignees, and optionally comments
+### `github_set_status`
 
-**Example:**
-```
-github_fetch_issue owner="mariozechner" repo="pi-coding-agent" issue_number=42
-```
+Update the live session issue state and/or assignee.
 
-### github_set_comment
+- `state` (optional): `"open"` or `"closed"`.
+- `assignee` (optional): username, or `null` to unassign.
 
-Add a comment to an issue.
+### `github_set_labels`
 
-**Parameters:**
-- `owner` (required): GitHub repository owner
-- `repo` (required): GitHub repository name
-- `issue_number` (required): Issue number
-- `body` (required): Comment text (Markdown supported)
+Replace, add, or remove labels on the live session issue.
 
-**Returns:**
-- Comment URL, comment ID, success confirmation
+- `labels` (optional): replace all labels with this array.
+- `addLabels` (optional): labels to add.
+- `removeLabels` (optional): labels to remove.
 
-**Example:**
-```
-github_set_comment owner="mariozechner" repo="pi-coding-agent" issue_number=42 body="Working on this now..."
-```
+### `github_update_issue`
 
-### github_set_status
+Update the live session issue `title`, `body`, `state`, `labels`, and/or `assignees`. At least one field is required.
 
-Update issue state (open/close) and/or assignee.
+### `github_fetch_pr`
 
-**Parameters:**
-- `owner` (required): GitHub repository owner
-- `repo` (required): GitHub repository name
-- `issue_number` (required): Issue number
-- `state` (optional): Set issue state - "open" or "closed"
-- `assignee` (optional): Set assignee username (null to unassign)
+Read the PR associated with the session (metadata + issue-style comments).
 
-**Returns:**
-- Updated issue state, assignees list
+- `pr_number` (optional): an in-scope PR number; defaults to the session's linked PR (or the open PR on the session branch).
+- `include_comments` (optional, default `true`).
 
-**Example:**
-```
-github_set_status owner="mariozechner" repo="pi-coding-agent" issue_number=42 state="closed" assignee="mbrooks"
-```
+### `github_set_pr_comment`
 
-### github_set_labels
+Add a comment to the associated PR.
 
-Add/remove labels on an issue.
+- `body` (required): comment text (Markdown supported).
+- `pr_number` (optional): an in-scope PR number.
 
-**Parameters:**
-- `owner` (required): GitHub repository owner
-- `repo` (required): GitHub repository name
-- `issue_number` (required): Issue number
-- `labels` (optional): Replace all labels with this array
-- `addLabels` (optional): Add these labels to existing labels
-- `removeLabels` (optional): Remove these labels from existing labels
+### `github_update_pr`
 
-**Returns:**
-- Updated label list
+Update the associated PR `title`, `body`, `state`, and/or `labels`. Does not merge or create PRs. At least one field is required.
 
-**Example:**
-```
-github_set_labels owner="mariozechner" repo="pi-coding-agent" issue_number=42 addLabels=["in-progress"] removeLabels=["needs-triage"]
-```
+- `pr_number` (optional): an in-scope PR number.
 
-## Configuration
+### `github_list_pr_review_comments`
 
-Set the `GITHUB_TOKEN` environment variable:
+Read code review comments on the associated PR.
 
-```bash
-export GITHUB_TOKEN=ghp_your_token_here
-```
+- `pr_number` (optional): an in-scope PR number.
 
-Or add it to your `.env` file:
+## Removed worker tools
 
-```
-GITHUB_TOKEN=ghp_your_token_here
-```
+The following tools are intentionally **not** exposed to the worker because they cannot be scoped to the current issue:
 
-## Creating a GitHub Token
+- `github_query_issues` (cross-repo / arbitrary issue discovery)
+- `github_assigned_open_issues` (cross-repo discovery)
+- The token-probe form of `github_get_authenticated_user` (the worker no longer probes a local token)
 
-1. Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
-2. Click "Generate new token (classic)"
-3. Give it a descriptive name (e.g., "pi-coding-agent")
-4. Select scopes:
-   - `repo` (full control of private repositories) - for private repos
-   - `public_repo` (only public repositories) - for public repos only
-5. Click "Generate token"
-6. Copy the token and store it securely
+`github_get_authenticated_user` remains, but is served by the control-plane gateway rather than acting as a worker-side token probe.
 
-## Usage with Yeetomatic
+## Error handling
 
-Yeetomatic can use these tools to autonomously manage GitHub issues:
+Gateway failures are returned in the `details.error` field. Common cases:
 
-1. Query for open issues: `github_query_issues owner="..." repo="..." state="open"`
-2. Fetch issue details: `github_fetch_issue owner="..." repo="..." issue_number=123`
-3. Add status comments: `github_set_comment owner="..." repo="..." issue_number=123 body="..."`
-4. Update status: `github_set_status owner="..." repo="..." issue_number=123 state="closed"`
-5. Manage labels: `github_set_labels owner="..." repo="..." issue_number=123 addLabels=["completed"]`
+- `GitHub scope error: pr_number N is not associated with session ...` — the request targeted an out-of-scope PR.
+- `GitHub gateway error: ...` — a GitHub API error or validation failure.
+- `GitHub gateway transport is not available; cannot call ... outside a worker session` — the extension was loaded outside a worker session (no transport installed).
 
-## Error Handling
+## Direct (non-worker) usage
 
-All tools return error information in the `details.error` field when something goes wrong. Common errors:
-
-- `GITHUB_TOKEN environment variable is not set` - Token not configured
-- `Invalid owner/repo` - Repository name format issue
-- HTTP errors from GitHub API (404, 403, etc.)
+This extension is designed for the worker/gateway path. It no longer reads `GITHUB_TOKEN` from the environment or a `.env` file, and it does not build an Octokit instance. To use GitHub tools from a non-worker pi process, run them where the control plane is reachable; outside a worker session, `callGitHubGateway` throws because no transport is installed.
