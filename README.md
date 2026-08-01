@@ -1,12 +1,21 @@
-# Yeetomatic
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/yeetomatic-logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/yeetomatic-logo-light.png">
+    <img src="assets/yeetomatic-logo-light.png" alt="Yeetomatic logo" width="280">
+  </picture>
 
-Yeetomatic (Task Automation & Response System) is a self-hosted coding agent that turns GitHub issues into pull requests.
+  <h1>Yeetomatic</h1>
+  <p><strong>Task Automation &amp; Response System</strong></p>
+</div>
 
-Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through implementation, feedback, and PR delivery.
+Yeetomatic is a self-hosted coding agent that turns GitHub issues into pull requests with isolated execution and protected credentials.
+
+Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through design, implementation, feedback, and PR delivery.
 
 ## Features
 
-- **Issue refinement** — authorized maintainers can run `/yeetomatic issue-refinement` to launch a disposable worker that investigates a new issue and replaces its body with a more complete Proposed Task, without starting implementation.
+- **Issue refinement** — project collaborators can run `/yeetomatic issue-refinement` to launch a disposable worker that investigates a new issue and replaces its body with a more complete Proposed Task, without starting implementation.
 - **Issue-to-PR automation** — creates a `yeetomatic/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
 - **GitHub-native collaboration** — responds to issue updates, comments, PR reviews, and inline review comments.
 - **Multi-repository support** — manages each repository, worktree, and issue session independently.
@@ -19,7 +28,7 @@ Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launc
 
 ### Requirements
 
-- Docker Engine or Docker Desktop with Docker Compose
+- Docker Engine or Docker Desktop with Docker Compose (not currently compatible with Kubernetes but PRs welcome!)
 - A GitHub personal access token that can read and modify the repositories Yeetomatic will manage
 
 ### Start Yeetomatic
