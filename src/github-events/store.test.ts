@@ -3,7 +3,7 @@ import { unlinkSync } from "node:fs";
 
 import { GitHubEventStore } from "./store.js";
 
-const TEST_DB = "/tmp/tars-github-event-store-test.sqlite";
+const TEST_DB = "/tmp/yeetomatic-github-event-store-test.sqlite";
 
 describe("GitHubEventStore", () => {
 	beforeEach(() => {

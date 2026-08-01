@@ -88,7 +88,7 @@ if [[ -n "$ADMIN_USER" && -n "$ADMIN_PASS" ]]; then
   while true; do
     RESPONSE=$(curl -sf -u "${ADMIN_USER}:${ADMIN_PASS}" "${API_BASE}/api/status/working" 2>/dev/null || true)
     if [[ -z "$RESPONSE" ]]; then
-      echo "Warning: could not reach TARS status API. Proceeding with deploy."
+      echo "Warning: could not reach Yeetomatic status API. Proceeding with deploy."
       break
     fi
 

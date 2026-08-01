@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This protocol defines how TARS starts a worker container for one issue session and exposes the worker session URL.
+This protocol defines how Yeetomatic starts a worker container for one issue session and exposes the worker session URL.
 
 ## Design Choice
 
@@ -10,23 +10,23 @@ Keep launch input simple:
 
 - repository content is provided through a single bind mount
 - session metadata is not pushed through stdin
-- the worker receives launch configuration from TARS after opening the worker session WebSocket
-- cancellation is process-level: TARS stops the container
+- the worker receives launch configuration from Yeetomatic after opening the worker session WebSocket
+- cancellation is process-level: Yeetomatic stops the container
 
-This keeps the authoritative control surface in one place: the session server hosted by TARS.
+This keeps the authoritative control surface in one place: the session server hosted by Yeetomatic.
 
 ## Worker Image
 
 The worker image is a clean Debian-based image built for agent execution. It should contain:
 
 - Node.js
-- the agent runtime and TARS worker entrypoint
+- the agent runtime and Yeetomatic worker entrypoint
 - git
 - common shell tools
 
-The worker runs as the non-root `tars` user with `HOME=/home/tars` and `PI_CODING_AGENT_DIR=/home/tars/.pi/agent`. System package installation with `apt-get` is therefore not available during an ordinary worker session. Node packages and other user-writable tooling may still be installed when the workspace permits it.
+The worker runs as the non-root `yeetomatic` user with `HOME=/home/yeetomatic` and `PI_CODING_AGENT_DIR=/home/yeetomatic/.pi/agent`. System package installation with `apt-get` is therefore not available during an ordinary worker session. Node packages and other user-writable tooling may still be installed when the workspace permits it.
 
-Before the first worker launch in each control-plane process, TARS builds the `worker` Dockerfile target and tags it with the current WebSocket transport label. Docker reuses unchanged build layers, and subsequent launches in the same process reuse that completed image-build promise.
+Before the first worker launch in each control-plane process, Yeetomatic builds the `worker` Dockerfile target and tags it with the current WebSocket transport label. Docker reuses unchanged build layers, and subsequent launches in the same process reuse that completed image-build promise.
 
 ## Docker Run Shape
 
@@ -34,16 +34,16 @@ Illustrative command:
 
 ```bash
 docker run --rm \
-  --name tars-session-mbrooks-tars-395 \
-  --network container:tars \
-  --mount type=volume,src=tars_workspaces,dst=/app/workspaces \
-  -e TARS_SESSION_KEY=mbrooks/tars#395 \
-  -e TARS_SESSION_WS_URL=ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
-  -e TARS_SOUL_PATH=/app/SOUL.md \
+  --name yeetomatic-session-mbrooks-tars-395 \
+  --network container:yeetomatic \
+  --mount type=volume,src=yeetomatic_workspaces,dst=/app/workspaces \
+  -e YEETOMATIC_SESSION_KEY=mbrooks/tars#395 \
+  -e YEETOMATIC_SESSION_WS_URL=ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token> \
+  -e YEETOMATIC_SOUL_PATH=/app/SOUL.md \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
   -e OLLAMA_HOST=http://127.0.0.1:11434 \
-  tars-worker:latest
+  yeetomatic-worker:latest
 ```
 
 Notes:
@@ -63,32 +63,32 @@ The session URL exists only for the lifetime of one active worker run.
 
 Example:
 
-- `ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
 
 For non-compose deployments, the base URL may instead point at `host.docker.internal` or another worker-reachable control-plane address. The key requirement is that the value matches the worker container's network perspective.
 
-TARS should create and remove the underlying pending reservation as part of session lifecycle management.
+Yeetomatic should create and remove the underlying pending reservation as part of session lifecycle management.
 
 ## Launch Validation
 
-Before launching, TARS validates:
+Before launching, Yeetomatic validates:
 
 - the primary worktree exists
 - the primary worktree path is under the mounted workspace root
 - the worker control base URL can be converted to the session WebSocket URL
 - the container image exists or can be built
 
-If validation fails, TARS should not start the worker and should handle the failure through existing session reporting.
+If validation fails, Yeetomatic should not start the worker and should handle the failure through existing session reporting.
 
 ## Launch Handshake
 
 The launch handshake is:
 
-1. TARS allocates a dedicated per-session token and WebSocket reservation.
-2. TARS launches the worker container with session URL and session key env vars.
+1. Yeetomatic allocates a dedicated per-session token and WebSocket reservation.
+2. Yeetomatic launches the worker container with session URL and session key env vars.
 4. The worker connects and sends `hello`.
-5. TARS validates that the session key matches the reserved session.
-6. TARS replies with `launch_config`.
+5. Yeetomatic validates that the session key matches the reserved session.
+6. Yeetomatic replies with `launch_config`.
 7. The worker acknowledges and begins execution.
 
 ## Launch Payload
@@ -118,7 +118,7 @@ The session protocol should not carry model selection. Model choice belongs to w
 
 ## Cancellation
 
-TARS may cancel a session in two ways:
+Yeetomatic may cancel a session in two ways:
 
 1. graceful:
    - send `control` with `action: "stop"`

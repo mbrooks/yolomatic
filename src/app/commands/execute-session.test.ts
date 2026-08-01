@@ -39,7 +39,7 @@ function makeDeps(overrides?: {
 	} as unknown as SessionRepository;
 
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "tars/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
 		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
@@ -51,8 +51,8 @@ function makeDeps(overrides?: {
 	};
 
 	const executor: ExecutionService = overrides?.executor ?? {
-		execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." })),
-		executePRReview: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." })),
+		execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." })),
+		executePRReview: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." })),
 	};
 
 	const github: GitHubService = {
@@ -124,7 +124,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -140,9 +140,9 @@ describe("ExecuteSession", () => {
 		const deps = makeDeps({
 			commitAndPush: vi.fn(async () => {
 				throw new Error(
-					"Command failed: git push origin tars/issue-1\n" +
+					"Command failed: git push origin yeetomatic/issue-1\n" +
 					"To https://github.com/mbrooks/tars.git\n" +
-					" ! [remote rejected] tars/issue-1 -> tars/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
+					" ! [remote rejected] yeetomatic/issue-1 -> yeetomatic/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				);
 			}),
 		});
@@ -155,24 +155,24 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.github.fileSelfReport).toHaveBeenCalledWith(
-			expect.stringContaining("TARS self-report"),
+			expect.stringContaining("Yeetomatic self-report"),
 			expect.stringContaining("github_pat_scope_missing"),
-			expect.arrayContaining(["tars-self-report", "bug"]),
+			expect.arrayContaining(["yeetomatic-self-report", "bug"]),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS delivery failed"),
+			expect.stringContaining("Yeetomatic delivery failed"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working", "tars-delivery-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
 	});
 
 	it("falls back to git_worktree_failure for other push errors", async () => {
@@ -190,20 +190,20 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.github.fileSelfReport).toHaveBeenCalledWith(
-			expect.stringContaining("TARS self-report"),
+			expect.stringContaining("Yeetomatic self-report"),
 			expect.stringContaining("git_worktree_failure"),
-			expect.arrayContaining(["tars-self-report", "bug"]),
+			expect.arrayContaining(["yeetomatic-self-report", "bug"]),
 		);
 	});
 
-	it("posts diagnostic comment and keeps tars-working when commitAndPush returns false", async () => {
+	it("posts diagnostic comment and keeps yeetomatic-working when commitAndPush returns false", async () => {
 		const deps = makeDeps({
 			commitAndPush: vi.fn(async () => false),
 		});
@@ -216,7 +216,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -244,7 +244,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -256,13 +256,13 @@ describe("ExecuteSession", () => {
 			1,
 			expect.stringContaining("PR created: https://github.com/mbrooks/tars/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("posts 'PR already exists' comment when PR already exists", async () => {
 		const deps = makeDeps({
 			createPullRequest: vi.fn(async () => {
-				throw new Error("A pull request already exists for tars/issue-1");
+				throw new Error("A pull request already exists for yeetomatic/issue-1");
 			}),
 		});
 		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -277,7 +277,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -289,16 +289,16 @@ describe("ExecuteSession", () => {
 			1,
 			expect.stringContaining("PR already exists: https://github.com/mbrooks/tars/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("includes PAT scope hint in delivery failure comment", async () => {
 		const deps = makeDeps({
 			commitAndPush: vi.fn(async () => {
 				throw new Error(
-					"Command failed: git push origin tars/issue-1\n" +
+					"Command failed: git push origin yeetomatic/issue-1\n" +
 					"To https://github.com/mbrooks/tars.git\n" +
-					" ! [remote rejected] tars/issue-1 -> tars/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
+					" ! [remote rejected] yeetomatic/issue-1 -> yeetomatic/issue-1 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				);
 			}),
 		});
@@ -311,7 +311,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -340,19 +340,19 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.any(Object));
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS stopped before execution"),
+			expect.stringContaining("Yeetomatic stopped before execution"),
 		);
 		expect(deps.executor.execute).not.toHaveBeenCalled();
 	});
@@ -360,7 +360,7 @@ describe("ExecuteSession", () => {
 	it("handles waiting-feedback status", async () => {
 		const deps = makeDeps({
 			executor: {
-				execute: vi.fn(async () => ({ status: "waiting-feedback" as const, summary: "Need more info.", rawResponse: "TARS_STATUS: waiting-feedback\nNeed more info." })),
+				execute: vi.fn(async () => ({ status: "waiting-feedback" as const, summary: "Need more info.", rawResponse: "YEETOMATIC_STATUS: waiting-feedback\nNeed more info." })),
 				executePRReview: vi.fn(),
 			},
 		});
@@ -373,14 +373,14 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "waiting-feedback");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-feedback-required"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-feedback-required"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -392,7 +392,7 @@ describe("ExecuteSession", () => {
 	it("handles cancelled status", async () => {
 		const deps = makeDeps({
 			executor: {
-				execute: vi.fn(async () => ({ status: "cancelled" as const, summary: "Stopped.", rawResponse: "TARS_STATUS: cancelled\nStopped." })),
+				execute: vi.fn(async () => ({ status: "cancelled" as const, summary: "Stopped.", rawResponse: "YEETOMATIC_STATUS: cancelled\nStopped." })),
 				executePRReview: vi.fn(),
 			},
 		});
@@ -405,20 +405,20 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "cancelled");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-cancelled"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-cancelled"]);
 	});
 
 	it("handles working status continuation", async () => {
 		const deps = makeDeps({
 			executor: {
-				execute: vi.fn(async () => ({ status: "working" as const, summary: "Still going.", rawResponse: "TARS_STATUS: working\nStill going." })),
+				execute: vi.fn(async () => ({ status: "working" as const, summary: "Still going.", rawResponse: "YEETOMATIC_STATUS: working\nStill going." })),
 				executePRReview: vi.fn(),
 			},
 		});
@@ -431,14 +431,14 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "working");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working"]);
 	});
 
 	it("handles failed status from executor for rate-limit errors", async () => {
@@ -457,14 +457,14 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -494,19 +494,19 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
 		expect(deps.github.postComment).not.toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS is still working on this issue."),
+			expect.stringContaining("Yeetomatic is still working on this issue."),
 		);
 	});
 
@@ -523,7 +523,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -544,7 +544,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -570,7 +570,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -584,7 +584,7 @@ describe("ExecuteSession", () => {
 			toolHistory: [],
 			fatalError: { category: "permission_denied", message: "EACCES", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "",
@@ -612,7 +612,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -620,7 +620,7 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.fileSelfReport).toHaveBeenCalled();
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
 	});
 
 	it("posts failure comment on fatal system error when self-report is disabled", async () => {
@@ -628,7 +628,7 @@ describe("ExecuteSession", () => {
 			toolHistory: [],
 			fatalError: { category: "permission_denied", message: "EACCES", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "",
@@ -656,7 +656,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: false,
 		});
 
@@ -664,7 +664,7 @@ describe("ExecuteSession", () => {
 
 		expect(deps.github.fileSelfReport).not.toHaveBeenCalled();
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
 	});
 
 	it("rethrows non-fatal execution errors", async () => {
@@ -685,7 +685,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -695,8 +695,8 @@ describe("ExecuteSession", () => {
 	});
 
 	it("triggers self-evolution on non-fatal error when enabled", async () => {
-		const prev = process.env.TARS_SELF_EVOLUTION_ENABLED;
-		process.env.TARS_SELF_EVOLUTION_ENABLED = "true";
+		const prev = process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED;
+		process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED = "true";
 		const deps = makeDeps({
 			executor: {
 				execute: vi.fn(async () => {
@@ -714,14 +714,14 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await expect(execute.run(state)).rejects.toThrow("executor blew up");
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
 		expect(deps.tasks.unregister).toHaveBeenCalled();
-		process.env.TARS_SELF_EVOLUTION_ENABLED = prev;
+		process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED = prev;
 	});
 
 	it("returns cancelled when abort signal fires during execution", async () => {
@@ -747,14 +747,14 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
 		await execute.run(state);
 
 		expect(deps.sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 1);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-cancelled"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-cancelled"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -771,7 +771,7 @@ describe("ExecuteSession", () => {
 			prNumber: 42,
 		});
 		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
-			head: { ref: "tars/issue-2" },
+			head: { ref: "yeetomatic/issue-2" },
 		});
 
 		const execute = new ExecuteSession({
@@ -782,7 +782,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -808,7 +808,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -831,7 +831,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -839,21 +839,21 @@ describe("ExecuteSession", () => {
 
 		expect(deps.executor.execute).not.toHaveBeenCalled();
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("credential cleanup failed") }));
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-failed"]);
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, expect.stringContaining("TARS stopped before execution"));
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-failed"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 1, expect.stringContaining("Yeetomatic stopped before execution"));
 	});
 
 	it("calls updatePullRequestBranch and retries when syncWorktree diverges for a PR session", async () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
 		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
-			head: { ref: "tars/issue-1" },
+			head: { ref: "yeetomatic/issue-1" },
 		});
 		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
 		let syncCalls = 0;
 		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
 			syncCalls += 1;
-			if (syncCalls === 1) throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+			if (syncCalls === 1) throw new WorktreeBranchDivergedError("yeetomatic/issue-1", "origin/yeetomatic/issue-1");
 		}) as never;
 
 		const execute = new ExecuteSession({
@@ -864,7 +864,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -879,7 +879,7 @@ describe("ExecuteSession", () => {
 		const deps = makeDeps();
 		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
 		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
-			throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+			throw new WorktreeBranchDivergedError("yeetomatic/issue-1", "origin/yeetomatic/issue-1");
 		}) as never;
 
 		const execute = new ExecuteSession({
@@ -890,7 +890,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -905,11 +905,11 @@ describe("ExecuteSession", () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
 		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
-			head: { ref: "tars/issue-1" },
+			head: { ref: "yeetomatic/issue-1" },
 		});
 		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
 		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
-			throw new WorktreeBranchDivergedError("tars/issue-1", "origin/tars/issue-1");
+			throw new WorktreeBranchDivergedError("yeetomatic/issue-1", "origin/yeetomatic/issue-1");
 		}) as never;
 		(deps.github.updatePullRequestBranch as ReturnType<typeof vi.fn>) = vi.fn(async () => {
 			throw new Error("merge conflict");
@@ -923,7 +923,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -944,7 +944,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -982,7 +982,7 @@ describe("ExecuteSession", () => {
 						onActivity();
 						onActivity();
 					}
-					return { status: "complete" as const, summary: "Done.", rawResponse: "TARS_STATUS: complete\nDone." };
+					return { status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." };
 				}),
 				executePRReview: vi.fn(),
 			},
@@ -996,7 +996,7 @@ describe("ExecuteSession", () => {
 			tasks: deps.tasks,
 			clock: deps.clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 

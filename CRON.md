@@ -1,6 +1,6 @@
 # Auto-Update via Cron
 
-TARS can auto-update itself from `origin/main` using the included script `scripts/update-tars-if-needed.sh`.
+Yeetomatic can auto-update itself from `origin/main` using the included script `scripts/update-yeetomatic-if-needed.sh`.
 
 ## What it does
 
@@ -14,7 +14,7 @@ TARS can auto-update itself from `origin/main` using the included script `script
 
 1. Make sure the script is executable:
    ```bash
-   chmod +x scripts/update-tars-if-needed.sh
+   chmod +x scripts/update-yeetomatic-if-needed.sh
    ```
 
 2. Open your crontab:
@@ -24,25 +24,25 @@ TARS can auto-update itself from `origin/main` using the included script `script
 
 3. Add an entry to run every 15 minutes (adjust path to your clone):
    ```cron
-   */15 * * * * cd /opt/tars && ./scripts/update-tars-if-needed.sh >> /var/log/tars-update.log 2>&1
+   */15 * * * * cd /opt/yeetomatic && ./scripts/update-yeetomatic-if-needed.sh >> /var/log/yeetomatic-update.log 2>&1
    ```
 
    Or with `SHELL` and `PATH` set for Docker and Node:
    ```cron
    SHELL=/bin/bash
    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-   */15 * * * * cd /opt/tars && ./scripts/update-tars-if-needed.sh >> /var/log/tars-update.log 2>&1
+   */15 * * * * cd /opt/yeetomatic && ./scripts/update-yeetomatic-if-needed.sh >> /var/log/yeetomatic-update.log 2>&1
    ```
 
 ## Post-restart checks
 
-- TARS exposes port `6767`. After the script runs `docker compose up -d --build`, verify the container is healthy:
+- Yeetomatic exposes port `6767`. After the script runs `docker compose up -d --build`, verify the container is healthy:
   ```bash
-  docker ps --filter name=tars
+  docker ps --filter name=yeetomatic
   curl -f http://localhost:6767/webhook -X POST -H "X-GitHub-Event: ping" -d '{"zen":"Ping!"}'
   ```
 
 ## Notes
 
-- **Data survives restarts.** Volumes `tars_sessions`, `tars_workspaces`, and `tars_pi` are mounted externally, so active sessions and workspace checkouts persist across container restarts.
-- **In-flight webhooks may be interrupted.** GitHub retries most webhook deliveries automatically, but any currently running TARS session inside the container will be cut short during the restart.
+- **Data survives restarts.** Volumes `yeetomatic_sessions`, `yeetomatic_workspaces`, and `yeetomatic_pi` are mounted externally, so active sessions and workspace checkouts persist across container restarts.
+- **In-flight webhooks may be interrupted.** GitHub retries most webhook deliveries automatically, but any currently running Yeetomatic session inside the container will be cut short during the restart.

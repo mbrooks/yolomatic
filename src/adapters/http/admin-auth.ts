@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { sendJson, sendText } from "./response-helpers.js";
 
-const SESSION_COOKIE_NAME = "tars_admin_session";
+const SESSION_COOKIE_NAME = "yeetomatic_admin_session";
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 function isSecureRequest(request: IncomingMessage): boolean {
@@ -133,7 +133,7 @@ function checkAdminAuth(
 
 	if (!request.headers.authorization) {
 		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="TARS Admin"');
+		response.setHeader("WWW-Authenticate", 'Basic realm="Yeetomatic Admin"');
 		response.setHeader("content-type", "text/plain; charset=utf-8");
 		response.end("Unauthorized");
 		return false;
@@ -141,7 +141,7 @@ function checkAdminAuth(
 
 	if (!hasValidBasicAuth(request, username, password)) {
 		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="TARS Admin"');
+		response.setHeader("WWW-Authenticate", 'Basic realm="Yeetomatic Admin"');
 		response.setHeader("content-type", "text/plain; charset=utf-8");
 		response.end("Invalid credentials");
 		return false;

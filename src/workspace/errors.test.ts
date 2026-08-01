@@ -18,10 +18,10 @@ describe("EmptyRepositoryError", () => {
 
 describe("WorktreeBranchDivergedError", () => {
 	it("has the correct name, branch, and remoteRef", () => {
-		const error = new WorktreeBranchDivergedError("tars/issue-472", "origin/tars/issue-472");
+		const error = new WorktreeBranchDivergedError("yeetomatic/issue-472", "origin/yeetomatic/issue-472");
 		expect(error.name).toBe("WorktreeBranchDivergedError");
-		expect(error.branch).toBe("tars/issue-472");
-		expect(error.remoteRef).toBe("origin/tars/issue-472");
+		expect(error.branch).toBe("yeetomatic/issue-472");
+		expect(error.remoteRef).toBe("origin/yeetomatic/issue-472");
 		expect(error.message).toContain("diverged");
 		expect(error.message).toContain("update-branch");
 	});

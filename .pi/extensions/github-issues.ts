@@ -1,7 +1,7 @@
 /**
  * GitHub Issues Extension for pi-coding-agent
  *
- * Provides GitHub issue management tools for TARS and direct pi-agent workflows.
+ * Provides GitHub issue management tools for Yeetomatic and direct pi-agent workflows.
  * 
  * Tools:
  * - github_get_authenticated_user: Get the GitHub username associated with the API token

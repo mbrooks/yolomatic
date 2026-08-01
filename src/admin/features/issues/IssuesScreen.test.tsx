@@ -92,10 +92,10 @@ describe("IssuesScreen", () => {
 			expect(screen.getByText("Bug")).toBeDefined();
 		});
 		fireEvent.click(screen.getByText("Bug"));
-		expect(screen.getByText("Assign to TARS")).toBeDefined();
+		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
 
 		mockIssuesRef.current = [
-			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["tars"], html_url: "https://github.com/o/r/issues/1" },
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["yeetomatic"], html_url: "https://github.com/o/r/issues/1" },
 		];
 		rerender(
 			<IssuesScreen
@@ -106,8 +106,8 @@ describe("IssuesScreen", () => {
 			/>,
 		);
 		await waitFor(() => {
-			expect(screen.queryByText("Assign to TARS")).toBeNull();
+			expect(screen.queryByText("Assign to Yeetomatic")).toBeNull();
 		});
-		expect(screen.getByText("tars")).toBeDefined();
+		expect(screen.getByText("yeetomatic")).toBeDefined();
 	});
 });

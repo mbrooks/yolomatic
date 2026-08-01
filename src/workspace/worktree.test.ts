@@ -45,7 +45,7 @@ function makeBareRepos(bareRepoPath: string, overrides: Partial<{
 
 describe("WorktreeManager", () => {
 	it("force-removes an evicted worktree when normal removal fails", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-force-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-force-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const existingWorktreePath = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const newWorktreePath = path.join(bareRepoPath, ".worktrees", "issue-2");
@@ -93,7 +93,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("skips removal when the requested worktree is not registered", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-missing-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-missing-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "worktree" && args[1] === "list") {
@@ -116,7 +116,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("removes a clean worktree without stashing", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-clean-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-clean-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
@@ -154,7 +154,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("stashes changes before removing a dirty worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-dirty-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-dirty-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
@@ -177,7 +177,7 @@ describe("WorktreeManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["stash", "push", "-m", "TARS auto-stash before cleanup of issue-42", "-u"],
+			["stash", "push", "-m", "Yeetomatic auto-stash before cleanup of issue-42", "-u"],
 			{ cwd: worktreePath },
 		);
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", worktreePath], { cwd: bareRepoPath });
@@ -186,7 +186,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("force-removes a worktree when normal removal fails during cleanup", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-cleanup-force-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-cleanup-force-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
@@ -218,7 +218,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("quarantines a worktree when force removal fails with permission denied", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-quarantine-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-quarantine-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		await mkdir(worktreePath, { recursive: true });
@@ -256,7 +256,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("returns the existing worktree without creating a new one", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-exists-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-exists-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		await mkdir(worktreePath, { recursive: true });
@@ -281,7 +281,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("reuses an existing branch when creating a worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-reuse-branch-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-reuse-branch-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
@@ -299,16 +299,16 @@ describe("WorktreeManager", () => {
 
 		await worktrees.createOrGetWorktree("mbrooks", "tars", 42);
 
-		expect(runCommand).toHaveBeenCalledWith("git", ["branch", "-f", "tars/issue-42", "origin/HEAD"], {
+		expect(runCommand).toHaveBeenCalledWith("git", ["branch", "-f", "yeetomatic/issue-42", "origin/HEAD"], {
 			cwd: bareRepoPath,
 		});
-		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "add", "--force", worktreePath, "tars/issue-42"], {
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "add", "--force", worktreePath, "yeetomatic/issue-42"], {
 			cwd: bareRepoPath,
 		});
 	});
 
 	it("wraps worktree add failures with recovery guidance", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-add-error-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-add-error-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
@@ -328,7 +328,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("evicts the least-recently-used worktree under lru eviction", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-lru-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-lru-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const olderPath = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const newerPath = path.join(bareRepoPath, ".worktrees", "issue-2");
@@ -340,8 +340,8 @@ describe("WorktreeManager", () => {
 			if (args[0] === "worktree" && args[1] === "list") {
 				return {
 					stdout:
-						`worktree ${olderPath}\nbranch refs/heads/tars/issue-1\n` +
-						`worktree ${newerPath}\nbranch refs/heads/tars/issue-2\n`,
+						`worktree ${olderPath}\nbranch refs/heads/yeetomatic/issue-1\n` +
+						`worktree ${newerPath}\nbranch refs/heads/yeetomatic/issue-2\n`,
 					stderr: "",
 				};
 			}
@@ -369,7 +369,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("quarantines a permission-blocked eviction candidate and still creates the new worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-skip-blocked-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-skip-blocked-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const blockedPath = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const removablePath = path.join(bareRepoPath, ".worktrees", "issue-2");
@@ -381,8 +381,8 @@ describe("WorktreeManager", () => {
 			if (args[0] === "worktree" && args[1] === "list") {
 				return {
 					stdout:
-						`worktree ${blockedPath}\nbranch refs/heads/tars/issue-1\n` +
-						`worktree ${removablePath}\nbranch refs/heads/tars/issue-2\n`,
+						`worktree ${blockedPath}\nbranch refs/heads/yeetomatic/issue-1\n` +
+						`worktree ${removablePath}\nbranch refs/heads/yeetomatic/issue-2\n`,
 					stderr: "",
 				};
 			}
@@ -414,7 +414,7 @@ describe("WorktreeManager", () => {
 	});
 
 	it("uses default eviction strategy when config omits it", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "tars-worktree-defaults-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-defaults-"));
 		const bareRepoPath = path.join(root, "mbrooks-tars");
 		const existingPath = path.join(bareRepoPath, ".worktrees", "issue-1");
 		await mkdir(existingPath, { recursive: true });
@@ -444,7 +444,7 @@ describe("WorktreeManager", () => {
 
 	describe("syncWorktree", () => {
 		it("throws when the worktree has not been created yet", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-missing-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-missing-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
@@ -465,7 +465,7 @@ describe("WorktreeManager", () => {
 		});
 
 		it("fast-forwards the worktree branch to origin and sanitizes the remote URL", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-ff-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-ff-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });
@@ -474,7 +474,7 @@ describe("WorktreeManager", () => {
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 				calls.push({ cmd: _command, args });
 				if (args[0] === "worktree" && args[1] === "list") {
-					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/tars/issue-42\n`, stderr: "" };
+					return { stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-42\n`, stderr: "" };
 				}
 				if (args[0] === "status" && args[1] === "--porcelain") {
 					return { stdout: "", stderr: "" };
@@ -497,8 +497,8 @@ describe("WorktreeManager", () => {
 			await worktrees.syncWorktree("mbrooks", "tars", 42);
 
 			expect(bareRepos.fetchOrigin).toHaveBeenCalledWith(bareRepoPath);
-			expect(bareRepos.remoteBranchExists).toHaveBeenCalledWith(bareRepoPath, "tars/issue-42");
-			expect(runCommand).toHaveBeenCalledWith("git", ["merge", "--ff-only", "origin/tars/issue-42"], { cwd: worktreePath });
+			expect(bareRepos.remoteBranchExists).toHaveBeenCalledWith(bareRepoPath, "yeetomatic/issue-42");
+			expect(runCommand).toHaveBeenCalledWith("git", ["merge", "--ff-only", "origin/yeetomatic/issue-42"], { cwd: worktreePath });
 			expect(runCommand).toHaveBeenCalledWith(
 				"git",
 				["remote", "set-url", "origin", "https://github.com/mbrooks/tars.git"],
@@ -507,7 +507,7 @@ describe("WorktreeManager", () => {
 		});
 
 		it("leaves a not-yet-pushed branch in place without merging", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-nopush-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-nopush-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });
@@ -545,7 +545,7 @@ describe("WorktreeManager", () => {
 		});
 
 		it("raises WorktreeBranchDivergedError when ff-only merge fails", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-diverged-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-diverged-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });
@@ -579,7 +579,7 @@ describe("WorktreeManager", () => {
 		});
 
 		it("stashes and restores a dirty worktree across sync", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-stash-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-stash-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });
@@ -619,14 +619,14 @@ describe("WorktreeManager", () => {
 
 			expect(runCommand).toHaveBeenCalledWith(
 				"git",
-				["stash", "push", "-m", "TARS auto-stash before sync of issue-42", "-u"],
+				["stash", "push", "-m", "Yeetomatic auto-stash before sync of issue-42", "-u"],
 				{ cwd: worktreePath },
 			);
 			expect(runCommand).toHaveBeenCalledWith("git", ["stash", "pop"], { cwd: worktreePath });
 		});
 
 		it("fails when stash pop conflicts", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-stash-conflict-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-stash-conflict-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });
@@ -663,7 +663,7 @@ describe("WorktreeManager", () => {
 		});
 
 		it("fails when sanitizing the remote URL fails", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "tars-sync-sanitize-fail-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sync-sanitize-fail-"));
 			const bareRepoPath = path.join(root, "mbrooks-tars");
 			const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 			await mkdir(worktreePath, { recursive: true });

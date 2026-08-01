@@ -1,6 +1,6 @@
 # SQLite Schema
 
-TARS persists runtime state in SQLite databases opened with `node:sqlite`
+Yeetomatic persists runtime state in SQLite databases opened with `node:sqlite`
 (`DatabaseSync`). Each long-lived store opens its own database file and runs
 the shared migration set in `src/migrations/index.ts` on construction. All
 migrations are idempotent (`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF
@@ -57,7 +57,7 @@ Upsert pattern: `INSERT ... ON CONFLICT(key) DO UPDATE SET value=excluded.value,
 
 ### `skills`
 
-Backs `SkillsStore`. Stores user-authored TARS skills (`name`, `description`,
+Backs `SkillsStore`. Stores user-authored Yeetomatic skills (`name`, `description`,
 `content`) with an enable flag.
 
 | Column       | Type    | Constraints                          | Notes                                                          |
@@ -103,7 +103,7 @@ Idempotency log for delivered GitHub webhook events. `markSeen` uses
 | `repo`       | TEXT | `NOT NULL`         | Repository name.                                                  |
 | `event_type` | TEXT | `NOT NULL`         | GitHub event type (e.g. `issues`, `issue_comment`, `pull_request`). |
 | `occurred_at`| TEXT | `NOT NULL`         | When the event occurred on GitHub (ISO timestamp).               |
-| `seen_at`    | TEXT | `NOT NULL`         | When TARS first recorded it (ISO timestamp).                     |
+| `seen_at`    | TEXT | `NOT NULL`         | When Yeetomatic first recorded it (ISO timestamp).                     |
 
 Indexes:
 
@@ -213,7 +213,7 @@ The JSON document stored in `sessions.state_json`. Defined in
 | `resumeOnBoot`        | boolean (optional)                   | Whether to resume the session on next control-plane boot.          |
 | `queuedComments`      | string[] (optional)                   | Comments queued for the next iteration.                           |
 | `sessionTag`          | string (optional)                     | Overrides the default `${repo}-issue-${issueNumber}` log tag.       |
-| `branch`              | string (optional)                     | Branch associated with the session (defaults to `tars/issue-${issueNumber}`). |
+| `branch`              | string (optional)                     | Branch associated with the session (defaults to `yeetomatic/issue-${issueNumber}`). |
 | `taskStartedAt`       | string (optional)                     | ISO timestamp of the current/latest task execution start.          |
 | `taskFinishedAt`      | string (optional)                     | ISO timestamp of the current/latest task execution finish.         |
 | `totalExecutionTimeMs`| number (optional)                     | Cumulative task execution time across iterations.                  |

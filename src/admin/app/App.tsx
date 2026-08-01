@@ -155,7 +155,7 @@ function AppHeader({
 }): React.ReactElement {
 	return (
 		<header>
-			<h1>TARS Admin</h1>
+			<h1>Yeetomatic Admin</h1>
 			<div className="header-actions">
 				<button
 					className={`global-tab${isSettingsActive ? " active" : ""}`}

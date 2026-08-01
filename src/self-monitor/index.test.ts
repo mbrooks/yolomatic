@@ -8,7 +8,7 @@ import { FatalSystemError, SelfMonitor } from "./index.js";
 
 describe("SelfMonitor", () => {
 	it("records tool history and detects fatal errors", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		const monitor = new SelfMonitor(dir);
 
 		monitor.recordToolEnd("read", { content: "hello" }, false);
@@ -18,7 +18,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("does not flag benign results", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		const monitor = new SelfMonitor(dir);
 
 		monitor.recordToolEnd("bash", { output: "hello", exitCode: 0 }, false);
@@ -27,7 +27,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("gathers system evidence on fatal error", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		await writeFile(path.join(dir, "file.txt"), "test");
 
 		const monitor = new SelfMonitor(dir);
@@ -43,7 +43,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("truncates long results in history", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		const monitor = new SelfMonitor(dir);
 
 		const longOutput = "x".repeat(3000);
@@ -55,7 +55,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("throws when creating fatal error without one", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		const monitor = new SelfMonitor(dir);
 		await expect(monitor.createFatalSystemError()).rejects.toThrow("No fatal error recorded");
 	});
@@ -65,7 +65,7 @@ describe("SelfMonitor", () => {
 			toolHistory: [{ toolName: "bash", args: undefined, result: "err", isError: true, timestamp: "2024-01-01T00:00:00Z" }],
 			fatalError: { category: "permission_denied", message: "EACCES", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
@@ -78,7 +78,7 @@ describe("SelfMonitor", () => {
 		});
 
 		expect(body).toContain("permission_denied");
-		expect(body).toContain("tars");
+		expect(body).toContain("yeetomatic");
 		expect(body).toContain("/tmp/ws");
 		expect(body).toContain("Suggested remediation");
 	});
@@ -88,7 +88,7 @@ describe("SelfMonitor", () => {
 			toolHistory: [{ toolName: "bash", args: undefined, result: "err", isError: true, timestamp: "2024-01-01T00:00:00Z" }],
 			fatalError: { category: "github_pat_scope_missing", message: "PAT scope missing", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
@@ -109,7 +109,7 @@ describe("SelfMonitor", () => {
 	});
 
 	it("sanitizes tokens in output", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-sm-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sm-"));
 		const monitor = new SelfMonitor(dir);
 		monitor.recordToolEnd("bash", "ghp_secret123abc", false);
 		const record = (monitor as unknown as { toolHistory: Array<{ result: string }> }).toolHistory[0];
@@ -124,7 +124,7 @@ describe("FatalSystemError", () => {
 			toolHistory: [],
 			fatalError: { category: "disk_full" as const, message: "No space", toolName: "bash" },
 			systemEvidence: {
-				whoami: "tars",
+				whoami: "yeetomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "",

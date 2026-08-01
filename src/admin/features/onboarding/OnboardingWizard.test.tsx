@@ -370,7 +370,7 @@ describe("OnboardingWizard", () => {
 
 		it("preserves in-progress localStorage state over config for edited fields", () => {
 			localStorage.setItem(
-				"tars-onboarding-wizard",
+				"yeetomatic-onboarding-wizard",
 				JSON.stringify({
 					step: 2,
 					adminUsername: "in-progress-admin",
@@ -410,7 +410,7 @@ describe("OnboardingWizard", () => {
 
 		it("unprotects sensitive fields when localStorage has a replacement value", () => {
 			localStorage.setItem(
-				"tars-onboarding-wizard",
+				"yeetomatic-onboarding-wizard",
 				JSON.stringify({
 					step: 1,
 					adminUsername: "admin",
@@ -447,7 +447,7 @@ describe("OnboardingWizard", () => {
 	it("renders step 1 by default", async () => {
 		render(<OnboardingWizard />);
 		await waitForReady();
-		expect(screen.queryByText("Welcome to TARS")).not.toBeNull();
+		expect(screen.queryByText("Welcome to Yeetomatic")).not.toBeNull();
 		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
@@ -688,8 +688,8 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
 
-		expect(screen.queryByText("Your settings have been saved and TARS is loading them now.")).not.toBeNull();
-		expect(screen.queryByText(/Restart TARS/u)).toBeNull();
+		expect(screen.queryByText("Your settings have been saved and Yeetomatic is loading them now.")).not.toBeNull();
+		expect(screen.queryByText(/Restart Yeetomatic/u)).toBeNull();
 		expect(onComplete).toHaveBeenCalledTimes(1);
 		expect(initializeWorkspaces).toHaveBeenCalled();
 		expect(submitOnboarding).toHaveBeenCalled();
@@ -730,12 +730,12 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		await waitForReady();
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
-		await waitFor(() => expect(localStorage.getItem("tars-onboarding-wizard")).toContain("admin"));
+		await waitFor(() => expect(localStorage.getItem("yeetomatic-onboarding-wizard")).toContain("admin"));
 	});
 
 	it("restores state from localStorage", async () => {
 		localStorage.setItem(
-			"tars-onboarding-wizard",
+			"yeetomatic-onboarding-wizard",
 			JSON.stringify({
 				step: 2,
 				adminUsername: "stored-admin",
@@ -821,7 +821,7 @@ describe("OnboardingWizard", () => {
 
 	it("deselects and selects all repositories in step 4", async () => {
 		localStorage.setItem(
-			"tars-onboarding-wizard",
+			"yeetomatic-onboarding-wizard",
 			JSON.stringify({
 				step: 4,
 				adminUsername: "admin",
@@ -895,9 +895,9 @@ describe("OnboardingWizard", () => {
 
 		// Rerunning the wizard with configured repos only pre-selects the
 		// configured repo; other accessible repos are left unchecked.
-		const tarsCheckbox = screen.getByLabelText("mbrooks/tars") as HTMLInputElement;
+		const yeetomaticCheckbox = screen.getByLabelText("mbrooks/tars") as HTMLInputElement;
 		const helloCheckbox = screen.getByLabelText("octocat/hello") as HTMLInputElement;
-		expect(tarsCheckbox.checked).toBe(true);
+		expect(yeetomaticCheckbox.checked).toBe(true);
 		expect(helloCheckbox.checked).toBe(false);
 		// ...and the configured one shows an "enabled" badge.
 		expect(screen.getAllByText("enabled")).not.toBeNull();

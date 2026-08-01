@@ -28,9 +28,9 @@ describe("GitHubPollingService interface", () => {
 			state: "open",
 			created_at: "2026-06-01T00:00:00Z",
 			updated_at: "2026-06-01T00:01:00Z",
-			labels: [{ name: "tars" }],
-			assignee: { login: "tars-bot" },
-			assignees: [{ login: "tars-bot" }],
+			labels: [{ name: "yeetomatic" }],
+			assignee: { login: "yeetomatic-bot" },
+			assignees: [{ login: "yeetomatic-bot" }],
 			user: { login: "human" },
 		};
 		const pullRequest: PollPullRequest = {
@@ -41,10 +41,10 @@ describe("GitHubPollingService interface", () => {
 			merged: false,
 			created_at: "2026-06-01T00:00:00Z",
 			updated_at: "2026-06-01T00:01:00Z",
-			head: { ref: "tars/issue-2" },
+			head: { ref: "yeetomatic/issue-2" },
 			user: { login: "human" },
 		};
-		expect(issue.labels[0]?.name).toBe("tars");
-		expect(pullRequest.head.ref).toBe("tars/issue-2");
+		expect(issue.labels[0]?.name).toBe("yeetomatic");
+		expect(pullRequest.head.ref).toBe("yeetomatic/issue-2");
 	});
 });

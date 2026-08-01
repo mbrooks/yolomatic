@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { runMigrations, MIGRATIONS } from "./index.js";
 
 describe("migrations", () => {
-	const dbPath = "/tmp/tars-migrations-test.sqlite";
+	const dbPath = "/tmp/yeetomatic-migrations-test.sqlite";
 
 	beforeEach(() => {
 		try {

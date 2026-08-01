@@ -139,7 +139,7 @@ export function IssueDetail({
 								<span key={a} className="issue-tag assignee-tag">{a}</span>
 							))}
 							{justAssigned && selected.assignees.length === 0 && (
-								<span className="issue-tag assignee-tag">TARS</span>
+								<span className="issue-tag assignee-tag">Yeetomatic</span>
 							)}
 						</>
 					) : (
@@ -153,7 +153,7 @@ export function IssueDetail({
 								disabled={assigning}
 								style={{ marginLeft: "0.5rem" }}
 							>
-								{assigning ? "Assigning..." : "Assign to TARS"}
+								{assigning ? "Assigning..." : "Assign to Yeetomatic"}
 							</button>
 							<button
 								className="action-btn"

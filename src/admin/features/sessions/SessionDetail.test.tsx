@@ -35,7 +35,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		body: null,
 		summary: null,
 		workspacePath: "/ws/42",
-		branch: "tars/issue-42",
+		branch: "yeetomatic/issue-42",
 		lastActivity: "2026-01-01T00:00:00Z",
 		createdAt: "2026-01-01T00:00:00Z",
 		prUrl: null,

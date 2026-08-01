@@ -62,7 +62,7 @@ describe("buildPRReviewPrompt", () => {
 		expect(prompt).toContain("PR review feedback received");
 		expect(prompt).toContain("issue #56");
 		expect(prompt).toContain("mbrooks/tars");
-		expect(prompt).toContain("tars/issue-56");
+		expect(prompt).toContain("yeetomatic/issue-56");
 		expect(prompt).toContain("Fix typo");
 		expect(prompt).toContain("src/foo.ts:42");
 	});

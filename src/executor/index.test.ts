@@ -13,7 +13,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 }));
 
 vi.mock("./model-registry.js", () => ({
-	createTarsModelRegistry: vi.fn(),
+	createYeetomaticModelRegistry: vi.fn(),
 }));
 
 vi.mock("../logging/llm-logger.js", () => ({
@@ -34,7 +34,7 @@ vi.mock("../logging/session-log-store.js", () => ({
 import { PiAgentExecutor } from "./index.js";
 
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
-import { createTarsModelRegistry } from "./model-registry.js";
+import { createYeetomaticModelRegistry } from "./model-registry.js";
 
 describe("PiAgentExecutor", () => {
 	afterEach(() => {
@@ -59,7 +59,7 @@ describe("PiAgentExecutor", () => {
 	}
 
 	async function makeSoulPath() {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 		return soulPath;
@@ -72,7 +72,7 @@ describe("PiAgentExecutor", () => {
 		};
 	}
 
-	function mockSuccessfulSession(content = "TARS_STATUS: complete\nDone.") {
+	function mockSuccessfulSession(content = "YEETOMATIC_STATUS: complete\nDone.") {
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -92,7 +92,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("executes end-to-end with mocked Pi dependencies", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -105,7 +105,7 @@ describe("PiAgentExecutor", () => {
 			}),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "TARS_STATUS: complete\nDone." },
+				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone." },
 			],
 		};
 
@@ -114,7 +114,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -151,7 +151,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("notifies onActivity for each model output event", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -164,7 +164,7 @@ describe("PiAgentExecutor", () => {
 			}),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "TARS_STATUS: complete\nDone." },
+				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone." },
 			],
 		};
 
@@ -173,7 +173,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -210,7 +210,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("logs and rethrows when session.prompt throws", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -228,7 +228,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -250,7 +250,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("throws FatalSystemError when a fatal tool error is detected", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -279,7 +279,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -302,10 +302,10 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns cancelled when abort signal is already aborted", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -330,7 +330,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns failed when assistant message contains a 429 rate-limit error", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -339,7 +339,7 @@ describe("PiAgentExecutor", () => {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "TARS_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
+				{ role: "assistant", content: "YEETOMATIC_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
 			],
 		};
 
@@ -348,7 +348,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -372,7 +372,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns cancelled when abort signal fires during execution", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "tars-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -393,7 +393,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -420,7 +420,7 @@ describe("PiAgentExecutor", () => {
 	it("uses an override prompt and passes the configured model into Pi", async () => {
 		const soulPath = await makeSoulPath();
 		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
 		const { mockSession } = mockSuccessfulSession();
 		const onSessionCreated = vi.fn();
 
@@ -440,7 +440,7 @@ describe("PiAgentExecutor", () => {
 
 	it("builds feedback and PR review prompts for continued sessions", async () => {
 		const soulPath = await makeSoulPath();
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const feedbackSession = mockSuccessfulSession().mockSession;
 		const executor = new PiAgentExecutor({ soulPath });
 
@@ -454,7 +454,7 @@ describe("PiAgentExecutor", () => {
 
 	it("warns when the configured model cannot be resolved", async () => {
 		const soulPath = await makeSoulPath();
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
 		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
@@ -469,13 +469,13 @@ describe("PiAgentExecutor", () => {
 
 	it("logs non-rate assistant errors without overriding the parsed result", async () => {
 		const soulPath = await makeSoulPath();
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "TARS_STATUS: complete\nDone.", errorMessage: "tool failed", stopReason: "error" },
+				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone.", errorMessage: "tool failed", stopReason: "error" },
 			],
 		};
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
@@ -489,13 +489,13 @@ describe("PiAgentExecutor", () => {
 
 	it("logs assistant error stop reasons without a message", async () => {
 		const soulPath = await makeSoulPath();
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "TARS_STATUS: working\nRetrying.", stopReason: "error" },
+				{ role: "assistant", content: "YEETOMATIC_STATUS: working\nRetrying.", stopReason: "error" },
 			],
 		};
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
@@ -509,7 +509,7 @@ describe("PiAgentExecutor", () => {
 
 	it("marks execution-environment blocker responses as failed", async () => {
 		const soulPath = await makeSoulPath();
-		(createTarsModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
