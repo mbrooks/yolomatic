@@ -27,7 +27,7 @@ implemented by Yeetomatic:
 - In Docker Compose deployments, let workers share the Yeetomatic container network namespace so they reach Yeetomatic and Ollama over `127.0.0.1` instead of a host-published port.
 - Keep `WORKSPACES_DIR` identical in the control plane and worker so git worktree metadata stays valid without path rewriting.
 - Keep the first implementation simple:
-  - one worker per issue session
+  - one worker per execution attempt
   - one read-write mount for the full workspace tree
   - internet access enabled
   - one session-scoped WebSocket connection
@@ -46,5 +46,15 @@ implemented by Yeetomatic:
 
 - `pause` exists in the protocol type but currently aborts execution in the same way as `stop`; resumable pause semantics are not implemented.
 - Event batches currently contain canonical `session_log` entries rather than separate assistant, reasoning, and tool event variants.
-- A worker reconnect is treated as a new execution. An interrupted WebSocket connection is not resumed in place.
+- A disconnect fails the execution. Resumption launches a new worker and
+  WebSocket reservation; an interrupted connection is not resumed in place.
 - The worker image is rebuilt once per control-plane process so deployments use current source; Docker reuses unchanged build layers. The container is fresh for each execution.
+- Worker names are deterministic. Name-conflict recovery removes and retries
+  only stopped containers; running or uninspectable conflicts fail closed.
+- Workers have no Docker restart policy or reconciliation/adoption loop. A
+  worker still running after a control-plane restart blocks a same-session
+  relaunch until it exits or is handled outside the executor.
+- Stop requests rely on a control acknowledgement before arming the five-second
+  `docker stop` fallback. A missing acknowledgement currently has no timeout.
+- Heartbeats update activity and `maxRuntimeSeconds` is sent in launch config,
+  but neither is enforced as a worker-protocol watchdog or runtime deadline.
