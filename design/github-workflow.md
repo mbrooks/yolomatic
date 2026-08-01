@@ -2,7 +2,7 @@
 
 Status: as-built design
 
-Last verified: 2026-08-01 against `github/main` at `4e45443`
+Last verified: 2026-08-01 against `github/main` at `26171605efdd`
 
 ## Purpose
 
@@ -244,10 +244,12 @@ ambiguous or credential-bearing workspace.
 
 ### Worker Execution
 
-The disposable worker receives the issue prompt, worktree path, model
-credentials, and a session-scoped WebSocket URL. It edits the worktree and
+The disposable worker receives the issue prompt, worktree path, configured
+model selection, and a session-scoped WebSocket URL. It edits the worktree and
 streams activity and a terminal result back to the control plane. It has no
-GitHub token and no Docker socket.
+GitHub token and no Docker socket. Docker image, mount, networking, naming,
+recovery, and cleanup behavior is described in
+[protocol-launch.md](protocol-launch.md).
 
 An active issue comment or issue-description edit is sent through the live
 worker's steering channel instead of creating a new execution. Steering waits
