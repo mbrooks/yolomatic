@@ -155,7 +155,7 @@ describe("HandleIssueRefinement", () => {
 			}) as never,
 		);
 		const logs = getSessionLogs("mbrooks/yeetomatic#1");
-		expect(logs.some((l) => l.level === "warn" && l.message.includes("not a repository owner"))).toBe(true);
+		expect(logs.some((l) => l.level === "warn" && l.message.includes("not a repository collaborator"))).toBe(true);
 		expect(logs.some((l) => l.message === "Refinement started")).toBe(false);
 	});
 
@@ -196,13 +196,13 @@ describe("HandleIssueRefinement", () => {
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
-		expect(github.getCollaboratorPermissionLevel).toHaveBeenCalledWith("mbrooks", "yeetomatic", "user");
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository owners can run issue refinement.");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "user");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository collaborators can run issue refinement.");
 	});
 
 	it("allows refinement from a repository owner with admin permission", async () => {
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
-		github.getCollaboratorPermissionLevel.mockResolvedValue("admin");
+		github.isCollaborator.mockResolvedValue(true);
 		executor.executeRefinement.mockResolvedValue({
 			proposedTaskBody: "Refined body",
 			summary: "Summary",
@@ -216,7 +216,7 @@ describe("HandleIssueRefinement", () => {
 			}) as never,
 		);
 
-		expect(github.getCollaboratorPermissionLevel).toHaveBeenCalledWith("mbrooks", "yeetomatic", "repo-owner");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "repo-owner");
 		expect(executor.executeRefinement).toHaveBeenCalled();
 		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
 		expect(github.postComment).toHaveBeenCalledWith(
@@ -227,16 +227,55 @@ describe("HandleIssueRefinement", () => {
 		);
 	});
 
-	it("rejects refinement from a collaborator without admin permission", async () => {
+	it("allows refinement from a write-permission collaborator when isCollaborator is true", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		github.getCollaboratorPermissionLevel.mockResolvedValue("write");
+		github.isCollaborator.mockResolvedValue(true);
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "contributor" },
 				comment: { id: 106, body: "/yeetomatic issue-refinement", user: { login: "contributor" } },
 			}) as never,
 		);
+
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "contributor");
+		expect(executor.executeRefinement).toHaveBeenCalled();
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+	});
+
+	it("rejects refinement from a non-collaborator who is not the admin username", async () => {
+		github.isCollaborator.mockResolvedValue(false);
+		await handler.execute(
+			createCommandPayload({
+				sender: { login: "outsider" },
+				comment: { id: 107, body: "/yeetomatic issue-refinement", user: { login: "outsider" } },
+			}) as never,
+		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository owners can run issue refinement.");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "outsider");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository collaborators can run issue refinement.");
+	});
+
+	it("authorizes the configured admin username even when isCollaborator returns false", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		github.isCollaborator.mockResolvedValue(false);
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.isCollaborator).not.toHaveBeenCalled();
+		expect(executor.executeRefinement).toHaveBeenCalled();
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
 	});
 
 	it("posts a starting comment immediately when refinement begins", async () => {
@@ -487,6 +526,7 @@ describe("HandleIssueRefinement", () => {
 			updateIssueBody: vi.fn(async () => {}),
 			getIssue: vi.fn(async () => ({ state: "open", body: "Body" })),
 			getCollaboratorPermissionLevel: vi.fn(async (): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> => null),
+			isCollaborator: vi.fn(async (): Promise<boolean> => false),
 		};
 	}
 

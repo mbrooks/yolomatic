@@ -111,4 +111,5 @@ export interface GitHubService {
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 	getRepository(owner: string, repo: string): Promise<RepositoryInfo | null>;
 	getCollaboratorPermissionLevel(owner: string, repo: string, username: string): Promise<CollaboratorPermission | null>;
+	isCollaborator(owner: string, repo: string, username: string): Promise<boolean>;
 }

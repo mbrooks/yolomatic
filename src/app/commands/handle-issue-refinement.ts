@@ -7,7 +7,7 @@ import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
-import { isAdmin, isAdminPermission, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import { isAdmin, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { statSync } from "node:fs";
@@ -50,7 +50,7 @@ export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yeetomatic. Refin
 export const ISSUE_REFINEMENT_INSTRUCTIONS = [
 	"## Yeetomatic issue refinement",
 	"",
-	"An authorized maintainer can ask Yeetomatic to investigate this issue and replace its body with a more complete Proposed Task. Yeetomatic uses this repository's `issue-refinement` skill when available, otherwise it uses its built-in issue-refinement defaults.",
+	"A repository collaborator or the configured admin can ask Yeetomatic to investigate this issue and replace its body with a more complete Proposed Task. Yeetomatic uses this repository's `issue-refinement` skill when available, otherwise it uses its built-in issue-refinement defaults.",
 	"",
 	"To start, comment:",
 	"",
@@ -152,11 +152,11 @@ export class HandleIssueRefinement {
 
 		const authorized =
 			isAdmin(payload.sender.login, this.deps.adminGithubUsername) ||
-			isAdminPermission(await this.deps.github.getCollaboratorPermissionLevel(owner, repo, payload.sender.login));
+			(await this.deps.github.isCollaborator(owner, repo, payload.sender.login));
 		if (!authorized) {
-			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository owner\n`);
-			this.log(owner, repo, issueNumber, "warn", `Refinement rejected: @${payload.sender.login} is not a repository owner`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Only repository owners can run issue refinement.");
+			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository collaborator\n`);
+			this.log(owner, repo, issueNumber, "warn", `Refinement rejected: @${payload.sender.login} is not a repository collaborator`);
+			await this.deps.github.postComment(owner, repo, issueNumber, "Only repository collaborators can run issue refinement.");
 			return;
 		}
 
