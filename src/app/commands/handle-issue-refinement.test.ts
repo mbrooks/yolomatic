@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { HandleIssueRefinement, ISSUE_REFINEMENT_INSTRUCTIONS } from "./handle-issue-refinement.js";
+import { HandleIssueRefinement, ISSUE_REFINEMENT_INSTRUCTIONS, ISSUE_REFINEMENT_STARTING_COMMENT } from "./handle-issue-refinement.js";
 import { RefinementStore } from "../../refinement/store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 
@@ -170,6 +170,39 @@ describe("HandleIssueRefinement", () => {
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository owners can run issue refinement.");
+	});
+
+	it("posts a starting comment immediately when refinement begins", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		const startCallCount: number[] = [];
+		executor.executeRefinement.mockImplementation(async () => {
+			const calls = github.postComment.mock.calls as unknown as Array<[string, string, number, string]>;
+			startCallCount.push(calls.filter((c) => c[3] === ISSUE_REFINEMENT_STARTING_COMMENT).length);
+			return { proposedTaskBody: "Refined body", summary: "Summary", investigation: "Investigation" };
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(startCallCount[0]).toBeGreaterThanOrEqual(1);
+		const calls = github.postComment.mock.calls as unknown as Array<[string, string, number, string]>;
+		expect(calls[0][3]).toBe(ISSUE_REFINEMENT_STARTING_COMMENT);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
+	});
+
+	it("does not post a starting comment when the task key is already claimed", async () => {
+		tasks.register.mockReturnValue(null as never);
+		await handler.execute(createCommandPayload() as never);
+		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
+	});
+
+	it("does not post a starting comment for non-admin users", async () => {
+		await handler.execute(
+			createCommandPayload({
+				sender: { login: "user" },
+				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
+			}) as never,
+		);
+		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
 	});
 
 	it("ignores non-exact refinement commands", async () => {
