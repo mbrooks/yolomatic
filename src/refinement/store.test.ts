@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -77,32 +77,39 @@ describe("RefinementStore", () => {
 	});
 
 	it("lists attempts by issue", () => {
-		store.createAttempt({
-			owner: "mbrooks",
-			repo: "yeetomatic",
-			issueNumber: 5,
-			requester: "admin",
-			originalTitle: "A",
-			originalBody: "a",
-			originalBodyFingerprint: "fp1",
-			instructionSource: "prompt-defaults",
-			state: "applied",
-		});
-		store.createAttempt({
-			owner: "mbrooks",
-			repo: "yeetomatic",
-			issueNumber: 5,
-			requester: "admin",
-			originalTitle: "B",
-			originalBody: "b",
-			originalBodyFingerprint: "fp2",
-			instructionSource: "prompt-defaults",
-			state: "failed",
-		});
+		vi.useFakeTimers();
+		try {
+			vi.setSystemTime(new Date("2026-08-01T12:00:00.000Z"));
+			store.createAttempt({
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 5,
+				requester: "admin",
+				originalTitle: "A",
+				originalBody: "a",
+				originalBodyFingerprint: "fp1",
+				instructionSource: "prompt-defaults",
+				state: "applied",
+			});
+			vi.setSystemTime(new Date("2026-08-01T12:00:00.001Z"));
+			store.createAttempt({
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 5,
+				requester: "admin",
+				originalTitle: "B",
+				originalBody: "b",
+				originalBodyFingerprint: "fp2",
+				instructionSource: "prompt-defaults",
+				state: "failed",
+			});
 
-		const attempts = store.listAttemptsByIssue("mbrooks", "yeetomatic", 5);
-		expect(attempts).toHaveLength(2);
-		expect(attempts[0]!.state).toBe("failed");
+			const attempts = store.listAttemptsByIssue("mbrooks", "yeetomatic", 5);
+			expect(attempts).toHaveLength(2);
+			expect(attempts[0]!.state).toBe("failed");
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("looks up attempt by delivery id", () => {

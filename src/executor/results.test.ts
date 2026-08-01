@@ -194,6 +194,27 @@ describe("parseRefinementResult", () => {
 		expect(result!.proposedTaskBody).toBe("Body");
 	});
 
+	it("extracts a fenced JSON refinement result surrounded by commentary", () => {
+		const raw = [
+			"I now have a complete picture. Here is my refined task body.",
+			"",
+			"```json",
+			JSON.stringify({
+				proposedTaskBody: "## Summary\nRefined directly.",
+				summary: "Clarified requirements.",
+				investigation: "Read the implementation.",
+			}),
+			"```",
+		].join("\n");
+
+		const result = parseRefinementResult(raw);
+
+		expect(result).not.toBeNull();
+		expect(result!.proposedTaskBody).toBe("## Summary\nRefined directly.");
+		expect(result!.summary).toBe("Clarified requirements.");
+		expect(result!.investigation).toBe("Read the implementation.");
+	});
+
 	it("falls back to heuristic extraction", () => {
 		const raw = "## Proposed Task\nRefined body.\n## Summary\nBetter description.\n## Investigation\nRead code.";
 		const result = parseRefinementResult(raw);

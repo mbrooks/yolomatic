@@ -10,33 +10,53 @@ export interface RefinementResult {
 	investigation: string;
 }
 
+function parseRefinementJson(candidate: string): RefinementResult | null {
+	const trimmed = candidate.trim();
+	if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+		return null;
+	}
+
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (
+			typeof parsed.proposedTaskBody === "string" &&
+			parsed.proposedTaskBody.length > 0 &&
+			typeof parsed.summary === "string" &&
+			typeof parsed.investigation === "string"
+		) {
+			return {
+				proposedTaskBody: parsed.proposedTaskBody,
+				summary: parsed.summary,
+				investigation: parsed.investigation,
+			};
+		}
+	} catch {
+		return null;
+	}
+
+	return null;
+}
+
 export function parseRefinementResult(rawResponse: string): RefinementResult | null {
 	let trimmed = rawResponse.trim();
-	const fencedMatch = /^```(?:json)?\s*\n([\s\S]*?)\n```\s*$/u.exec(trimmed);
+	if (!trimmed) return null;
+
+	for (const match of trimmed.matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/giu)) {
+		const parsed = parseRefinementJson(match[1] ?? "");
+		if (parsed) return parsed;
+	}
+
+	const fencedMatch = /^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/iu.exec(trimmed);
 	if (fencedMatch) {
 		trimmed = fencedMatch[1]!.trim();
 	}
 
-	const looksLikeJson = trimmed.startsWith("{") && trimmed.endsWith("}");
-	if (looksLikeJson) {
-		try {
-			const parsed = JSON.parse(trimmed);
-			if (
-				typeof parsed.proposedTaskBody === "string" &&
-				parsed.proposedTaskBody.length > 0 &&
-				typeof parsed.summary === "string" &&
-				typeof parsed.investigation === "string"
-			) {
-				return {
-					proposedTaskBody: parsed.proposedTaskBody,
-					summary: parsed.summary,
-					investigation: parsed.investigation,
-				};
-			}
-			return null;
-		} catch {
-			return null;
-		}
+	const parsedJson = parseRefinementJson(trimmed);
+	if (parsedJson) {
+		return parsedJson;
+	}
+	if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+		return null;
 	}
 
 	const bodyMatch = /##\s*Proposed Task\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
