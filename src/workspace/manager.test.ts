@@ -494,6 +494,78 @@ describe("WorkspaceManager", () => {
 		await expect(manager.commitAndPush("mbrooks", "yeetomatic", 42)).rejects.toThrow("Authentication failed");
 	});
 
+	it("retries a non-fast-forward push with the captured remote head as an explicit lease", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-push-lease-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const expectedRemoteHead = "a".repeat(40);
+		let pushAttempts = 0;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "push") {
+				pushAttempts += 1;
+				if (pushAttempts === 1) {
+					const error = new Error("failed to push some refs") as Error & { stderr?: string };
+					error.stderr = "! [rejected] branch -> branch (non-fast-forward)";
+					throw error;
+				}
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(
+			manager.commitAndPushPath(worktreePath, "yeetomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
+		).resolves.toBe(true);
+
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["push", "origin", "yeetomatic/issue-42"],
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			[
+				"push",
+				`--force-with-lease=refs/heads/yeetomatic/issue-42:${expectedRemoteHead}`,
+				"origin",
+				"yeetomatic/issue-42",
+			],
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
+		);
+	});
+
+	it("surfaces a rejected lease instead of overwriting a concurrently updated branch", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-stale-push-lease-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const expectedRemoteHead = "b".repeat(40);
+		let pushAttempts = 0;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "push") {
+				pushAttempts += 1;
+				if (pushAttempts === 1) {
+					throw new Error("push rejected (non-fast-forward)");
+				}
+				throw new Error("stale info: remote branch changed during execution");
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(
+			manager.commitAndPushPath(worktreePath, "yeetomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
+		).rejects.toThrow("remote branch changed during execution");
+		expect(pushAttempts).toBe(2);
+	});
+
 	it("commits with a custom message when provided", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-msg-"));
 		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
