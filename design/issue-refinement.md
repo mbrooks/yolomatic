@@ -75,7 +75,7 @@ When an eligible issue is opened, Yeetomatic posts exactly one static comment:
 ```markdown
 ## Yeetomatic issue refinement
 
-An authorized maintainer can ask Yeetomatic to investigate this issue and
+A repository collaborator or the configured admin can ask Yeetomatic to investigate this issue and
 replace its body with a more complete Proposed Task. Yeetomatic uses this
 repository's `issue-refinement` skill when available, otherwise it uses its
 built-in issue-refinement defaults.
@@ -196,13 +196,15 @@ sequenceDiagram
 The GitHub webhook signature authenticates that GitHub delivered the event; it
 does not by itself authorize the sender to refine an issue.
 
-For the first implementation, only the exact configured
-`admin_github_username` may run `/yeetomatic issue-refinement`. Authorization
-uses the signed webhook's `sender.login`.
-
-Repository collaborators may be supported later through a deterministic GitHub
-permission lookup requiring `write`, `maintain`, or `admin`. The issue author
-role alone is not sufficient authorization.
+The configured `admin_github_username` and explicit repository
+collaborators may run `/yeetomatic issue-refinement`. Authorization uses the
+signed webhook's `sender.login`. Collaborator membership is determined via
+`repos.checkCollaborator` (the GitHub collaborator-membership endpoint, which
+returns `204` for explicit collaborators and `404` otherwise), not via the
+effective permission level alone: public repositories grant an effective `read`
+permission to users who were never added as collaborators, so a permission
+level alone would over-authorize arbitrary public-repo visitors. The issue
+author role alone is not sufficient authorization.
 
 Every request must also satisfy these checks:
 
@@ -364,7 +366,7 @@ The implementation is expected to add or extend these boundaries:
 - A new eligible issue receives exactly one static instruction comment that
   includes the worker access and issue-verification warning.
 - Opening an issue does not launch a refinement worker.
-- Only `admin_github_username` can start refinement in the first implementation.
+- The configured `admin_github_username` and explicit repository collaborators can start refinement.
 - The exact `/yeetomatic issue-refinement` command starts a fresh instance of
   the existing Docker worker workflow.
 - The worker follows the target repository's `issue-refinement` skill when it
