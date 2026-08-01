@@ -17,7 +17,7 @@ Example:
 
 ```text
 /workspaces/
-  mbrooks-tars/
+  mbrooks-yeetomatic/
   mbrooks-casebot/
   mbrooks-case/
 ```
