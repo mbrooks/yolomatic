@@ -8,7 +8,7 @@ export class SafeDeployer {
 	private readonly backupDir: string;
 
 	constructor(backupDir?: string) {
-		this.backupDir = backupDir ?? path.join(os.tmpdir(), "tars-self-evolution-backups");
+		this.backupDir = backupDir ?? path.join(os.tmpdir(), "yeetomatic-self-evolution-backups");
 	}
 
 	async applyPatch(patch: Patch): Promise<RollbackSnapshot> {

@@ -75,7 +75,7 @@ export function analyzeError(error: Error, repoPath: string = process.cwd()): Ro
 	if (error.stack && isCodeLevelStack(error.stack, repoPath)) {
 		return {
 			level: "code-level",
-			description: `Runtime error in TARS source: ${error.message}`,
+			description: `Runtime error in Yeetomatic source: ${error.message}`,
 			affectedFiles: extractAffectedFilesFromStack(error.stack, repoPath),
 		};
 	}
@@ -85,7 +85,7 @@ export function analyzeError(error: Error, repoPath: string = process.cwd()): Ro
 		msg.includes("json") ||
 		msg.includes("parse") ||
 		msg.includes("unexpected token") ||
-		msg.includes("tars_status") ||
+		msg.includes("yeetomatic_status") ||
 		msg.includes("status protocol")
 	) {
 		return {

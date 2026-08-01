@@ -145,7 +145,7 @@ describe("admin-router-shared", () => {
 
 describe("resolveAdminPath / resolveAdminDefaultPage", () => {
 	it("falls back to the default admin path when unset", () => {
-		expect(resolveAdminPath({} as never)).toBe("/tars/admin");
+		expect(resolveAdminPath({} as never)).toBe("/yeetomatic/admin");
 	});
 
 	it("returns the configured admin path when set", () => {

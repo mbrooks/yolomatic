@@ -52,9 +52,9 @@ async function waitForFinish(res: MockResponse): Promise<void> {
 describe("injectAdminConfig", () => {
 	it("injects the config script before </head> when present", () => {
 		const html = "<html><head><title>T</title></head><body></body></html>";
-		const result = injectAdminConfig(html, "/tars/admin", "#/dashboard");
+		const result = injectAdminConfig(html, "/yeetomatic/admin", "#/dashboard");
 		expect(result).toContain(
-			'<script>window.__TARS_ADMIN_PATH__ = "/tars/admin"; window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/dashboard";</script>',
+			'<script>window.__YEETOMATIC_ADMIN_PATH__ = "/yeetomatic/admin"; window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/dashboard";</script>',
 		);
 		expect(result).toMatch(/<script>[^<]*<\/script><\/head>/);
 	});
@@ -62,8 +62,8 @@ describe("injectAdminConfig", () => {
 	it("injects after <body> when no </head> is present", () => {
 		const html = "<html><body><div></div></body></html>";
 		const result = injectAdminConfig(html, "/custom/admin", "#/repos");
-		expect(result).toContain('window.__TARS_ADMIN_PATH__ = "/custom/admin"');
-		expect(result).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+		expect(result).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/custom/admin"');
+		expect(result).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos"');
 		expect(result).toMatch(/<body><script>/);
 	});
 
@@ -71,8 +71,8 @@ describe("injectAdminConfig", () => {
 		const html = "plain text";
 		const result = injectAdminConfig(html);
 		expect(result.startsWith("<script>")).toBe(true);
-		expect(result).toContain('window.__TARS_ADMIN_PATH__ = "/tars/admin"');
-		expect(result).toContain('window.__TARS_ADMIN_DEFAULT_PAGE__ = "#/dashboard"');
+		expect(result).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/yeetomatic/admin"');
+		expect(result).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/dashboard"');
 	});
 
 	it("escapes quote characters in the configured values", () => {
@@ -85,7 +85,7 @@ describe("adminHtml", () => {
 	let dir: string;
 
 	beforeEach(async () => {
-		dir = await mkdtemp(path.join(os.tmpdir(), "tars-asset-server-"));
+		dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-asset-server-"));
 	});
 
 	afterEach(async () => {
@@ -95,17 +95,17 @@ describe("adminHtml", () => {
 	it("reads and injects config into the built index.html", async () => {
 		await writeFile(
 			path.join(dir, "index.html"),
-			'<!doctype html><html><head><title>TARS</title></head><body><div id="root"></div></body></html>',
+			'<!doctype html><html><head><title>Yeetomatic</title></head><body><div id="root"></div></body></html>',
 		);
-		const html = await adminHtml(dir, "/tars/admin", "#/dashboard");
-		expect(html).toContain("TARS");
-		expect(html).toContain('window.__TARS_ADMIN_PATH__ = "/tars/admin"');
+		const html = await adminHtml(dir, "/yeetomatic/admin", "#/dashboard");
+		expect(html).toContain("Yeetomatic");
+		expect(html).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/yeetomatic/admin"');
 	});
 
 	it("falls back to the fallback html when index.html is missing", async () => {
-		const html = await adminHtml(path.join(dir, "missing"), "/tars/admin");
-		expect(html).toContain("TARS Admin assets have not been built.");
-		expect(html).not.toContain("__TARS_ADMIN_PATH__");
+		const html = await adminHtml(path.join(dir, "missing"), "/yeetomatic/admin");
+		expect(html).toContain("Yeetomatic Admin assets have not been built.");
+		expect(html).not.toContain("__YEETOMATIC_ADMIN_PATH__");
 	});
 });
 
@@ -113,7 +113,7 @@ describe("serveAdminAsset", () => {
 	let dir: string;
 
 	beforeEach(async () => {
-		dir = await mkdtemp(path.join(os.tmpdir(), "tars-asset-server-assets-"));
+		dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-asset-server-assets-"));
 	});
 
 	afterEach(async () => {
@@ -205,7 +205,7 @@ describe("sendStream", () => {
 	});
 
 	it("streams an existing file to the response", async () => {
-		const file = path.join(os.tmpdir(), `tars-stream-test-${Date.now()}.js`);
+		const file = path.join(os.tmpdir(), `yeetomatic-stream-test-${Date.now()}.js`);
 		await writeFile(file, "export default 1;");
 		const res = createMockResponse();
 		sendStream(res as unknown as http.ServerResponse, 200, "text/javascript; charset=utf-8", file);

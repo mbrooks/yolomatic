@@ -5,7 +5,7 @@ import { parseHash, buildHash, navigate, useRoute, DEFAULT_SETTINGS_TAB, getDefa
 
 describe("getDefaultAdminPage", () => {
 	afterEach(() => {
-		delete (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__?: string }).__TARS_ADMIN_DEFAULT_PAGE__;
+		delete (window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__?: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__;
 		window.location.hash = "";
 	});
 
@@ -14,24 +14,24 @@ describe("getDefaultAdminPage", () => {
 	});
 
 	it("returns the configured override", () => {
-		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos";
+		(window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos";
 		expect(getDefaultAdminPage()).toBe("#/repos");
 	});
 
 	it("falls back to #/dashboard for an empty override", () => {
-		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "";
+		(window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "";
 		expect(getDefaultAdminPage()).toBe("#/dashboard");
 	});
 });
 
 describe("useRoute default page", () => {
 	afterEach(() => {
-		delete (window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__?: string }).__TARS_ADMIN_DEFAULT_PAGE__;
+		delete (window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__?: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__;
 		window.location.hash = "";
 	});
 
 	it("navigates to the configured default page when the hash is empty", async () => {
-		(window as unknown as { __TARS_ADMIN_DEFAULT_PAGE__: string }).__TARS_ADMIN_DEFAULT_PAGE__ = "#/repos";
+		(window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos";
 		window.location.hash = "";
 		const { unmount } = renderHook(() => useRoute());
 		await new Promise((r) => setTimeout(r, 0));

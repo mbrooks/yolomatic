@@ -215,7 +215,7 @@ export class RepoSkillService {
 	}
 
 	private async ensureGitIdentity(worktreePath: string): Promise<void> {
-		await this.runCommand("git", ["config", "user.name", "TARS"], { cwd: worktreePath });
+		await this.runCommand("git", ["config", "user.name", "Yeetomatic"], { cwd: worktreePath });
 		await this.runCommand("git", ["config", "user.email", `${this.config.githubUsername}@users.noreply.github.com`], { cwd: worktreePath });
 	}
 
@@ -280,7 +280,7 @@ export class RepoSkillService {
 
 			await this.ensureGitIdentity(worktreePath);
 			await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
-			await this.runCommand("git", ["commit", "-m", `tars: update skill ${data.name}`], { cwd: worktreePath });
+			await this.runCommand("git", ["commit", "-m", `yeetomatic: update skill ${data.name}`], { cwd: worktreePath });
 			await this.runCommand("git", ["push", "origin", this.config.defaultBranch], { cwd: worktreePath });
 			return { success: true };
 		} catch (error) {
@@ -308,7 +308,7 @@ export class RepoSkillService {
 
 			await this.ensureGitIdentity(worktreePath);
 			await this.runCommand("git", ["add", "-A"], { cwd: worktreePath });
-			await this.runCommand("git", ["commit", "-m", `tars: delete skill ${name}`], { cwd: worktreePath });
+			await this.runCommand("git", ["commit", "-m", `yeetomatic: delete skill ${name}`], { cwd: worktreePath });
 			await this.runCommand("git", ["push", "origin", this.config.defaultBranch], { cwd: worktreePath });
 			return { success: true };
 		} catch (error) {

@@ -19,7 +19,7 @@ export function sessionKey(owner: string, repo: string, issueNumber: number): st
 }
 
 export function branchName(issueNumber: number): string {
-	return `tars/issue-${issueNumber}`;
+	return `yeetomatic/issue-${issueNumber}`;
 }
 
 export interface SessionRisk {
@@ -40,7 +40,7 @@ export function detectSessionRisk(session: SessionState): SessionRisk {
 		}
 	}
 
-	if (session.title.trim().startsWith("TARS:")) {
+	if (session.title.trim().startsWith("Yeetomatic:")) {
 		reasons.push("Session title looks like a generated PR title.");
 	}
 

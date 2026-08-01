@@ -46,7 +46,7 @@ describe("requireAdminText", () => {
 		const response = createResponse();
 
 		expect(requireAdminText(request, response, "admin", "secret")).toBe(true);
-		expect(response.getHeader("set-cookie")).toContain("tars_admin_session=");
+		expect(response.getHeader("set-cookie")).toContain("yeetomatic_admin_session=");
 		expect(response.getHeader("set-cookie")).toContain("HttpOnly");
 		expect(response.getHeader("set-cookie")).toContain("Secure");
 	});
@@ -82,7 +82,7 @@ describe("requireAdminText", () => {
 
 	it("rejects requests without valid cookie or basic auth", () => {
 		const request = createRequest({
-			cookie: "tars_admin_session=invalid",
+			cookie: "yeetomatic_admin_session=invalid",
 		});
 		const response = createResponse();
 

@@ -66,8 +66,8 @@ Contract tests:
 ### GitHub Label And Status Naming
 
 Scope:
-- GitHub labels such as `tars-working`, `tars-feedback-required`,
-  `tars-pr-created`, and `tars-complete`
+- GitHub labels such as `yeetomatic-working`, `yeetomatic-feedback-required`,
+  `yeetomatic-pr-created`, and `yeetomatic-complete`
 - Session status names and status-transition semantics
 
 Compatibility plan:

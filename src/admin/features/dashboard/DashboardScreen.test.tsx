@@ -16,7 +16,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "tars/issue-1",
+		branch: "yeetomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,

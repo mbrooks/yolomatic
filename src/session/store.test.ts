@@ -16,7 +16,7 @@ describe("SessionStore (SQLite-backed)", () => {
 	let dbPath: string;
 
 	beforeEach(async () => {
-		dir = await mkdtemp(path.join(os.tmpdir(), "tars-store-"));
+		dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-store-"));
 		dbPath = dbPathFor(dir);
 	});
 

@@ -70,7 +70,7 @@ export class HandlePRReview {
 
 		const resolvedSession = await this.resolveSessionForPullRequest(owner, repo, prNumber, branch);
 		if (!resolvedSession) {
-			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not associated with a TARS session\n`);
+			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not associated with a Yeetomatic session\n`);
 			return;
 		}
 
@@ -90,7 +90,7 @@ export class HandlePRReview {
 				repo,
 				prNumber,
 				[
-					"**TARS stopped before execution.**",
+					"**Yeetomatic stopped before execution.**",
 					"",
 					mappingError,
 					"",
@@ -227,13 +227,13 @@ export class HandlePRReview {
 				owner,
 				repo,
 				prNumber,
-				steered ? "Review feedback was steered to the active TARS task." : "TARS is busy. Review feedback could not be steered.",
+				steered ? "Review feedback was steered to the active Yeetomatic task." : "Yeetomatic is busy. Review feedback could not be steered.",
 			);
 			return;
 		}
 
 		const worktreePath = state.workspacePath;
-		const branchName = state.branch ?? `tars/issue-${issueNumber}`;
+		const branchName = state.branch ?? `yeetomatic/issue-${issueNumber}`;
 		let result: ExecutionResult;
 		try {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
@@ -269,7 +269,7 @@ export class HandlePRReview {
 			if (abortController.signal.aborted) {
 				process.stdout.write(`[webhook] PR review execution aborted for ${inFlightKey}\n`);
 				await this.deps.sessions.cancelSession(owner, repo, issueNumber);
-				await this.deps.github.postPRComment(owner, repo, prNumber, "Task cancelled by admin. TARS is idle.");
+				await this.deps.github.postPRComment(owner, repo, prNumber, "Task cancelled by admin. Yeetomatic is idle.");
 				return;
 			}
 			const message = error instanceof Error ? error.message : String(error);
@@ -281,7 +281,7 @@ export class HandlePRReview {
 					[
 						"**Build failed**",
 						"",
-						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
 						"",
 						`Error: ${message}`,
 					].join("\n"),
@@ -289,7 +289,7 @@ export class HandlePRReview {
 				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 				throw error;
 			}
-			await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
+			await this.deps.github.postPRComment(owner, repo, prNumber, `**Yeetomatic failed.**\n\nError: ${message}`);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
 		} finally {
@@ -314,9 +314,9 @@ export class HandlePRReview {
 				[
 					"Task cancelled by admin.",
 					"",
-					result.summary || "TARS has stopped working on this review.",
+					result.summary || "Yeetomatic has stopped working on this review.",
 					"",
-					"TARS is idle and ready for the next task.",
+					"Yeetomatic is idle and ready for the next task.",
 				].join("\n"),
 			);
 			return;
@@ -335,7 +335,7 @@ export class HandlePRReview {
 					repo,
 					prNumber,
 					[
-						"**TARS iteration complete.**",
+						"**Yeetomatic iteration complete.**",
 						"",
 						"Changes pushed to the PR branch.",
 						"",
@@ -349,7 +349,7 @@ export class HandlePRReview {
 					repo,
 					prNumber,
 					[
-						"**TARS iteration complete.**",
+						"**Yeetomatic iteration complete.**",
 						"",
 						"No changes were needed.",
 						"",
@@ -366,7 +366,7 @@ export class HandlePRReview {
 				prNumber,
 				[
 					"Need clarification:",
-					result.summary || "TARS needs more information before continuing.",
+					result.summary || "Yeetomatic needs more information before continuing.",
 				].join("\n\n"),
 			);
 		} else if (result.status === "failed") {
@@ -379,13 +379,13 @@ export class HandlePRReview {
 					[
 						"**Build failed**",
 						"",
-						"TARS encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
 						"",
 						`Error: ${message}`,
 					].join("\n"),
 				);
 			} else {
-				await this.deps.github.postPRComment(owner, repo, prNumber, `**TARS failed.**\n\nError: ${message}`);
+				await this.deps.github.postPRComment(owner, repo, prNumber, `**Yeetomatic failed.**\n\nError: ${message}`);
 			}
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 		} else {
@@ -395,7 +395,7 @@ export class HandlePRReview {
 				repo,
 				prNumber,
 				[
-					"TARS is still working on the review feedback.",
+					"Yeetomatic is still working on the review feedback.",
 					"",
 					result.summary || "Execution is in progress.",
 				].join("\n"),
@@ -410,7 +410,7 @@ export class HandlePRReview {
 		comments: Array<{ id: number; body: string; user: string }>,
 		reviewBody?: string,
 	): Promise<void> {
-		const lines = ["**TARS acknowledgement**"];
+		const lines = ["**Yeetomatic acknowledgement**"];
 		if (reviewBody) {
 			lines.push("");
 			lines.push("Acknowledged the review comment.");

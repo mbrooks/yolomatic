@@ -2,9 +2,9 @@
 
 ## Summary
 
-TARS runs as a control plane and launches a separate worker container for each issue execution. The worker owns agent execution and code changes. TARS owns everything deterministic before and after the run.
+Yeetomatic runs as a control plane and launches a separate worker container for each issue execution. The worker owns agent execution and code changes. Yeetomatic owns everything deterministic before and after the run.
 
-The control plane and worker communicate through a bidirectional session protocol over a WebSocket connection. TARS hosts the server side on its existing control-plane HTTP server. The worker is the client that connects with a session-specific URL and token.
+The control plane and worker communicate through a bidirectional session protocol over a WebSocket connection. Yeetomatic hosts the server side on its existing control-plane HTTP server. The worker is the client that connects with a session-specific URL and token.
 
 ## Why This Shape
 
@@ -26,7 +26,7 @@ Using a dedicated WebSocket session keeps the design honest:
 
 ## Control Plane Responsibilities
 
-TARS remains responsible for:
+Yeetomatic remains responsible for:
 
 - receiving GitHub webhooks and admin actions
 - creating and updating session state
@@ -55,15 +55,15 @@ These responsibilities line up with the current flow in:
 The worker is responsible for:
 
 - booting the agent runtime
-- connecting to the TARS worker session URL
+- connecting to the Yeetomatic worker session URL
 - completing the hello and launch handshake
 - setting `cwd` to the primary worktree
-- loading the same TARS-authored prompt rules and status protocol
+- loading the same Yeetomatic-authored prompt rules and status protocol
 - executing tool calls, shell commands, file edits, and package installs
-- sending event batches and heartbeat messages to TARS
-- streaming assistant output, reasoning summaries, tool activity, and terminal state back to TARS
-- receiving steering and control messages from TARS
-- sending one terminal completion payload to TARS
+- sending event batches and heartbeat messages to Yeetomatic
+- streaming assistant output, reasoning summaries, tool activity, and terminal state back to Yeetomatic
+- receiving steering and control messages from Yeetomatic
+- sending one terminal completion payload to Yeetomatic
 
 This is a containerized version of the current in-process executor in:
 
@@ -72,9 +72,9 @@ This is a containerized version of the current in-process executor in:
 
 ## Trust Boundaries
 
-### TARS Container
+### Yeetomatic Container
 
-TARS may keep:
+Yeetomatic may keep:
 
 - GitHub credentials
 - session state and jsonl history
@@ -97,12 +97,12 @@ The worker gets:
 The worker does not get:
 
 - GitHub credentials
-- `.env` from the TARS server environment
-- TARS memory DB
-- TARS admin credentials
+- `.env` from the Yeetomatic server environment
+- Yeetomatic memory DB
+- Yeetomatic admin credentials
 - Docker socket
 - a mounted LLM session directory
-- direct access to TARS source checkout unless it is under the workspace mount
+- direct access to Yeetomatic source checkout unless it is under the workspace mount
 
 Important caveat:
 
@@ -114,9 +114,9 @@ Important caveat:
 The worker mount model is:
 
 - host: `WORKSPACES_DIR`
-- container: `WORKSPACES_DIR` at the same absolute path used by TARS
+- container: `WORKSPACES_DIR` at the same absolute path used by Yeetomatic
 
-TARS passes the primary worktree path separately, for example:
+Yeetomatic passes the primary worktree path separately, for example:
 
 - `/app/workspaces/mbrooks-tars/.worktrees/issue-395`
 
@@ -124,11 +124,11 @@ All other repos under that shared workspace root are available for reference and
 
 The worker does not need a runtime mount for RPC.
 
-Instead, TARS passes a session URL such as:
+Instead, Yeetomatic passes a session URL such as:
 
-- `ws://127.0.0.1:6767/tars-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%23395&token=<opaque-token>`
 
-In the Docker Compose deployment, workers share the TARS container network namespace, so loopback is the correct control-plane address from the worker's perspective.
+In the Docker Compose deployment, workers share the Yeetomatic container network namespace, so loopback is the correct control-plane address from the worker's perspective.
 
 ## Process Model
 
@@ -142,25 +142,25 @@ This keeps cleanup simple and prevents detached processes from surviving outside
 
 ## Session Lifecycle
 
-1. TARS receives or resumes an issue session.
-2. TARS prepares the primary worktree.
-3. TARS creates a per-session WebSocket reservation and token.
-4. TARS launches a fresh worker container with the workspace mount and session URL.
+1. Yeetomatic receives or resumes an issue session.
+2. Yeetomatic prepares the primary worktree.
+3. Yeetomatic creates a per-session WebSocket reservation and token.
+4. Yeetomatic launches a fresh worker container with the workspace mount and session URL.
 5. The worker connects and sends `hello`.
-6. TARS verifies the session key matches the reserved session and replies with `launch_config`.
+6. Yeetomatic verifies the session key matches the reserved session and replies with `launch_config`.
 7. The worker runs the agent against the primary worktree.
 8. The worker streams `event_batch` and `heartbeat` messages during execution.
-9. TARS may send `control` messages such as `pause`, `stop`, or `steer`.
+9. Yeetomatic may send `control` messages such as `pause`, `stop`, or `steer`.
 10. The worker sends one terminal `complete` message.
-11. TARS stores logs, updates session state, and handles delivery.
-12. TARS removes the worker container and clears the session reservation.
+11. Yeetomatic stores logs, updates session state, and handles delivery.
+12. Yeetomatic removes the worker container and clears the session reservation.
 
 ## Logging Model
 
-Central session logs stay in TARS.
+Central session logs stay in Yeetomatic.
 
 - The worker sends structured event messages over the WebSocket session.
-- TARS maps them into the existing session log system and persists the canonical session record.
+- Yeetomatic maps them into the existing session log system and persists the canonical session record.
 - Worker stdout and stderr can still be captured by Docker for debugging, but they are not the authoritative control channel.
 
 This keeps the existing admin log views conceptually intact while avoiding stdout as a protocol.
@@ -169,17 +169,17 @@ This keeps the existing admin log views conceptually intact while avoiding stdou
 
 The worker should be treated as a stateless execution runtime.
 
-- TARS owns persisted transcript and session history.
-- The worker should not mount or write the long-lived LLM session directory used by TARS today.
+- Yeetomatic owns persisted transcript and session history.
+- The worker should not mount or write the long-lived LLM session directory used by Yeetomatic today.
 - Assistant responses, reasoning summaries, tool activity, steering inputs, and terminal results should be streamed back over the WebSocket session.
 
-If TARS later needs resumable execution, it should derive restart context from centrally persisted session history rather than a worker-owned on-disk session folder.
+If Yeetomatic later needs resumable execution, it should derive restart context from centrally persisted session history rather than a worker-owned on-disk session folder.
 
 ## Steering Model
 
 Steering is explicit in this design.
 
-- TARS may send a `control` message with `action: "steer"` and a text payload.
+- Yeetomatic may send a `control` message with `action: "steer"` and a text payload.
 - The worker passes that text into the live agent session using the agent's existing steering mechanism.
 - The worker acknowledges receipt and later reports resulting progress through normal events.
 

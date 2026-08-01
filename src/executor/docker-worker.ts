@@ -23,7 +23,7 @@ import {
 import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
 
 const execFileAsync = promisify(execFile);
-const WORKER_IMAGE_TRANSPORT_LABEL = "io.tars.worker.transport";
+const WORKER_IMAGE_TRANSPORT_LABEL = "io.yeetomatic.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 const MAX_WORKER_LAUNCH_RETRIES = 3;
 const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
@@ -196,10 +196,10 @@ export class DockerWorkerExecutor implements ExecutionService {
 			cwd: this.options.projectRoot,
 			env: {
 				...process.env,
-				TARS_SESSION_KEY: sessionKey,
-				TARS_SESSION_WS_URL: workerSessionUrl,
-				TARS_SOUL_PATH: this.options.soulPath,
-				TARS_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
+				YEETOMATIC_SESSION_KEY: sessionKey,
+				YEETOMATIC_SESSION_WS_URL: workerSessionUrl,
+				YEETOMATIC_SOUL_PATH: this.options.soulPath,
+				YEETOMATIC_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
 			},
 			stdio: ["ignore", "pipe", "pipe"],
 		});
@@ -490,11 +490,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 		args.push(
 			"-e",
-			"TARS_SESSION_KEY",
+			"YEETOMATIC_SESSION_KEY",
 			"-e",
-			"TARS_SESSION_WS_URL",
+			"YEETOMATIC_SESSION_WS_URL",
 			"-e",
-			"TARS_SOUL_PATH",
+			"YEETOMATIC_SOUL_PATH",
 			this.options.workerImage,
 		);
 
@@ -647,7 +647,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private buildContainerName(state: SessionState): string {
-		return `tars-session-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
+		return `yeetomatic-session-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
 	}
 
 	private createMessageIdFactory(): () => string {

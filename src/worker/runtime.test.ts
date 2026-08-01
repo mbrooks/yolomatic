@@ -194,7 +194,7 @@ describe("runWorkerRuntime", () => {
 			return {
 				status: "complete",
 				summary: "done",
-				rawResponse: "TARS_STATUS: complete\ndone",
+				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
 			};
 		});
 
@@ -314,7 +314,7 @@ describe("runWorkerRuntime", () => {
 		).rejects.toThrow("Unsupported protocol version");
 	});
 
-	it("aborts execution when TARS sends stop", async () => {
+	it("aborts execution when Yeetomatic sends stop", async () => {
 		const results: Array<ReturnType<typeof createWorkerMessage>> = [];
 
 		executeWithOverride.mockImplementation(async (_state, _prompt, signal, onSessionCreated) => {

@@ -3,7 +3,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
-import { hasTarsVisibleLabel, isAssignedToTars } from "../../domain/workflow/policy.js";
+import { hasYeetomaticVisibleLabel, isAssignedToYeetomatic } from "../../domain/workflow/policy.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 import {
 	issueSessionKey,
@@ -67,24 +67,24 @@ export class HandleIssueEvent {
 		}
 
 		if (payload.action === "unassigned") {
-			if (isAssignedToTars(issue, this.deps.githubUsername)) {
-				process.stdout.write(`[webhook] issues.unassigned ignored: TARS still assigned to ${key}\n`);
+			if (isAssignedToYeetomatic(issue, this.deps.githubUsername)) {
+				process.stdout.write(`[webhook] issues.unassigned ignored: Yeetomatic still assigned to ${key}\n`);
 				return;
 			}
-			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (TARS unassigned)\n`);
+			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (Yeetomatic unassigned)\n`);
 			const state = await this.deps.sessions.get(owner, repo, issue.number);
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
 				await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending");
 				await removeWorkflowLabels(this.deps.github, owner, repo, issue.number);
-				await this.deps.github.postComment(owner, repo, issue.number, "TARS unassigned. Pausing work.");
+				await this.deps.github.postComment(owner, repo, issue.number, "Yeetomatic unassigned. Pausing work.");
 			}
 			return;
 		}
 
 		if (payload.action === "edited") {
-			const hasTarsLabel = hasTarsVisibleLabel(issue.labels) || issue.user?.login === this.deps.githubUsername;
-			if (!isAssignedToTars(issue, this.deps.githubUsername) && !hasTarsLabel) {
-				process.stdout.write(`[webhook] issues.edited ignored: not a TARS issue\n`);
+			const hasYeetomaticLabel = hasYeetomaticVisibleLabel(issue.labels) || issue.user?.login === this.deps.githubUsername;
+			if (!isAssignedToYeetomatic(issue, this.deps.githubUsername) && !hasYeetomaticLabel) {
+				process.stdout.write(`[webhook] issues.edited ignored: not a Yeetomatic issue\n`);
 				return;
 			}
 			const state = await this.deps.sessions.get(owner, repo, issue.number);
@@ -96,7 +96,7 @@ export class HandleIssueEvent {
 				const steered = await this.deps.tasks.steer(key, issue.body ?? "");
 				if (steered) {
 					process.stdout.write(`[webhook] steered description update on active execution ${key}\n`);
-					await this.deps.github.postComment(owner, repo, issue.number, "Issue description updated. Steering to TARS.");
+					await this.deps.github.postComment(owner, repo, issue.number, "Issue description updated. Steering to Yeetomatic.");
 				} else {
 					await this.deps.github.postComment(owner, repo, issue.number, "Issue description updated but could not be steered.");
 				}
@@ -167,7 +167,7 @@ export class HandleIssueEvent {
 				repo,
 				issue.number,
 				prepared.session,
-				"Picked up by TARS. Working on it...",
+				"Picked up by Yeetomatic. Working on it...",
 			);
 		} finally {
 			this.inFlight.delete(key);

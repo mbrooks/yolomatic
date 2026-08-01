@@ -124,7 +124,7 @@ export class WorktreeManager {
 
 		await this.bareRepos.fetchOrigin(bareRepoPath);
 
-		const stashed = await this.stashIfDirty(worktreePath, `TARS auto-stash before sync of issue-${issueNumber}`);
+		const stashed = await this.stashIfDirty(worktreePath, `Yeetomatic auto-stash before sync of issue-${issueNumber}`);
 
 		const remoteExists = await this.bareRepos.remoteBranchExists(bareRepoPath, branchName);
 		if (remoteExists) {
@@ -184,7 +184,7 @@ export class WorktreeManager {
 		const { stashed, forced } = await this.performSafeRemoval(
 			worktreePath,
 			bareRepoPath,
-			`TARS auto-stash before cleanup of issue-${issueNumber}`,
+			`Yeetomatic auto-stash before cleanup of issue-${issueNumber}`,
 		);
 
 		const changeSummary = stashed ? "stashed" : "none";
@@ -348,7 +348,7 @@ export class WorktreeManager {
 		owner: string,
 		repo: string,
 	): Promise<void> {
-		const stashMessage = `TARS auto-stash before eviction of ${path.basename(worktreePath)}`;
+		const stashMessage = `Yeetomatic auto-stash before eviction of ${path.basename(worktreePath)}`;
 		const { stashed: hasUncommitted } = await this.performSafeRemoval(worktreePath, bareRepoPath, stashMessage);
 
 		const strategy = this.config.evictionStrategy ?? "lru";

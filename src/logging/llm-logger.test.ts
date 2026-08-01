@@ -20,11 +20,11 @@ describe("LlmLogger", () => {
 	}
 
 	it("logs with custom session tag when provided", () => {
-		const logger = new LlmLogger("tars", 0, "tars-job-abc123");
+		const logger = new LlmLogger("tars", 0, "yeetomatic-job-abc123");
 		logger.logPrompt("Hello world", 2);
 
 		const lines = getLines();
-		expect(lines.some((l) => l.includes("[tars-job-abc123]"))).toBe(true);
+		expect(lines.some((l) => l.includes("[yeetomatic-job-abc123]"))).toBe(true);
 	});
 
 	it("logs prompts with token info", () => {
@@ -96,10 +96,10 @@ describe("LlmLogger", () => {
 
 	it("logs responses", () => {
 		const logger = new LlmLogger("tars", 42);
-		logger.logResponse("TARS_STATUS: complete\nDone.");
+		logger.logResponse("YEETOMATIC_STATUS: complete\nDone.");
 
 		const lines = getLines();
-		expect(lines.some((l) => l.includes("[response] TARS_STATUS: complete"))).toBe(true);
+		expect(lines.some((l) => l.includes("[response] YEETOMATIC_STATUS: complete"))).toBe(true);
 		expect(lines.some((l) => l.includes("[response] Done."))).toBe(true);
 	});
 

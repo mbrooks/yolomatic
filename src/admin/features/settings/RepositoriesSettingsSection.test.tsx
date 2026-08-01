@@ -62,9 +62,9 @@ describe("RepositoriesSettingsSection", () => {
 		);
 		render(<RepositoriesSettingsSection />);
 
-		const tarsCheckbox = await screen.findByRole("checkbox", { name: /mbrooks\/tars/ }) as HTMLInputElement;
+		const yeetomaticCheckbox = await screen.findByRole("checkbox", { name: /mbrooks\/tars/ }) as HTMLInputElement;
 		const helloCheckbox = screen.getByRole("checkbox", { name: /octocat\/hello-world/ }) as HTMLInputElement;
-		expect(tarsCheckbox.checked).toBe(true);
+		expect(yeetomaticCheckbox.checked).toBe(true);
 		expect(helloCheckbox.checked).toBe(false);
 		expect(screen.getByText("1 of 2 selected")).not.toBeNull();
 	});

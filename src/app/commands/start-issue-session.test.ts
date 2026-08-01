@@ -83,7 +83,7 @@ function makeCommand(
 ) {
 	const repo = makeMockRepo(state);
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-1", branch: "tars/issue-1" })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-1", branch: "yeetomatic/issue-1" })),
 			syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: vi.fn(),
@@ -116,7 +116,7 @@ function makeCommand(
 		acceptInvitation: vi.fn(),
 		updateIssueAssignees: vi.fn(),
 		closeIssue: vi.fn(),
-		getAuthenticatedUser: vi.fn(async () => ({ login: "tars-bot" })),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
 	};
@@ -142,7 +142,7 @@ function makeCommand(
 		executor,
 		clock,
 		"main",
-		"tars-bot",
+		"yeetomatic-bot",
 		true,
 	);
 	return { command, repo, workspaces, github, tasks, executor };
@@ -175,7 +175,7 @@ describe("StartIssueSession", () => {
 			executor,
 			clock,
 			defaultBranch: "main",
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -191,7 +191,7 @@ describe("StartIssueSession", () => {
 			expect(result.data.started).toBe(true);
 			expect(result.data.status).toBe("working");
 		}
-		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-bot"]);
+		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-bot"]);
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
@@ -252,7 +252,7 @@ describe("StartIssueSession", () => {
 			executor,
 			{ now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 },
 			(owner, repoName) => (owner === "mbrooks" && repoName === "tars" ? "master" : "main"),
-			"tars-bot",
+			"yeetomatic-bot",
 			true,
 		);
 

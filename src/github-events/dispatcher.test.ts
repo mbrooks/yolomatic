@@ -26,7 +26,7 @@ describe("GitHubEventDispatcher", () => {
 			handleIssueComment: { execute: vi.fn() } as never,
 			handlePRReview: { execute: vi.fn() } as never,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 		});
 
 		await dispatcher.dispatch({
@@ -38,7 +38,7 @@ describe("GitHubEventDispatcher", () => {
 			occurredAt: "2026-06-01T00:00:00.000Z",
 			payload: {
 				action: "opened",
-				issue: { number: 1, title: "Issue", body: "", labels: [], assignees: [{ login: "tars-bot" }] },
+				issue: { number: 1, title: "Issue", body: "", labels: [], assignees: [{ login: "yeetomatic-bot" }] },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
@@ -98,7 +98,7 @@ describe("GitHubEventDispatcher", () => {
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
-		}, "tars-bot")).toBeNull();
+		}, "yeetomatic-bot")).toBeNull();
 		expect(pollingSubjectFromEvent({
 			id: "comment",
 			type: "issue_comment",
@@ -108,12 +108,12 @@ describe("GitHubEventDispatcher", () => {
 			occurredAt: "2026-06-01T00:00:00.000Z",
 			payload: {
 				action: "created",
-				issue: { number: 3, title: "Issue", body: "", assignees: [{ login: "tars-bot" }] },
+				issue: { number: 3, title: "Issue", body: "", assignees: [{ login: "yeetomatic-bot" }] },
 				comment: { id: 1, body: "Comment", user: { login: "human" } },
 				repository: { name: "tars", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
-		}, "tars-bot")).toEqual(expect.objectContaining({ subjectKey: "mbrooks/tars:issue:3" }));
+		}, "yeetomatic-bot")).toEqual(expect.objectContaining({ subjectKey: "mbrooks/tars:issue:3" }));
 		expect(pollingSubjectFromEvent({
 			id: "pr",
 			type: "pull_request",

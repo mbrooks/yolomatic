@@ -59,7 +59,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("**TARS failed.**"),
+			expect.stringContaining("**Yeetomatic failed.**"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
@@ -105,7 +105,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("**TARS failed.**"),
+			expect.stringContaining("**Yeetomatic failed.**"),
 		);
 	});
 
@@ -124,7 +124,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS encountered a 429 rate-limit error from Ollama"),
+			expect.stringContaining("Yeetomatic encountered a 429 rate-limit error from Ollama"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
@@ -148,7 +148,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			99,
-			expect.stringContaining("**TARS failed.**"),
+			expect.stringContaining("**Yeetomatic failed.**"),
 		);
 	});
 
@@ -176,7 +176,7 @@ describe("ExecuteSessionReporter", () => {
 			},
 		});
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "waiting-feedback");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-feedback-required"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-feedback-required"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
 			"tars",
@@ -207,10 +207,10 @@ describe("ExecuteSessionReporter", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				labels: ["bug"],
-				branch: "tars/issue-1",
+				branch: "yeetomatic/issue-1",
 			},
 		});
-		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "tars/issue-1", "fix: Fix the bug");
+		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "yeetomatic/issue-1", "fix: Fix the bug");
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
 		expect(deps.github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
@@ -248,7 +248,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			99,
-			expect.stringContaining("**TARS failed.**"),
+			expect.stringContaining("**Yeetomatic failed.**"),
 		);
 	});
 
@@ -267,10 +267,10 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS delivery failed."),
+			expect.stringContaining("Yeetomatic delivery failed."),
 		);
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working", "tars-delivery-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
 	});
 
 	it("posts delivery failure comment when error is not an Error instance and workspace listing succeeds", async () => {
@@ -288,7 +288,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS delivery failed."),
+			expect.stringContaining("Yeetomatic delivery failed."),
 		);
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
 	});
@@ -310,7 +310,7 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS delivery failed."),
+			expect.stringContaining("Yeetomatic delivery failed."),
 		);
 	});
 
@@ -358,10 +358,10 @@ describe("ExecuteSessionReporter", () => {
 			"mbrooks",
 			"tars",
 			1,
-			expect.stringContaining("TARS delivery failed."),
+			expect.stringContaining("Yeetomatic delivery failed."),
 		);
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "failed");
 		expect(deps.github.fileSelfReport).toHaveBeenCalled();
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["tars-working", "tars-delivery-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
 	});
 });

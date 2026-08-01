@@ -263,7 +263,7 @@ describe("GitHubServiceAdapter", () => {
 				repo: "tars",
 				path: "README.md",
 				message: "Initial commit",
-				content: Buffer.from("# tars\n\nAuto-initialized by TARS.\n").toString("base64"),
+				content: Buffer.from("# tars\n\nAuto-initialized by Yeetomatic.\n").toString("base64"),
 				branch: "main",
 			});
 		});
@@ -649,8 +649,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.update with assignees", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssueAssignees("mbrooks", "tars", 1, ["tars-bot"]);
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars", issue_number: 1, assignees: ["tars-bot"] });
+			await adapter.updateIssueAssignees("mbrooks", "tars", 1, ["yeetomatic-bot"]);
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "tars", issue_number: 1, assignees: ["yeetomatic-bot"] });
 		});
 	});
 

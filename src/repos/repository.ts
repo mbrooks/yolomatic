@@ -5,7 +5,7 @@ export type RepoGitHubEventMode = "webhook" | "polling" | "both";
 export type RepositoryVisibility = RepoVisibility;
 
 /**
- * A repository managed by TARS, persisted in the `repositories` SQLite table.
+ * A repository managed by Yeetomatic, persisted in the `repositories` SQLite table.
  *
  * `githubEventMode` and `defaultBranch` are nullable per-repo overrides; when
  * null the value is inherited from the global settings.

@@ -74,7 +74,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-01T12:00:00.000Z"),
 			dispatch: vi.fn(),
@@ -96,8 +96,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:30.000Z",
 					updated_at: "2026-06-01T12:00:30.000Z",
 					labels: [],
-					assignee: { login: "tars-bot" },
-					assignees: [{ login: "tars-bot" }],
+					assignee: { login: "yeetomatic-bot" },
+					assignees: [{ login: "yeetomatic-bot" }],
 					user: { login: "human" },
 				},
 			]),
@@ -107,7 +107,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			dispatch,
 		});
@@ -130,7 +130,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			listManagedRepos,
 			dispatch,
@@ -149,9 +149,9 @@ describe("tickGitHubPolling", () => {
 			state: "open",
 			created_at: "2026-06-01T12:00:30.000Z",
 			updated_at: "2026-06-01T12:00:30.000Z",
-			labels: [{ name: "tars" }],
-			assignee: { login: "tars-bot" },
-			assignees: [{ login: "tars-bot" }],
+			labels: [{ name: "yeetomatic" }],
+			assignee: { login: "yeetomatic-bot" },
+			assignees: [{ login: "yeetomatic-bot" }],
 			user: { login: "human" },
 		};
 		const pr = {
@@ -162,7 +162,7 @@ describe("tickGitHubPolling", () => {
 			merged: false,
 			created_at: "2026-06-01T12:00:30.000Z",
 			updated_at: "2026-06-01T12:00:30.000Z",
-			head: { ref: "tars/issue-1" },
+			head: { ref: "yeetomatic/issue-1" },
 			user: { login: "human" },
 		};
 
@@ -255,7 +255,7 @@ describe("tickGitHubPolling", () => {
 		});
 		const dispatch = vi.fn(async (_event: unknown) => {});
 
-		await tickGitHubPolling({ github, eventStore: store, githubUsername: "tars-bot", intervalMs: 60000, dispatch });
+		await tickGitHubPolling({ github, eventStore: store, githubUsername: "yeetomatic-bot", intervalMs: 60000, dispatch });
 
 		const dispatchedTypes = dispatch.mock.calls.map((call) => (call[0] as { type: string }).type);
 		expect(dispatchedTypes).toEqual(["issue_comment", "issue"]);
@@ -303,7 +303,7 @@ describe("tickGitHubPolling", () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
 
 		try {
-			await tickGitHubPolling({ github, eventStore: store, githubUsername: "tars-bot", intervalMs: 60000, dispatch });
+			await tickGitHubPolling({ github, eventStore: store, githubUsername: "yeetomatic-bot", intervalMs: 60000, dispatch });
 
 			expect(dispatch).toHaveBeenCalledTimes(2);
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] dispatch failed id="));
@@ -334,8 +334,8 @@ describe("tickGitHubPolling", () => {
 				created_at: "2026-06-01T12:00:00.000Z",
 				updated_at: "2026-06-04T12:00:00.000Z",
 				labels: [],
-				assignee: { login: "tars-bot" },
-				assignees: [{ login: "tars-bot" }],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
 				user: { login: "human" },
 			}]),
 			listIssueEventsSince: vi.fn(async () => [{
@@ -351,8 +351,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:00.000Z",
 					updated_at: "2026-06-04T12:00:00.000Z",
 					labels: [],
-					assignee: { login: "tars-bot" },
-					assignees: [{ login: "tars-bot" }],
+					assignee: { login: "yeetomatic-bot" },
+					assignees: [{ login: "yeetomatic-bot" }],
 					user: { login: "human" },
 				},
 			}]),
@@ -370,8 +370,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:00.000Z",
 					updated_at: "2026-06-04T12:00:00.000Z",
 					labels: [],
-					assignee: { login: "tars-bot" },
-					assignees: [{ login: "tars-bot" }],
+					assignee: { login: "yeetomatic-bot" },
+					assignees: [{ login: "yeetomatic-bot" }],
 					user: { login: "human" },
 				},
 			}]),
@@ -381,7 +381,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch,
@@ -420,7 +420,7 @@ describe("tickGitHubPolling", () => {
 			merged: false,
 			created_at: "2026-06-01T12:00:00.000Z",
 			updated_at: "2026-06-04T12:00:00.000Z",
-			head: { ref: "tars/issue-1" },
+			head: { ref: "yeetomatic/issue-1" },
 			user: { login: "human" },
 		};
 		const github = makeGithub({
@@ -448,7 +448,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch,
@@ -479,7 +479,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch: vi.fn(),
@@ -491,7 +491,7 @@ describe("tickGitHubPolling", () => {
 		startGitHubPolling({
 			github: makeGithub(),
 			eventStore: makeStore(null),
-			githubUsername: "tars-bot",
+			githubUsername: "yeetomatic-bot",
 			intervalMs: 60000,
 			dispatch: vi.fn(),
 		});
@@ -512,7 +512,7 @@ describe("tickGitHubPolling", () => {
 			startGitHubPolling({
 				github: makeGithub(),
 				eventStore: store,
-				githubUsername: "tars-bot",
+				githubUsername: "yeetomatic-bot",
 				intervalMs: 1000,
 				dispatch: vi.fn(),
 			});
@@ -541,7 +541,7 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "tars-bot",
+				githubUsername: "yeetomatic-bot",
 				intervalMs: 60000,
 				now: () => now,
 				dispatch: vi.fn(),
@@ -564,7 +564,7 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "tars-bot",
+				githubUsername: "yeetomatic-bot",
 				intervalMs: 60000,
 				now: () => new Date("2026-06-01T12:00:00.000Z"),
 				dispatch: vi.fn(),
@@ -602,7 +602,7 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "tars-bot",
+				githubUsername: "yeetomatic-bot",
 				intervalMs: 60000,
 				now: () => new Date("2026-06-04T12:00:00.000Z"),
 				dispatch: vi.fn(),
@@ -629,7 +629,7 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github,
 					eventStore: makeStore("2026-06-01T12:00:00.000Z"),
-					githubUsername: "tars-bot",
+					githubUsername: "yeetomatic-bot",
 					intervalMs: 60000,
 					resolveGitHubEventMode: (owner, repo) => (repo === "webhook-only" ? "webhook" : "both"),
 					dispatch: vi.fn(),
@@ -654,7 +654,7 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github: makeGithub(),
 					eventStore: makeStore(null),
-					githubUsername: "tars-bot",
+					githubUsername: "yeetomatic-bot",
 					intervalMs: 60000,
 					dispatch: vi.fn(),
 				});
@@ -679,7 +679,7 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github,
 					eventStore: makeStore(null),
-					githubUsername: "tars-bot",
+					githubUsername: "yeetomatic-bot",
 					intervalMs: 60000,
 					resolveGitHubEventMode: () => "polling",
 					dispatch: vi.fn(),

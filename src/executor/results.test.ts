@@ -4,27 +4,27 @@ import { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRat
 
 describe("parseExecutionResult", () => {
 	it("parses working status", () => {
-		const result = parseExecutionResult("TARS_STATUS: working\nStill working.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: working\nStill working.");
 		expect(result.status).toBe("working");
 		expect(result.summary).toBe("Still working.");
 	});
 
 	it("parses waiting-feedback status", () => {
-		const result = parseExecutionResult("TARS_STATUS: waiting-feedback\nNeed info.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: waiting-feedback\nNeed info.");
 		expect(result.status).toBe("waiting-feedback");
 		expect(result.summary).toBe("Need info.");
 	});
 
 	it("parses complete status", () => {
-		const result = parseExecutionResult("TARS_STATUS: complete\nDone.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("defaults to working for unknown status", () => {
-		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: unknown\nOops.");
 		expect(result.status).toBe("working");
-		expect(result.summary).toBe("TARS_STATUS: unknown\nOops.");
+		expect(result.summary).toBe("YEETOMATIC_STATUS: unknown\nOops.");
 	});
 
 	it("defaults to working when no status line is present", () => {
@@ -34,7 +34,7 @@ describe("parseExecutionResult", () => {
 	});
 
 	it("trims whitespace", () => {
-		const result = parseExecutionResult("\n  TARS_STATUS: complete  \n  Summary  \n");
+		const result = parseExecutionResult("\n  YEETOMATIC_STATUS: complete  \n  Summary  \n");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Summary");
 	});
@@ -45,24 +45,24 @@ describe("parseExecutionResult", () => {
 	});
 
 	it("falls back to trimmed response when summary is empty", () => {
-		const result = parseExecutionResult("TARS_STATUS: complete\n   ");
-		expect(result.summary).toBe("TARS_STATUS: complete");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: complete\n   ");
+		expect(result.summary).toBe("YEETOMATIC_STATUS: complete");
 	});
 
 	it("finds status line anywhere in the response", () => {
-		const result = parseExecutionResult("Some preamble.\nTARS_STATUS: complete\nDone.");
+		const result = parseExecutionResult("Some preamble.\nYEETOMATIC_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("uses the last status line when multiple are present", () => {
-		const result = parseExecutionResult("TARS_STATUS: working\nStill going.\nTARS_STATUS: complete\nDone.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: working\nStill going.\nYEETOMATIC_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("ignores invalid status lines and finds a later valid one", () => {
-		const result = parseExecutionResult("TARS_STATUS: unknown\nOops.\nTARS_STATUS: complete\nFixed.");
+		const result = parseExecutionResult("YEETOMATIC_STATUS: unknown\nOops.\nYEETOMATIC_STATUS: complete\nFixed.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Fixed.");
 	});
@@ -158,11 +158,11 @@ describe("getLastAssistantText", () => {
 				role: "assistant",
 				content: [
 					{ type: "thinking", thinking: "I need to explain this clearly." },
-					{ type: "text", text: "TARS_STATUS: complete\nDone." },
+					{ type: "text", text: "YEETOMATIC_STATUS: complete\nDone." },
 				],
 			}],
 		};
-		expect(getLastAssistantText(session)).toBe("TARS_STATUS: complete\nDone.");
+		expect(getLastAssistantText(session)).toBe("YEETOMATIC_STATUS: complete\nDone.");
 		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
 	});
 

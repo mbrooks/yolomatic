@@ -39,7 +39,7 @@ describe("settings/model", () => {
 
     it("returns a string as-is", () => {
       const def = getSettingDefinition("github_username")!;
-      expect(parseSettingValue(def, "tars-bot")).toBe("tars-bot");
+      expect(parseSettingValue(def, "yeetomatic-bot")).toBe("yeetomatic-bot");
     });
   });
 
@@ -57,7 +57,7 @@ describe("settings/model", () => {
 
     it("formats a string", () => {
       const def = getSettingDefinition("github_username")!;
-      expect(formatSettingValue(def, "tars-bot")).toBe("tars-bot");
+      expect(formatSettingValue(def, "yeetomatic-bot")).toBe("yeetomatic-bot");
     });
   });
 
@@ -90,7 +90,7 @@ describe("settings/model", () => {
     });
 
     it("trims string values", () => {
-      expect(coerceEnvValue("github_username", "  tars  ")).toBe("tars");
+      expect(coerceEnvValue("github_username", "  yeetomatic  ")).toBe("yeetomatic");
     });
   });
 

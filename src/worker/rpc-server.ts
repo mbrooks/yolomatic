@@ -6,7 +6,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import type { AnyWorkerProtocolMessage, WorkerProtocolMessage } from "./protocol.js";
 import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
 
-export const WORKER_RPC_PATH = "/tars-worker/ws";
+export const WORKER_RPC_PATH = "/yeetomatic-worker/ws";
 
 export interface WorkerRpcConnection {
 	send(message: WorkerProtocolMessage): Promise<void>;

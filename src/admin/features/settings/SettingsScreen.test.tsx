@@ -33,7 +33,7 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "github_username",
-		value: "tars-bot",
+		value: "yeetomatic-bot",
 		description: "GitHub username",
 		type: "string",
 		default: undefined,
@@ -414,10 +414,10 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
 		await waitFor(() => {
-			expect(screen.getByDisplayValue("tars-bot")).not.toBeNull();
+			expect(screen.getByDisplayValue("yeetomatic-bot")).not.toBeNull();
 		});
 
-		const input = screen.getByDisplayValue("tars-bot") as HTMLInputElement;
+		const input = screen.getByDisplayValue("yeetomatic-bot") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "new-bot" } });
 
 		expect(input.parentElement?.classList.contains("dirty")).toBe(true);
@@ -429,10 +429,10 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
 		await waitFor(() => {
-			expect(screen.getByDisplayValue("tars-bot")).not.toBeNull();
+			expect(screen.getByDisplayValue("yeetomatic-bot")).not.toBeNull();
 		});
 
-		fireEvent.change(screen.getByDisplayValue("tars-bot"), { target: { value: "new-bot" } });
+		fireEvent.change(screen.getByDisplayValue("yeetomatic-bot"), { target: { value: "new-bot" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
 		await waitFor(() => {
