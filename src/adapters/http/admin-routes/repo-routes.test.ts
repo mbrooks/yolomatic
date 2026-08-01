@@ -47,6 +47,7 @@ describe("handleRepoRoutes", () => {
 		getAuthenticatedUser: vi.fn() as ReturnType<typeof vi.fn>,
 		listAccessibleRepositories: vi.fn() as ReturnType<typeof vi.fn>,
 		getRepository: vi.fn() as ReturnType<typeof vi.fn>,
+		getCollaboratorPermissionLevel: vi.fn() as ReturnType<typeof vi.fn>,
 	};
 
 	const settingsStore = {

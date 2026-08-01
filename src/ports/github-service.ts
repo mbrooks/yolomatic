@@ -50,6 +50,8 @@ export interface PendingInvitation {
 	html_url: string;
 }
 
+export type CollaboratorPermission = "admin" | "maintain" | "write" | "triage" | "read";
+
 export type RepoVisibility = "public" | "private" | "internal";
 
 export interface AccessibleRepo {
@@ -108,4 +110,5 @@ export interface GitHubService {
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 	getRepository(owner: string, repo: string): Promise<RepositoryInfo | null>;
+	getCollaboratorPermissionLevel(owner: string, repo: string, username: string): Promise<CollaboratorPermission | null>;
 }

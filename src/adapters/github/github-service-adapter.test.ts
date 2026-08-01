@@ -38,6 +38,7 @@ function createMockOctokit(overrides?: Partial<{
 			get: vi.fn(async () => ({ data: { default_branch: "main", full_name: "mbrooks/yeetomatic", visibility: "private" } })),
 			createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
 			listForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
+			getCollaboratorPermissionLevel: vi.fn(async () => ({ data: { permission: "read" } })),
 			...(overrides?.repos ?? {}),
 		},
 		search: {
@@ -782,6 +783,53 @@ describe("GitHubServiceAdapter", () => {
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.getRepository("unknown", "missing");
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("getCollaboratorPermissionLevel", () => {
+		it("returns the permission level when it is a known value", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					getCollaboratorPermissionLevel: vi.fn(async () => ({ data: { permission: "admin" } })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBe("admin");
+			expect(octokit.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", username: "octocat" });
+		});
+
+		it("returns null when the permission value is unrecognized", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					getCollaboratorPermissionLevel: vi.fn(async () => ({ data: { permission: "unknown" } })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBeNull();
+		});
+
+		it("returns null when permission is missing", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					getCollaboratorPermissionLevel: vi.fn(async () => ({ data: {} })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			expect(result).toBeNull();
+		});
+
+		it("returns null on error", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					getCollaboratorPermissionLevel: vi.fn(async () => { throw new Error("Not found"); }),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
 			expect(result).toBeNull();
 		});
 	});

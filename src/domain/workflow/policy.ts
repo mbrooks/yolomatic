@@ -1,5 +1,6 @@
 import { isTerminalStatus } from "../session/model.js";
 import type { SessionState, SessionStatus } from "../../session/store.js";
+import type { CollaboratorPermission } from "../../ports/github-service.js";
 
 interface IssueLabel {
 	name?: string;
@@ -32,6 +33,10 @@ export function isAssignedToYeetomatic(
 
 export function isAdmin(senderLogin: string, adminGithubUsername: string | undefined): boolean {
 	return !!adminGithubUsername && senderLogin === adminGithubUsername;
+}
+
+export function isAdminPermission(permission: CollaboratorPermission | null | undefined): boolean {
+	return permission === "admin";
 }
 
 export function shouldIgnoreIssueEvent(

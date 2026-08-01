@@ -129,7 +129,47 @@ describe("HandleIssueRefinement", () => {
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only admins can run issue refinement.");
+		expect(github.getCollaboratorPermissionLevel).toHaveBeenCalledWith("mbrooks", "yeetomatic", "user");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository owners can run issue refinement.");
+	});
+
+	it("allows refinement from a repository owner with admin permission", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		github.getCollaboratorPermissionLevel.mockResolvedValue("admin");
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(
+			createCommandPayload({
+				sender: { login: "repo-owner" },
+				comment: { id: 105, body: "/yeetomatic issue-refinement", user: { login: "repo-owner" } },
+			}) as never,
+		);
+
+		expect(github.getCollaboratorPermissionLevel).toHaveBeenCalledWith("mbrooks", "yeetomatic", "repo-owner");
+		expect(executor.executeRefinement).toHaveBeenCalled();
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			"Issue refined at the request of @repo-owner. The issue body now contains the Proposed Task. No implementation session was started.",
+		);
+	});
+
+	it("rejects refinement from a collaborator without admin permission", async () => {
+		github.getCollaboratorPermissionLevel.mockResolvedValue("write");
+		await handler.execute(
+			createCommandPayload({
+				sender: { login: "contributor" },
+				comment: { id: 106, body: "/yeetomatic issue-refinement", user: { login: "contributor" } },
+			}) as never,
+		);
+		expect(executor.executeRefinement).not.toHaveBeenCalled();
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository owners can run issue refinement.");
 	});
 
 	it("ignores non-exact refinement commands", async () => {
@@ -346,6 +386,7 @@ describe("HandleIssueRefinement", () => {
 			postComment: vi.fn(async () => 1),
 			updateIssueBody: vi.fn(async () => {}),
 			getIssue: vi.fn(async () => ({ state: "open", body: "Body" })),
+			getCollaboratorPermissionLevel: vi.fn(async (): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> => null),
 		};
 	}
 
