@@ -335,6 +335,15 @@ export class GitHubServiceAdapter implements GitHubService {
 		}
 	}
 
+	async isCollaborator(owner: string, repo: string, username: string): Promise<boolean> {
+		try {
+			const response = await this.octokit.repos.checkCollaborator({ owner, repo, username });
+			return response?.status === 204;
+		} catch {
+			return false;
+		}
+	}
+
 	private normalizeVisibility(
 		visibility: unknown,
 		isPrivate: unknown,
