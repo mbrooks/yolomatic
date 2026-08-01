@@ -5,7 +5,7 @@ import { dispatchWebhookEvent, normalizeWebhookEvent } from "./webhook-adapter.j
 describe("webhook-adapter", () => {
 	const payload = {
 		action: "created",
-		repository: { name: "tars", owner: { login: "mbrooks" } },
+		repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 		issue: { number: 1, title: "Issue", body: "Body", updated_at: "2026-06-01T00:00:00Z" },
 		comment: { id: 10, body: "Comment", user: { login: "human" }, created_at: "2026-06-01T00:00:00Z" },
 		pull_request: { number: 2, head: { ref: "branch" }, state: "open", merged: false, updated_at: "2026-06-01T00:00:00Z" },

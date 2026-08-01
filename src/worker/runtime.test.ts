@@ -171,7 +171,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("handshakes, forwards session logs, handles steering, and sends completion", async () => {
-		const sessionKey = "mbrooks/tars#12";
+		const sessionKey = "mbrooks/yeetomatic#12";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 		let resolvePrompt!: () => void;
 		const promptReleased = new Promise<void>((resolve) => {
@@ -208,9 +208,9 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("launch_config", sessionKey, "launch-1", {
 							session: {
 								owner: "mbrooks",
-								repo: "tars",
+								repo: "yeetomatic",
 								issueNumber: 12,
-								workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-12",
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-12",
 								title: "Issue title",
 								body: "Issue body",
 							},
@@ -256,9 +256,9 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", "other/session#1", "launch-bad", {
 						session: {
 							owner: "mbrooks",
-							repo: "tars",
+							repo: "yeetomatic",
 							issueNumber: 99,
-							workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-99",
+							workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
 							title: "Bad session",
 							body: "Body",
 						},
@@ -271,7 +271,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-99",
-				sessionKey: "mbrooks/tars#99",
+				sessionKey: "mbrooks/yeetomatic#99",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unexpected session key");
@@ -287,14 +287,14 @@ describe("runWorkerRuntime", () => {
 					{
 						type: "launch_config",
 						protocolVersion: 99,
-						sessionKey: "mbrooks/tars#100",
+						sessionKey: "mbrooks/yeetomatic#100",
 						messageId: "launch-version",
 						payload: {
 							session: {
 								owner: "mbrooks",
-								repo: "tars",
+								repo: "yeetomatic",
 								issueNumber: 100,
-								workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-100",
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-100",
 								title: "Bad version",
 								body: "Body",
 							},
@@ -308,7 +308,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-100",
-				sessionKey: "mbrooks/tars#100",
+				sessionKey: "mbrooks/yeetomatic#100",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unsupported protocol version");
@@ -336,12 +336,12 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "mbrooks/tars#55", "launch-stop", {
+						createWorkerMessage("launch_config", "mbrooks/yeetomatic#55", "launch-stop", {
 							session: {
 								owner: "mbrooks",
-								repo: "tars",
+								repo: "yeetomatic",
 								issueNumber: 55,
-								workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-55",
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-55",
 								title: "Stop worker",
 								body: "Body",
 							},
@@ -355,7 +355,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "mbrooks/tars#55", "control-stop", {
+							createWorkerMessage("control", "mbrooks/yeetomatic#55", "control-stop", {
 								action: "stop",
 							}),
 						);
@@ -366,7 +366,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-55",
-			sessionKey: "mbrooks/tars#55",
+			sessionKey: "mbrooks/yeetomatic#55",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -396,12 +396,12 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "mbrooks/tars#56", "launch-steer", {
+						createWorkerMessage("launch_config", "mbrooks/yeetomatic#56", "launch-steer", {
 							session: {
 								owner: "mbrooks",
-								repo: "tars",
+								repo: "yeetomatic",
 								issueNumber: 56,
-								workspacePath: "/workspaces/mbrooks-tars/.worktrees/issue-56",
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
 								title: "Steer too early",
 								body: "Body",
 							},
@@ -415,7 +415,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "mbrooks/tars#56", "control-steer", {
+							createWorkerMessage("control", "mbrooks/yeetomatic#56", "control-steer", {
 								action: "steer",
 								message: "too soon",
 							}),
@@ -430,7 +430,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-56",
-			sessionKey: "mbrooks/tars#56",
+			sessionKey: "mbrooks/yeetomatic#56",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -456,7 +456,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-57",
-				sessionKey: "mbrooks/tars#57",
+				sessionKey: "mbrooks/yeetomatic#57",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Worker RPC connection closed before launch config arrived");

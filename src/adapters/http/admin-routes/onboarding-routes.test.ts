@@ -372,7 +372,7 @@ describe("handleOnboardingRoutes", () => {
 
 		it("returns configured repositories when repositoryStore is available", async () => {
 			const stores = await tmpStores();
-			await stores.repository.upsert({ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" });
+			await stores.repository.upsert({ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" });
 			const req = mockRequest({
 				url: "/api/onboarding/repos",
 				method: "POST",
@@ -385,7 +385,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "tars" }]);
+			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "yeetomatic" }]);
 		});
 
 		it("returns an empty configured list when repositoryStore is absent", async () => {
@@ -451,7 +451,7 @@ describe("handleOnboardingRoutes", () => {
 				body: JSON.stringify({
 					token: "ghp_fake",
 					username: "user",
-					repos: [{ owner: "mbrooks", repo: "tars" }],
+					repos: [{ owner: "mbrooks", repo: "yeetomatic" }],
 				}),
 			});
 			const res = mockResponse();
@@ -461,11 +461,11 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.initialized).toEqual(["mbrooks/tars"]);
-			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "tars");
+			expect(body.initialized).toEqual(["mbrooks/yeetomatic"]);
+			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 			const managed = await stores.repository.list();
 			expect(managed).toHaveLength(1);
-			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "tars" });
+			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "yeetomatic" });
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {

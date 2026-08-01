@@ -20,26 +20,26 @@ describe("createWebhookServerDeps", () => {
 		const fallbackTaskController = deps.taskController;
 		const fallbackWorkspaceService = (deps.cleanupCommand as any).workspaces;
 
-		expect(fallbackTaskController.cancel("mbrooks/tars#1")).toBe(false);
-		expect(fallbackTaskController.isActive("mbrooks/tars#1")).toBe(false);
-		await expect(fallbackTaskController.steer("mbrooks/tars#1", "comment")).resolves.toBe(false);
-		expect(fallbackTaskController.register("mbrooks/tars#1", vi.fn())).not.toBeNull();
-		expect(fallbackTaskController.unregister("mbrooks/tars#1")).toBeUndefined();
+		expect(fallbackTaskController.cancel("mbrooks/yeetomatic#1")).toBe(false);
+		expect(fallbackTaskController.isActive("mbrooks/yeetomatic#1")).toBe(false);
+		await expect(fallbackTaskController.steer("mbrooks/yeetomatic#1", "comment")).resolves.toBe(false);
+		expect(fallbackTaskController.register("mbrooks/yeetomatic#1", vi.fn())).not.toBeNull();
+		expect(fallbackTaskController.unregister("mbrooks/yeetomatic#1")).toBeUndefined();
 		expect(fallbackTaskController.isDraining()).toBe(false);
 		expect(fallbackTaskController.setDraining(true)).toBeUndefined();
 
-		await expect(fallbackWorkspaceService.createOrGetWorktree("mbrooks", "tars", 1)).resolves.toEqual({
+		await expect(fallbackWorkspaceService.createOrGetWorktree("mbrooks", "yeetomatic", 1)).resolves.toEqual({
 			path: "",
 			branch: "",
 		});
-		await expect(fallbackWorkspaceService.syncWorktree("mbrooks", "tars", 1)).resolves.toBeUndefined();
-		await expect(fallbackWorkspaceService.removeWorktree("mbrooks", "tars", 1)).resolves.toBeUndefined();
-		await expect(fallbackWorkspaceService.commitAndPush("mbrooks", "tars", 1, "msg")).resolves.toBe(false);
+		await expect(fallbackWorkspaceService.syncWorktree("mbrooks", "yeetomatic", 1)).resolves.toBeUndefined();
+		await expect(fallbackWorkspaceService.removeWorktree("mbrooks", "yeetomatic", 1)).resolves.toBeUndefined();
+		await expect(fallbackWorkspaceService.commitAndPush("mbrooks", "yeetomatic", 1, "msg")).resolves.toBe(false);
 		await expect(fallbackWorkspaceService.commitAndPushPath("/tmp/ws", "branch", "msg", "main")).resolves.toBe(false);
 		await expect(fallbackWorkspaceService.hasChanges("/tmp/ws", true)).resolves.toBe(false);
-		expect(fallbackWorkspaceService.getWorktreePath("mbrooks", "tars", 1)).toBe("");
-		await expect(fallbackWorkspaceService.getGitStatus("mbrooks", "tars", 1)).resolves.toBe("");
-		await expect(fallbackWorkspaceService.getGitDiff("mbrooks", "tars", 1)).resolves.toBe("");
+		expect(fallbackWorkspaceService.getWorktreePath("mbrooks", "yeetomatic", 1)).toBe("");
+		await expect(fallbackWorkspaceService.getGitStatus("mbrooks", "yeetomatic", 1)).resolves.toBe("");
+		await expect(fallbackWorkspaceService.getGitDiff("mbrooks", "yeetomatic", 1)).resolves.toBe("");
 
 		const status = await deps.getAdminStatus.execute();
 		expect(status.success).toBe(true);
@@ -113,19 +113,19 @@ describe("createWebhookServerDeps", () => {
 		await expect(wrappedWorkspaceService.commitAndPushPath("/tmp/ws", "branch", "msg", "main")).resolves.toBe(true);
 		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "branch", "msg", "main");
 
-		expect(deps.taskController.cancel("mbrooks/tars#1")).toBe(true);
-		expect(deps.taskController.isActive("mbrooks/tars#1")).toBe(true);
-		await expect(deps.taskController.steer("mbrooks/tars#1", "comment")).resolves.toBe(true);
-		deps.taskController.register("mbrooks/tars#1", vi.fn());
-		deps.taskController.unregister("mbrooks/tars#1");
+		expect(deps.taskController.cancel("mbrooks/yeetomatic#1")).toBe(true);
+		expect(deps.taskController.isActive("mbrooks/yeetomatic#1")).toBe(true);
+		await expect(deps.taskController.steer("mbrooks/yeetomatic#1", "comment")).resolves.toBe(true);
+		deps.taskController.register("mbrooks/yeetomatic#1", vi.fn());
+		deps.taskController.unregister("mbrooks/yeetomatic#1");
 		expect(deps.taskController.isDraining()).toBe(true);
 		deps.taskController.setDraining(false);
 
-		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/tars#1");
-		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/tars#1");
-		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/tars#1", "comment");
-		expect(taskController.register).toHaveBeenCalledWith("mbrooks/tars#1", expect.any(Function));
-		expect(taskController.unregister).toHaveBeenCalledWith("mbrooks/tars#1");
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#1", "comment");
+		expect(taskController.register).toHaveBeenCalledWith("mbrooks/yeetomatic#1", expect.any(Function));
+		expect(taskController.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
 		expect(taskController.isDraining).toHaveBeenCalled();
 		expect(taskController.setDraining).toHaveBeenCalledWith(false);
 

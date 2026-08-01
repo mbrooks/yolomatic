@@ -187,7 +187,7 @@ describe.sequential("handleAdminRoute", () => {
 			saveRepoSkill,
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ description: "Updated description" }),
@@ -197,8 +197,8 @@ describe.sequential("handleAdminRoute", () => {
 		const handled = await handleAdminRoute(req, res, deps);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
-		expect(getRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", "triage");
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", {
+		expect(getRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", "triage");
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", {
 			name: "triage",
 			description: "Updated description",
 			content: "Existing body",
@@ -268,7 +268,7 @@ describe.sequential("handleAdminRoute", () => {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "tars",
+							repo: "yeetomatic",
 							issueNumber: 1,
 							status: "working",
 							lastActivity: "2025-01-01T00:00:00Z",
@@ -352,7 +352,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/sessions/:owner/:repo/:issue/log returns log", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/log",
+			url: "/api/sessions/mbrooks/yeetomatic/1/log",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -367,7 +367,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands runs command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ command: "stop" }),
@@ -534,7 +534,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/log",
+			url: "/api/sessions/mbrooks/yeetomatic/1/log",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -547,7 +547,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands rejects missing command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({}),
@@ -571,7 +571,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ command: "stop" }),
@@ -851,7 +851,7 @@ describe.sequential("handleAdminRoute", () => {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "tars",
+							repo: "yeetomatic",
 							issueNumber: 1,
 							status: "complete",
 							lastActivity: "2025-01-01T00:00:00Z",
@@ -888,7 +888,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/sessions/:owner/:repo/:issue/unknown returns 404", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/unknown",
+			url: "/api/sessions/mbrooks/yeetomatic/1/unknown",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -901,7 +901,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/unknown returns 404", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/tars/1/unknown",
+			url: "/api/sessions/mbrooks/yeetomatic/1/unknown",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ command: "stop" }),
@@ -1137,7 +1137,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET /api/repos/:owner/:repo/skills returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1169,7 +1169,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1187,7 +1187,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills lists repo skills", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1202,7 +1202,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -1221,7 +1221,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1243,7 +1243,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
@@ -1266,7 +1266,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
@@ -1282,7 +1282,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
 		});
@@ -1295,7 +1295,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 400 on invalid json", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: "not-json",
@@ -1309,7 +1309,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 500 when repoSkillService is missing", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage", content: "# Triage" }),
@@ -1323,7 +1323,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills requires name and content", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage" }),
@@ -1345,7 +1345,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "DELETE",
 		});
 		const res = mockResponse();
@@ -1357,7 +1357,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("DELETE returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "DELETE",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1371,7 +1371,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("DELETE /api/repos/:owner/:repo/skills/:name removes a repo skill", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "DELETE",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1392,7 +1392,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: false, error: "git error" })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "DELETE",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1412,7 +1412,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => { throw new Error("boom"); }),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "DELETE",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1446,7 +1446,7 @@ describe.sequential("handleAdminRoute", () => {
 			} as never,
 		};
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills",
+			url: "/api/repos/mbrooks/yeetomatic/skills",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1463,7 +1463,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET returns 500 when repoSkillService missing for detail", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1483,7 +1483,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1503,7 +1503,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			body: JSON.stringify({ name: "triage" }),
 		});
@@ -1516,7 +1516,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("PATCH returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage" }),
@@ -1537,7 +1537,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage" }),
@@ -1558,7 +1558,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: "not-json",
@@ -1573,7 +1573,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("returns 404 for unknown routes inside skills", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/extra/path",
+			url: "/api/repos/mbrooks/yeetomatic/skills/extra/path",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1590,7 +1590,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1610,7 +1610,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1624,7 +1624,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills/:name returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -1641,7 +1641,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage", description: "updated", content: "c", enabled: true }),
@@ -1662,7 +1662,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "renamed" }),
@@ -1683,7 +1683,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/skills/triage",
+			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
 			method: "PATCH",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ name: "triage" }),
@@ -1698,10 +1698,10 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/issues returns open issues", async () => {
 		githubService.listOpenIssues.mockResolvedValue([
-			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
 		]);
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues",
+			url: "/api/repos/mbrooks/yeetomatic/issues",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1713,13 +1713,13 @@ describe.sequential("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.issues).toHaveLength(1);
 		expect(body.issues[0].number).toBe(1);
-		expect(githubService.listOpenIssues).toHaveBeenCalledWith("mbrooks", "tars");
+		expect(githubService.listOpenIssues).toHaveBeenCalledWith("mbrooks", "yeetomatic");
 	});
 
 	it("GET /api/repos/:owner/:repo/issues returns 500 when githubService missing", async () => {
 		const noGhDeps = { ...deps, githubService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues",
+			url: "/api/repos/mbrooks/yeetomatic/issues",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1735,7 +1735,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET /api/repos/:owner/:repo/issues handles service error", async () => {
 		githubService.listOpenIssues.mockRejectedValue(new Error("Network error"));
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues",
+			url: "/api/repos/mbrooks/yeetomatic/issues",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -1751,7 +1751,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to Yeetomatic username", async () => {
 		store.set("github_username", "yeetomatic-bot");
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -1764,14 +1764,14 @@ describe.sequential("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.started).toBe(true);
 		expect(body.status).toBe("queued");
-		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 42, ["yeetomatic-bot"]);
-		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "tars", 42, "Bug", "desc", ["bug"]);
+		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic-bot"]);
+		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Bug", "desc", ["bug"]);
 	});
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when githubService missing", async () => {
 		const noGhDeps = { ...deps, githubService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -1788,7 +1788,7 @@ describe.sequential("handleAdminRoute", () => {
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when settingsStore missing", async () => {
 		const noStoreDeps = { ...deps, settingsStore: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -1804,7 +1804,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when github_username not set", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -1822,7 +1822,7 @@ describe.sequential("handleAdminRoute", () => {
 		store.set("github_username", "yeetomatic-bot");
 		githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/42/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -1838,7 +1838,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns false for invalid issue number", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/tars/issues/abc/assign",
+			url: "/api/repos/mbrooks/yeetomatic/issues/abc/assign",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});

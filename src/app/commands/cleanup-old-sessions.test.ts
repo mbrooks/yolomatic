@@ -8,7 +8,7 @@ import type { SessionState } from "../../session/store.js";
 function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 341,
 		title: "test",
 		body: "",
@@ -49,9 +49,9 @@ describe("CleanupOldSessions", () => {
 		const result = await command.execute(7);
 
 		expect(result).toEqual({ deleted: 1, failed: 0 });
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 341);
-		expect(workspaces.removeWorktree).not.toHaveBeenCalledWith("mbrooks", "tars", 342);
-		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "tars", 341);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
+		expect(workspaces.removeWorktree).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 342);
+		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
 
 		writeSpy.mockRestore();
 	});
@@ -76,7 +76,7 @@ describe("CleanupOldSessions", () => {
 
 		expect(result).toEqual({ deleted: 0, failed: 1 });
 		expect(sessions.delete).not.toHaveBeenCalled();
-		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("failed to delete mbrooks/tars#341"));
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("failed to delete mbrooks/yeetomatic#341"));
 
 		writeSpy.mockRestore();
 	});
@@ -100,8 +100,8 @@ describe("CleanupOldSessions", () => {
 		const result = await command.execute(7);
 
 		expect(result).toEqual({ deleted: 1, failed: 0 });
-		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "tars", 341);
-		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "tars", 341);
+		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
+		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
 
 		writeSpy.mockRestore();
 	});

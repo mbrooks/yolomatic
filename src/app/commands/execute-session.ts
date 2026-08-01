@@ -147,7 +147,7 @@ export class ExecuteSession {
 						owner,
 						repo,
 						issueNumber,
-						`⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+						`⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`,
 					);
 					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
@@ -161,7 +161,7 @@ export class ExecuteSession {
 						const engine = new SelfEvolutionEngine({
 							github: this.deps.github,
 							repoPath: process.cwd(),
-							selfReportRepo: { owner: "mbrooks", repo: "tars" },
+							selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
 						});
 						await engine.handleError(error as Error);
 					} catch (seError) {

@@ -23,7 +23,7 @@ const mockIssue = {
 	state: "open",
 	labels: ["bug", "ui"],
 	assignees: ["mbrooks"],
-	html_url: "https://github.com/mbrooks/tars/issues/1",
+	html_url: "https://github.com/mbrooks/yeetomatic/issues/1",
 };
 
 describe("IssueDetail", () => {
@@ -37,45 +37,45 @@ describe("IssueDetail", () => {
 	});
 
 	it("renders empty state when no issue selected", () => {
-		render(<IssueDetail selected={null} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={null} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("Select an issue from the list to view details.")).toBeDefined();
 	});
 
 	it("renders issue title with link", () => {
-		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="yeetomatic" />);
 		const link = screen.getByRole("link");
 		expect(link.textContent).toBe("#1 Bug report");
-		expect(link.getAttribute("href")).toBe("https://github.com/mbrooks/tars/issues/1");
+		expect(link.getAttribute("href")).toBe("https://github.com/mbrooks/yeetomatic/issues/1");
 	});
 
 	it("renders description", () => {
-		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("Something is broken")).toBeDefined();
 	});
 
 	it("renders empty description message when body is empty", () => {
-		render(<IssueDetail selected={{ ...mockIssue, body: "" }} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={{ ...mockIssue, body: "" }} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("No description provided.")).toBeDefined();
 	});
 
 	it("renders assignees as tags", () => {
-		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("mbrooks")).toBeDefined();
 	});
 
 	it("renders unassigned message when no assignees", () => {
-		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("Unassigned")).toBeDefined();
 	});
 
 	it("does not show action buttons when issue has assignees", () => {
-		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.queryByText("Assign to Yeetomatic")).toBeNull();
 		expect(screen.queryByText("Start Session")).toBeNull();
 	});
 
 	it("shows Assign to Yeetomatic and Start Session buttons when issue is unassigned", () => {
-		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={{ ...mockIssue, assignees: [] }} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
 		expect(screen.getByText("Start Session")).toBeDefined();
 	});
@@ -87,7 +87,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onAssignSuccess={onAssignSuccess}
 			/>,
 		);
@@ -96,7 +96,7 @@ describe("IssueDetail", () => {
 		await waitFor(() =>
 			expect(mockAssignIssue).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				1,
 				"Bug report",
 				"Something is broken",
@@ -113,7 +113,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 				onStartSessionSuccess={onStartSessionSuccess}
 			/>,
 		);
@@ -122,7 +122,7 @@ describe("IssueDetail", () => {
 		await waitFor(() =>
 			expect(mockStartIssueSession).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				1,
 				"Bug report",
 				"Something is broken",
@@ -138,7 +138,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		const button = screen.getByText("Assign to Yeetomatic");
@@ -152,7 +152,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		const button = screen.getByText("Assign to Yeetomatic");
@@ -166,7 +166,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		const button = screen.getByText("Start Session");
@@ -180,7 +180,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		const button = screen.getByText("Start Session");
@@ -189,13 +189,13 @@ describe("IssueDetail", () => {
 	});
 
 	it("renders labels as tags", () => {
-		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={mockIssue} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("bug")).toBeDefined();
 		expect(screen.getByText("ui")).toBeDefined();
 	});
 
 	it("renders no labels message when no labels", () => {
-		render(<IssueDetail selected={{ ...mockIssue, labels: [] }} owner="mbrooks" repo="tars" />);
+		render(<IssueDetail selected={{ ...mockIssue, labels: [] }} owner="mbrooks" repo="yeetomatic" />);
 		expect(screen.getByText("No labels")).toBeDefined();
 	});
 
@@ -205,7 +205,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 1, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
@@ -215,7 +215,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 2, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		expect(screen.queryByText("Assigning...")).toBeNull();
@@ -228,7 +228,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 1, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		fireEvent.click(screen.getByText("Start Session"));
@@ -238,7 +238,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 2, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		expect(screen.queryByText("Starting...")).toBeNull();
@@ -252,7 +252,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 1, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
@@ -264,7 +264,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 2, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		expect(screen.queryByText("Network error")).toBeNull();
@@ -277,7 +277,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		const button = screen.getByText("Assign to Yeetomatic");
@@ -293,7 +293,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 1, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		fireEvent.click(screen.getByText("Assign to Yeetomatic"));
@@ -303,7 +303,7 @@ describe("IssueDetail", () => {
 			<IssueDetail
 				selected={{ ...mockIssue, number: 2, assignees: [] }}
 				owner="mbrooks"
-				repo="tars"
+				repo="yeetomatic"
 			/>,
 		);
 		expect(screen.queryByText("Yeetomatic")).toBeNull();

@@ -189,13 +189,13 @@ describe("handleSkillRoutes", () => {
 	it("GET /api/repos/:owner/:repo/skills returns 500 without repo skill service", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills"),
+			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -208,7 +208,7 @@ describe("handleSkillRoutes", () => {
 		]);
 		const listAll = vi.fn(async () => []);
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills"),
+			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
 				adminUsername: "admin",
@@ -216,7 +216,7 @@ describe("handleSkillRoutes", () => {
 				repoSkillService: { listRepoSkills },
 				skillStore: { listAll },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
@@ -230,31 +230,31 @@ describe("handleSkillRoutes", () => {
 			{ name: "n", description: "", content: "", updatedAt: "", source: "repo" as const },
 		]);
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { saveRepoSkill, listRepoSkills },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(201);
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", { name: "n", description: "", content: "c" });
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", { name: "n", description: "", content: "c" });
 	});
 
 	it("POST /api/repos/:owner/:repo/skills returns 400 when missing required fields", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", JSON.stringify({ name: "n" })),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { saveRepoSkill: vi.fn() },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
@@ -264,14 +264,14 @@ describe("handleSkillRoutes", () => {
 		const res = response();
 		const saveRepoSkill = vi.fn(async () => ({ success: false, error: "fail" }));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { saveRepoSkill, listRepoSkills: vi.fn(async () => []) },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -287,14 +287,14 @@ describe("handleSkillRoutes", () => {
 			source: "repo" as const,
 		}));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/found"),
+			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { getRepoSkill },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/found",
+			"/api/repos/mbrooks/yeetomatic/skills/found",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
@@ -304,14 +304,14 @@ describe("handleSkillRoutes", () => {
 	it("GET /api/repos/:owner/:repo/skills/:name returns 404 for missing skill", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/missing"),
+			request("/api/repos/mbrooks/yeetomatic/skills/missing"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { getRepoSkill: vi.fn(async () => null) },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/missing",
+			"/api/repos/mbrooks/yeetomatic/skills/missing",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(404);
@@ -320,7 +320,7 @@ describe("handleSkillRoutes", () => {
 	it("PATCH /api/repos/:owner/:repo/skills/:name returns 404 for missing skill", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
+			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
 				adminUsername: "admin",
@@ -329,7 +329,7 @@ describe("handleSkillRoutes", () => {
 					getRepoSkill: vi.fn(async () => null),
 				},
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(404);
@@ -339,7 +339,7 @@ describe("handleSkillRoutes", () => {
 		const res = response();
 		const saveRepoSkill = vi.fn(async () => ({ success: false, error: "fail" }));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
+			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
 				adminUsername: "admin",
@@ -355,7 +355,7 @@ describe("handleSkillRoutes", () => {
 					saveRepoSkill,
 				},
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -367,7 +367,7 @@ describe("handleSkillRoutes", () => {
 		const saveRepoSkill = vi.fn(async () => ({ success: true }));
 		const handled = await handleSkillRoutes(
 			request(
-				"/api/repos/mbrooks/tars/skills/triage",
+				"/api/repos/mbrooks/yeetomatic/skills/triage",
 				"PATCH",
 				JSON.stringify({ name: "triage-v2" }),
 			),
@@ -387,12 +387,12 @@ describe("handleSkillRoutes", () => {
 					saveRepoSkill,
 				},
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
-		expect(deleteRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", "triage");
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", {
+		expect(deleteRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", "triage");
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", {
 			name: "triage-v2",
 			description: "Existing",
 			content: "Body",
@@ -403,14 +403,14 @@ describe("handleSkillRoutes", () => {
 		const res = response();
 		const deleteRepoSkill = vi.fn(async () => ({ success: true }));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/old", "DELETE"),
+			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { deleteRepoSkill },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/old",
+			"/api/repos/mbrooks/yeetomatic/skills/old",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
@@ -421,14 +421,14 @@ describe("handleSkillRoutes", () => {
 		const res = response();
 		const deleteRepoSkill = vi.fn(async () => ({ success: false, error: "fail" }));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/old", "DELETE"),
+			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { deleteRepoSkill },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/old",
+			"/api/repos/mbrooks/yeetomatic/skills/old",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -539,14 +539,14 @@ describe("handleSkillRoutes error cases", () => {
 	it("GET /api/repos/:owner/:repo/skills returns 500 on listRepoSkills error", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills"),
+			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { listRepoSkills: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -556,14 +556,14 @@ describe("handleSkillRoutes error cases", () => {
 	it("POST /api/repos/:owner/:repo/skills returns 400 on invalid JSON", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", "not-json"),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", "not-json"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { saveRepoSkill: vi.fn() },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
@@ -572,14 +572,14 @@ describe("handleSkillRoutes error cases", () => {
 	it("GET /api/repos/:owner/:repo/skills/:name returns 500 on getRepoSkill error", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/found"),
+			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { getRepoSkill: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/found",
+			"/api/repos/mbrooks/yeetomatic/skills/found",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -589,14 +589,14 @@ describe("handleSkillRoutes error cases", () => {
 	it("PATCH /api/repos/:owner/:repo/skills/:name returns 400 on invalid JSON", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/triage", "PATCH", "not-json"),
+			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", "not-json"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { getRepoSkill: vi.fn() },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
@@ -605,14 +605,14 @@ describe("handleSkillRoutes error cases", () => {
 	it("DELETE /api/repos/:owner/:repo/skills/:name returns 500 on deleteRepoSkill error", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/old", "DELETE"),
+			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { deleteRepoSkill: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
-			"/api/repos/mbrooks/tars/skills/old",
+			"/api/repos/mbrooks/yeetomatic/skills/old",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -686,13 +686,13 @@ describe("handleSkillRoutes missing service branches", () => {
 	it("POST /api/repos/:owner/:repo/skills returns 500 without repo skill service", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -701,13 +701,13 @@ describe("handleSkillRoutes missing service branches", () => {
 	it("GET /api/repos/:owner/:repo/skills/:name returns 500 without repo skill service", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/found"),
+			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/skills/found",
+			"/api/repos/mbrooks/yeetomatic/skills/found",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -716,13 +716,13 @@ describe("handleSkillRoutes missing service branches", () => {
 	it("PATCH /api/repos/:owner/:repo/skills/:name returns 500 without repo skill service", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
+			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -731,13 +731,13 @@ describe("handleSkillRoutes missing service branches", () => {
 	it("DELETE /api/repos/:owner/:repo/skills/:name returns 500 without repo skill service", async () => {
 		const res = response();
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/old", "DELETE"),
+			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 			} as never,
-			"/api/repos/mbrooks/tars/skills/old",
+			"/api/repos/mbrooks/yeetomatic/skills/old",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -780,7 +780,7 @@ describe("handleSkillRoutes additional branches", () => {
 		const deleteRepoSkill = vi.fn(async () => ({ success: true }));
 		const saveRepoSkill = vi.fn(async () => ({ success: true }));
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills/triage", "PATCH", JSON.stringify({ name: "triage" })),
+			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ name: "triage" })),
 			res,
 			{
 				adminUsername: "admin",
@@ -797,12 +797,12 @@ describe("handleSkillRoutes additional branches", () => {
 					saveRepoSkill,
 				},
 			} as never,
-			"/api/repos/mbrooks/tars/skills/triage",
+			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
 		expect(deleteRepoSkill).not.toHaveBeenCalled();
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "tars", {
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", {
 			name: "triage",
 			description: "Existing",
 			content: "Body",
@@ -816,14 +816,14 @@ describe("handleSkillRoutes final coverage", () => {
 		const saveRepoSkill = vi.fn(async () => ({ success: true }));
 		const listRepoSkills = vi.fn(async () => []);
 		const handled = await handleSkillRoutes(
-			request("/api/repos/mbrooks/tars/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
+			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
 				adminUsername: "admin",
 				adminPassword: "secret",
 				repoSkillService: { saveRepoSkill, listRepoSkills },
 			} as never,
-			"/api/repos/mbrooks/tars/skills",
+			"/api/repos/mbrooks/yeetomatic/skills",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(201);

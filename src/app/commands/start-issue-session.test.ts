@@ -22,7 +22,7 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 		createSession: vi.fn(async (_o, _r, _n, title, body, workspacePath, labels) => {
 			currentState = {
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 1,
 				title,
 				body,
@@ -61,7 +61,7 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 function makeState(status: SessionState["status"]): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 1,
 		title: "Test",
 		body: "Body",
@@ -184,21 +184,21 @@ describe("StartIssueSession", () => {
 
 	it("assigns issue, creates session, and starts execution", async () => {
 		const { command, github, executor } = makeCommand(null);
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", ["bug"]);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
 
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.started).toBe(true);
 			expect(result.data.status).toBe("working");
 		}
-		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-bot"]);
+		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-bot"]);
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
 	it("returns conflict when session is already active", async () => {
 		const { command, tasks } = makeCommand(null);
 		(tasks.isActive as ReturnType<typeof vi.fn>).mockReturnValue(true);
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -209,7 +209,7 @@ describe("StartIssueSession", () => {
 
 	it("returns started false when session already exists and is not pending", async () => {
 		const { command } = makeCommand(makeState("working"));
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -221,7 +221,7 @@ describe("StartIssueSession", () => {
 	it("handles errors during execution", async () => {
 		const { command, executor } = makeCommand(null);
 		(executor.execute as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Execution failed"));
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -233,7 +233,7 @@ describe("StartIssueSession", () => {
 	it("handles errors from ensureSessionExists", async () => {
 		const { command, workspaces } = makeCommand(null);
 		(workspaces.createOrGetWorktree as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Workspace error"));
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -251,12 +251,12 @@ describe("StartIssueSession", () => {
 			tasks,
 			executor,
 			{ now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 },
-			(owner, repoName) => (owner === "mbrooks" && repoName === "tars" ? "master" : "main"),
+			(owner, repoName) => (owner === "mbrooks" && repoName === "yeetomatic" ? "master" : "main"),
 			"yeetomatic-bot",
 			true,
 		);
 
-		const result = await command.execute("mbrooks", "tars", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(true);
 		expect(executor.execute).toHaveBeenCalled();

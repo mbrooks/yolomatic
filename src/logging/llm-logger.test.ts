@@ -20,7 +20,7 @@ describe("LlmLogger", () => {
 	}
 
 	it("logs with custom session tag when provided", () => {
-		const logger = new LlmLogger("tars", 0, "yeetomatic-job-abc123");
+		const logger = new LlmLogger("yeetomatic", 0, "yeetomatic-job-abc123");
 		logger.logPrompt("Hello world", 2);
 
 		const lines = getLines();
@@ -28,16 +28,16 @@ describe("LlmLogger", () => {
 	});
 
 	it("logs prompts with token info", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logPrompt("Hello world", 2);
 
 		const lines = getLines();
 		expect(lines.some((l) => l.includes("[prompt] Prompt sent (2 tokens)"))).toBe(true);
-		expect(lines.some((l) => l.includes("[tars-issue-42]"))).toBe(true);
+		expect(lines.some((l) => l.includes("[yeetomatic-issue-42]"))).toBe(true);
 	});
 
 	it("logs prompts with unknown tokens when not specified", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logPrompt("Hello world");
 
 		const lines = getLines();
@@ -45,7 +45,7 @@ describe("LlmLogger", () => {
 	});
 
 	it("truncates long prompts", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		const longPrompt = "a".repeat(3000);
 		logger.logPrompt(longPrompt);
 
@@ -55,7 +55,7 @@ describe("LlmLogger", () => {
 	});
 
 	it("logs thoughts", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logThought("I should check the handlers first.");
 
 		const lines = getLines();
@@ -63,14 +63,14 @@ describe("LlmLogger", () => {
 	});
 
 	it("skips empty thoughts", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logThought("   ");
 
 		expect(process.stdout.write).not.toHaveBeenCalled();
 	});
 
 	it("logs tool calls", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logToolCall("read", { path: "./src/index.ts" });
 
 		const lines = getLines();
@@ -78,7 +78,7 @@ describe("LlmLogger", () => {
 	});
 
 	it("logs tool results", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logToolResult("read", "file content here");
 
 		const lines = getLines();
@@ -86,7 +86,7 @@ describe("LlmLogger", () => {
 	});
 
 	it("truncates long tool results", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		const longResult = "b".repeat(600);
 		logger.logToolResult("read", longResult);
 
@@ -95,7 +95,7 @@ describe("LlmLogger", () => {
 	});
 
 	it("logs responses", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logResponse("YEETOMATIC_STATUS: complete\nDone.");
 
 		const lines = getLines();
@@ -104,14 +104,14 @@ describe("LlmLogger", () => {
 	});
 
 	it("skips empty responses", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logResponse("   ");
 
 		expect(process.stdout.write).not.toHaveBeenCalled();
 	});
 
 	it("logs errors", () => {
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logError(new Error("Something broke"), "Execution failed");
 
 		const lines = getLines();
@@ -120,7 +120,7 @@ describe("LlmLogger", () => {
 
 	it("respects LOG_PROMPTS=false", () => {
 		process.env.LOG_PROMPTS = "false";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logPrompt("Hello");
 
 		expect(process.stdout.write).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe("LlmLogger", () => {
 
 	it("respects LOG_THOUGHTS=false", () => {
 		process.env.LOG_THOUGHTS = "false";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logThought("Thinking...");
 
 		expect(process.stdout.write).not.toHaveBeenCalled();
@@ -136,7 +136,7 @@ describe("LlmLogger", () => {
 
 	it("respects LOG_TOOLS=false", () => {
 		process.env.LOG_TOOLS = "false";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logToolCall("read", { path: "./src" });
 		logger.logToolResult("read", "content");
 
@@ -145,7 +145,7 @@ describe("LlmLogger", () => {
 
 	it("respects LOG_RESPONSES=false", () => {
 		process.env.LOG_RESPONSES = "false";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logResponse("Done");
 
 		expect(process.stdout.write).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe("LlmLogger", () => {
 
 	it("respects LOG_LEVEL=error (only errors logged)", () => {
 		process.env.LOG_LEVEL = "error";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		logger.logPrompt("Hello");
 		logger.logThought("Thinking");
 		logger.logToolCall("read", {});
@@ -168,7 +168,7 @@ describe("LlmLogger", () => {
 
 	it("uses full content in debug mode", () => {
 		process.env.LOG_LEVEL = "debug";
-		const logger = new LlmLogger("tars", 42);
+		const logger = new LlmLogger("yeetomatic", 42);
 		const longPrompt = "a".repeat(3000);
 		logger.logPrompt(longPrompt);
 

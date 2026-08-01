@@ -186,7 +186,7 @@ describe("createWebhookServer", () => {
 			isInFlight: vi.fn(() => false),
 		};
 		readBody.mockResolvedValueOnce(
-			Buffer.from('{"action":"created","comment":{"id":1,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+			Buffer.from('{"action":"created","comment":{"id":1,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"yeetomatic","owner":{"login":"mbrooks"}}}'),
 		);
 
 		const { createWebhookServer } = await import("./server.js");
@@ -210,7 +210,7 @@ describe("createWebhookServer", () => {
 			expect.objectContaining({
 				type: "issue_comment",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				source: "webhook",
 				payload: expect.objectContaining({ action: "created" }),
 			}),
@@ -221,7 +221,7 @@ describe("createWebhookServer", () => {
 	it("routes issues webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
 		readBody.mockResolvedValueOnce(
-			Buffer.from('{"action":"opened","issue":{"number":12,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+			Buffer.from('{"action":"opened","issue":{"number":12,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"yeetomatic","owner":{"login":"mbrooks"}}}'),
 		);
 
 		const { createWebhookServer } = await import("./server.js");
@@ -243,7 +243,7 @@ describe("createWebhookServer", () => {
 			expect.objectContaining({
 				type: "issue",
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				source: "webhook",
 				payload: expect.objectContaining({ action: "opened" }),
 			}),
@@ -254,7 +254,7 @@ describe("createWebhookServer", () => {
 	it("routes pull_request_review_comment webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
 		readBody.mockResolvedValueOnce(
-			Buffer.from('{"action":"created","comment":{"id":2,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+			Buffer.from('{"action":"created","comment":{"id":2,"created_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"yeetomatic","owner":{"login":"mbrooks"}}}'),
 		);
 
 		const { createWebhookServer } = await import("./server.js");
@@ -284,7 +284,7 @@ describe("createWebhookServer", () => {
 	it("routes pull_request_review webhooks through the normalized dispatcher", async () => {
 		const handlers = makeHandlers();
 		readBody.mockResolvedValueOnce(
-			Buffer.from('{"action":"submitted","review":{"id":3,"submitted_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"tars","owner":{"login":"mbrooks"}}}'),
+			Buffer.from('{"action":"submitted","review":{"id":3,"submitted_at":"2026-06-28T00:00:00.000Z"},"repository":{"name":"yeetomatic","owner":{"login":"mbrooks"}}}'),
 		);
 
 		const { createWebhookServer } = await import("./server.js");

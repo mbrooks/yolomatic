@@ -17,16 +17,16 @@ describe("issues api", () => {
 		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			jsonResponse({
 				issues: [
-					{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+					{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
 				],
 			}),
 		);
 
-		await expect(fetchOpenIssues("mbrooks", "tars")).resolves.toEqual([
-			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/tars/issues/1" },
+		await expect(fetchOpenIssues("mbrooks", "yeetomatic")).resolves.toEqual([
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
 		]);
 
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues");
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/issues");
 	});
 
 	it("assigns issue via POST", async () => {
@@ -34,9 +34,9 @@ describe("issues api", () => {
 			jsonResponse({ started: true, status: "working", message: "ok" }),
 		);
 
-		await expect(assignIssue("mbrooks", "tars", 42, "Bug", "desc", ["bug"])).resolves.toEqual({ started: true, status: "working", message: "ok" });
+		await expect(assignIssue("mbrooks", "yeetomatic", 42, "Bug", "desc", ["bug"])).resolves.toEqual({ started: true, status: "working", message: "ok" });
 
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/assign", {
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/issues/42/assign", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -48,13 +48,13 @@ describe("issues api", () => {
 			jsonResponse({ started: true, status: "working", message: "ok" }),
 		);
 
-		await expect(startIssueSession("mbrooks", "tars", 42, "Bug", "desc", ["bug"])).resolves.toEqual({
+		await expect(startIssueSession("mbrooks", "yeetomatic", 42, "Bug", "desc", ["bug"])).resolves.toEqual({
 			started: true,
 			status: "working",
 			message: "ok",
 		});
 
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/start-session", {
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/issues/42/start-session", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
@@ -66,9 +66,9 @@ describe("issues api", () => {
 			jsonResponse({ closed: true }),
 		);
 
-		await expect(closeIssue("mbrooks", "tars", 42)).resolves.toEqual({ closed: true });
+		await expect(closeIssue("mbrooks", "yeetomatic", 42)).resolves.toEqual({ closed: true });
 
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/close", {
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/issues/42/close", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({}),
@@ -80,9 +80,9 @@ describe("issues api", () => {
 			jsonResponse({ closed: true, labeled: true }),
 		);
 
-		await expect(markIssueDoNotWork("mbrooks", "tars", 42)).resolves.toEqual({ closed: true, labeled: true });
+		await expect(markIssueDoNotWork("mbrooks", "yeetomatic", 42)).resolves.toEqual({ closed: true, labeled: true });
 
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/tars/issues/42/mark-do-not-work", {
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/issues/42/mark-do-not-work", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({}),

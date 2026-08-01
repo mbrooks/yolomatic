@@ -99,7 +99,7 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "configured_repositories",
-		value: "[\"mbrooks/tars\"]",
+		value: "[\"mbrooks/yeetomatic\"]",
 		description: "JSON list of repositories configured during onboarding",
 		type: "string",
 		default: "[]",
@@ -329,9 +329,9 @@ describe("SettingsScreen", () => {
 			if (url === "/api/repos/accessible") {
 				return Promise.resolve(jsonResponse({
 					repositories: [
-						{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", visibility: "private" },
+						{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
 					],
-					configured: [{ owner: "mbrooks", repo: "tars" }],
+					configured: [{ owner: "mbrooks", repo: "yeetomatic" }],
 				}));
 			}
 			if (url === "/api/settings") {
@@ -342,7 +342,7 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="repositories" />);
 
 		await waitFor(() => {
-			expect(screen.getByText("mbrooks/tars")).not.toBeNull();
+			expect(screen.getByText("mbrooks/yeetomatic")).not.toBeNull();
 		});
 
 		expect(screen.getByRole("button", { name: "Repositories" }).className).toContain("active");

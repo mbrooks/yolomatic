@@ -186,7 +186,7 @@ export class ExecuteSessionReporter {
 				"**Yeetomatic delivery failed.**",
 				"",
 				scopeHint,
-				`A bug report has been filed in \`mbrooks/tars\`: ${issueUrl}`,
+				`A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`,
 				"",
 				"<details>",
 				"<summary>Delivery diagnostics</summary>",

@@ -35,11 +35,11 @@ vi.mock("../../api/onboarding.js", async (importOriginal) => {
 		generateWebhookSecret: vi.fn(async () => ({ secret: "a".repeat(192) })),
 		listAccessibleRepositories: vi.fn(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
 		})),
-		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/tars"] })),
+		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/yeetomatic"] })),
 		submitOnboarding: vi.fn(async () => ({ success: true, activated: true, requiresRestart: [] })),
 	};
 });
@@ -81,7 +81,7 @@ describe("OnboardingWizard", () => {
 		// override it via mockResolvedValue/mockImplementation.
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
 			configured: [],
@@ -323,7 +323,7 @@ describe("OnboardingWizard", () => {
 			// empty submitted value.
 			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 			expect(screen.queryByText("Using the configured GitHub token.")).not.toBeNull();
-			await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 			fireEvent.click(screen.getByText("Initialize & Finish"));
 			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
@@ -332,7 +332,7 @@ describe("OnboardingWizard", () => {
 			expect(onboarding.initializeWorkspaces).toHaveBeenCalledWith({
 				token: "",
 				username: "configured-user",
-				repos: [{ owner: "mbrooks", repo: "tars" }, { owner: "octocat", repo: "hello" }],
+				repos: [{ owner: "mbrooks", repo: "yeetomatic" }, { owner: "octocat", repo: "hello" }],
 			});
 			expect(onboarding.submitOnboarding).toHaveBeenCalledTimes(1);
 		});
@@ -683,7 +683,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
-		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
@@ -715,7 +715,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
-		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
@@ -836,7 +836,7 @@ describe("OnboardingWizard", () => {
 				webhookSecret: "webhook-secret",
 				webhookSecretProtected: false,
 				repositories: [
-					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars", selected: true },
+					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", selected: true },
 					{ owner: "octocat", repo: "hello", fullName: "octocat/hello", selected: true },
 				],
 				error: null,
@@ -847,7 +847,7 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 
 		const repositoryCheckboxes = [
-			screen.getByLabelText("mbrooks/tars") as HTMLInputElement,
+			screen.getByLabelText("mbrooks/yeetomatic") as HTMLInputElement,
 			screen.getByLabelText("octocat/hello") as HTMLInputElement,
 		];
 		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
@@ -870,7 +870,7 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 		// The list is populated automatically; the legacy Fetch button is gone.
 		expect(screen.queryByRole("button", { name: /fetch repositories/i })).toBeNull();
-		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 		expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeNull();
 	});
 
@@ -878,10 +878,10 @@ describe("OnboardingWizard", () => {
 		const onboarding = await import("../../api/onboarding.js");
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
-			configured: [{ owner: "mbrooks", repo: "tars" }],
+			configured: [{ owner: "mbrooks", repo: "yeetomatic" }],
 		}));
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
@@ -891,11 +891,11 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
-		await waitFor(() => expect(screen.queryByText("mbrooks/tars")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		// Rerunning the wizard with configured repos only pre-selects the
 		// configured repo; other accessible repos are left unchecked.
-		const yeetomaticCheckbox = screen.getByLabelText("mbrooks/tars") as HTMLInputElement;
+		const yeetomaticCheckbox = screen.getByLabelText("mbrooks/yeetomatic") as HTMLInputElement;
 		const helloCheckbox = screen.getByLabelText("octocat/hello") as HTMLInputElement;
 		expect(yeetomaticCheckbox.checked).toBe(true);
 		expect(helloCheckbox.checked).toBe(false);
@@ -910,7 +910,7 @@ describe("OnboardingWizard", () => {
 			fetchCount++;
 			return {
 				repositories: [
-					{ owner: "mbrooks", repo: "tars", fullName: "mbrooks/tars" },
+					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
 				],
 				configured: [],
 			};

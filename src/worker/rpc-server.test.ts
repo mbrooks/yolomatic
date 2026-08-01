@@ -121,19 +121,19 @@ import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./webs
 describe("WorkerRpcServer", () => {
 	it("accepts a pending worker session and buffers early messages", async () => {
 		const { server, rpcServer, close } = createHarness();
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#77");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#77");
 		const { client, socket } = createUpgradeSocket();
 
 		server.emit(
 			"upgrade",
-			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%2377&token=${pending.token}` },
+			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%2377&token=${pending.token}` },
 			socket,
 			Buffer.alloc(0),
 		);
 
 		await sendWorkerWebSocketMessage(
 			client as never,
-			createWorkerMessage("hello", "mbrooks/tars#77", "msg-1", { workerVersion: "test", pid: 1 }),
+			createWorkerMessage("hello", "mbrooks/yeetomatic#77", "msg-1", { workerVersion: "test", pid: 1 }),
 		);
 
 		try {
@@ -150,7 +150,7 @@ describe("WorkerRpcServer", () => {
 				clientMessages.push(decodeWorkerWebSocketMessage(raw).messageId);
 			});
 
-			await connection.send(createWorkerMessage("ack", "mbrooks/tars#77", "ack-1", { ackMessageId: "msg-1" }));
+			await connection.send(createWorkerMessage("ack", "mbrooks/yeetomatic#77", "ack-1", { ackMessageId: "msg-1" }));
 			await waitFor(() => expect(clientMessages).toEqual(["ack-1"]));
 
 			client.close();
@@ -162,14 +162,14 @@ describe("WorkerRpcServer", () => {
 
 	it("rejects unauthorized upgrade attempts", async () => {
 		const { server, rpcServer, close } = createHarness();
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#78");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#78");
 		void pending.waitForConnection().catch(() => undefined);
 		const { socket } = createUpgradeSocket();
 
 		try {
 			server.emit(
 				"upgrade",
-				{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%2378&token=wrong` },
+				{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%2378&token=wrong` },
 				socket,
 				Buffer.alloc(0),
 			);
@@ -185,13 +185,13 @@ describe("WorkerRpcServer", () => {
 	it("rejects pending connections when disposed or closed", async () => {
 		const { rpcServer, close } = createHarness();
 		try {
-			const disposed = rpcServer.createPendingConnection("mbrooks/tars#79");
+			const disposed = rpcServer.createPendingConnection("mbrooks/yeetomatic#79");
 			disposed.dispose(new Error("disposed"));
 			await expect(disposed.waitForConnection()).rejects.toThrow("disposed");
 
-			const closed = rpcServer.createPendingConnection("mbrooks/tars#80");
+			const closed = rpcServer.createPendingConnection("mbrooks/yeetomatic#80");
 			await rpcServer.close();
-			await expect(closed.waitForConnection()).rejects.toThrow("closed before mbrooks/tars#80 connected");
+			await expect(closed.waitForConnection()).rejects.toThrow("closed before mbrooks/yeetomatic#80 connected");
 		} finally {
 			await close();
 		}
@@ -199,12 +199,12 @@ describe("WorkerRpcServer", () => {
 
 	it("buffers websocket errors and reports closed connections immediately", async () => {
 		const { server, rpcServer, close } = createHarness();
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#81");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#81");
 		const { client, socket } = createUpgradeSocket();
 
 		server.emit(
 			"upgrade",
-			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%2381&token=${pending.token}` },
+			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%2381&token=${pending.token}` },
 			socket,
 			Buffer.alloc(0),
 		);
@@ -237,7 +237,7 @@ describe("WorkerRpcServer", () => {
 		await expect(unattachedServer.close()).resolves.toBeUndefined();
 
 		const { server, rpcServer, close } = createHarness();
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#82");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#82");
 		void pending.waitForConnection().catch(() => undefined);
 		const { socket } = createUpgradeSocket();
 
@@ -259,12 +259,12 @@ describe("WorkerRpcServer", () => {
 
 	it("closes active connections and ignores dispose after a worker is connected", async () => {
 		const { server, rpcServer, close } = createHarness();
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#83");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#83");
 		const { client, socket } = createUpgradeSocket();
 
 		server.emit(
 			"upgrade",
-			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%2383&token=${pending.token}` },
+			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%2383&token=${pending.token}` },
 			socket,
 			Buffer.alloc(0),
 		);
@@ -288,23 +288,23 @@ describe("WorkerRpcServer", () => {
 		expect(ignored.socket.write).not.toHaveBeenCalled();
 		expect(ignored.socket.destroy).not.toHaveBeenCalled();
 
-		const mismatched = rpcServer.createPendingConnection("mbrooks/tars#84");
+		const mismatched = rpcServer.createPendingConnection("mbrooks/yeetomatic#84");
 		void mismatched.waitForConnection().catch(() => undefined);
 		const mismatchSocket = createUpgradeSocket();
 		server.emit(
 			"upgrade",
-			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%23999&token=${mismatched.token}` },
+			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%23999&token=${mismatched.token}` },
 			mismatchSocket.socket,
 			Buffer.alloc(0),
 		);
 		expect(mismatchSocket.socket.write).toHaveBeenCalledWith("HTTP/1.1 401 Unauthorized\r\n\r\n");
 		expect(mismatchSocket.socket.destroy).toHaveBeenCalled();
 
-		const pending = rpcServer.createPendingConnection("mbrooks/tars#85");
+		const pending = rpcServer.createPendingConnection("mbrooks/yeetomatic#85");
 		const { client, socket } = createUpgradeSocket();
 		server.emit(
 			"upgrade",
-			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Ftars%2385&token=${pending.token}` },
+			{ url: `${WORKER_RPC_PATH}?sessionKey=mbrooks%2Fyeetomatic%2385&token=${pending.token}` },
 			socket,
 			Buffer.alloc(0),
 		);

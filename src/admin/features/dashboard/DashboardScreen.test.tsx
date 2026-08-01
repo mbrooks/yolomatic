@@ -9,7 +9,7 @@ import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
 function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 1,
 		status: "working",
 		title: null,
@@ -65,14 +65,14 @@ describe("DashboardScreen", () => {
 
 	it("renders recent session rows", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "tars", issueNumber: 1, status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
 			makeSession({ owner: "mbrooks", repo: "case", issueNumber: 2, status: "complete" }),
 		];
 		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
 
 		const recentActivity = document.querySelector(".dashboard-section:has(h2):has(.activity-list)");
 		expect(recentActivity).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("mbrooks/tars")).not.toBeNull();
+		expect(within(recentActivity as HTMLElement).getByText("mbrooks/yeetomatic")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("#1")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("mbrooks/case")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("#2")).not.toBeNull();

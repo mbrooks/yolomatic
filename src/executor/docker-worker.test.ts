@@ -42,8 +42,8 @@ describe("DockerWorkerExecutor", () => {
 			expect(args).toContain("run");
 			expect(args).toContain("--mount");
 			expect(args).not.toContain("GITHUB_TOKEN");
-			expect(options.env.YEETOMATIC_SESSION_KEY).toBe("mbrooks/tars#418");
-			expect(options.env.YEETOMATIC_SESSION_WS_URL).toContain("sessionKey=mbrooks%2Ftars%23418");
+			expect(options.env.YEETOMATIC_SESSION_KEY).toBe("mbrooks/yeetomatic#418");
+			expect(options.env.YEETOMATIC_SESSION_WS_URL).toContain("sessionKey=mbrooks%2Fyeetomatic%23418");
 
 			void connectMockWorker(
 				harness.workerRpcServer,
@@ -53,12 +53,12 @@ describe("DockerWorkerExecutor", () => {
 					const launch = message as WorkerProtocolMessage<"launch_config">;
 					expect(launch.payload.session.workspacePath).toBe(harness.workspacePath);
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/tars#418", "ack-1", {
+						createWorkerMessage("ack", "mbrooks/yeetomatic#418", "ack-1", {
 							ackMessageId: launch.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("event_batch", "mbrooks/tars#418", "events-1", {
+						createWorkerMessage("event_batch", "mbrooks/yeetomatic#418", "events-1", {
 							events: [
 								{
 									type: "session_log",
@@ -73,7 +73,7 @@ describe("DockerWorkerExecutor", () => {
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/tars#418", "complete-1", {
+						createWorkerMessage("complete", "mbrooks/yeetomatic#418", "complete-1", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -90,7 +90,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			const result = await harness.executor.execute({
 				issueNumber: 418,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Implement dockerized worker runtime",
 				body: "Body",
@@ -103,11 +103,11 @@ describe("DockerWorkerExecutor", () => {
 
 			expect(result.status).toBe("complete");
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/tars#418",
-				expect.objectContaining({ message: "Launching worker container yeetomatic-session-mbrooks-tars-418" }),
+				"mbrooks/yeetomatic#418",
+				expect.objectContaining({ message: "Launching worker container yeetomatic-session-mbrooks-yeetomatic-418" }),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/tars#418",
+				"mbrooks/yeetomatic#418",
 				expect.objectContaining({ message: "Prompt sent" }),
 			);
 		} finally {
@@ -127,12 +127,12 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/tars#419", "ack-build", {
+						createWorkerMessage("ack", "mbrooks/yeetomatic#419", "ack-build", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/tars#419", "complete-build", {
+						createWorkerMessage("complete", "mbrooks/yeetomatic#419", "complete-build", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -148,7 +148,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			await harness.executor.execute({
 				issueNumber: 419,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Build image when missing",
 				body: "Body",
@@ -192,12 +192,12 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/tars#424", "ack-rebuild", {
+						createWorkerMessage("ack", "mbrooks/yeetomatic#424", "ack-rebuild", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/tars#424", "complete-rebuild", {
+						createWorkerMessage("complete", "mbrooks/yeetomatic#424", "complete-rebuild", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -213,7 +213,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			await harness.executor.execute({
 				issueNumber: 424,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Rebuild stale worker image",
 				body: "Body",
@@ -262,8 +262,8 @@ describe("DockerWorkerExecutor", () => {
 		expect((executor as any).buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
 		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
 		expect((executor as any).appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
-		expect((executor as any).buildWorkerSessionUrl("mbrooks/tars#1", "token-1")).toBe(
-			"wss://control.example.test/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%231&token=token-1",
+		expect((executor as any).buildWorkerSessionUrl("mbrooks/yeetomatic#1", "token-1")).toBe(
+			"wss://control.example.test/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%231&token=token-1",
 		);
 		expect(() => (executor as any).resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
 	});
@@ -309,8 +309,8 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
-			expect((executor as any).buildWorkerSessionUrl("mbrooks/tars#1", "token-1")).toBe(
-				"ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Ftars%231&token=token-1",
+			expect((executor as any).buildWorkerSessionUrl("mbrooks/yeetomatic#1", "token-1")).toBe(
+				"ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%231&token=token-1",
 			);
 
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
@@ -401,7 +401,7 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("error", "mbrooks/tars#420", "error-1", {
+						createWorkerMessage("error", "mbrooks/yeetomatic#420", "error-1", {
 							message: "worker blew up",
 						}),
 					);
@@ -417,7 +417,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 420,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Feedback task",
 					body: "Body",
@@ -448,7 +448,7 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type === "launch_config") {
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/tars#421", "ack-launch", {
+							createWorkerMessage("ack", "mbrooks/yeetomatic#421", "ack-launch", {
 								ackMessageId: message.messageId,
 							}),
 						);
@@ -457,12 +457,12 @@ describe("DockerWorkerExecutor", () => {
 					if (message.type === "control") {
 						sawStop = message.payload.action === "stop";
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/tars#421", "ack-stop", {
+							createWorkerMessage("ack", "mbrooks/yeetomatic#421", "ack-stop", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "mbrooks/tars#421", "complete-stop", {
+							createWorkerMessage("complete", "mbrooks/yeetomatic#421", "complete-stop", {
 								result: {
 									status: "cancelled",
 									summary: "stopped",
@@ -482,7 +482,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			const run = harness.executor.execute({
 				issueNumber: 421,
-				repo: "tars",
+				repo: "yeetomatic",
 				owner: "mbrooks",
 				title: "Abort task",
 				body: "Body",
@@ -509,7 +509,7 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send(
-					createWorkerMessage("hello", "mbrooks/tars#999", "hello-wrong-session", {
+					createWorkerMessage("hello", "mbrooks/yeetomatic#999", "hello-wrong-session", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -522,7 +522,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 422,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Wrong session key",
 					body: "Body",
@@ -546,7 +546,7 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send({
-					...createWorkerMessage("hello", "mbrooks/tars#423", "hello-bad-version", {
+					...createWorkerMessage("hello", "mbrooks/yeetomatic#423", "hello-bad-version", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -560,7 +560,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 423,
-					repo: "tars",
+					repo: "yeetomatic",
 					owner: "mbrooks",
 					title: "Bad protocol version",
 					body: "Body",
@@ -596,12 +596,12 @@ describe("DockerWorkerExecutor", () => {
 					async (connection, message) => {
 						if (message.type !== "launch_config") return;
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/tars#425", "ack-retry", {
+							createWorkerMessage("ack", "mbrooks/yeetomatic#425", "ack-retry", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "mbrooks/tars#425", "complete-retry", {
+							createWorkerMessage("complete", "mbrooks/yeetomatic#425", "complete-retry", {
 								result: {
 									status: "complete",
 									summary: "recovered",
@@ -621,20 +621,20 @@ describe("DockerWorkerExecutor", () => {
 			expect(spawnMock).toHaveBeenCalledTimes(2);
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
-				["inspect", "--format", "{{.State.Status}}", "yeetomatic-session-mbrooks-tars-425"],
+				["inspect", "--format", "{{.State.Status}}", "yeetomatic-session-mbrooks-yeetomatic-425"],
 				expect.any(Object),
 				expect.any(Function),
 			);
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
-				["rm", "yeetomatic-session-mbrooks-tars-425"],
+				["rm", "yeetomatic-session-mbrooks-yeetomatic-425"],
 				expect.any(Object),
 				expect.any(Function),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/tars#425",
+				"mbrooks/yeetomatic#425",
 				expect.objectContaining({
-					message: "Removed stopped conflicting worker container yeetomatic-session-mbrooks-tars-425; retrying launch",
+					message: "Removed stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-425; retrying launch",
 				}),
 			);
 		} finally {
@@ -655,12 +655,12 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(426, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-tars-426" is already in use',
+				'The container name "/yeetomatic-session-mbrooks-yeetomatic-426" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(execFileMock).not.toHaveBeenCalledWith(
 				"docker",
-				["rm", "yeetomatic-session-mbrooks-tars-426"],
+				["rm", "yeetomatic-session-mbrooks-yeetomatic-426"],
 				expect.any(Object),
 				expect.any(Function),
 			);
@@ -682,13 +682,13 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(428, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-tars-428" is already in use',
+				'The container name "/yeetomatic-session-mbrooks-yeetomatic-428" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/tars#428",
+				"mbrooks/yeetomatic#428",
 				expect.objectContaining({
-					message: "Could not inspect conflicting worker container yeetomatic-session-mbrooks-tars-428",
+					message: "Could not inspect conflicting worker container yeetomatic-session-mbrooks-yeetomatic-428",
 				}),
 			);
 		} finally {
@@ -713,13 +713,13 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(429, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-tars-429" is already in use',
+				'The container name "/yeetomatic-session-mbrooks-yeetomatic-429" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/tars#429",
+				"mbrooks/yeetomatic#429",
 				expect.objectContaining({
-					message: "Could not remove stopped conflicting worker container yeetomatic-session-mbrooks-tars-429",
+					message: "Could not remove stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-429",
 				}),
 			);
 		} finally {
@@ -755,7 +755,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(430);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://x-access-token:ghp_secret@github.com/mbrooks/tars.git\n", "");
+				callback(null, "https://x-access-token:ghp_secret@github.com/mbrooks/yeetomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -779,7 +779,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(431);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://github.com/mbrooks/tars.git\n", "");
+				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -794,10 +794,10 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/tars#431", "ack-safe", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "mbrooks/yeetomatic#431", "ack-safe", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/tars#431", "complete-safe", {
+						createWorkerMessage("complete", "mbrooks/yeetomatic#431", "complete-safe", {
 							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 						}),
 					);
@@ -824,7 +824,7 @@ async function createHarness(issueNumber: number): Promise<{
 	close: () => Promise<void>;
 }> {
 	const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), `yeetomatic-docker-worker-${issueNumber}-`));
-	const workspacePath = path.join(workspacesRoot, "mbrooks-tars", ".worktrees", `issue-${issueNumber}`);
+	const workspacePath = path.join(workspacesRoot, "mbrooks-yeetomatic", ".worktrees", `issue-${issueNumber}`);
 	await mkdir(workspacePath, { recursive: true });
 
 	const workerRpcServer = createFakeWorkerRpcServer();
@@ -865,7 +865,7 @@ function makeConflictingChildProcess(issueNumber: number): EventEmitter & { stdo
 		child.stderr.emit(
 			"data",
 			Buffer.from(
-				`docker: Error response from daemon: Conflict. The container name "/yeetomatic-session-mbrooks-tars-${issueNumber}" is already in use by container "existing".`,
+				`docker: Error response from daemon: Conflict. The container name "/yeetomatic-session-mbrooks-yeetomatic-${issueNumber}" is already in use by container "existing".`,
 			),
 		);
 		child.emit("exit", 125, null);
@@ -876,7 +876,7 @@ function makeConflictingChildProcess(issueNumber: number): EventEmitter & { stdo
 function makeSessionState(issueNumber: number, workspacePath: string) {
 	return {
 		issueNumber,
-		repo: "tars",
+		repo: "yeetomatic",
 		owner: "mbrooks",
 		title: "Recover a conflicting worker container",
 		body: "Body",

@@ -216,11 +216,11 @@ describe("createAdminWebSocketServer", () => {
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
-		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 });
+		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 });
 		socket.emitMessage({ type: "subscribe-status" });
 		await Promise.resolve();
 
-		server.broadcastLog("mbrooks/tars#1", {
+		server.broadcastLog("mbrooks/yeetomatic#1", {
 			timestamp: "2025-01-01T00:00:00Z",
 			level: "info",
 			message: "hello",
@@ -232,7 +232,7 @@ describe("createAdminWebSocketServer", () => {
 				{ type: "status", data: { agent: "online" } },
 				{
 					type: "log-entry",
-					sessionKey: "mbrooks/tars#1",
+					sessionKey: "mbrooks/yeetomatic#1",
 					entry: {
 						timestamp: "2025-01-01T00:00:00Z",
 						level: "info",
@@ -250,9 +250,9 @@ describe("createAdminWebSocketServer", () => {
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
-		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 });
-		socket.emitMessage({ type: "unsubscribe-log", owner: "mbrooks", repo: "tars", issueNumber: 1 });
-		server.broadcastLog("mbrooks/tars#1", {
+		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 });
+		socket.emitMessage({ type: "unsubscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 });
+		server.broadcastLog("mbrooks/yeetomatic#1", {
 			timestamp: "2025-01-01T00:00:00Z",
 			level: "info",
 			message: "hidden",

@@ -34,7 +34,7 @@ function makeDeps(overrides?: {
 	} as unknown as SessionRepository;
 
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "tars", issueNumber: 1 })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 })),
 		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),
@@ -83,7 +83,7 @@ function makeDeps(overrides?: {
 
 const state: SessionState = {
 	owner: "mbrooks",
-	repo: "tars",
+	repo: "yeetomatic",
 	issueNumber: 1,
 	title: "Test title",
 	body: "Test body description",
@@ -115,11 +115,11 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("No code changes were necessary."),
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
 	});
 
 	it("creates a PR with a thorough description including issue context and diff", async () => {
@@ -133,7 +133,7 @@ describe("ExecuteSessionDelivery", () => {
 				expect(body).toContain("Test body description");
 				expect(body).toContain("## Changes");
 				expect(body).toContain("diff --git a/src/main.ts");
-				return { number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" };
+				return { number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" };
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({
@@ -148,20 +148,20 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.github.createPullRequest).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			"Yeetomatic: Test title",
 			expect.stringContaining("Fixes #1"),
 			"yeetomatic/issue-1",
 			"main",
 		);
-		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "tars", 1, 42, "https://github.com/mbrooks/tars/pull/42");
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, 42, "https://github.com/mbrooks/yeetomatic/pull/42");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
-			expect.stringContaining("PR created: https://github.com/mbrooks/tars/pull/42"),
+			expect.stringContaining("PR created: https://github.com/mbrooks/yeetomatic/pull/42"),
 		);
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 1, ["yeetomatic-pr-created"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-pr-created"]);
 	});
 
 	it("handles existing PR when createPullRequest throws 'already exists'", async () => {
@@ -171,7 +171,7 @@ describe("ExecuteSessionDelivery", () => {
 			}),
 		});
 		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
-			{ number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" },
+			{ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" },
 		]);
 		const delivery = new ExecuteSessionDelivery({
 			sessions: deps.sessions,
@@ -183,12 +183,12 @@ describe("ExecuteSessionDelivery", () => {
 
 		await delivery.deliverCompletion(state, result);
 
-		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "tars", 1, 42, "https://github.com/mbrooks/tars/pull/42");
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, 42, "https://github.com/mbrooks/yeetomatic/pull/42");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
-			expect.stringContaining("PR already exists: https://github.com/mbrooks/tars/pull/42"),
+			expect.stringContaining("PR already exists: https://github.com/mbrooks/yeetomatic/pull/42"),
 		);
 	});
 
@@ -210,7 +210,7 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("No code changes were necessary."),
 		);
@@ -225,7 +225,7 @@ describe("ExecuteSessionDelivery", () => {
 				expect(body).toContain("...");
 				expect(body).not.toContain("a".repeat(2100));
 				expect(body).not.toContain("d".repeat(5100));
-				return { number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" };
+				return { number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" };
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({
@@ -246,7 +246,7 @@ describe("ExecuteSessionDelivery", () => {
 			createPullRequest: vi.fn(async (o, r, title, body) => {
 				expect(body).toContain("## Issue Context");
 				expect(body).toContain("Test title");
-				return { number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" };
+				return { number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" };
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({
@@ -268,7 +268,7 @@ describe("ExecuteSessionDelivery", () => {
 				expect(body).toContain("Fixes #1");
 				expect(body).toContain("## Issue Context");
 				expect(body).not.toContain("## Summary");
-				return { number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" };
+				return { number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" };
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({
@@ -302,12 +302,12 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			state,
 			expect.any(Error),
 		);
-		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "tars", 1, "complete");
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
 	});
 
 	it("handles unrecognized createPullRequest errors", async () => {
@@ -328,7 +328,7 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			state,
 			expect.any(Error),
@@ -351,7 +351,7 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			expect.stringContaining("No code changes were necessary."),
 		);
@@ -376,7 +376,7 @@ describe("ExecuteSessionDelivery", () => {
 
 		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			1,
 			state,
 			expect.any(Error),
@@ -388,7 +388,7 @@ describe("ExecuteSessionDelivery", () => {
 			getGitDiff: vi.fn(async () => ""),
 			createPullRequest: vi.fn(async (o, r, title, body) => {
 				expect(body).not.toContain("## Changes");
-				return { number: 42, html_url: "https://github.com/mbrooks/tars/pull/42" };
+				return { number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" };
 			}),
 		});
 		const delivery = new ExecuteSessionDelivery({

@@ -12,9 +12,9 @@ describe("log-events", () => {
 		};
 
 		const unsubscribe = onSessionLogEvent(listener);
-		emitSessionLogEvent("mbrooks/tars#1", entry);
+		emitSessionLogEvent("mbrooks/yeetomatic#1", entry);
 
-		expect(listener).toHaveBeenCalledWith("mbrooks/tars#1", entry);
+		expect(listener).toHaveBeenCalledWith("mbrooks/yeetomatic#1", entry);
 		unsubscribe();
 	});
 
@@ -28,7 +28,7 @@ describe("log-events", () => {
 
 		const unsubscribe = onSessionLogEvent(listener);
 		unsubscribe();
-		emitSessionLogEvent("mbrooks/tars#1", entry);
+		emitSessionLogEvent("mbrooks/yeetomatic#1", entry);
 
 		expect(listener).not.toHaveBeenCalled();
 	});

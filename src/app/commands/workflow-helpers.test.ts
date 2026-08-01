@@ -21,7 +21,7 @@ import { EmptyRepositoryError } from "../../workspace/errors.js";
 function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "tars",
+		repo: "yeetomatic",
 		issueNumber: 56,
 		title: "Title",
 		body: "Body",
@@ -36,7 +36,7 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 
 describe("workflow helpers", () => {
 	it("builds the canonical issue session key", () => {
-		expect(issueSessionKey("mbrooks", "tars", 56)).toBe("mbrooks/tars#56");
+		expect(issueSessionKey("mbrooks", "yeetomatic", 56)).toBe("mbrooks/yeetomatic#56");
 	});
 
 	it("removes the workflow labels in a stable order", async () => {
@@ -44,13 +44,13 @@ describe("workflow helpers", () => {
 			removeLabel: vi.fn(),
 		};
 
-		await removeWorkflowLabels(github as never, "mbrooks", "tars", 56);
+		await removeWorkflowLabels(github as never, "mbrooks", "yeetomatic", 56);
 
 		expect(github.removeLabel.mock.calls).toEqual([
-			["mbrooks", "tars", 56, "yeetomatic-working"],
-			["mbrooks", "tars", 56, "yeetomatic-feedback-required"],
-			["mbrooks", "tars", 56, "yeetomatic-pr-created"],
-			["mbrooks", "tars", 56, "yeetomatic-complete"],
+			["mbrooks", "yeetomatic", 56, "yeetomatic-working"],
+			["mbrooks", "yeetomatic", 56, "yeetomatic-feedback-required"],
+			["mbrooks", "yeetomatic", 56, "yeetomatic-pr-created"],
+			["mbrooks", "yeetomatic", 56, "yeetomatic-complete"],
 		]);
 	});
 
@@ -61,10 +61,10 @@ describe("workflow helpers", () => {
 			postComment: vi.fn(),
 		};
 
-		await markIssueWorking(github as never, "mbrooks", "tars", 56, "Picked up by Yeetomatic. Working on it...");
+		await markIssueWorking(github as never, "mbrooks", "yeetomatic", 56, "Picked up by Yeetomatic. Working on it...");
 
-		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 56, ["yeetomatic-working"]);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Picked up by Yeetomatic. Working on it...");
+		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, ["yeetomatic-working"]);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Picked up by Yeetomatic. Working on it...");
 	});
 
 	it("stops an active session immediately when a cancellation signal is sent", async () => {
@@ -81,10 +81,10 @@ describe("workflow helpers", () => {
 			cancel: vi.fn(() => true),
 		};
 
-		const result = await stopSessionByAdmin(sessions as never, github as never, tasks as never, "mbrooks", "tars", 56);
+		const result = await stopSessionByAdmin(sessions as never, github as never, tasks as never, "mbrooks", "yeetomatic", 56);
 
 		expect(result).toBe("stopping");
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Stopping Yeetomatic...");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Stopping Yeetomatic...");
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
 
@@ -107,16 +107,16 @@ describe("workflow helpers", () => {
 			github as never,
 			tasks as never,
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			56,
 			99,
 		);
 
 		expect(result).toBe("cancelled");
-		expect(sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
-		expect(github.removeLabel).toHaveBeenCalledWith("mbrooks", "tars", 56, "yeetomatic-working");
-		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 56, ["yeetomatic-cancelled"]);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Task cancelled by admin. Yeetomatic is idle.");
+		expect(sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(github.removeLabel).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "yeetomatic-working");
+		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, ["yeetomatic-cancelled"]);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Task cancelled by admin. Yeetomatic is idle.");
 	});
 
 	it("queues feedback for resume on boot", async () => {
@@ -128,7 +128,7 @@ describe("workflow helpers", () => {
 
 		expect(sessions.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"tars",
+			"yeetomatic",
 			56,
 			"working",
 			expect.objectContaining({
@@ -155,7 +155,7 @@ describe("workflow helpers", () => {
 				workspaces as never,
 				github as never,
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Title",
 				"Body",
@@ -185,7 +185,7 @@ describe("workflow helpers", () => {
 				workspaces as never,
 				github as never,
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Title",
 				"Body",
@@ -193,10 +193,10 @@ describe("workflow helpers", () => {
 				"main",
 			);
 
-			expect(workspaces.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "tars", 56);
+			expect(workspaces.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
 			expect(sessions.createSession).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Title",
 				"Body",
@@ -216,7 +216,7 @@ describe("workflow helpers", () => {
 				createOrGetWorktree: vi.fn(async () => {
 					callCount++;
 					if (callCount === 1) {
-						throw new EmptyRepositoryError("/tmp/ws/mbrooks-tars");
+						throw new EmptyRepositoryError("/tmp/ws/mbrooks-yeetomatic");
 					}
 					return { path: "/tmp/ws", branch: "yeetomatic/issue-56" };
 				}),
@@ -230,7 +230,7 @@ describe("workflow helpers", () => {
 				workspaces as never,
 				github as never,
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Title",
 				"Body",
@@ -238,7 +238,7 @@ describe("workflow helpers", () => {
 				"main",
 			);
 
-			expect(github.initializeEmptyRepo).toHaveBeenCalledWith("mbrooks", "tars", "main");
+			expect(github.initializeEmptyRepo).toHaveBeenCalledWith("mbrooks", "yeetomatic", "main");
 			expect(workspaces.createOrGetWorktree).toHaveBeenCalledTimes(2);
 			expect(sessions.createSession).toHaveBeenCalled();
 		});
@@ -263,7 +263,7 @@ describe("workflow helpers", () => {
 					workspaces as never,
 					github as never,
 					"mbrooks",
-					"tars",
+					"yeetomatic",
 					56,
 					"Title",
 					"Body",
@@ -310,14 +310,14 @@ describe("workflow helpers", () => {
 			expect(result).toBe(true);
 			expect(sessions.updateStatus).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"pending",
 				{ resumeOnBoot: true },
 			);
 			expect(github.postComment).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Deploy in progress. Task will resume after restart.",
 			);
@@ -345,7 +345,7 @@ describe("workflow helpers", () => {
 			expect(result).toBe(true);
 			expect(sessions.updateStatus).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"working",
 				expect.objectContaining({
@@ -355,7 +355,7 @@ describe("workflow helpers", () => {
 			);
 			expect(github.postComment).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Deploy in progress. Feedback will be processed after restart.",
 			);
@@ -378,14 +378,14 @@ describe("workflow helpers", () => {
 				executor as never,
 				github as never,
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				session,
 				"Picked up by Yeetomatic. Working on it...",
 			);
 
-			expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "tars", 56, ["yeetomatic-working"]);
-			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Picked up by Yeetomatic. Working on it...");
+			expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, ["yeetomatic-working"]);
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Picked up by Yeetomatic. Working on it...");
 			expect(executor.run).toHaveBeenCalledWith(session, undefined);
 		});
 
@@ -404,7 +404,7 @@ describe("workflow helpers", () => {
 				executor as never,
 				github as never,
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				session,
 				"Feedback received. Resuming work.",
@@ -434,13 +434,13 @@ describe("workflow helpers", () => {
 				"user",
 				"admin",
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				56,
 			);
 
 			expect(result).toBe("not-admin");
-			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Only admins can stop Yeetomatic.");
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Only admins can stop Yeetomatic.");
 			expect(tasks.cancel).not.toHaveBeenCalled();
 		});
 
@@ -465,14 +465,14 @@ describe("workflow helpers", () => {
 				"admin",
 				"admin",
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				99,
 			);
 
 			expect(result).toBe("cancelled");
-			expect(sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "tars", 56);
-			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Task cancelled by admin. Yeetomatic is idle.");
+			expect(sessions.cancelSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Task cancelled by admin. Yeetomatic is idle.");
 		});
 
 		it("returns stopping when an active task is cancelled", async () => {
@@ -493,14 +493,14 @@ describe("workflow helpers", () => {
 				"admin",
 				"admin",
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				56,
 			);
 
 			expect(result).toBe("stopping");
-			expect(tasks.cancel).toHaveBeenCalledWith("mbrooks/tars#56");
-			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 56, "Stopping Yeetomatic...");
+			expect(tasks.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Stopping Yeetomatic...");
 			expect(sessions.get).not.toHaveBeenCalled();
 		});
 	});
@@ -508,33 +508,33 @@ describe("workflow helpers", () => {
 	describe("resolveIssueContext", () => {
 		it("extracts owner/repo/issue/key and resolves the default branch via resolver", () => {
 			const ctx = resolveIssueContext(
-				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+				{ repository: { name: "yeetomatic", owner: { login: "mbrooks" } }, issue: { number: 42 } },
 				() => "develop",
 			);
 
 			expect(ctx).toEqual({
 				owner: "mbrooks",
-				repo: "tars",
+				repo: "yeetomatic",
 				issueNumber: 42,
-				key: "mbrooks/tars#42",
+				key: "mbrooks/yeetomatic#42",
 				defaultBranch: "develop",
 			});
 		});
 
 		it("falls back to the static default branch when no resolver is provided", () => {
 			const ctx = resolveIssueContext(
-				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+				{ repository: { name: "yeetomatic", owner: { login: "mbrooks" } }, issue: { number: 42 } },
 				undefined,
 				"release",
 			);
 
 			expect(ctx.defaultBranch).toBe("release");
-			expect(ctx.key).toBe("mbrooks/tars#42");
+			expect(ctx.key).toBe("mbrooks/yeetomatic#42");
 		});
 
 		it("falls back to main when neither resolver nor default branch is provided", () => {
 			const ctx = resolveIssueContext(
-				{ repository: { name: "tars", owner: { login: "mbrooks" } }, issue: { number: 42 } },
+				{ repository: { name: "yeetomatic", owner: { login: "mbrooks" } }, issue: { number: 42 } },
 			);
 
 			expect(ctx.defaultBranch).toBe("main");
@@ -629,7 +629,7 @@ describe("workflow helpers", () => {
 
 		const ctx = {
 			owner: "mbrooks",
-			repo: "tars",
+			repo: "yeetomatic",
 			issueNumber: 56,
 			title: "Title",
 			body: "Body",
@@ -662,7 +662,7 @@ describe("workflow helpers", () => {
 			expect(result).toEqual({ skip: true, kind: "draining" });
 			expect(deps.github.postComment).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"Deploy in progress. Task will resume after restart.",
 			);
@@ -691,7 +691,7 @@ describe("workflow helpers", () => {
 			expect(result).toEqual({ skip: true, kind: "draining" });
 			expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				56,
 				"working",
 				expect.objectContaining({ resumeOnBoot: true, queuedComments: ["existing", "new"] }),
@@ -736,9 +736,9 @@ describe("workflow helpers", () => {
 
 		const basePayload = {
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/tars/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
 			comment: { id: 1, body: "please update", user: { login: "human" } },
-			repository: { name: "tars", owner: { login: "mbrooks" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "human" },
 		};
 
@@ -748,7 +748,7 @@ describe("workflow helpers", () => {
 				deps,
 				{ ...basePayload, issue: { number: 99 } },
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				99,
 			);
 
@@ -758,20 +758,20 @@ describe("workflow helpers", () => {
 
 		it("logs and returns true when the PR cannot be fetched", async () => {
 			const { deps, github } = makeDeps({ getPullRequest: vi.fn(async () => null) });
-			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yeetomatic", 99);
 
 			expect(routed).toBe(true);
-			expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "tars", 99);
+			expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		});
 
 		it("logs and returns true when the PR branch is not associated with a session", async () => {
 			const { deps, sessions } = makeDeps({
 				getPullRequest: vi.fn(async () => ({ head: { ref: "feature/x" }, state: "open", merged: false })),
 			});
-			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yeetomatic", 99);
 
 			expect(routed).toBe(true);
-			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		});
 
 		it("routes an admin stop command to the mapped issue", async () => {
@@ -785,13 +785,13 @@ describe("workflow helpers", () => {
 				deps,
 				{ ...basePayload, comment: { id: 1, body: "/yeetomatic stop", user: { login: "admin" } }, sender: { login: "admin" } },
 				"mbrooks",
-				"tars",
+				"yeetomatic",
 				99,
 			);
 
 			expect(routed).toBe(true);
-			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "tars", 99, "Stopping Yeetomatic...");
-			expect(stop).toHaveBeenCalledWith("mbrooks/tars#56");
+			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Stopping Yeetomatic...");
+			expect(stop).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
 		});
 
 		it("forwards the comment to the PR review handler when mapped and not a stop command", async () => {
@@ -800,7 +800,7 @@ describe("workflow helpers", () => {
 				getPullRequest: vi.fn(async () => ({ head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false })),
 				prReview: { execute },
 			});
-			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yeetomatic", 99);
 
 			expect(routed).toBe(true);
 			expect(execute).toHaveBeenCalledWith(
@@ -818,10 +818,10 @@ describe("workflow helpers", () => {
 				findSessionByPR: vi.fn(async () => ({ issueNumber: 77 } as never)),
 				prReview: { execute },
 			});
-			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yeetomatic", 99);
 
 			expect(routed).toBe(true);
-			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "tars", 99);
+			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 			expect(execute).toHaveBeenCalled();
 		});
 
@@ -829,7 +829,7 @@ describe("workflow helpers", () => {
 			const { deps } = makeDeps({
 				getPullRequest: vi.fn(async () => ({ head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false })),
 			});
-			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "tars", 99);
+			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yeetomatic", 99);
 
 			expect(routed).toBe(true);
 		});

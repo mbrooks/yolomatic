@@ -41,7 +41,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "tars",
+							repo: "yeetomatic",
 							issueNumber: 1,
 							status: "working",
 							lastActivity: new Date().toISOString(),
