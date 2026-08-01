@@ -117,6 +117,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			github,
 			tasks,
 			githubUsername: deps.githubUsername,
+			selfReportEnabled: deps.selfReportEnabled,
 		});
 
 		this.handleIssueCommentCmd = new HandleIssueComment({
