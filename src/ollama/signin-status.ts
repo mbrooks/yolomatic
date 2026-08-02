@@ -11,6 +11,41 @@ export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
 /** Bounded timeout for the non-interactive `ollama login` invocation. */
 export const DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS = 8000;
 
+/**
+ * Env var that enables debug logging for the Ollama sign-in check. When set
+ * to a truthy value (1/true/yes), the default debug logger writes the issued
+ * command and the captured result to stdout, so a maintainer can see exactly
+ * what `docker exec ... ollama login` returned instead of guessing.
+ */
+export const OLLAMA_SIGNIN_DEBUG_ENV = "DEBUG_OLLAMA_SIGNIN";
+
+/** Truncation limit for stdout/stderr captured in debug log lines. */
+const DEBUG_OUTPUT_LIMIT = 2000;
+
+/** Debug logger: receives human-readable lines describing the command + result. */
+export type OllamaDebugLogger = (message: string) => void;
+
+/**
+ * Build the default debug logger. Reads {@link OLLAMA_SIGNIN_DEBUG_ENV} once
+ * so the enable decision is fixed for the lifetime of the returned logger.
+ * Exported for unit tests; production callers should pass `options.debug` or
+ * let `checkOllamaSignInStatus` construct this lazily.
+ */
+export function createOllamaDebugLogger(
+	env: NodeJS.ProcessEnv = process.env,
+): OllamaDebugLogger {
+	const enabled = /^(1|true|yes)$/iu.test(String(env[OLLAMA_SIGNIN_DEBUG_ENV] ?? "").trim());
+	return (message: string): void => {
+		if (!enabled) return;
+		process.stdout.write(`[ollama-signin] ${message}\n`);
+	};
+}
+
+function truncateForLog(value: string): string {
+	const single = value.replace(/\r?\n/g, "\\n");
+	return single.length > DEBUG_OUTPUT_LIMIT ? `${single.slice(0, DEBUG_OUTPUT_LIMIT)}...` : single;
+}
+
 export interface OllamaSignInResult {
 	/** Whether the Ollama account is registered / signed in. */
 	signedIn: boolean;
@@ -37,6 +72,8 @@ export interface OllamaSignInOptions {
 	timeoutMs?: number;
 	/** Inject an `execFile` implementation (defaults to promisified `node:child_process`). */
 	execFile?: OllamaExecFile;
+	/** Inject a debug logger (defaults to {@link createOllamaDebugLogger}, env-gated). */
+	debug?: OllamaDebugLogger;
 }
 
 /**
@@ -100,15 +137,20 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 
 	const timeoutMs = options.timeoutMs ?? DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS;
 	const exec = options.execFile ?? execFileDefault;
+	const debug = options.debug ?? createOllamaDebugLogger();
+
+	const args = ["exec", "-it", containerName, "ollama", "login"];
+	debug(`issuing: docker ${args.join(" ")} (timeout ${timeoutMs}ms)`);
 
 	try {
 		const result = await exec(
 			"docker",
-			["exec", "-it", containerName, "ollama", "login"],
+			args,
 			{ timeout: timeoutMs, maxBuffer: 1024 * 1024 },
 		);
 		const stdout = typeof result === "string" ? result : asString(result.stdout);
 		const stderr = typeof result === "string" ? "" : asString(result.stderr);
+		debug(`result: exit 0; stdout=${truncateForLog(stdout)}; stderr=${truncateForLog(stderr)}`);
 		return parseOllamaSignInOutput(`${stdout}\n${stderr}`);
 	} catch (error) {
 		const err = error as Partial<ExecFileException> & {
@@ -122,6 +164,12 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 		const stdout = asString(err.stdout);
 		const stderr = asString(err.stderr);
 		const combined = `${stdout}\n${stderr}`.trim();
+
+		debug(
+			`result: error code=${String(err.code ?? "?")} signal=${String(err.signal ?? "?")}` +
+				` killed=${String(err.killed ?? false)}; stdout=${truncateForLog(stdout)};` +
+				` stderr=${truncateForLog(stderr)}; message=${truncateForLog(err instanceof Error ? err.message : String(error ?? ""))}`,
+		);
 
 		// `ollama login` prints the connect URL (or the "already signed in" line)
 		// and then blocks waiting for the browser OAuth flow to complete. When
@@ -180,11 +228,12 @@ export class DefaultOllamaSignInService implements OllamaSignInService {
 	constructor(
 		private readonly settingsStore: SettingsStore,
 		private readonly execFile?: OllamaExecFile,
+		private readonly debug?: OllamaDebugLogger,
 	) {}
 
 	async checkSignInStatus(options?: { containerName?: string }): Promise<OllamaSignInResult> {
 		const configured = options?.containerName?.trim();
 		const containerName = configured || this.settingsStore.getString("ollama_container_name", DEFAULT_OLLAMA_CONTAINER_NAME);
-		return checkOllamaSignInStatus({ containerName, execFile: this.execFile });
+		return checkOllamaSignInStatus({ containerName, execFile: this.execFile, debug: this.debug });
 	}
 }
