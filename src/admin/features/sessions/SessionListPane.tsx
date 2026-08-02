@@ -14,7 +14,6 @@ export function SessionListPane({
 	return (
 		<div className="list-pane">
 			<div className="list-header">
-				<div className="list-col repo">Repo</div>
 				<div className="list-col issue">Issue</div>
 				<div className="list-col type">Type</div>
 				<div className="list-col status">Status</div>
@@ -41,9 +40,6 @@ export function SessionListPane({
 								}
 							}}
 						>
-							<div className="list-col repo">
-								{session.owner}/{session.repo}
-							</div>
 							<div className="list-col issue">#{session.issueNumber}</div>
 							<div className="list-col type">
 								<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>

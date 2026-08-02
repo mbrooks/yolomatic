@@ -293,22 +293,16 @@ describe("App", () => {
 	});
 
 	it("allows selecting a session in working view", async () => {
+		window.location.hash = "#/working";
 		render(<App />);
 
-		await waitFor(() => {
-			expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: /Active Sessions/ }));
-
-		await waitFor(() => {
-			expect(screen.queryByRole("button", { name: /mbrooks\/yeetomatic #1/i })).not.toBeNull();
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: /mbrooks\/yeetomatic #1/i }));
+		const issueNumber = await screen.findByText("#1");
+		const sessionRow = issueNumber.closest('[role="button"]');
+		expect(sessionRow).not.toBeNull();
+		fireEvent.click(sessionRow!);
 
 		await waitFor(() => {
-			expect(screen.queryByText(/Select a session from the list to view details and actions./)).toBeNull();
+			expect(screen.queryByText("mbrooks/yeetomatic#1")).not.toBeNull();
 		});
 	});
 
