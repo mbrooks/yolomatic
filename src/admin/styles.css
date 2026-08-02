@@ -114,8 +114,13 @@ h1 {
 	text-transform: uppercase;
 }
 
-.type-badge.github_issue {
+.type-badge.implementation {
 	color: var(--blue);
+}
+
+.type-badge.refinement {
+	border-color: var(--yellow);
+	color: var(--yellow);
 }
 
 .list-col.status {

@@ -62,6 +62,16 @@ export class StaleSessionDetector implements StaleSessionService {
 			};
 		}
 
+		if (session.kind === "refinement") {
+			return {
+				session,
+				isStale: false,
+				ageMs,
+				classification: "unknown",
+				worktreeDirty: null,
+			};
+		}
+
 		if (this.isInFlight(session.owner, session.repo, session.issueNumber)) {
 			return {
 				session,

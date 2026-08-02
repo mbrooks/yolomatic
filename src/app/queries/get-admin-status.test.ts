@@ -48,6 +48,7 @@ describe("GetAdminStatus", () => {
 		if (result.success) {
 			expect(result.data.agent).toBe("online");
 			expect(result.data.sessions).toHaveLength(2);
+			expect(result.data.sessions.every((session) => session.kind === "implementation")).toBe(true);
 			expect(result.data.uptime).toBe("1h");
 			expect(result.data.draining).toBe(false);
 		}
@@ -56,7 +57,7 @@ describe("GetAdminStatus", () => {
 	it("returns busy when a session is working", async () => {
 		const repo: SessionRepository = {
 			getAll: vi.fn(async () => [
-				makeState({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
+				makeState({ kind: "refinement", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
 			]),
 		} as unknown as SessionRepository;
 		const stale: StaleSessionService = {
@@ -77,6 +78,7 @@ describe("GetAdminStatus", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.agent).toBe("busy");
+			expect(result.data.sessions[0].kind).toBe("refinement");
 		}
 	});
 
