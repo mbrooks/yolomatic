@@ -58,8 +58,8 @@ describe("DashboardScreen", () => {
 
 		const headers = activityList!.querySelectorAll(".activity-list-header > div");
 		expect(headers[0].textContent).toBe("Repo");
-		expect(headers[1].textContent).toBe("Type");
-		expect(headers[2].textContent).toBe("Issue");
+		expect(headers[1].textContent).toBe("Issue");
+		expect(headers[2].textContent).toBe("Type");
 		expect(headers[3].textContent).toBe("Status");
 		expect(headers[4].textContent).toBe("Activity");
 	});

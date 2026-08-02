@@ -139,6 +139,7 @@ h1 {
 	border-radius: 4px;
 	font-size: 0.7rem;
 	padding: 0.1rem 0.35rem;
+	text-transform: uppercase;
 }
 
 .status-badge.pending {
@@ -147,26 +148,33 @@ h1 {
 
 .status-badge.working {
 	color: var(--yellow);
+	border-color: var(--yellow);
 }
 
 .status-badge.waiting-feedback {
 	color: var(--blue);
+	border-color: var(--blue);
 }
 
 .status-badge.paused {
 	color: var(--red);
+	border-color: var(--red);
 }
 
 .status-badge.complete {
 	color: var(--green);
+	border-color: var(--green);
 }
 
 .status-badge.failed {
 	color: var(--red);
+	border-color: var(--red);
+
 }
 
 .status-badge.cancelled {
 	color: var(--red);
+	border-color: var(--red);
 }
 
 .stale-dot {
@@ -1707,14 +1715,17 @@ a:hover {
 /* Refinement activity panel */
 .status-badge.applied {
 	color: var(--green);
+	border-color: var(--green);
 }
 
 .status-badge.running {
 	color: var(--yellow);
+	border-color: var(--yellow);
 }
 
 .status-badge.stale {
 	color: var(--yellow);
+	border-color: var(--yellow);
 }
 
 .status-badge.instructed {
