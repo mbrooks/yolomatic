@@ -106,6 +106,25 @@ describe("StaleSessionDetector", () => {
 		expect(result[0].classification).toBe("unknown");
 	});
 
+	it("does not classify working refinement sessions as stale", async () => {
+		const detector = makeDetector({
+			sessions: [
+				makeSession({
+					kind: "refinement",
+					owner: "mbrooks",
+					repo: "yeetomatic",
+					issueNumber: 1,
+					status: "working",
+				}),
+			],
+			thresholdMs: 1,
+		});
+
+		const result = await detector.detectStaleSessions();
+
+		expect(result[0]).toMatchObject({ isStale: false, classification: "unknown", worktreeDirty: null });
+	});
+
 	it("marks sessions below the threshold as not stale", async () => {
 		const detector = makeDetector({
 			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],

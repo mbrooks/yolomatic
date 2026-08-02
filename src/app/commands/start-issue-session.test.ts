@@ -210,6 +210,17 @@ describe("StartIssueSession", () => {
 		}
 	});
 
+	it("returns conflict when a persisted refinement session is working", async () => {
+		const { command, repo, github, executor } = makeCommand(makeState("working"));
+		await repo.save({ ...makeState("working"), kind: "refinement" });
+
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+
+		expect(result).toEqual({ success: false, code: "conflict", message: "Issue refinement is currently running" });
+		expect(github.updateIssueAssignees).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
 	it("returns started false when session already exists and is not pending", async () => {
 		const { command } = makeCommand(makeState("working"));
 		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);

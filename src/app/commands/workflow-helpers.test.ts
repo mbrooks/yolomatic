@@ -168,6 +168,49 @@ describe("workflow helpers", () => {
 			expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		});
 
+		it("replaces a terminal refinement session when implementation starts", async () => {
+			const existing = makeSession({
+				kind: "refinement",
+				status: "complete",
+				summary: "Refined",
+				workspacePath: "/tmp/refinement",
+			});
+			const sessions = {
+				get: vi.fn(async () => existing),
+				createSession: vi.fn(),
+				updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
+					...existing,
+					...updates,
+					status,
+				})),
+			};
+			const workspaces = {
+				createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/implementation", branch: "yeetomatic/issue-56" })),
+			};
+
+			const result = await ensureSessionExists(
+				sessions as never,
+				workspaces as never,
+				{} as never,
+				"mbrooks",
+				"yeetomatic",
+				56,
+				"Title",
+				"Body",
+				["bug"],
+				"main",
+			);
+
+			expect(result).toMatchObject({
+				kind: "implementation",
+				status: "pending",
+				workspacePath: "/tmp/implementation",
+				branch: "yeetomatic/issue-56",
+				summary: undefined,
+			});
+			expect(sessions.createSession).not.toHaveBeenCalled();
+		});
+
 		it("creates a worktree and session when none exists", async () => {
 			const sessions = {
 				get: vi.fn(async () => null),
@@ -675,6 +718,17 @@ describe("workflow helpers", () => {
 			const result = await prepareIssueSession(deps as never, ctx, { commentBodies: ["hi"] });
 
 			expect(result).toEqual({ skip: false, session: expect.objectContaining({ status: "working" }) });
+		});
+
+		it("blocks comment-style implementation starts while refinement is working", async () => {
+			const deps = makeDeps({
+				sessions: { get: vi.fn(async () => makeSession({ kind: "refinement", status: "working" })) },
+			});
+
+			const result = await prepareIssueSession(deps as never, ctx, { commentBodies: ["hi"] });
+
+			expect(result).toEqual({ skip: true, kind: "status", status: "working" });
+			expect(deps.tasks.isDraining).not.toHaveBeenCalled();
 		});
 
 		it("queues comment bodies and posts a draining message when draining with comments", async () => {

@@ -28,6 +28,7 @@ function mockLogResponse(overrides: Record<string, unknown> = {}) {
 
 function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
 	return {
+		kind: "implementation" as const,
 		owner: "mbrooks",
 		repo: "yeetomatic",
 		issueNumber: 1,

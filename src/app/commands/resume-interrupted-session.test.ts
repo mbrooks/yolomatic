@@ -36,6 +36,11 @@ function makeDeps(session: SessionState | null) {
 	const sessions: SessionRepository = {
 		get: vi.fn(async () => session),
 		save: vi.fn(async (s) => s),
+		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
+			...session!,
+			...updates,
+			status,
+		})),
 	} as unknown as SessionRepository;
 	const github: GitHubService = {
 		postComment: vi.fn(async () => 1),
@@ -69,6 +74,26 @@ describe("ResumeInterruptedSession", () => {
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("terminal status"));
 
 		writeSpy.mockRestore();
+	});
+
+	it("marks interrupted refinement sessions failed instead of resuming implementation", async () => {
+		const deps = makeDeps(makeSession({ kind: "refinement", status: "working", resumeOnBoot: true }));
+
+		const command = new ResumeInterruptedSession(deps);
+		await command.execute("mbrooks", "yeetomatic", 7);
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			7,
+			"failed",
+			expect.objectContaining({
+				summary: "interrupted by restart",
+				staleReason: "interrupted by restart",
+				resumeOnBoot: undefined,
+			}),
+		);
+		expect(deps.github.postComment).not.toHaveBeenCalled();
 	});
 
 	it("posts a resume comment and re-runs a working session", async () => {

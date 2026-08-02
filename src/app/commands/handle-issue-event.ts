@@ -58,7 +58,10 @@ export class HandleIssueEvent {
 	}
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
-		return this.inFlight.has(issueSessionKey(owner, repo, issueNumber));
+		return (
+			this.inFlight.has(issueSessionKey(owner, repo, issueNumber)) ||
+			(this.deps.refinement?.isInFlight(owner, repo, issueNumber) ?? false)
+		);
 	}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {

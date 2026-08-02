@@ -76,6 +76,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		};
 		const refinement = new HandleIssueRefinement({
 			refinementStore,
+			sessions,
 			github,
 			tasks,
 			workspaces,

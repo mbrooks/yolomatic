@@ -6,10 +6,12 @@ import { HandleIssueRefinement, buildNewIssueComment, ISSUE_REFINEMENT_STARTING_
 import { RefinementStore } from "../../refinement/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
+import type { SessionState } from "../../session/store.js";
 
 describe("HandleIssueRefinement", () => {
 	let tmpDir: string;
 	let store: RefinementStore;
+	let sessions: ReturnType<typeof createSessionsMock>;
 	let github: ReturnType<typeof createGitHubMock>;
 	let tasks: ReturnType<typeof createTasksMock>;
 	let workspaces: ReturnType<typeof createWorkspacesMock>;
@@ -19,6 +21,7 @@ describe("HandleIssueRefinement", () => {
 	beforeEach(async () => {
 		tmpDir = await mkdtemp(path.join(os.tmpdir(), "refinement-handler-"));
 		store = new RefinementStore(path.join(tmpDir, "refinement.sqlite"));
+		sessions = createSessionsMock();
 		github = createGitHubMock();
 		tasks = createTasksMock();
 		workspaces = createWorkspacesMock(tmpDir);
@@ -26,6 +29,7 @@ describe("HandleIssueRefinement", () => {
 		_resetSessionLogs();
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -94,6 +98,7 @@ describe("HandleIssueRefinement", () => {
 	it("appends an admin status link to the new-issue comment when enabled", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -121,6 +126,7 @@ describe("HandleIssueRefinement", () => {
 	it("interpolates the configured Yeetomatic username in the new-issue comment", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -140,6 +146,7 @@ describe("HandleIssueRefinement", () => {
 	it("does not post the automatic comment when issueNewCommentEnabled is false", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -162,6 +169,7 @@ describe("HandleIssueRefinement", () => {
 	it("still runs the refinement command when issueNewCommentEnabled is false", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -190,6 +198,7 @@ describe("HandleIssueRefinement", () => {
 	it("appends an admin status link to refinement status comments when enabled", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -252,6 +261,24 @@ describe("HandleIssueRefinement", () => {
 		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
 		expect(attempt).not.toBeNull();
 		expect(attempt!.state).toBe("applied");
+	});
+
+	it("persists a working refinement session and completes it after success", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockImplementation(async () => {
+			expect(await sessions.get()).toMatchObject({ kind: "refinement", status: "working" });
+			return { proposedTaskBody: "Refined body", summary: "Summary", investigation: "Investigation" };
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(await sessions.get()).toMatchObject({
+			kind: "refinement",
+			status: "complete",
+			summary: "Summary",
+			taskStartedAt: "2026-08-01T00:00:00.000Z",
+			taskFinishedAt: "2026-08-01T00:00:00.000Z",
+		});
 	});
 
 	it("records activity logs for a successful refinement", async () => {
@@ -460,6 +487,27 @@ describe("HandleIssueRefinement", () => {
 		);
 	});
 
+	it("does not overlap with a persisted working implementation session", async () => {
+		await sessions.save({
+			kind: "implementation",
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 1,
+			title: "Test",
+			body: "Body",
+			status: "working",
+			sessionPath: "/tmp/session.jsonl",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(executor.executeRefinement).not.toHaveBeenCalled();
+		expect(tasks.register).not.toHaveBeenCalled();
+	});
+
 	it("marks stale when the issue is closed during refinement", async () => {
 		github.getIssue.mockResolvedValueOnce({ state: "open", body: "Body" }).mockResolvedValueOnce({ state: "closed", body: "Body" });
 		executor.executeRefinement.mockResolvedValue({
@@ -473,6 +521,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
 		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
 		expect(attempt!.state).toBe("stale");
+		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue closed during refinement" });
 	});
 
 	it("marks stale when the issue body changes during refinement", async () => {
@@ -490,6 +539,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
 		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
 		expect(attempt!.state).toBe("stale");
+		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue body changed during refinement" });
 	});
 
 	it("uses repository skill when present", async () => {
@@ -517,6 +567,7 @@ describe("HandleIssueRefinement", () => {
 	it("ignores command when repository is not managed", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -535,6 +586,7 @@ describe("HandleIssueRefinement", () => {
 	it("ignores command when refinement is disabled", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -583,6 +635,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refinement failed: worker crashed");
 		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
 		expect(attempt!.state).toBe("failed");
+		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "worker crashed" });
 	});
 
 	it("ignores non-created comment actions", async () => {
@@ -626,6 +679,7 @@ describe("HandleIssueRefinement", () => {
 	it("does not post instructions when refinement is disabled", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
+			sessions: sessions as never,
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
@@ -655,6 +709,41 @@ describe("HandleIssueRefinement", () => {
 			getIssue: vi.fn(async () => ({ state: "open", body: "Body" })),
 			getCollaboratorPermissionLevel: vi.fn(async (): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> => null),
 			isCollaborator: vi.fn(async (): Promise<boolean> => false),
+		};
+	}
+
+	function createSessionsMock() {
+		let current: SessionState | null = null;
+		return {
+			get: vi.fn(async () => current),
+			save: vi.fn(async (state: SessionState) => {
+				current = state;
+				return state;
+			}),
+			createSession: vi.fn(async (owner, repo, issueNumber, title, body, workspacePath, labels) => {
+				if (!current) {
+					current = {
+						kind: "implementation",
+						owner,
+						repo,
+						issueNumber,
+						title,
+						body,
+						status: "pending",
+						sessionPath: `/tmp/issue-${issueNumber}.jsonl`,
+						workspacePath,
+						lastActivity: new Date().toISOString(),
+						seeded: false,
+						labels,
+					};
+				}
+				return current;
+			}),
+			updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates = {}) => {
+				if (!current) throw new Error("No session");
+				current = { ...current, ...updates, status, lastActivity: new Date().toISOString() };
+				return current;
+			}),
 		};
 	}
 
