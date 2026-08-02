@@ -8,14 +8,14 @@ const execFileDefault = promisify(execFileCallback);
 /** Default Ollama container name (matches the `yeetomatic-ollama` service in docker-compose.yml). */
 export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
 
-/** Bounded timeout for the non-interactive `ollama login` invocation. */
+/** Bounded timeout for the non-interactive `ollama signin` invocation. */
 export const DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS = 8000;
 
 /**
  * Generic env var that enables debug logging. When set to a truthy value
  * (1/true/yes), the default debug logger writes the issued command and the
  * captured result to stdout, so a maintainer can see exactly what
- * `docker exec ... ollama login` returned instead of guessing. Defaults to
+ * `docker exec ... ollama signin` returned instead of guessing. Defaults to
  * `false` (debugging off) when unset.
  */
 export const DEBUG_LOG_ENV = "DEBUG_LOG";
@@ -79,7 +79,7 @@ export interface OllamaSignInOptions {
 }
 
 /**
- * Parse the textual output of `ollama login` into a structured result.
+ * Parse the textual output of `ollama signin` into a structured result.
  * Handles both the "already signed in" and "you need to be signed in"
  * (with the connect URL) shapes reported by the Ollama CLI.
  */
@@ -122,10 +122,10 @@ function isTimeoutError(error: unknown): boolean {
 }
 
 /**
- * Check Ollama sign-in status by invoking `ollama login` inside the Ollama
- * container via the Docker socket. Allocates a pseudo-TTY (`-it`) so the
- * interactive Ollama CLI prints its status / connect URL the same way it
- * does when run by hand; bounded timeout so a blocking OAuth wait is killed.
+ * Check Ollama sign-in status by invoking `ollama signin` inside the Ollama
+ * container via the Docker socket. Runs non-interactively (no `-it`) so it
+ * works when stdin is not a terminal (e.g. when driven by the control
+ * plane); bounded timeout so a blocking OAuth wait is killed.
  */
 export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Promise<OllamaSignInResult> {
 	const containerName = options.containerName.trim();
@@ -141,7 +141,7 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 	const exec = options.execFile ?? execFileDefault;
 	const debug = options.debug ?? createOllamaDebugLogger();
 
-	const args = ["exec", "-it", containerName, "ollama", "login"];
+	const args = ["exec", containerName, "ollama", "signin"];
 	debug(`issuing: docker ${args.join(" ")} (timeout ${timeoutMs}ms)`);
 
 	try {
@@ -173,7 +173,7 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 				` stderr=${truncateForLog(stderr)}; message=${truncateForLog(err instanceof Error ? err.message : String(error ?? ""))}`,
 		);
 
-		// `ollama login` prints the connect URL (or the "already signed in" line)
+		// `ollama signin` prints the connect URL (or the "already signed in" line)
 		// and then blocks waiting for the browser OAuth flow to complete. When
 		// our bounded timeout kills it, the buffered stdout/stderr still holds
 		// that output, so parse it before classifying the failure. This also
