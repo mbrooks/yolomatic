@@ -63,7 +63,12 @@ function makeState(status: SessionState["status"]): SessionState {
 
 function makeCommand(
 	state: SessionState | null,
-	deps?: Partial<{ workspaces: WorkspaceService; tasks: TaskControlService; archiveDir: string }>,
+	deps?: Partial<{
+		workspaces: WorkspaceService;
+		tasks: TaskControlService;
+		archiveDir: string;
+		restartSession: ((owner: string, repo: string, issueNumber: number) => Promise<void>) | null;
+	}>,
 ) {
 	const repo = makeMockRepo(state);
 	const workspaces: WorkspaceService = deps?.workspaces ?? {
@@ -87,8 +92,10 @@ function makeCommand(
 		setDraining: vi.fn(),
 	};
 	const clock: Clock = { now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 };
-	const command = new RunSessionCommand(repo, workspaces, tasks, clock, deps?.archiveDir);
-	return { command, repo, workspaces, tasks };
+	const restartSession =
+		deps && "restartSession" in deps ? deps.restartSession ?? undefined : vi.fn(async () => undefined);
+	const command = new RunSessionCommand(repo, workspaces, tasks, clock, deps?.archiveDir, restartSession);
+	return { command, repo, workspaces, tasks, restartSession };
 }
 
 describe("RunSessionCommand", () => {
@@ -150,11 +157,82 @@ describe("RunSessionCommand", () => {
 
 	it("restarts a failed session", async () => {
 		const state = makeState("failed");
-		const { command, repo, workspaces } = makeCommand(state);
+		const { command, repo, workspaces, restartSession } = makeCommand(state);
 		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
 		expect(result.success).toBe(true);
+		if (result.success && "dispatched" in result.data) {
+			expect(result.data.dispatched).toBe(true);
+		}
 		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
 		expect(repo.restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+	});
+
+	it("restarts a cancelled session", async () => {
+		const state = makeState("cancelled");
+		const { command, restartSession } = makeCommand(state);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
+		expect(result.success).toBe(true);
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+	});
+
+	it("rejects restart when the session is already active", async () => {
+		const state = makeState("failed");
+		const { command, tasks, repo, workspaces, restartSession } = makeCommand(state);
+		(tasks.isActive as ReturnType<typeof vi.fn>).mockReturnValue(true);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.code).toBe("conflict");
+		}
+		expect(workspaces.removeWorktree).not.toHaveBeenCalled();
+		expect(repo.restartSession).not.toHaveBeenCalled();
+		expect(restartSession).not.toHaveBeenCalled();
+	});
+
+	it("queues restart for boot while draining", async () => {
+		const state = makeState("failed");
+		const { command, tasks, repo, restartSession } = makeCommand(state);
+		(tasks.isDraining as ReturnType<typeof vi.fn>).mockReturnValue(true);
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
+		expect(result.success).toBe(true);
+		if (result.success && "dispatched" in result.data) {
+			expect(result.data.dispatched).toBe(false);
+		}
+		expect(repo.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending", {
+			resumeOnBoot: true,
+		});
+		expect(restartSession).not.toHaveBeenCalled();
+	});
+
+	it("fails before resetting when restart dispatch is not configured", async () => {
+		const state = makeState("failed");
+		const { command, repo, workspaces } = makeCommand(state, { restartSession: null });
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.code).toBe("internal");
+		}
+		expect(workspaces.removeWorktree).not.toHaveBeenCalled();
+		expect(repo.restartSession).not.toHaveBeenCalled();
+	});
+
+	it("marks a restarted session failed when dispatch rejects", async () => {
+		const state = makeState("failed");
+		const restartSession = vi.fn(async () => {
+			throw new Error("dispatch unavailable");
+		});
+		const { command, repo } = makeCommand(state, { restartSession });
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "restart");
+		expect(result.success).toBe(true);
+		await vi.waitFor(() => {
+			expect(repo.markFailed).toHaveBeenCalledWith(
+				"mbrooks",
+				"yeetomatic",
+				1,
+				"Admin restart dispatch failed: dispatch unavailable",
+			);
+		});
 	});
 
 	it("rejects restarting a completed session", async () => {

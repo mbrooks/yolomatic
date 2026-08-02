@@ -218,10 +218,24 @@ describe("buildRuntimeGraph", () => {
 		expect(graph.server.listen).not.toHaveBeenCalled();
 	});
 
-	it("passes the prebuilt StartIssueSession through webhook server options", () => {
+	it("passes session start and restart dispatchers through webhook server options", async () => {
 		const graph = buildRuntimeGraph(baseConfig, makeDeps());
 		const callArgs = (createWebhookServerMock as ReturnType<typeof vi.fn>).mock.calls[0];
-		expect(callArgs?.[9]).toEqual({ prebuiltStartIssueSession: graph.startIssueSession, repositoryStore: expect.anything() });
+		const options = callArgs?.[9] as {
+			prebuiltStartIssueSession: typeof graph.startIssueSession;
+			repositoryStore: unknown;
+			restartSession: (owner: string, repo: string, issueNumber: number) => Promise<void>;
+		};
+		expect(options).toEqual(
+			expect.objectContaining({
+				prebuiltStartIssueSession: graph.startIssueSession,
+				repositoryStore: expect.anything(),
+				restartSession: expect.any(Function),
+			}),
+		);
+
+		await options.restartSession("mbrooks", "yeetomatic", 513);
+		expect(graph.handlers.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 513);
 	});
 
 	it("resolve helpers passed to handlers resolve default branch and event mode", () => {
