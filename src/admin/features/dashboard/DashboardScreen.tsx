@@ -91,33 +91,38 @@ export function DashboardScreen({
 							<div className="activity-status">Status</div>
 							<div className="activity-time">Activity</div>
 						</div>
-						{recentSessions.map((session) => (
-							<div
-								key={`${session.owner}/${session.repo}#${session.issueNumber}`}
-								className="activity-row"
-								onClick={() => onSelectSession(session)}
-								tabIndex={0}
-								role="button"
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										onSelectSession(session);
-									}
-								}}
-							>
-								<div className="activity-repo">
-									{session.owner}/{session.repo}
+						{recentSessions.map((session) => {
+							const isRefinement = session.kind === "refinement";
+							return (
+								<div
+									key={`${session.owner}/${session.repo}#${session.issueNumber}`}
+									className="activity-row"
+									onClick={() => onSelectSession(session)}
+									tabIndex={0}
+									role="button"
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											onSelectSession(session);
+										}
+									}}
+								>
+									<div className="activity-repo">
+										{session.owner}/{session.repo}
+									</div>
+									<div className="list-col type">
+										<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>
+											{isRefinement ? "Refinement" : "Issue"}
+										</span>
+									</div>
+									<div className="activity-issue">
+										#{session.issueNumber}
+									</div>
+									<div className={`activity-status ${session.status}`}>{session.status}</div>
+									<div className="activity-time">{formatRelative(session.lastActivity)}</div>
 								</div>
-								<div className="activity-repo">
-									{session.owner}/{session.kind}
-								</div>
-								<div className="activity-issue">
-									#{session.issueNumber}
-								</div>
-								<div className={`activity-status ${session.status}`}>{session.status}</div>
-								<div className="activity-time">{formatRelative(session.lastActivity)}</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</div>
