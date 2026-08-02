@@ -7,6 +7,7 @@ import type { SessionState } from "../../session/store.js";
 import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
+import { appendAdminLink } from "./comment-links.js";
 import type { PRReviewPayload } from "./handle-pr-review.js";
 
 /**
@@ -276,11 +277,12 @@ export async function markIssueWorking(
 	repo: string,
 	issueNumber: number,
 	message?: string,
+	adminIssueUrl?: string,
 ): Promise<void> {
 	await removeWorkflowLabels(github, owner, repo, issueNumber);
 	await github.addLabels(owner, repo, issueNumber, ["yeetomatic-working"]);
 	if (message) {
-		await github.postComment(owner, repo, issueNumber, message);
+		await github.postComment(owner, repo, issueNumber, appendAdminLink(message, adminIssueUrl));
 	}
 }
 
@@ -408,8 +410,9 @@ export async function startIssueExecution(
 	session: SessionState,
 	message: string,
 	commentBody?: string,
+	adminIssueUrl?: string,
 ): Promise<void> {
-	await markIssueWorking(github, owner, repo, issueNumber, message);
+	await markIssueWorking(github, owner, repo, issueNumber, message, adminIssueUrl);
 	await executor.run(session, commentBody);
 }
 

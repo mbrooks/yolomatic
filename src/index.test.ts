@@ -33,6 +33,9 @@ vi.mock("./config.js", () => ({
 		workerOllamaHost: undefined,
 		adminPath: "/yeetomatic/admin",
 		adminDefaultPage: "#/dashboard",
+		issueNewCommentEnabled: true,
+		issueAdminLinkInCommentsEnabled: true,
+		adminBaseUrl: undefined,
 	})),
 	isBootstrapComplete: vi.fn(() => true),
 }));
@@ -262,6 +265,9 @@ describe("main", () => {
 			workerOllamaHost: undefined,
 		adminPath: "/yeetomatic/admin",
 		adminDefaultPage: "#/dashboard",
+		issueNewCommentEnabled: true,
+		issueAdminLinkInCommentsEnabled: true,
+		adminBaseUrl: undefined,
 		});
 
 		await main();
@@ -362,6 +368,9 @@ describe("main", () => {
 			workerOllamaHost: undefined,
 		adminPath: "/yeetomatic/admin",
 		adminDefaultPage: "#/dashboard",
+		issueNewCommentEnabled: true,
+		issueAdminLinkInCommentsEnabled: true,
+		adminBaseUrl: undefined,
 		});
 
 		await main();
@@ -544,6 +553,9 @@ describe("main", () => {
 			workerOllamaHost: undefined,
 		adminPath: "/yeetomatic/admin",
 		adminDefaultPage: "#/dashboard",
+		issueNewCommentEnabled: true,
+		issueAdminLinkInCommentsEnabled: true,
+		adminBaseUrl: undefined,
 		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();

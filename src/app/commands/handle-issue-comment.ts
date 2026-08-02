@@ -14,6 +14,7 @@ import {
 } from "./workflow-helpers.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface CommentEventPayload {
 	action: string;
@@ -49,9 +50,15 @@ export class HandleIssueComment {
 			executor: ExecuteSessionDeps;
 			refinement?: HandleIssueRefinement;
 			prReview?: { execute: (payload: import("./handle-pr-review.js").PRReviewPayload) => Promise<void> };
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {
 		this.executor = new ExecuteSession(deps.executor);
+	}
+
+	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
 	}
 
 	async execute(payload: CommentEventPayload): Promise<void> {
@@ -180,7 +187,7 @@ export class HandleIssueComment {
 		const session = prepared.session;
 		if (session.status === "paused") {
 			process.stdout.write(`[webhook] comment ignored: ${key} is paused\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is paused on this issue. It will resume when unpaused.");
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Yeetomatic is paused on this issue. It will resume when unpaused."));
 			return;
 		}
 
@@ -193,6 +200,11 @@ export class HandleIssueComment {
 			session,
 			"Feedback received. Resuming work.",
 			payload.comment.body,
+			this.adminIssueUrl(owner, repo, issueNumber),
 		);
+	}
+
+	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
 }

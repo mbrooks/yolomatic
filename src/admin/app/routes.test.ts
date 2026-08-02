@@ -175,6 +175,10 @@ describe("parseHash", () => {
 		expect(parseHash("#/settings/ai-llm")).toEqual({ screen: "settings", tab: "ai-llm" });
 	});
 
+	it("parses settings view with issues category tab", () => {
+		expect(parseHash("#/settings/issues")).toEqual({ screen: "settings", tab: "issues" });
+	});
+
 	it("parses server-skills view", () => {
 		expect(parseHash("#/settings/skills")).toEqual({ screen: "settings", tab: "skills" });
 	});
@@ -302,6 +306,12 @@ describe("buildHash", () => {
 	it("round-trips settings category tab", () => {
 		const hash = buildHash({ screen: "settings" as const, tab: "git-worktrees" as const });
 		expect(parseHash(hash)).toEqual(expect.objectContaining({ screen: "settings", tab: "git-worktrees" }));
+	});
+
+	it("round-trips the issues settings category tab without colliding with the repo-detail issues tab", () => {
+		const hash = buildHash({ screen: "settings" as const, tab: "issues" as const });
+		expect(hash).toBe("#/settings/issues");
+		expect(parseHash(hash)).toEqual({ screen: "settings", tab: "issues" });
 	});
 
 	it("round-trips repositories settings tab", () => {

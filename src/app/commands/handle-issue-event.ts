@@ -14,6 +14,7 @@ import {
 	prepareIssueSession,
 } from "./workflow-helpers.js";
 import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface IssueEventPayload {
 	action: string;
@@ -48,6 +49,8 @@ export class HandleIssueEvent {
 			executor: ExecuteSessionDeps;
 			refinement?: HandleIssueRefinement;
 			inFlight?: Set<string>;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {
 		this.executor = new ExecuteSession(deps.executor);
@@ -56,6 +59,14 @@ export class HandleIssueEvent {
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
 		return this.inFlight.has(issueSessionKey(owner, repo, issueNumber));
+	}
+
+	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
 
 	async execute(payload: IssueEventPayload): Promise<void> {
@@ -82,7 +93,7 @@ export class HandleIssueEvent {
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
 				await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending");
 				await removeWorkflowLabels(this.deps.github, owner, repo, issue.number);
-				await this.deps.github.postComment(owner, repo, issue.number, "Yeetomatic unassigned. Pausing work.");
+				await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Yeetomatic unassigned. Pausing work."));
 			}
 			return;
 		}
@@ -102,9 +113,9 @@ export class HandleIssueEvent {
 				const steered = await this.deps.tasks.steer(key, issue.body ?? "");
 				if (steered) {
 					process.stdout.write(`[webhook] steered description update on active execution ${key}\n`);
-					await this.deps.github.postComment(owner, repo, issue.number, "Issue description updated. Steering to Yeetomatic.");
+					await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Issue description updated. Steering to Yeetomatic."));
 				} else {
-					await this.deps.github.postComment(owner, repo, issue.number, "Issue description updated but could not be steered.");
+					await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Issue description updated but could not be steered."));
 				}
 				return;
 			}
@@ -174,6 +185,7 @@ export class HandleIssueEvent {
 				issue.number,
 				prepared.session,
 				"Picked up by Yeetomatic. Working on it...",
+				this.adminIssueUrl(owner, repo, issue.number),
 			);
 		} finally {
 			this.inFlight.delete(key);

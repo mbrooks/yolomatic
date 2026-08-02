@@ -14,6 +14,7 @@ import { WorktreeBranchDivergedError } from "../../workspace/errors.js";
 import { issueSessionKey, removeWorkflowLabels } from "./workflow-helpers.js";
 import { ExecuteSessionDelivery } from "./execute-session-delivery.js";
 import { ExecuteSessionReporter } from "./execute-session-reporter.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface ExecuteSessionDeps {
 	sessions: SessionRepository;
@@ -26,6 +27,8 @@ export interface ExecuteSessionDeps {
 	resolveDefaultBranch?: (owner: string, repo: string) => string;
 	githubUsername: string;
 	selfReportEnabled: boolean;
+	issueAdminLinkInCommentsEnabled?: boolean;
+	adminBaseUrl?: string;
 }
 
 export class ExecuteSession {
@@ -38,6 +41,8 @@ export class ExecuteSession {
 			workspaces: deps.workspaces,
 			sessions: deps.sessions,
 			selfReportEnabled: deps.selfReportEnabled,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		});
 		this.delivery = new ExecuteSessionDelivery({
 			sessions: deps.sessions,
@@ -46,6 +51,8 @@ export class ExecuteSession {
 			defaultBranch: deps.defaultBranch,
 			resolveDefaultBranch: deps.resolveDefaultBranch,
 			reporter: this.reporter,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		});
 	}
 
@@ -137,7 +144,7 @@ export class ExecuteSession {
 					await this.deps.sessions.cancelSession(owner, repo, issueNumber);
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
 					await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-cancelled"]);
-					await this.deps.github.postComment(owner, repo, issueNumber, "Task cancelled by admin. Yeetomatic is idle.");
+					await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Task cancelled by admin. Yeetomatic is idle."));
 					return;
 				}
 
@@ -147,7 +154,7 @@ export class ExecuteSession {
 						owner,
 						repo,
 						issueNumber,
-						`⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`,
+						this.withLink(owner, repo, issueNumber, `⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`),
 					);
 					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
@@ -314,14 +321,22 @@ export class ExecuteSession {
 			owner,
 			repo,
 			issueNumber,
-			[
+			this.withLink(owner, repo, issueNumber, [
 				"**Yeetomatic stopped before execution.**",
 				"",
 				message,
 				"",
 				"This protects the task from being handled by the wrong issue worktree.",
-			].join("\n"),
+			].join("\n")),
 		);
+	}
+
+	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
 
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {

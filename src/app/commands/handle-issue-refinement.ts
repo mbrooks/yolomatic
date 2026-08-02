@@ -7,6 +7,7 @@ import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 import { isAdmin, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -47,19 +48,25 @@ export interface IssueRefinementInstructionPayload {
 
 export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yeetomatic. Refining this issue. No implementation session will start.";
 
-export const ISSUE_REFINEMENT_INSTRUCTIONS = [
-	"## Yeetomatic issue refinement",
-	"",
-	"A repository collaborator or the configured admin can ask Yeetomatic to investigate this issue and replace its body with a more complete Proposed Task. Yeetomatic uses this repository's `issue-refinement` skill when available, otherwise it uses its built-in issue-refinement defaults.",
-	"",
-	"To start, comment:",
-	"",
-	"/yeetomatic issue-refinement",
-	"",
-	"The command starts an LLM-driven worker with repository, shell, test, and network access. Because issue content can influence the worker's behavior, verify the issue before starting refinement.",
-	"",
-	"When refinement succeeds, Yeetomatic automatically replaces this issue body. The original body is retained in Yeetomatic's refinement history. Refinement does not start implementation or create a pull request.",
-].join("\n");
+/**
+ * Build the short automatic comment Yeetomatic posts on newly opened issues.
+ *
+ * Lists the available commands (assign-to-Yeetomatic, `/yeetomatic
+ * issue-refinement`, `/yeetomatic stop`) and, when an admin issue URL is
+ * provided, appends a one-line status-tracking link. The detailed refinement
+ * explanation lives in README.md / design/issue-refinement.md and is not
+ * duplicated here.
+ */
+export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: string): string {
+	const body = [
+		"Yeetomatic is available to work on this issue.",
+		"",
+		"- Assign the issue to `" + githubUsername + "` to start an implementation session and open a pull request.",
+		"- `/yeetomatic issue-refinement` — have an authorized maintainer ask Yeetomatic to refine the issue body into a Proposed Task (no implementation or PR).",
+		"- `/yeetomatic stop` — stop the active session (authorized maintainers only).",
+	].join("\n");
+	return appendAdminLink(body, adminIssueUrl);
+}
 
 export class HandleIssueRefinement {
 	private readonly inFlight = new Set<string>();
@@ -78,6 +85,9 @@ export class HandleIssueRefinement {
 			resolveDefaultBranch?: (owner: string, repo: string) => string;
 			isRepoManaged?: (owner: string, repo: string) => boolean;
 			refinementEnabled?: boolean;
+			issueNewCommentEnabled?: boolean;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {}
 
@@ -99,8 +109,21 @@ export class HandleIssueRefinement {
 			return;
 		}
 
+		if (this.deps.issueNewCommentEnabled === false) {
+			process.stdout.write(`[refinement] automatic new-issue comment disabled for ${owner}/${repo}#${issueNumber}\n`);
+			return;
+		}
+
 		process.stdout.write(`[refinement] posting instructions for ${owner}/${repo}#${issueNumber}\n`);
-		const commentId = await this.deps.github.postComment(owner, repo, issueNumber, ISSUE_REFINEMENT_INSTRUCTIONS);
+		const adminIssueUrl = resolveAdminIssueUrl(
+			this.deps.adminBaseUrl,
+			this.deps.issueAdminLinkInCommentsEnabled,
+			owner,
+			repo,
+			issueNumber,
+		);
+		const comment = buildNewIssueComment(this.deps.githubUsername, adminIssueUrl);
+		const commentId = await this.deps.github.postComment(owner, repo, issueNumber, comment);
 		this.deps.refinementStore.recordInstructionComment(owner, repo, issueNumber, commentId);
 		this.log(owner, repo, issueNumber, "info", "Posted issue-refinement instructions");
 	}
@@ -156,20 +179,20 @@ export class HandleIssueRefinement {
 		if (!authorized) {
 			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository collaborator\n`);
 			this.log(owner, repo, issueNumber, "warn", `Refinement rejected: @${payload.sender.login} is not a repository collaborator`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Only repository collaborators can run issue refinement.");
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Only repository collaborators can run issue refinement."));
 			return;
 		}
 
 		if (this.inFlight.has(key)) {
 			process.stdout.write(`[refinement] ignored: ${key} is already being refined\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Refinement is already running for this issue.");
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement is already running for this issue."));
 			return;
 		}
 
 		if (this.deps.tasks.isActive(key)) {
 			process.stdout.write(`[refinement] ignored: ${key} has an active implementation task\n`);
 			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: an implementation task is active");
-			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation.");
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation."));
 			return;
 		}
 
@@ -183,12 +206,12 @@ export class HandleIssueRefinement {
 			this.inFlight.delete(key);
 			process.stdout.write(`[refinement] ignored: ${key} task key is already claimed\n`);
 			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: task key is already claimed");
-			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation.");
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation."));
 			return;
 		}
 
 		process.stdout.write(`[refinement] starting for ${owner}/${repo}#${issueNumber}\n`);
-		await this.deps.github.postComment(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT);
+		await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT));
 		this.log(owner, repo, issueNumber, "info", "Refinement started");
 
 		let attemptId: string | undefined;
@@ -253,21 +276,21 @@ export class HandleIssueRefinement {
 			if (!currentIssue || currentIssue.state === "closed") {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: "issue closed during refinement" });
 				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue closed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yeetomatic issue-refinement` again.");
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yeetomatic issue-refinement` again."));
 				return;
 			}
 			const currentFingerprint = fingerprintBody(currentIssue.body ?? "");
 			if (currentFingerprint !== fingerprint) {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: "issue body changed during refinement" });
 				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue body changed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yeetomatic issue-refinement` again.");
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yeetomatic issue-refinement` again."));
 				return;
 			}
 
 			if (result.proposedTaskBody.length > 65535) {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: "proposed task body exceeds GitHub size limit" });
 				this.log(owner, repo, issueNumber, "warn", "Refinement failed: proposed task body exceeds GitHub size limit");
-				await this.deps.github.postComment(owner, repo, issueNumber, "Refinement produced a body that is too large for GitHub. Please run the command again with a narrower request.");
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement produced a body that is too large for GitHub. Please run the command again with a narrower request."));
 				return;
 			}
 
@@ -278,7 +301,7 @@ export class HandleIssueRefinement {
 				owner,
 				repo,
 				issueNumber,
-				`Issue refined at the request of @${payload.sender.login}. The issue body now contains the Proposed Task. No implementation session was started.`,
+				this.withAdminLink(owner, repo, issueNumber, `Issue refined at the request of @${payload.sender.login}. The issue body now contains the Proposed Task. No implementation session was started.`),
 			);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -287,7 +310,7 @@ export class HandleIssueRefinement {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: message });
 			}
 			this.log(owner, repo, issueNumber, "error", `Refinement failed: ${message}`);
-			await this.deps.github.postComment(owner, repo, issueNumber, `Refinement failed: ${message}`);
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, `Refinement failed: ${message}`));
 		} finally {
 			this.deps.tasks.unregister(key, registration);
 			this.inFlight.delete(key);
@@ -315,6 +338,13 @@ export class HandleIssueRefinement {
 		details?: Record<string, unknown>,
 	): void {
 		recordSessionLog(issueSessionKey(owner, repo, issueNumber), { level, message, details });
+	}
+
+	private withAdminLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(
+			body,
+			resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber),
+		);
 	}
 
 	private isEligibleForInstructions(payload: IssueRefinementInstructionPayload): boolean {

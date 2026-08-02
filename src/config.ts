@@ -65,6 +65,9 @@ export interface AppConfig {
 	workerOllamaHost?: string;
 	adminPath: string;
 	adminDefaultPage: string;
+	issueNewCommentEnabled: boolean;
+	issueAdminLinkInCommentsEnabled: boolean;
+	adminBaseUrl: string | undefined;
 }
 
 export function getConfig(store: SettingsStore): AppConfig {
@@ -118,6 +121,12 @@ export function getConfig(store: SettingsStore): AppConfig {
 		adminDefaultPage: (() => {
 			const raw = store.get("admin_default_page")?.trim();
 			return raw || DEFAULT_ADMIN_DEFAULT_PAGE;
+		})(),
+		issueNewCommentEnabled: store.getBoolean("issue_new_comment_enabled", true),
+		issueAdminLinkInCommentsEnabled: store.getBoolean("issue_admin_link_in_comments_enabled", true),
+		adminBaseUrl: (() => {
+			const raw = store.get("admin_base_url")?.trim();
+			return raw || undefined;
 		})(),
 	};
 }

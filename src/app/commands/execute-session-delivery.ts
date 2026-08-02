@@ -5,6 +5,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { SessionState } from "../../session/store.js";
 import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { ExecuteSessionReporter } from "./execute-session-reporter.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export class ExecuteSessionDelivery {
 	constructor(
@@ -15,8 +16,18 @@ export class ExecuteSessionDelivery {
 			defaultBranch?: string;
 			resolveDefaultBranch?: (owner: string, repo: string) => string;
 			reporter: ExecuteSessionReporter;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {}
+
+	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
+	}
 
 	async deliverCompletion(
 		current: SessionState,
@@ -46,7 +57,7 @@ export class ExecuteSessionDelivery {
 					owner,
 					repo,
 					issueNumber,
-					[
+					this.withLink(owner, repo, issueNumber, [
 						"**Yeetomatic Complete**",
 						"",
 						"Summary:",
@@ -64,7 +75,7 @@ export class ExecuteSessionDelivery {
 						postStatus || "(clean)",
 						"```",
 						"</details>",
-					].join("\n"),
+					].join("\n")),
 				);
 
 				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
@@ -91,7 +102,7 @@ export class ExecuteSessionDelivery {
 				owner,
 				repo,
 				issueNumber,
-				[
+				this.withLink(owner, repo, issueNumber, [
 					"**Yeetomatic Complete**",
 					"",
 					`PR created: ${prUrl}`,
@@ -100,7 +111,7 @@ export class ExecuteSessionDelivery {
 					result.summary || "No summary provided.",
 					"",
 					"Ready for review.",
-				].join("\n"),
+				].join("\n")),
 			);
 		} else if (deliveryOutcome === "pr-existed" && prUrl) {
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-pr-created"]);
@@ -108,7 +119,7 @@ export class ExecuteSessionDelivery {
 				owner,
 				repo,
 				issueNumber,
-				[
+				this.withLink(owner, repo, issueNumber, [
 					"**Yeetomatic Complete**",
 					"",
 					`PR already exists: ${prUrl}`,
@@ -117,21 +128,21 @@ export class ExecuteSessionDelivery {
 					result.summary || "No summary provided.",
 					"",
 					"Ready for review.",
-				].join("\n"),
+				].join("\n")),
 			);
 		} else {
 			await this.deps.github.postComment(
 				owner,
 				repo,
 				issueNumber,
-				[
+				this.withLink(owner, repo, issueNumber, [
 					"**Yeetomatic Complete**",
 					"",
 					"Summary:",
 					result.summary || "No summary provided.",
 					"",
 					"No code changes were necessary.",
-				].join("\n"),
+				].join("\n")),
 			);
 		}
 	}
