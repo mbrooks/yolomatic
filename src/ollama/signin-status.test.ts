@@ -76,7 +76,7 @@ describe("checkOllamaSignInStatus", () => {
 		expect(result.signedIn).toBe(true);
 		expect(result.user).toBe("bob");
 		expect(result.error).toBeUndefined();
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "yeetomatic-ollama", "ollama", "login"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "-it", "yeetomatic-ollama", "ollama", "login"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
 	});
 
 	it("returns the connect URL when the account is not signed in", async () => {
@@ -181,7 +181,7 @@ describe("DefaultOllamaSignInService", () => {
 		expect(result.signedIn).toBe(true);
 		expect(result.user).toBe("carol");
 		expect(store.getString).toHaveBeenCalledWith("ollama_container_name", DEFAULT_OLLAMA_CONTAINER_NAME);
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "custom-ollama", "ollama", "login"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "-it", "custom-ollama", "ollama", "login"], expect.anything());
 	});
 
 	it("prefers an explicitly provided container name over settings", async () => {
@@ -189,7 +189,7 @@ describe("DefaultOllamaSignInService", () => {
 		const store = makeStore("settings-ollama");
 		const service = new DefaultOllamaSignInService(store, exec);
 		await service.checkSignInStatus({ containerName: "explicit-ollama" });
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "explicit-ollama", "ollama", "login"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "-it", "explicit-ollama", "ollama", "login"], expect.anything());
 	});
 
 	it("uses the configured container name from settings when the passed value is empty", async () => {
@@ -197,6 +197,6 @@ describe("DefaultOllamaSignInService", () => {
 		const store = makeStore("settings-ollama");
 		const service = new DefaultOllamaSignInService(store, exec);
 		await service.checkSignInStatus({ containerName: "   " });
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "settings-ollama", "ollama", "login"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "-it", "settings-ollama", "ollama", "login"], expect.anything());
 	});
 });

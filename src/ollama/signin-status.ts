@@ -84,7 +84,9 @@ function isTimeoutError(error: unknown): boolean {
 
 /**
  * Check Ollama sign-in status by invoking `ollama login` inside the Ollama
- * container via the Docker socket. Non-interactive: no TTY, bounded timeout.
+ * container via the Docker socket. Allocates a pseudo-TTY (`-it`) so the
+ * interactive Ollama CLI prints its status / connect URL the same way it
+ * does when run by hand; bounded timeout so a blocking OAuth wait is killed.
  */
 export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Promise<OllamaSignInResult> {
 	const containerName = options.containerName.trim();
@@ -102,7 +104,7 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 	try {
 		const result = await exec(
 			"docker",
-			["exec", containerName, "ollama", "login"],
+			["exec", "-it", containerName, "ollama", "login"],
 			{ timeout: timeoutMs, maxBuffer: 1024 * 1024 },
 		);
 		const stdout = typeof result === "string" ? result : asString(result.stdout);
