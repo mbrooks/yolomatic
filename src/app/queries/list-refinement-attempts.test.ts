@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -17,6 +17,7 @@ describe("ListRefinementAttempts", () => {
 	});
 
 	afterEach(async () => {
+		vi.useRealTimers();
 		await rm(tmpDir, { recursive: true, force: true });
 	});
 
@@ -29,6 +30,8 @@ describe("ListRefinementAttempts", () => {
 	});
 
 	it("returns attempts newest first with all fields", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
 		const first = store.createAttempt({
 			owner: "mbrooks",
 			repo: "yeetomatic",
@@ -41,6 +44,7 @@ describe("ListRefinementAttempts", () => {
 			state: "applied",
 			summary: "First summary",
 		});
+		vi.setSystemTime(new Date("2026-01-01T00:00:00.001Z"));
 		const second = store.createAttempt({
 			owner: "mbrooks",
 			repo: "yeetomatic",
