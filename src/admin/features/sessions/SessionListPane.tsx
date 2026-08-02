@@ -22,6 +22,7 @@ export function SessionListPane({
 			</div>
 			<div className="list-body">
 				{sessions.map((session) => {
+					const isRefinement = session.kind === "refinement";
 					const isSelected =
 						selected?.owner === session.owner &&
 						selected?.repo === session.repo &&
@@ -45,7 +46,9 @@ export function SessionListPane({
 							</div>
 							<div className="list-col issue">#{session.issueNumber}</div>
 							<div className="list-col type">
-								<span className="type-badge issue">Issue</span>
+								<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>
+									{isRefinement ? "Refinement" : "Issue"}
+								</span>
 							</div>
 							<div className="list-col status">
 								<span className={`status-badge ${session.status}`}>{session.status}</span>

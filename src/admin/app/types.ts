@@ -72,6 +72,7 @@ export type RepoSkill = {
 };
 
 export type Session = {
+	kind: "implementation" | "refinement";
 	owner: string;
 	repo: string;
 	issueNumber: number;

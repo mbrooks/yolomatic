@@ -378,6 +378,37 @@ describe("startRuntime", () => {
 		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
 	});
 
+	it("marks interrupted refinement sessions failed without resuming them", async () => {
+		sessionStoreMock.getAll.mockImplementationOnce(async () => [
+			{
+				kind: "refinement",
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 517,
+				status: "working",
+				workspacePath: "/tmp/refinement",
+				title: "Title",
+				body: "Body",
+				lastActivity: new Date().toISOString(),
+				seeded: false,
+			},
+		] as never);
+
+		await startRuntime(baseConfig, makeDeps());
+
+		const { SessionManager } = await import("../session/manager.js");
+		const sessionManager = vi.mocked(SessionManager).mock.results.at(-1)?.value;
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			517,
+			"failed",
+			expect.objectContaining({ summary: "interrupted by restart", resumeOnBoot: undefined }),
+		);
+		const handlersInstance = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+		expect(handlersInstance.resumeInterruptedSession).not.toHaveBeenCalled();
+	});
+
 	it("swallows resume errors per session and outer resume errors", async () => {
 		sessionStoreMock.getAll.mockImplementationOnce(async () => {
 			throw new Error("resume outer");

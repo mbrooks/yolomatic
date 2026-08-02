@@ -3,7 +3,7 @@ import type { GitHubService } from "../../ports/github-service.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
-import type { SessionState } from "../../session/store.js";
+import { isTerminalStatus, type SessionState } from "../../session/store.js";
 import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
@@ -157,6 +157,10 @@ export async function prepareIssueSession(
 		ctx.labels,
 		ctx.defaultBranch,
 	);
+
+	if (session.kind === "refinement" && session.status === "working") {
+		return { skip: true, kind: "status", status: session.status };
+	}
 
 	if (options.requirePending && session.status !== "pending") {
 		return { skip: true, kind: "status", status: session.status };
@@ -339,7 +343,8 @@ export async function ensureSessionExists(
 	defaultBranch: string,
 ): Promise<SessionState> {
 	let session = await sessions.get(owner, repo, issueNumber);
-	if (session) {
+	const replacesTerminalRefinement = session?.kind === "refinement" && isTerminalStatus(session.status);
+	if (session && !replacesTerminalRefinement) {
 		return session;
 	}
 
@@ -353,6 +358,31 @@ export async function ensureSessionExists(
 		} else {
 			throw error;
 		}
+	}
+
+	if (session && replacesTerminalRefinement) {
+		return sessions.updateStatus(owner, repo, issueNumber, "pending", {
+			kind: "implementation",
+			title,
+			body,
+			labels: labels ?? [],
+			workspacePath: worktree.path,
+			branch: worktree.branch,
+			seeded: false,
+			summary: undefined,
+			prUrl: undefined,
+			prNumber: undefined,
+			iterationCount: undefined,
+			restartCount: undefined,
+			restartedFrom: undefined,
+			staleDetectedAt: undefined,
+			staleReason: undefined,
+			resumeOnBoot: undefined,
+			queuedComments: undefined,
+			taskStartedAt: undefined,
+			taskFinishedAt: undefined,
+			totalExecutionTimeMs: undefined,
+		});
 	}
 
 	session = await sessions.createSession(

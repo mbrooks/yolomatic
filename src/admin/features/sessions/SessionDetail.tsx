@@ -36,14 +36,24 @@ export function SessionDetail({
 			<div className="detail-section">
 				<h3>Summary</h3>
 				<dl className="detail-grid">
+					<dt>Type</dt>
+					<dd>
+						<span className={`type-badge ${selected.kind}`}>
+							{selected.kind === "refinement" ? "Refinement" : "Issue"}
+						</span>
+					</dd>
 					<dt>Status</dt>
 					<dd>
 						<span className={`status-badge ${selected.status}`}>{selected.status}</span>
 					</dd>
-					<dt>Branch</dt>
-					<dd>{selected.branch}</dd>
-					<dt>Workspace</dt>
-					<dd>{selected.workspacePath}</dd>
+					{selected.kind === "implementation" ? (
+						<>
+							<dt>Branch</dt>
+							<dd>{selected.branch}</dd>
+							<dt>Workspace</dt>
+							<dd>{selected.workspacePath}</dd>
+						</>
+					) : null}
 					<dt>Last activity</dt>
 					<dd>{formatRelative(selected.lastActivity)}</dd>
 					{selected.totalExecutionTimeMs !== null ? (
@@ -75,16 +85,20 @@ export function SessionDetail({
 								#{selected.issueNumber}
 							</a>
 						</dd>
-						<dt>Pull request</dt>
-						<dd>
-							{selected.prUrl ? (
-								<a href={selected.prUrl} target="_blank" rel="noreferrer">
-									PR #{selected.prNumber ?? "open"}
-								</a>
-							) : (
-								"None"
-							)}
-						</dd>
+						{selected.kind === "implementation" ? (
+							<>
+								<dt>Pull request</dt>
+								<dd>
+									{selected.prUrl ? (
+										<a href={selected.prUrl} target="_blank" rel="noreferrer">
+											PR #{selected.prNumber ?? "open"}
+										</a>
+									) : (
+										"None"
+									)}
+								</dd>
+							</>
+						) : null}
 					</>
 				</dl>
 			</div>
@@ -116,19 +130,21 @@ export function SessionDetail({
 				</div>
 			) : null}
 
-			<div className="detail-section">
-				<h3>Actions</h3>
-				<div className="detail-actions">
-					{SESSION_ACTIONS.filter((action) => action.visible(selected.status)).map((action) => (
-						<SessionActionControl
-							key={action.key}
-							session={selected}
-							action={action}
-							onMutate={onMutate}
-						/>
-					))}
+			{selected.kind === "implementation" ? (
+				<div className="detail-section">
+					<h3>Actions</h3>
+					<div className="detail-actions">
+						{SESSION_ACTIONS.filter((action) => action.visible(selected.status)).map((action) => (
+							<SessionActionControl
+								key={action.key}
+								session={selected}
+								action={action}
+								onMutate={onMutate}
+							/>
+						))}
+					</div>
 				</div>
-			</div>
+			) : null}
 
 			<div className="detail-section">
 				<h3>Log</h3>
