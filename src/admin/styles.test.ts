@@ -30,6 +30,7 @@ describe("admin table layouts", () => {
 		const body = rule(css, ".list-col.type");
 
 		expect(body).toContain("flex: 0 0 5.25rem");
+		expect(body).toContain("margin-right: 0.5rem");
 		expect(body).toContain("overflow: visible");
 	});
 });

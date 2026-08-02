@@ -103,6 +103,7 @@ h1 {
 
 .list-col.type {
 	flex: 0 0 5.25rem;
+	margin-right: 0.5rem;
 	overflow: visible;
 }
 
