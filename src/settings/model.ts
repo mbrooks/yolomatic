@@ -309,10 +309,21 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 	{
 		key: "pi_agent_provider",
 		type: "string",
-		description: "LLM provider (e.g. ollama)",
+		description: "LLM provider used by worker containers. The only supported provider is ollama; additional providers may be added here in the future.",
+		default: "ollama",
 		requiresRestart: false,
 		sensitive: false,
 		envVar: "PI_AGENT_PROVIDER",
+		category: "ai-llm",
+	},
+	{
+		key: "ollama_container_name",
+		type: "string",
+		description: "Name of the Ollama Docker container the control plane shells into to check Ollama sign-in status (defaults to yeetomatic-ollama, matching docker-compose.yml). Falls back to the compose `ollama` service when unset and no explicit name is configured.",
+		default: "yeetomatic-ollama",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "OLLAMA_CONTAINER_NAME",
 		category: "ai-llm",
 	},
 	{
