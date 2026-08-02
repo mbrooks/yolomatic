@@ -62,6 +62,32 @@ describe("migrations", () => {
 		db.close();
 	});
 
+	it("adds the steering_prompt column to refinement_attempts via migration 8", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+		expect(columns.some((c) => c.name === "steering_prompt")).toBe(true);
+
+		db.prepare(
+			"INSERT INTO refinement_attempts (id, owner, repo, issue_number, requester, original_title, original_body, original_body_fingerprint, instruction_source, state, steering_prompt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		).run("r1", "o", "r", 1, "admin", "T", "B", "fp", "prompt-defaults", "running", "Focus on rollback", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z");
+		const row = db.prepare("SELECT steering_prompt FROM refinement_attempts WHERE id = ?").get("r1") as { steering_prompt: string };
+		expect(row.steering_prompt).toBe("Focus on rollback");
+		db.close();
+	});
+
+	it("is idempotent when adding the steering_prompt column", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+		const steeringColumns = columns.filter((c) => c.name === "steering_prompt");
+		expect(steeringColumns).toHaveLength(1);
+		db.close();
+	});
+
 	it("repairs missing tables when migration bookkeeping is ahead of schema", () => {
 		const db = new DatabaseSync(dbPath);
 		db.exec(`
