@@ -3488,9 +3488,21 @@ describe("createWebhookServer", () => {
 		const workspaceManager = {
 			removeWorktree: vi.fn(async () => undefined),
 		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+		const restartSession = vi.fn(async () => undefined);
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined, workspaceManager);
+		const server = createWebhookServer(
+			"secret",
+			handlers,
+			mockStore,
+			"admin",
+			"secret",
+			undefined,
+			workspaceManager,
+			undefined,
+			undefined,
+			{ restartSession },
+		);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3505,6 +3517,7 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.restarted).toBe(true);
+		expect(body.dispatched).toBe(true);
 		expect(body.status).toBe("pending");
 		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 5);
 		expect(mockStore.set).toHaveBeenCalled();
@@ -3518,6 +3531,7 @@ describe("createWebhookServer", () => {
 		expect(updatedState.iterationCount).toBeUndefined();
 		expect(updatedState.restartCount).toBe(1);
 		expect(updatedState.restartedFrom).toBe("failed");
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 5);
 
 		server.close();
 	});
@@ -3547,9 +3561,21 @@ describe("createWebhookServer", () => {
 		const workspaceManager = {
 			removeWorktree: vi.fn(async () => undefined),
 		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+		const restartSession = vi.fn(async () => undefined);
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined, workspaceManager);
+		const server = createWebhookServer(
+			"secret",
+			handlers,
+			mockStore,
+			"admin",
+			"secret",
+			undefined,
+			workspaceManager,
+			undefined,
+			undefined,
+			{ restartSession },
+		);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3564,7 +3590,9 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.restarted).toBe(true);
+		expect(body.dispatched).toBe(true);
 		expect(body.status).toBe("pending");
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 6);
 
 		server.close();
 	});
