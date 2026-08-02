@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { HandleIssueRefinement, ISSUE_REFINEMENT_INSTRUCTIONS, ISSUE_REFINEMENT_STARTING_COMMENT } from "./handle-issue-refinement.js";
+import { HandleIssueRefinement, buildNewIssueComment, ISSUE_REFINEMENT_STARTING_COMMENT } from "./handle-issue-refinement.js";
 import { RefinementStore } from "../../refinement/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
@@ -84,11 +84,139 @@ describe("HandleIssueRefinement", () => {
 
 	it("posts instructions for an eligible opened issue", async () => {
 		await handler.postInstructions(createInstructionPayload() as never);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_INSTRUCTIONS);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("yeetomatic-bot", undefined));
 		const record = store.getInstructionComment("mbrooks", "yeetomatic", 1);
 		expect(record).not.toBeNull();
 		const logs = getSessionLogs("mbrooks/yeetomatic#1");
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(true);
+	});
+
+	it("appends an admin status link to the new-issue comment when enabled", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueAdminLinkInCommentsEnabled: true,
+			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			buildNewIssueComment("yeetomatic-bot", expectedUrl),
+		);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain(`Track status: ${expectedUrl}`);
+	});
+
+	it("interpolates the configured Yeetomatic username in the new-issue comment", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "custom-yeet-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("custom-yeet-bot", undefined));
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain("custom-yeet-bot");
+	});
+
+	it("does not post the automatic comment when issueNewCommentEnabled is false", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueNewCommentEnabled: false,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		expect(github.postComment).not.toHaveBeenCalled();
+		expect(store.getInstructionComment("mbrooks", "yeetomatic", 1)).toBeNull();
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(false);
+	});
+
+	it("still runs the refinement command when issueNewCommentEnabled is false", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueNewCommentEnabled: false,
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(executor.executeRefinement).toHaveBeenCalled();
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+	});
+
+	it("appends an admin status link to refinement status comments when enabled", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueAdminLinkInCommentsEnabled: true,
+			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
+		const startingCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith(ISSUE_REFINEMENT_STARTING_COMMENT))!;
+		expect(startingCall[3]).toContain(`Track status: ${expectedUrl}`);
+		const refinedCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith("Issue refined at the request of"))!;
+		expect(refinedCall[3]).toContain(`Track status: ${expectedUrl}`);
 	});
 
 	it("does not post instructions twice for the same issue", async () => {

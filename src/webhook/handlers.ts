@@ -54,6 +54,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			memoryDir?: string;
 			repositoryStore?: RepositoryStore;
 			refinementStore?: RefinementStore;
+			issueNewCommentEnabled?: boolean;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -83,6 +86,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			defaultBranch: deps.defaultBranch,
 			resolveDefaultBranch: deps.resolveDefaultBranch,
 			isRepoManaged,
+			issueNewCommentEnabled: deps.issueNewCommentEnabled,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		});
 
 		const execDeps = {
@@ -96,6 +102,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			resolveDefaultBranch: deps.resolveDefaultBranch,
 			githubUsername: deps.githubUsername,
 			selfReportEnabled: deps.selfReportEnabled,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		};
 
 		this.handleIssueEventCmd = new HandleIssueEvent({
@@ -111,6 +119,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: execDeps,
 			refinement,
 			inFlight: this.inFlight,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		});
 
 		this.handlePRReviewCmd = new HandlePRReview({
@@ -135,6 +145,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: execDeps,
 			refinement,
 			prReview: this.handlePRReviewCmd,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			adminBaseUrl: deps.adminBaseUrl,
 		});
 
 		this.resumeSessionCmd = new ResumeInterruptedSession({

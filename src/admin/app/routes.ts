@@ -7,6 +7,7 @@ export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "git-worktrees", label: "Git & Worktrees" },
 	{ slug: "agent-behavior", label: "Worker Behavior" },
 	{ slug: "ai-llm", label: "AI / LLM" },
+	{ slug: "issues", label: "Issues" },
 ] as const;
 
 export type SettingsCategoryTab = typeof SETTINGS_CATEGORY_TABS[number]["slug"];
