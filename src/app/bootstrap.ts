@@ -136,6 +136,9 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		memoryDir: config.memoryDir,
 		repositoryStore,
 		refinementStore,
+		issueNewCommentEnabled: config.issueNewCommentEnabled,
+		issueAdminLinkInCommentsEnabled: config.issueAdminLinkInCommentsEnabled,
+		adminBaseUrl: config.adminBaseUrl,
 	});
 
 	const staleDetector = new StaleSessionDetector(

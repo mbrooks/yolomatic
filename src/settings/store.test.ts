@@ -89,6 +89,18 @@ describe("SettingsStore", () => {
 		expect(store.getBoolean("self_report_enabled")).toBe(true);
 	});
 
+	it("round-trips the issue comment, admin-link toggle, and admin base url settings", () => {
+		store.set("issue_new_comment_enabled", "false");
+		store.set("issue_admin_link_in_comments_enabled", "false");
+		store.set("admin_base_url", "http://host:6767/admin");
+		expect(store.getBoolean("issue_new_comment_enabled")).toBe(false);
+		expect(store.getBoolean("issue_admin_link_in_comments_enabled")).toBe(false);
+		expect(store.get("admin_base_url")).toBe("http://host:6767/admin");
+		const views = store.getAllViews();
+		expect(views.find((v) => v.key === "issue_new_comment_enabled")?.category).toBe("issues");
+		expect(views.find((v) => v.key === "admin_base_url")?.category).toBe("server");
+	});
+
 	it("getBoolean returns false for unknown keys", () => {
 		expect(store.getBoolean("nonexistent_key")).toBe(false);
 	});
