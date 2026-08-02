@@ -27,9 +27,12 @@ export interface CancelResult {
 
 export interface RestartResult {
 	restarted: boolean;
+	dispatched: boolean;
 	status: string;
 	message: string;
 }
+
+export type RestartSessionDispatcher = (owner: string, repo: string, issueNumber: number) => Promise<void>;
 
 export interface PauseResult {
 	paused: boolean;
@@ -80,6 +83,7 @@ export class RunSessionCommand {
 		private readonly tasks: TaskControlService,
 		private readonly clock: Clock,
 		private readonly archiveDir?: string,
+		private readonly restartSession?: RestartSessionDispatcher,
 	) {}
 
 	async execute(
@@ -125,13 +129,43 @@ export class RunSessionCommand {
 				if (!check.ok) {
 					return fail("invalid_state", check.reason);
 				}
+				if (this.tasks.isActive(key)) {
+					return fail("conflict", "Session is already being executed");
+				}
+				const draining = this.tasks.isDraining();
+				if (!draining && !this.restartSession) {
+					return fail("internal", "Session restart dispatcher is not configured");
+				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
 				clearSessionLogs(key);
 				const restarted = await this.sessions.restartSession(owner, repo, issueNumber);
+				if (draining) {
+					const queued = await this.sessions.updateStatus(owner, repo, issueNumber, "pending", {
+						resumeOnBoot: true,
+					});
+					return ok<RestartResult>({
+						restarted: true,
+						dispatched: false,
+						status: queued.status,
+						message: "Session reset and queued. Yeetomatic will restart it after the deploy completes.",
+					});
+				}
+
+				void this.restartSession!(owner, repo, issueNumber).catch((error: unknown) => {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[admin] failed to dispatch restart for ${key}: ${message}\n`);
+					void this.sessions
+						.markFailed(owner, repo, issueNumber, `Admin restart dispatch failed: ${message}`)
+						.catch((markError: unknown) => {
+							const markMessage = markError instanceof Error ? markError.message : String(markError);
+							process.stdout.write(`[admin] failed to record restart failure for ${key}: ${markMessage}\n`);
+						});
+				});
 				return ok<RestartResult>({
 					restarted: true,
+					dispatched: true,
 					status: restarted.status,
-					message: "Session restarted. Workspace reset to fresh state. Yeetomatic will re-process on the next triggering event.",
+					message: "Session reset and restart dispatched. Yeetomatic is starting execution.",
 				});
 			}
 

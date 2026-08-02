@@ -8,7 +8,7 @@ import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
 import { GetRefinementLog } from "../app/queries/get-refinement-log.js";
 import { ListRefinementAttempts } from "../app/queries/list-refinement-attempts.js";
-import { RunSessionCommand } from "../app/commands/run-session-command.js";
+import { RunSessionCommand, type RestartSessionDispatcher } from "../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 import type { SessionStore } from "../session/store.js";
@@ -64,6 +64,7 @@ export function createWebhookServerDeps(
 	adminPath: string = DEFAULT_ADMIN_PATH,
 	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
 	refinementStore?: RefinementStore,
+	restartSession?: RestartSessionDispatcher,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -76,7 +77,14 @@ export function createWebhookServerDeps(
 		getAdminStatus: new GetAdminStatus(sessionRepo, staleService, systemClock, taskService, repositoryStore),
 		getSession: new GetSession(sessionRepo),
 		getSessionLog: new GetSessionLog(sessionRepo),
-		runSessionCommand: new RunSessionCommand(sessionRepo, workspaceService, taskService, systemClock, archiveDir),
+		runSessionCommand: new RunSessionCommand(
+			sessionRepo,
+			workspaceService,
+			taskService,
+			systemClock,
+			archiveDir,
+			restartSession,
+		),
 		startIssueSession: prebuiltStartIssueSession,
 		taskController: taskService,
 		githubService,
