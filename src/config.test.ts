@@ -249,6 +249,59 @@ describe("adminWebSocketPath", () => {
 	});
 });
 
+describe("issue comment and admin-link settings", () => {
+	it("exposes defaults for issue comment and admin-link settings", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+
+		const config = getConfig(createStore());
+		expect(config.issueNewCommentEnabled).toBe(true);
+		expect(config.issueAdminLinkInCommentsEnabled).toBe(true);
+		expect(config.adminBaseUrl).toBeUndefined();
+	});
+
+	it("reads stored issue comment and admin-link settings", () => {
+		const store = createStore();
+		store.set("issue_new_comment_enabled", "false");
+		store.set("issue_admin_link_in_comments_enabled", "false");
+		store.set("admin_base_url", "  http://host:6767/admin/  ");
+
+		const config = getConfig(store);
+		expect(config.issueNewCommentEnabled).toBe(false);
+		expect(config.issueAdminLinkInCommentsEnabled).toBe(false);
+		expect(config.adminBaseUrl).toBe("http://host:6767/admin/");
+	});
+
+	it("treats a blank admin_base_url as undefined", () => {
+		const store = createStore();
+		store.set("admin_base_url", "   ");
+
+		const config = getConfig(store);
+		expect(config.adminBaseUrl).toBeUndefined();
+	});
+
+	it("reads issue settings from env via seedFromEnv", () => {
+		try {
+			unlinkSync(TEST_DB);
+		} catch {
+			// ignore
+		}
+		const store = new SettingsStore(TEST_DB);
+		store.seedFromEnv({
+			YEETOMATIC_ISSUE_NEW_COMMENT_ENABLED: "false",
+			YEETOMATIC_ISSUE_ADMIN_LINK_IN_COMMENTS_ENABLED: "false",
+			YEETOMATIC_ADMIN_BASE_URL: "http://host:6767/admin",
+		});
+		store.applyDefaults();
+
+		const config = getConfig(store);
+		expect(config.issueNewCommentEnabled).toBe(false);
+		expect(config.issueAdminLinkInCommentsEnabled).toBe(false);
+		expect(config.adminBaseUrl).toBe("http://host:6767/admin");
+	});
+});
+
 describe("admin config settings", () => {
 	it("exposes default admin path and default page", () => {
 		process.env.WEBHOOK_SECRET = "secret";

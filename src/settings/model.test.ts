@@ -115,6 +115,27 @@ describe("settings/model", () => {
       expect(getSettingDefinition("self_report_enabled")?.category).toBe("agent-behavior");
       expect(getSettingDefinition("pi_agent_model")?.category).toBe("ai-llm");
       expect(getSettingDefinition("log_level")?.category).toBe("logging");
+      expect(getSettingDefinition("issue_new_comment_enabled")?.category).toBe("issues");
+      expect(getSettingDefinition("issue_admin_link_in_comments_enabled")?.category).toBe("issues");
+      expect(getSettingDefinition("admin_base_url")?.category).toBe("server");
+    });
+
+    it("defines the issue comment and admin-link settings with expected defaults", () => {
+      expect(getSettingDefinition("issue_new_comment_enabled")?.default).toBe("true");
+      expect(getSettingDefinition("issue_new_comment_enabled")?.type).toBe("boolean");
+      expect(getSettingDefinition("issue_admin_link_in_comments_enabled")?.default).toBe("true");
+      expect(getSettingDefinition("issue_admin_link_in_comments_enabled")?.type).toBe("boolean");
+      expect(getSettingDefinition("admin_base_url")?.default).toBe("");
+      expect(getSettingDefinition("admin_base_url")?.type).toBe("string");
+    });
+
+    it("coerces the issue toggle and admin base url env values", () => {
+      expect(coerceEnvValue("issue_new_comment_enabled", "true")).toBe("true");
+      expect(coerceEnvValue("issue_new_comment_enabled", "false")).toBe("false");
+      expect(coerceEnvValue("issue_new_comment_enabled", "maybe")).toBe("false");
+      expect(coerceEnvValue("issue_admin_link_in_comments_enabled", "true")).toBe("true");
+      expect(coerceEnvValue("admin_base_url", "  http://host/admin  ")).toBe("http://host/admin");
+      expect(coerceEnvValue("admin_base_url", "  ")).toBeUndefined();
     });
 
     it("defines GitHub event ingestion settings", () => {

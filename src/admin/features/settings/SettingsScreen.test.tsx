@@ -141,6 +141,39 @@ const MOCK_SETTINGS = [
 		updatedAt: "2026-06-15T00:00:00.000Z",
 		category: "agent-behavior",
 	},
+	{
+		key: "issue_new_comment_enabled",
+		value: true,
+		description: "Post an automatic comment on newly opened issues.",
+		type: "boolean",
+		default: true,
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "issues",
+	},
+	{
+		key: "issue_admin_link_in_comments_enabled",
+		value: true,
+		description: "Include a link to the admin UI in status comments.",
+		type: "boolean",
+		default: true,
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "issues",
+	},
+	{
+		key: "admin_base_url",
+		value: "http://host:6767/yeetomatic/admin",
+		description: "Absolute public base URL of the admin UI.",
+		type: "string",
+		default: "",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-06-15T00:00:00.000Z",
+		category: "server",
+	},
 ];
 
 function mockSettingsFetch() {
@@ -290,6 +323,7 @@ describe("SettingsScreen", () => {
 			"Git & Worktrees",
 			"Worker Behavior",
 			"AI / LLM",
+			"Issues",
 			"Skills",
 			"Invitations",
 			"Rerun On-Boarding",
@@ -308,6 +342,29 @@ describe("SettingsScreen", () => {
 		expect(screen.queryByText("onboarding_complete")).toBeNull();
 		expect(screen.queryByText("github_token")).toBeNull();
 		expect(screen.queryByText("self_report_enabled")).toBeNull();
+	});
+
+	it("renders the Issues tab with the issue-category toggles", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="issues" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("issue_new_comment_enabled")).not.toBeNull();
+		});
+		expect(screen.getByText("issue_admin_link_in_comments_enabled")).not.toBeNull();
+		expect(screen.getByRole("button", { name: "Issues" }).className).toContain("active");
+		expect(screen.queryByText("admin_base_url")).toBeNull();
+		expect(screen.queryByText("github_token")).toBeNull();
+	});
+
+	it("renders admin_base_url under the Server tab", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="server" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("port")).not.toBeNull();
+		});
+		expect(screen.getByText("admin_base_url")).not.toBeNull();
 	});
 
 	it("keeps Git & Worktrees settings in their own tab", async () => {

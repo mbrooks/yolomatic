@@ -10,6 +10,7 @@ import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { isRateLimitError, type ExecutionResult } from "../../executor/index.js";
 import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { removeWorkflowLabels } from "./workflow-helpers.js";
+import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,6 +25,8 @@ export class ExecuteSessionReporter {
 			workspaces: WorkspaceService;
 			sessions: SessionRepository;
 			selfReportEnabled: boolean;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			adminBaseUrl?: string;
 		},
 	) {}
 
@@ -33,6 +36,7 @@ export class ExecuteSessionReporter {
 		repo: string,
 		error: unknown,
 		context: string,
+		linkIssueNumber?: number,
 	): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
 		if (isRateLimitError(message)) {
@@ -43,7 +47,7 @@ export class ExecuteSessionReporter {
 				"",
 				`Error: ${message}`,
 			].join("\n");
-			await this.postComment(target, owner, repo, body);
+			await this.postComment(target, owner, repo, body, linkIssueNumber);
 			return;
 		}
 		const stack = error instanceof Error ? error.stack ?? "" : "";
@@ -59,7 +63,7 @@ export class ExecuteSessionReporter {
 			`<pre>${truncatedStack}</pre>`,
 			"</details>",
 		].join("\n");
-		await this.postComment(target, owner, repo, body);
+		await this.postComment(target, owner, repo, body, linkIssueNumber);
 	}
 
 	async handleExecutionFailure(args: {
@@ -70,7 +74,7 @@ export class ExecuteSessionReporter {
 		error: unknown;
 		context: string;
 	}): Promise<void> {
-		await this.postFailureComment(args.target, args.owner, args.repo, args.error, args.context);
+		await this.postFailureComment(args.target, args.owner, args.repo, args.error, args.context, args.sessionIssueNumber);
 		await this.deps.sessions.updateStatus(args.owner, args.repo, args.sessionIssueNumber, "failed");
 		if (args.target.kind === "issue") {
 			await removeWorkflowLabels(this.deps.github, args.owner, args.repo, args.sessionIssueNumber);
@@ -107,6 +111,7 @@ export class ExecuteSessionReporter {
 					"Need clarification:",
 					result.summary || "Yeetomatic needs more information before continuing.",
 				].join("\n\n"),
+				sessionIssueNumber,
 			);
 			return;
 		}
@@ -127,6 +132,7 @@ export class ExecuteSessionReporter {
 					"",
 					"Yeetomatic is idle and ready for the next task.",
 				].join("\n"),
+				sessionIssueNumber,
 			);
 			return;
 		}
@@ -174,6 +180,7 @@ export class ExecuteSessionReporter {
 				"",
 				result.summary || "Execution is in progress.",
 			].join("\n"),
+			sessionIssueNumber,
 		);
 	}
 
@@ -248,7 +255,7 @@ export class ExecuteSessionReporter {
 			].filter(Boolean).join("\n");
 		}
 
-		await this.postComment(target, owner, repo, commentBody);
+		await this.postComment(target, owner, repo, commentBody, issueNumber);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-feedback-required");
 		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-pr-created");
@@ -398,11 +405,24 @@ export class ExecuteSessionReporter {
 			: "Yeetomatic has stopped working on this review.";
 	}
 
-	private async postComment(target: ExecutionCommentTarget, owner: string, repo: string, body: string): Promise<void> {
+	private adminUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private async postComment(
+		target: ExecutionCommentTarget,
+		owner: string,
+		repo: string,
+		body: string,
+		linkIssueNumber?: number,
+	): Promise<void> {
+		const finalBody = linkIssueNumber !== undefined
+			? appendAdminLink(body, this.adminUrl(owner, repo, linkIssueNumber))
+			: body;
 		if (target.kind === "issue") {
-			await this.deps.github.postComment(owner, repo, target.number, body);
+			await this.deps.github.postComment(owner, repo, target.number, finalBody);
 			return;
 		}
-		await this.deps.github.postPRComment(owner, repo, target.number, body);
+		await this.deps.github.postPRComment(owner, repo, target.number, finalBody);
 	}
 }

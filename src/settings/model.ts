@@ -365,6 +365,36 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		envVar: "LOG_RESPONSES",
 		category: "logging",
 	},
+	{
+		key: "issue_new_comment_enabled",
+		type: "boolean",
+		description: "Post an automatic comment on newly opened issues explaining available Yeetomatic commands.",
+		default: "true",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "YEETOMATIC_ISSUE_NEW_COMMENT_ENABLED",
+		category: "issues",
+	},
+	{
+		key: "issue_admin_link_in_comments_enabled",
+		type: "boolean",
+		description: "Include a link to the admin UI in the status comments Yeetomatic posts on issues.",
+		default: "true",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "YEETOMATIC_ISSUE_ADMIN_LINK_IN_COMMENTS_ENABLED",
+		category: "issues",
+	},
+	{
+		key: "admin_base_url",
+		type: "string",
+		description: "Absolute public base URL of the admin UI used to build status-tracking links in issue comments (e.g. http://host:6767/yeetomatic/admin).",
+		default: "",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "YEETOMATIC_ADMIN_BASE_URL",
+		category: "server",
+	},
 ];
 
 const DEFINITION_MAP = new Map(SETTING_DEFINITIONS.map((d) => [d.key, d]));
