@@ -76,7 +76,7 @@ describe("checkOllamaSignInStatus", () => {
 		expect(result.signedIn).toBe(true);
 		expect(result.user).toBe("bob");
 		expect(result.error).toBeUndefined();
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "yeetomatic-ollama", "ollama", "signin"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "yeetomatic-ollama", "ollama", "login"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
 	});
 
 	it("returns the connect URL when the account is not signed in", async () => {
@@ -95,6 +95,19 @@ describe("checkOllamaSignInStatus", () => {
 		const result = await checkOllamaSignInStatus({ containerName: "ollama", execFile: exec });
 		expect(result.signedIn).toBe(false);
 		expect(result.signInUrl).toBe("https://ollama.com/connect?name=x&key=y");
+	});
+
+	it("surfaces the connect URL when the command blocks and is killed by the timeout", async () => {
+		const exec = failingExec(Object.assign(new Error("Command timed out"), {
+			killed: true,
+			signal: "SIGTERM",
+			stdout: "",
+			stderr: "You need to be signed in to Ollama to run Cloud models.\n    https://ollama.com/connect?name=x&key=y",
+		}));
+		const result = await checkOllamaSignInStatus({ containerName: "ollama", execFile: exec, timeoutMs: 1500 });
+		expect(result.signedIn).toBe(false);
+		expect(result.signInUrl).toBe("https://ollama.com/connect?name=x&key=y");
+		expect(result.error).toBeUndefined();
 	});
 
 	it("reports a timeout when the exec is killed with SIGTERM", async () => {
@@ -168,7 +181,7 @@ describe("DefaultOllamaSignInService", () => {
 		expect(result.signedIn).toBe(true);
 		expect(result.user).toBe("carol");
 		expect(store.getString).toHaveBeenCalledWith("ollama_container_name", DEFAULT_OLLAMA_CONTAINER_NAME);
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "custom-ollama", "ollama", "signin"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "custom-ollama", "ollama", "login"], expect.anything());
 	});
 
 	it("prefers an explicitly provided container name over settings", async () => {
@@ -176,7 +189,7 @@ describe("DefaultOllamaSignInService", () => {
 		const store = makeStore("settings-ollama");
 		const service = new DefaultOllamaSignInService(store, exec);
 		await service.checkSignInStatus({ containerName: "explicit-ollama" });
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "explicit-ollama", "ollama", "signin"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "explicit-ollama", "ollama", "login"], expect.anything());
 	});
 
 	it("uses the configured container name from settings when the passed value is empty", async () => {
@@ -184,6 +197,6 @@ describe("DefaultOllamaSignInService", () => {
 		const store = makeStore("settings-ollama");
 		const service = new DefaultOllamaSignInService(store, exec);
 		await service.checkSignInStatus({ containerName: "   " });
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "settings-ollama", "ollama", "signin"], expect.anything());
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "settings-ollama", "ollama", "login"], expect.anything());
 	});
 });

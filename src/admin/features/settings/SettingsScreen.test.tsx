@@ -626,7 +626,7 @@ describe("SettingsScreen", () => {
 		expect(link.tagName).toBe("A");
 		expect(link.getAttribute("target")).toBe("_blank");
 		expect(screen.getByText("Not signed in.")).not.toBeNull();
-		expect(screen.getByText(/docker exec -it yeetomatic-ollama ollama signin/)).not.toBeNull();
+		expect(screen.getByText(/docker exec -it yeetomatic-ollama ollama login/)).not.toBeNull();
 	});
 
 	it("renders an error with a retry control when the Ollama container cannot be reached", async () => {
