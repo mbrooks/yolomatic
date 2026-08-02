@@ -318,12 +318,12 @@ describe("SettingsScreen", () => {
 		const tabs = screen.getAllByRole("button").filter((button) => button.classList.contains("repo-tab"));
 		expect(tabs.map((button) => button.textContent)).toEqual([
 			"Server",
-			"GitHub Integration",
+			"Issues",
 			"Repositories",
+			"GitHub Integration",
 			"Git & Worktrees",
 			"Worker Behavior",
 			"AI / LLM",
-			"Issues",
 			"Skills",
 			"Invitations",
 			"Rerun On-Boarding",
