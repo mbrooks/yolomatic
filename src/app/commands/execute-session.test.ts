@@ -40,6 +40,7 @@ function makeDeps(overrides?: {
 
 	const workspaces: WorkspaceService = {
 		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 })),
+		updateDefaultBranchFromOrigin: vi.fn(async () => ({ branch: "main", before: null, after: "sha", updated: true })),
 		syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
 		commitAndPush: overrides?.commitAndPush ? vi.fn(overrides.commitAndPush) : vi.fn(async () => true),

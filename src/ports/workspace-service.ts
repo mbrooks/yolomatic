@@ -1,4 +1,8 @@
 export interface WorkspaceService {
+	updateDefaultBranchFromOrigin(
+		owner: string,
+		repo: string,
+	): Promise<{ branch: string; before: string | null; after: string; updated: boolean }>;
 	createOrGetWorktree(owner: string, repo: string, issueNumber: number): Promise<{ path: string; branch: string }>;
 	syncWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
 	removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
