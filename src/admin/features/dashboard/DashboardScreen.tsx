@@ -86,7 +86,7 @@ export function DashboardScreen({
 					<div className="activity-list">
 						<div className="activity-list-header">
 							<div className="activity-repo">Repo</div>
-							<div className="activity-repo">Type</div>
+							<div className="activity-type">Type</div>
 							<div className="activity-issue">Issue</div>
 							<div className="activity-status">Status</div>
 							<div className="activity-time">Activity</div>
@@ -110,7 +110,7 @@ export function DashboardScreen({
 									<div className="activity-repo">
 										{session.owner}/{session.repo}
 									</div>
-									<div className="list-col type">
+									<div className="activity-type">
 										<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>
 											{isRefinement ? "Refinement" : "Issue"}
 										</span>

@@ -115,6 +115,7 @@ h1 {
 }
 
 .type-badge.implementation {
+	border-color: var(--blue);
 	color: var(--blue);
 }
 
@@ -136,8 +137,8 @@ h1 {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	border-radius: 4px;
-	font-size: 0.75rem;
-	padding: 0.15rem 0.4rem;
+	font-size: 0.7rem;
+	padding: 0.1rem 0.35rem;
 }
 
 .status-badge.pending {
