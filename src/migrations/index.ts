@@ -181,6 +181,16 @@ export const MIGRATIONS: Migration[] = [
 			`);
 		},
 	},
+	{
+		id: 8,
+		name: "add_refinement_attempts_steering_prompt",
+		up(db) {
+			const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+			if (!columns.some((c) => c.name === "steering_prompt")) {
+				db.exec("ALTER TABLE refinement_attempts ADD COLUMN steering_prompt TEXT");
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

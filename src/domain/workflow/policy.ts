@@ -133,8 +133,44 @@ export function shouldIgnoreCommentEvent(
 	return { ignore: false, isMentioned, isCreatedByYeetomatic };
 }
 
+const ISSUE_REFINEMENT_COMMAND = "/yeetomatic issue-refinement";
+
+/**
+ * Parse an issue-refinement command from a comment body.
+ *
+ * The command must appear at the start of the trimmed comment (case-insensitive).
+ * When the command is the entire trimmed body, `steeringPrompt` is the empty
+ * string. When the command is followed by whitespace then additional text, the
+ * text after the separating whitespace (trimmed) is returned as the
+ * `steeringPrompt`. Embedded or quoted commands (e.g. `` `/yeetomatic
+ * issue-refinement` `` or `Please run /yeetomatic issue-refinement`) and
+ * Markdown-wrapped command tokens are rejected because the command token does
+ * not start the trimmed body.
+ */
+export function parseIssueRefinementCommand(
+	body: string,
+): { matched: true; steeringPrompt: string } | { matched: false } {
+	const trimmed = body.trim();
+	if (trimmed.length === 0) {
+		return { matched: false };
+	}
+	const lower = trimmed.toLowerCase();
+	if (!lower.startsWith(ISSUE_REFINEMENT_COMMAND)) {
+		return { matched: false };
+	}
+	if (trimmed.length === ISSUE_REFINEMENT_COMMAND.length) {
+		return { matched: true, steeringPrompt: "" };
+	}
+	const nextChar = trimmed[ISSUE_REFINEMENT_COMMAND.length]!;
+	if (!/\s/.test(nextChar)) {
+		return { matched: false };
+	}
+	const steeringPrompt = trimmed.slice(ISSUE_REFINEMENT_COMMAND.length).trim();
+	return { matched: true, steeringPrompt };
+}
+
 export function isIssueRefinementCommand(commentBody: string): boolean {
-	return commentBody.trim().toLowerCase() === "/yeetomatic issue-refinement";
+	return parseIssueRefinementCommand(commentBody).matched;
 }
 
 export function isStopCommand(commentBody: string): boolean {

@@ -172,4 +172,38 @@ describe("buildIssueRefinementPrompt", () => {
 		const prompt = buildIssueRefinementPrompt(state);
 		expect(prompt).toContain("built-in");
 	});
+
+	describe("steering prompt", () => {
+		const state = {
+			issueNumber: 10,
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			workspacePath: "/tmp/ws",
+			title: "T",
+			body: "B",
+		} as never;
+
+		it("is byte-for-byte identical when no steering prompt is supplied", () => {
+			const baseline = buildIssueRefinementPrompt(state);
+			expect(buildIssueRefinementPrompt(state, undefined)).toBe(baseline);
+			expect(buildIssueRefinementPrompt(state, undefined, "")).toBe(baseline);
+			expect(buildIssueRefinementPrompt(state, undefined, "   ")).toBe(baseline);
+		});
+
+		it("adds a labeled authoritative steering section when a prompt is provided", () => {
+			const prompt = buildIssueRefinementPrompt(state, undefined, "Focus on rollback");
+			expect(prompt).toContain("Steering prompt from the requesting maintainer (authoritative for this pass):");
+			expect(prompt).toContain("Focus on rollback");
+			expect(prompt).toContain("Treat the steering prompt as authoritative guidance");
+		});
+
+		it("places the steering section after the skill section and before the original issue", () => {
+			const prompt = buildIssueRefinementPrompt(state, "Skill instructions", "Focus on rollback");
+			const skillIdx = prompt.indexOf("Skill instructions");
+			const steeringIdx = prompt.indexOf("Steering prompt from the requesting maintainer");
+			const titleIdx = prompt.indexOf("Original issue title:");
+			expect(skillIdx).toBeLessThan(steeringIdx);
+			expect(steeringIdx).toBeLessThan(titleIdx);
+		});
+	});
 });

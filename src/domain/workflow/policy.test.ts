@@ -8,6 +8,7 @@ import {
 	shouldIgnoreCommentEvent,
 	isStopCommand,
 	isIssueRefinementCommand,
+	parseIssueRefinementCommand,
 	canPause,
 	canResume,
 	canRestart,
@@ -294,6 +295,64 @@ describe("shouldIgnoreCommentEvent", () => {
 	});
 });
 
+describe("parseIssueRefinementCommand", () => {
+	it("matches the no-argument command with an empty steering prompt", () => {
+		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement")).toEqual({ matched: true, steeringPrompt: "" });
+	});
+
+	it("is case-insensitive for the command token", () => {
+		expect(parseIssueRefinementCommand("/Yeetomatic Issue-Refinement")).toEqual({ matched: true, steeringPrompt: "" });
+	});
+
+	it("extracts trailing text as the steering prompt", () => {
+		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement Focus on rollback")).toEqual({
+			matched: true,
+			steeringPrompt: "Focus on rollback",
+		});
+	});
+
+	it("trims leading and trailing whitespace around the comment and steering prompt", () => {
+		expect(parseIssueRefinementCommand("  /yeetomatic issue-refinement   focus on migration   ")).toEqual({
+			matched: true,
+			steeringPrompt: "focus on migration",
+		});
+	});
+
+	it("treats trailing whitespace only as the empty steering prompt", () => {
+		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement   \n\t")).toEqual({ matched: true, steeringPrompt: "" });
+	});
+
+	it("collapses multiple separators into the trimmed steering prompt", () => {
+		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement    add    criteria")).toEqual({
+			matched: true,
+			steeringPrompt: "add    criteria",
+		});
+	});
+
+	it("rejects embedded commands", () => {
+		expect(parseIssueRefinementCommand("Please run /yeetomatic issue-refinement")).toEqual({ matched: false });
+	});
+
+	it("rejects backtick-wrapped command tokens", () => {
+		expect(parseIssueRefinementCommand("`/yeetomatic issue-refinement`")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("` /yeetomatic issue-refinement`")).toEqual({ matched: false });
+	});
+
+	it("rejects a command glued to trailing text with no separating whitespace", () => {
+		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement--verbose")).toEqual({ matched: false });
+	});
+
+	it("rejects empty or whitespace-only bodies", () => {
+		expect(parseIssueRefinementCommand("")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("   ")).toEqual({ matched: false });
+	});
+
+	it("rejects unrelated text", () => {
+		expect(parseIssueRefinementCommand("hello world")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("/yeetomatic stop")).toEqual({ matched: false });
+	});
+});
+
 describe("isIssueRefinementCommand", () => {
 	it("accepts the exact command", () => {
 		expect(isIssueRefinementCommand("/yeetomatic issue-refinement")).toBe(true);
@@ -303,9 +362,9 @@ describe("isIssueRefinementCommand", () => {
 		expect(isIssueRefinementCommand("/Yeetomatic Issue-Refinement")).toBe(true);
 	});
 
-	it("rejects suffixes and arguments", () => {
-		expect(isIssueRefinementCommand("/yeetomatic issue-refinement please")).toBe(false);
-		expect(isIssueRefinementCommand("/yeetomatic issue-refinement --verbose")).toBe(false);
+	it("accepts trailing steering-prompt text as a match", () => {
+		expect(isIssueRefinementCommand("/yeetomatic issue-refinement please")).toBe(true);
+		expect(isIssueRefinementCommand("/yeetomatic issue-refinement --verbose focus")).toBe(true);
 	});
 
 	it("rejects embedded commands", () => {

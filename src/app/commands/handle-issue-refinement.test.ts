@@ -466,13 +466,55 @@ describe("HandleIssueRefinement", () => {
 		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
 	});
 
-	it("ignores non-exact refinement commands", async () => {
+	it("ignores comments that do not start with the refinement command", async () => {
 		await handler.execute(
 			createCommandPayload({
-				comment: { id: 102, body: "/yeetomatic issue-refinement please", user: { login: "admin" } },
+				comment: { id: 102, body: "Please run /yeetomatic issue-refinement", user: { login: "admin" } },
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
+	});
+
+	it("threads a steering prompt from trailing text into the worker prompt and attempt", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(
+			createCommandPayload({
+				comment: { id: 108, body: "/yeetomatic issue-refinement Focus on rollback", user: { login: "admin" } },
+			}) as never,
+			"Focus on rollback",
+		);
+
+		expect(executor.executeRefinement).toHaveBeenCalledWith(expect.anything(), undefined, "Focus on rollback");
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt).not.toBeNull();
+		expect(attempt!.steeringPrompt).toBe("Focus on rollback");
+	});
+
+	it("records the steering prompt in the command-received log entry", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(
+			createCommandPayload({
+				comment: { id: 109, body: "/yeetomatic issue-refinement add criteria", user: { login: "admin" } },
+			}) as never,
+			"add criteria",
+		);
+
+		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const entry = logs.find((l) => l.message === "Refinement command received from @admin");
+		expect(entry).toBeDefined();
+		expect(entry!.details).toEqual({ steeringPrompt: "add criteria" });
 	});
 
 	it("does not overlap with active implementation", async () => {
@@ -560,6 +602,7 @@ describe("HandleIssueRefinement", () => {
 		expect(executor.executeRefinement).toHaveBeenCalledWith(
 			expect.anything(),
 			expect.stringContaining("Skill instructions"),
+			"",
 		);
 		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Skill-refined body");
 	});

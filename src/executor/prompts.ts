@@ -43,7 +43,21 @@ export interface PRReviewComment {
 	line?: number;
 }
 
-export function buildIssueRefinementPrompt(state: SessionState, skillContent?: string): string {
+function buildSteeringSection(steeringPrompt?: string): string[] {
+	if (!steeringPrompt || steeringPrompt.trim().length === 0) {
+		return [];
+	}
+	return [
+		"Steering prompt from the requesting maintainer (authoritative for this pass):",
+		"---",
+		steeringPrompt.trim(),
+		"---",
+		"Treat the steering prompt as authoritative guidance for this refinement pass (focus areas, requested changes, constraints). Still investigate the issue independently and produce a self-contained Proposed Task.",
+		"",
+	];
+}
+
+export function buildIssueRefinementPrompt(state: SessionState, skillContent?: string, steeringPrompt?: string): string {
 	const skillSection = skillContent
 		? [
 				"Repository skill instructions (follow these):",
@@ -73,6 +87,7 @@ export function buildIssueRefinementPrompt(state: SessionState, skillContent?: s
 		"The proposed task body should be self-contained and use sections such as Summary, Requirements, Acceptance criteria, and Out of scope when appropriate.",
 		"",
 		...skillSection,
+		...buildSteeringSection(steeringPrompt),
 		"Original issue title:",
 		state.title,
 		"",
