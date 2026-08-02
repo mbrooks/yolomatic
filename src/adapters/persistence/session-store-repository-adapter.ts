@@ -39,6 +39,7 @@ export class SessionStoreRepositoryAdapter implements SessionRepository {
 			return existing;
 		}
 		const state: SessionState = {
+			kind: "implementation",
 			issueNumber,
 			repo,
 			owner,

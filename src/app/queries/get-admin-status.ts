@@ -12,9 +12,11 @@ import {
 } from "../../domain/session/model.js";
 import { formatUptime } from "../../domain/workflow/policy.js";
 import type { StaleSessionInfo } from "../../session/stale-detector.js";
+import type { SessionKind } from "../../session/store.js";
 import { ok, type AppResult } from "../result.js";
 
 export interface AdminStatusSessionView {
+	kind: SessionKind;
 	owner: string;
 	repo: string;
 	issueNumber: number;
@@ -107,6 +109,7 @@ export class GetAdminStatus {
 			sessions: sorted.map((s) => {
 				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
 				return {
+					kind: s.kind ?? "implementation",
 					owner: s.owner,
 					repo: s.repo,
 					issueNumber: s.issueNumber,

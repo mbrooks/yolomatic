@@ -282,7 +282,25 @@ export async function startRuntime(
 	// Resume any sessions that were interrupted by a restart.
 	try {
 		const sessions = await sessionStore.getAll();
-		const sessionsToResume = sessions.filter((s) => s.resumeOnBoot || s.status === "working");
+		const interruptedRefinements = sessions.filter(
+			(s) => s.kind === "refinement" && s.status === "working",
+		);
+		for (const session of interruptedRefinements) {
+			process.stdout.write(
+				`[startup] Marking interrupted refinement ${session.owner}/${session.repo}#${session.issueNumber} as failed\n`,
+			);
+			await graph.sessionManager.updateStatus(session.owner, session.repo, session.issueNumber, "failed", {
+				summary: "interrupted by restart",
+				staleReason: "interrupted by restart",
+				resumeOnBoot: undefined,
+				queuedComments: undefined,
+				taskFinishedAt: new Date().toISOString(),
+			});
+		}
+
+		const sessionsToResume = sessions.filter(
+			(s) => s.kind !== "refinement" && (s.resumeOnBoot || s.status === "working"),
+		);
 		if (sessionsToResume.length > 0) {
 			process.stdout.write(`[startup] Found ${sessionsToResume.length} session(s) to resume after restart\n`);
 			for (const session of sessionsToResume) {

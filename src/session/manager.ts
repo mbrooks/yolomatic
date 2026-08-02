@@ -31,6 +31,7 @@ export class SessionManager implements SessionRepository {
 		}
 
 		const state: SessionState = {
+			kind: "implementation",
 			issueNumber,
 			repo,
 			owner,

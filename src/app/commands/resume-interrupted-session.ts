@@ -25,6 +25,20 @@ export class ResumeInterruptedSession {
 			return;
 		}
 
+		if (session.kind === "refinement") {
+			if (!isTerminalStatus(session.status)) {
+				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", {
+					summary: "interrupted by restart",
+					staleReason: "interrupted by restart",
+					resumeOnBoot: undefined,
+					queuedComments: undefined,
+					taskFinishedAt: new Date().toISOString(),
+				});
+			}
+			process.stdout.write(`[resume] refinement session ${key} is not resumable, skipping\n`);
+			return;
+		}
+
 		if (isTerminalStatus(session.status)) {
 			process.stdout.write(`[resume] session ${key} is in terminal status (${session.status}), skipping\n`);
 			return;

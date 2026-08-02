@@ -58,6 +58,7 @@ describe("SessionStore (SQLite-backed)", () => {
 
 		const first = await store.get("mbrooks", "yeetomatic", 1);
 		expect(first?.title).toBe("Test");
+		expect(first?.kind).toBe("implementation");
 
 		// Get again (served from cache, same object identity)
 		const second = await store.get("mbrooks", "yeetomatic", 1);
@@ -349,6 +350,7 @@ describe("SessionStore (SQLite-backed)", () => {
 			const result = await store2.get("mbrooks", "yeetomatic", 1);
 			expect(result?.title).toBe("Legacy");
 			expect(result?.status).toBe("working");
+			expect(result?.kind).toBe("implementation");
 
 			// Original file is preserved (rollback path).
 			await expect(access(store.getStatePath("mbrooks", "yeetomatic", 1))).resolves.toBeUndefined();

@@ -6,6 +6,7 @@ import path from "node:path";
 import { runMigrations } from "../migrations/index.js";
 
 export type SessionStatus = "pending" | "working" | "waiting-feedback" | "paused" | "complete" | "failed" | "cancelled";
+export type SessionKind = "implementation" | "refinement";
 
 export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
 
@@ -14,6 +15,8 @@ export function isTerminalStatus(status: SessionStatus): boolean {
 }
 
 export interface SessionState {
+	/** Omitted by legacy persisted sessions; readers normalize it to implementation. */
+	kind?: SessionKind;
 	issueNumber: number;
 	repo: string;
 	owner: string;
@@ -137,20 +140,21 @@ export class SessionStore {
 	}
 
 	async set(state: SessionState): Promise<SessionState> {
-		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
-		const stateJson = JSON.stringify(state, null, 2);
+		const normalizedState: SessionState = { ...state, kind: state.kind ?? "implementation" };
+		const key = this.getSessionKey(normalizedState.owner, normalizedState.repo, normalizedState.issueNumber);
+		const stateJson = JSON.stringify(normalizedState, null, 2);
 		this.upsertStmt.run(
 			key,
-			state.owner,
-			state.repo,
-			state.issueNumber,
-			state.status,
-			state.archivedAt ?? null,
+			normalizedState.owner,
+			normalizedState.repo,
+			normalizedState.issueNumber,
+			normalizedState.status,
+			normalizedState.archivedAt ?? null,
 			stateJson,
 			new Date().toISOString(),
 		);
-		this.cache.set(key, { state, archived: !!state.archivedAt });
-		return state;
+		this.cache.set(key, { state: normalizedState, archived: !!normalizedState.archivedAt });
+		return normalizedState;
 	}
 
 	async exists(owner: string, repo: string, issueNumber: number): Promise<boolean> {
@@ -254,7 +258,7 @@ export class SessionStore {
 				const filePath = path.join(repoDir, file);
 				try {
 					const raw = await readFile(filePath, "utf8");
-					const parsed = JSON.parse(raw) as SessionState;
+					const parsed = this.normalizeState(JSON.parse(raw) as SessionState);
 					if (!parsed || typeof parsed.owner !== "string" || typeof parsed.repo !== "string" || typeof parsed.issueNumber !== "number") {
 						continue;
 					}
@@ -287,12 +291,16 @@ export class SessionStore {
 
 	private parseState(raw: string, key?: string): SessionState | null {
 		try {
-			return JSON.parse(raw) as SessionState;
+			return this.normalizeState(JSON.parse(raw) as SessionState);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[session-store] warning: invalid state row ${key ?? ""}: ${message}\n`);
 			return null;
 		}
+	}
+
+	private normalizeState(state: SessionState): SessionState {
+		return { ...state, kind: state.kind ?? "implementation" };
 	}
 
 	private async pathExists(p: string): Promise<boolean> {

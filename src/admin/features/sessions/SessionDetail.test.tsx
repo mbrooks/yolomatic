@@ -27,6 +27,7 @@ import { useSessionLog } from "../../hooks/useSessionLog.js";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
+		kind: "implementation",
 		owner: "mbrooks",
 		repo: "yeetomatic",
 		issueNumber: 42,
@@ -195,6 +196,19 @@ describe("SessionDetail", () => {
 		expect(summaryGrid).not.toBeNull();
 		const issueLink = summaryGrid!.querySelector("a[href=\"https://github.com/mbrooks/yeetomatic/issues/42\"]");
 		expect(issueLink).not.toBeNull();
+	});
+
+	it("distinguishes refinement sessions and hides implementation-only details and actions", () => {
+		const session = makeSession({ kind: "refinement", status: "working" });
+
+		render(<SessionDetail selected={session} onMutate={vi.fn()} />);
+
+		expect(screen.getByText("Refinement")).toBeDefined();
+		expect(screen.queryByText("Branch")).toBeNull();
+		expect(screen.queryByText("Workspace")).toBeNull();
+		expect(screen.queryByText("Pull request")).toBeNull();
+		expect(screen.queryByText("Actions")).toBeNull();
+		expect(screen.queryByText("Pause")).toBeNull();
 	});
 
 	it("invokes onMutate after a successful action command", async () => {
