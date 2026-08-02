@@ -32,7 +32,7 @@ export function OllamaSignInPanel({ containerName = "yeetomatic-ollama" }: {
 		void load();
 	}, [load]);
 
-	const dockerCommand = `docker exec -it ${containerName} ollama signin`;
+	const dockerCommand = `docker exec -it ${containerName} ollama login`;
 
 	return (
 		<section className="ollama-signin-panel" aria-label="Ollama sign-in status">

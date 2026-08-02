@@ -8,7 +8,7 @@ const execFileDefault = promisify(execFileCallback);
 /** Default Ollama container name (matches the `yeetomatic-ollama` service in docker-compose.yml). */
 export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
 
-/** Bounded timeout for the non-interactive `ollama signin` invocation. */
+/** Bounded timeout for the non-interactive `ollama login` invocation. */
 export const DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS = 8000;
 
 export interface OllamaSignInResult {
@@ -40,7 +40,7 @@ export interface OllamaSignInOptions {
 }
 
 /**
- * Parse the textual output of `ollama signin` into a structured result.
+ * Parse the textual output of `ollama login` into a structured result.
  * Handles both the "already signed in" and "you need to be signed in"
  * (with the connect URL) shapes reported by the Ollama CLI.
  */
@@ -83,7 +83,7 @@ function isTimeoutError(error: unknown): boolean {
 }
 
 /**
- * Check Ollama sign-in status by invoking `ollama signin` inside the Ollama
+ * Check Ollama sign-in status by invoking `ollama login` inside the Ollama
  * container via the Docker socket. Non-interactive: no TTY, bounded timeout.
  */
 export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Promise<OllamaSignInResult> {
@@ -102,7 +102,7 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 	try {
 		const result = await exec(
 			"docker",
-			["exec", containerName, "ollama", "signin"],
+			["exec", containerName, "ollama", "login"],
 			{ timeout: timeoutMs, maxBuffer: 1024 * 1024 },
 		);
 		const stdout = typeof result === "string" ? result : asString(result.stdout);
@@ -117,12 +117,20 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 			killed?: boolean;
 		};
 
-		if (isTimeoutError(error)) {
-			return {
-				signedIn: false,
-				message: `Ollama sign-in check timed out after ${timeoutMs} ms.`,
-				error: "timeout",
-			};
+		const stdout = asString(err.stdout);
+		const stderr = asString(err.stderr);
+		const combined = `${stdout}\n${stderr}`.trim();
+
+		// `ollama login` prints the connect URL (or the "already signed in" line)
+		// and then blocks waiting for the browser OAuth flow to complete. When
+		// our bounded timeout kills it, the buffered stdout/stderr still holds
+		// that output, so parse it before classifying the failure. This also
+		// covers a non-zero exit that still produced a usable sign-in URL.
+		if (combined) {
+			const parsed = parseOllamaSignInOutput(combined);
+			if (parsed.signedIn || parsed.signInUrl) {
+				return parsed;
+			}
 		}
 
 		if (err.code === "ENOENT") {
@@ -133,15 +141,15 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 			};
 		}
 
-		const stdout = asString(err.stdout);
-		const stderr = asString(err.stderr);
-		const combined = `${stdout}\n${stderr}`.trim();
+		if (isTimeoutError(error)) {
+			return {
+				signedIn: false,
+				message: `Ollama sign-in check timed out after ${timeoutMs} ms.`,
+				error: "timeout",
+			};
+		}
 
 		if (combined) {
-			const parsed = parseOllamaSignInOutput(combined);
-			if (parsed.signedIn || parsed.signInUrl) {
-				return parsed;
-			}
 			if (/no such container/i.test(combined) || /not found/i.test(combined)) {
 				return {
 					signedIn: false,
@@ -149,7 +157,7 @@ export async function checkOllamaSignInStatus(options: OllamaSignInOptions): Pro
 					error: combined,
 				};
 			}
-			return { signedIn: false, message: parsed.message, error: combined };
+			return { signedIn: false, message: parseOllamaSignInOutput(combined).message, error: combined };
 		}
 
 		const message = err instanceof Error ? err.message : String(error ?? "Ollama sign-in check failed.");
