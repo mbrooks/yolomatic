@@ -118,6 +118,22 @@ describe("admin-router-shared", () => {
 		expect(JSON.parse(response.body).error).toBe("Settings store not configured");
 	});
 
+	it("requireDeps reports the Ollama sign-in service dependency error", () => {
+		const response = mockResponse();
+		const ctx = {
+			request: { headers: {} },
+			response,
+			deps: {},
+			body: {},
+			params: [],
+		} as unknown as AdminRouteContext;
+
+		const ok = requireDeps(ctx, ["ollamaSignInService"]);
+
+		expect(ok).toBe(false);
+		expect(JSON.parse(response.body).error).toBe("Ollama sign-in service not configured");
+	});
+
 	it("registry handles missing route deps before invoking the handler", async () => {
 		const handler = vi.fn(async () => ({ status: 200, body: { ok: true } }));
 		const registry = new AdminRouteRegistry().route({

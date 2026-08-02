@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { fetchSettings, updateSettings } from "../../api/settings.js";
+import { fetchOllamaSignInStatus, type OllamaSignInStatus } from "../../api/ollama.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
 import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
+import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
@@ -19,6 +21,7 @@ const SERVER_SETTINGS_SECTIONS = [
 
 const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
+	pi_agent_provider: ["ollama"],
 };
 
 export function SettingsScreen({
@@ -110,6 +113,19 @@ export function SettingsScreen({
 	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories"
 		? []
 		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
+	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
+	const effectiveProvider =
+		(edited.pi_agent_provider !== undefined ? String(edited.pi_agent_provider) : piAgentProviderSetting?.value) ??
+		(piAgentProviderSetting?.default !== undefined ? String(piAgentProviderSetting.default) : "");
+	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
+	const ollamaContainerSetting = settings?.find((setting) => setting.key === "ollama_container_name");
+	const ollamaContainerName = String(
+		(edited.ollama_container_name !== undefined
+			? String(edited.ollama_container_name)
+			: ollamaContainerSetting?.value) ??
+		(ollamaContainerSetting?.default !== undefined ? String(ollamaContainerSetting.default) : "yeetomatic-ollama") ??
+		"yeetomatic-ollama",
+	);
 
 	if (loading) {
 		return (
@@ -176,6 +192,12 @@ export function SettingsScreen({
 							/>
 						)}
 					</div>
+
+					{showOllamaPanel && (
+						<OllamaSignInPanel
+							containerName={ollamaContainerName}
+						/>
+					)}
 
 					<div className="settings-actions">
 						<button
