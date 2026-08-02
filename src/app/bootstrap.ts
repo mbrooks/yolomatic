@@ -106,7 +106,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 	});
 	const workerRpcServer = new WorkerRpcServer();
 	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
-	const githubGateway = new WorkerGitHubGateway(github);
+	const githubGateway = new WorkerGitHubGateway(github, workspaceManager);
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,

@@ -83,6 +83,22 @@ Read code review comments on the associated PR.
 
 - `pr_number` (optional): an in-scope PR number.
 
+### `github_update_main_from_origin`
+
+Ask the control plane to refresh the session repository's effective default branch (commonly `main`) from origin in the control-plane bare repo. The worker never receives `GITHUB_TOKEN` and never runs git directly; the control plane performs the fetch + local ref update on the worker's behalf.
+
+No parameters. The target is always the live session's `owner`/`repo`, and the branch is the effective default branch resolved by the workspace layer (per-repo override, else the global `defaultBranch`, else `main`).
+
+Response `data`:
+
+```json
+{ "branch": "main", "before": "<sha>|null", "after": "<sha>", "updated": true }
+```
+
+`before` is the previous SHA of the local default-branch ref (or `null` if it did not exist); `after` is the current `origin/{effectiveDefaultBranch}` SHA. `updated` is `true` when `before !== after`.
+
+Scoping: this tool never accepts `owner`/`repo`/`branch` parameters and cannot touch another repository. Missing-remote-branch and fetch failures are returned as ordinary gateway errors (`ok: false`, descriptive `error`, no `scopeError`). The operation only fast-forwards the local default-branch ref; it never rewrites `origin/{defaultBranch}` or modifies the session worktree branch `yeetomatic/issue-{n}`.
+
 ## Removed worker tools
 
 The following tools are intentionally **not** exposed to the worker because they cannot be scoped to the current issue:

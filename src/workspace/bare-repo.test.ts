@@ -209,4 +209,143 @@ describe("BareRepoManager", () => {
 
 		await expect(bareRepos.resolveBaseRef("/tmp/bare")).rejects.toThrow(EmptyRepositoryError);
 	});
+
+	describe("updateLocalBranchToOrigin", () => {
+		it("creates the local ref when it does not exist and reports updated=true", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-create-ref-"));
+			const calls: Array<[string, string[]]> = [];
+			const runCommand: CommandRunner = vi.fn(async (_command, args, options) => {
+				calls.push(["git", args]);
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					const ref = args[args.length - 1];
+					if (ref === "refs/heads/main") {
+						throw new Error("missing ref refs/heads/main");
+					}
+					if (ref === "origin/main") {
+						return { stdout: "after1234\n", stderr: "" };
+					}
+				}
+				if (args[0] === "rev-parse") {
+					const ref = args[args.length - 1];
+					if (ref === "origin/main") return { stdout: "after1234\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = new BareRepoManager(createConfig(root), git);
+
+			const result = await bareRepos.updateLocalBranchToOrigin("/tmp/bare", "main");
+
+			expect(result).toEqual({
+				branch: "main",
+				before: null,
+				after: "after1234",
+				updated: true,
+			});
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["fetch", "origin", "+refs/heads/*:refs/remotes/origin/*", "--prune"],
+				expect.objectContaining({ cwd: "/tmp/bare", env: expect.any(Object) }),
+			);
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["branch", "-f", "main", "origin/main"],
+				{ cwd: "/tmp/bare" },
+			);
+		});
+
+		it("fast-forwards an existing local ref and reports updated=true", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-ff-"));
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					return { stdout: "before5678\n", stderr: "" };
+				}
+				if (args[0] === "rev-parse") {
+					return { stdout: "after1234\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = new BareRepoManager(createConfig(root), git);
+
+			const result = await bareRepos.updateLocalBranchToOrigin("/tmp/bare", "main");
+
+			expect(result).toEqual({
+				branch: "main",
+				before: "before5678",
+				after: "after1234",
+				updated: true,
+			});
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["branch", "-f", "main", "origin/main"],
+				{ cwd: "/tmp/bare" },
+			);
+		});
+
+		it("reports updated=false and skips the branch update when already up to date", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-noop-"));
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "rev-parse") {
+					return { stdout: "same1234\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = new BareRepoManager(createConfig(root), git);
+
+			const result = await bareRepos.updateLocalBranchToOrigin("/tmp/bare", "main");
+
+			expect(result).toEqual({
+				branch: "main",
+				before: "same1234",
+				after: "same1234",
+				updated: false,
+			});
+			const branchCalls = (runCommand as ReturnType<typeof vi.fn>).mock.calls
+				.filter(([cmd, args]) => cmd === "git" && args[0] === "branch")
+				.filter(([_cmd, args]) => args[1] === "-f");
+			expect(branchCalls).toHaveLength(0);
+		});
+
+		it("throws when origin branch does not exist and performs no ref mutation", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-missing-origin-"));
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					const ref = args[args.length - 1];
+					if (ref === "origin/main") {
+						throw new Error("missing ref origin/main");
+					}
+					return { stdout: "before5678\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = new BareRepoManager(createConfig(root), git);
+
+			await expect(bareRepos.updateLocalBranchToOrigin("/tmp/bare", "main")).rejects.toThrow(
+				"origin/main does not exist",
+			);
+			const branchCalls = (runCommand as ReturnType<typeof vi.fn>).mock.calls
+				.filter(([cmd, args]) => cmd === "git" && args[0] === "branch")
+				.filter(([_cmd, args]) => args[1] === "-f");
+			expect(branchCalls).toHaveLength(0);
+		});
+
+		it("surfaces fetch failures as errors", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-fetch-fail-"));
+			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+				if (args[0] === "fetch") {
+					throw new Error("fatal: could not read from remote");
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const git = new GitCommandRunner(createConfig(root), runCommand);
+			const bareRepos = new BareRepoManager(createConfig(root), git);
+
+			await expect(bareRepos.updateLocalBranchToOrigin("/tmp/bare", "main")).rejects.toThrow(
+				"could not read from remote",
+			);
+		});
+	});
 });
