@@ -9,7 +9,7 @@ import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
 import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
-import { isAdmin, isIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import { isAdmin, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { statSync } from "node:fs";
@@ -63,7 +63,7 @@ export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: str
 		"Yeetomatic is available to work on this issue.",
 		"",
 		"- Assign the issue to `" + githubUsername + "` to start an implementation session and open a pull request.",
-		"- `/yeetomatic issue-refinement` — have an authorized maintainer ask Yeetomatic to refine the issue body into a Proposed Task (no implementation or PR).",
+		"- `/yeetomatic issue-refinement` — have an authorized maintainer ask Yeetomatic to refine the issue body into a Proposed Task (no implementation or PR). Trailing text after the command is treated as a steering prompt that shapes the refinement pass.",
 		"- `/yeetomatic stop` — stop the active session (authorized maintainers only).",
 	].join("\n");
 	return appendAdminLink(body, adminIssueUrl);
@@ -130,7 +130,7 @@ export class HandleIssueRefinement {
 		this.log(owner, repo, issueNumber, "info", "Posted issue-refinement instructions");
 	}
 
-	async execute(payload: IssueRefinementEventPayload): Promise<void> {
+	async execute(payload: IssueRefinementEventPayload, steeringPrompt?: string): Promise<void> {
 		const { owner, repo, issueNumber, key } = this.resolveContext(payload);
 
 		if (payload.action !== "created") {
@@ -138,12 +138,21 @@ export class HandleIssueRefinement {
 			return;
 		}
 
-		if (!isIssueRefinementCommand(payload.comment.body)) {
+		const parsed = parseIssueRefinementCommand(payload.comment.body);
+		if (!parsed.matched) {
 			return;
 		}
+		const steering = steeringPrompt ?? parsed.steeringPrompt;
 
 		process.stdout.write(`[refinement] command received for ${owner}/${repo}#${issueNumber}\n`);
-		this.log(owner, repo, issueNumber, "info", `Refinement command received from @${payload.sender.login}`);
+		this.log(
+			owner,
+			repo,
+			issueNumber,
+			"info",
+			`Refinement command received from @${payload.sender.login}`,
+			steering ? { steeringPrompt: steering } : undefined,
+		);
 
 		if (payload.comment.user.login === this.deps.githubUsername) {
 			process.stdout.write(`[refinement] ignored: comment from ${this.deps.githubUsername}\n`);
@@ -289,6 +298,7 @@ export class HandleIssueRefinement {
 				originalBodyFingerprint: fingerprint,
 				instructionSource: "prompt-defaults",
 				state: "running",
+				steeringPrompt: steering || undefined,
 			}).id;
 			this.log(owner, repo, issueNumber, "info", "Created refinement attempt", { attemptId });
 
@@ -312,7 +322,7 @@ export class HandleIssueRefinement {
 			const state = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
 				workspacePath: worktreePath,
 			});
-			const result = await this.deps.executor.executeRefinement(state, skillInfo.content);
+			const result = await this.deps.executor.executeRefinement(state, skillInfo.content, steering);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", { summary: result.summary });
 
 			this.deps.refinementStore.updateAttempt(attemptId, {

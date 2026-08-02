@@ -113,6 +113,17 @@ describe("HandleIssueComment", () => {
 			execute: vi.fn(async () => undefined),
 		};
 
+		const handlerDepsExecutor = {
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			github: github as never,
+			tasks: tasks as never,
+			clock: { now: () => new Date() } as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			selfReportEnabled: false,
+			executor: { execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." })), executePRReview: vi.fn() } as never,
+		};
 		const handler = new HandleIssueComment({
 			sessions: sessions as never,
 			workspaces: workspaces as never,
@@ -121,22 +132,94 @@ describe("HandleIssueComment", () => {
 			defaultBranch: "main",
 			githubUsername: "yeetomatic-bot",
 			adminGithubUsername: "admin",
-			executor: {
-				sessions: sessions as never,
-				workspaces: workspaces as never,
-				github: github as never,
-				tasks: tasks as never,
-				clock: { now: () => new Date() } as never,
-				defaultBranch: "main",
-				githubUsername: "yeetomatic-bot",
-				selfReportEnabled: false,
-				executor: { execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." })), executePRReview: vi.fn() } as never,
-			},
+			executor: handlerDepsExecutor,
 			prReview: prReview as never,
 		});
 
-		return { handler, sessions, github, prReview, tasks };
+		return { handler, sessions, github, prReview, tasks, workspaces, executor: handlerDepsExecutor };
 	}
+
+	it("routes a refinement command with trailing text as a steering prompt", async () => {
+		const refinement = { execute: vi.fn(async (_payload: unknown, _steering?: string) => undefined) };
+		const { sessions, workspaces, tasks, github, executor } = createHandler();
+		const handler = new HandleIssueComment({
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			tasks: tasks as never,
+			github: github as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			adminGithubUsername: "admin",
+			executor,
+			refinement: refinement as never,
+		});
+
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
+			comment: { id: 1, body: "/yeetomatic issue-refinement Focus on rollback", user: { login: "admin" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(refinement.execute).toHaveBeenCalledTimes(1);
+		const call = refinement.execute.mock.calls[0]!;
+		expect(call[0]).toMatchObject({ action: "created", repository: { name: "yeetomatic" } });
+		expect(call[1]).toBe("Focus on rollback");
+	});
+
+	it("routes a no-argument refinement command with an empty steering prompt", async () => {
+		const refinement = { execute: vi.fn(async (_payload: unknown, _steering?: string) => undefined) };
+		const { sessions, workspaces, tasks, github, executor } = createHandler();
+		const handler = new HandleIssueComment({
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			tasks: tasks as never,
+			github: github as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			adminGithubUsername: "admin",
+			executor,
+			refinement: refinement as never,
+		});
+
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
+			comment: { id: 2, body: "/yeetomatic issue-refinement", user: { login: "admin" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(refinement.execute).toHaveBeenCalledTimes(1);
+		expect(refinement.execute.mock.calls[0]![1]).toBe("");
+	});
+
+	it("does not route embedded refinement commands to the refinement handler", async () => {
+		const refinement = { execute: vi.fn(async (_payload: unknown, _steering?: string) => undefined) };
+		const { sessions, workspaces, tasks, github, executor } = createHandler();
+		const handler = new HandleIssueComment({
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			tasks: tasks as never,
+			github: github as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			adminGithubUsername: "admin",
+			executor,
+			refinement: refinement as never,
+		});
+
+		await handler.execute({
+			action: "created",
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
+			comment: { id: 3, body: "Please run /yeetomatic issue-refinement", user: { login: "admin" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(refinement.execute).not.toHaveBeenCalled();
+	});
 
 	it("routes non-issue branch PR comments through the stored PR mapping", async () => {
 		const { handler, sessions, github, prReview } = createHandler();

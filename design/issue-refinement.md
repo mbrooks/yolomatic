@@ -7,8 +7,9 @@ Last updated: 2026-08-01
 ## Purpose
 
 Yeetomatic should let an authorized maintainer replace a newly opened issue's
-body with a more complete Proposed Task. Refinement begins only after an exact,
-authenticated `/yeetomatic issue-refinement` command.
+body with a more complete Proposed Task. Refinement begins only after an
+authenticated `/yeetomatic issue-refinement` command, optionally followed by a
+steering prompt that shapes the refinement pass.
 
 Opening an issue does not start refinement. Yeetomatic posts a static comment
 explaining the command and worker capabilities, warning maintainers to verify
@@ -84,6 +85,11 @@ To start, comment:
 
 `/yeetomatic issue-refinement`
 
+Optional trailing text after the command is treated as a steering prompt that
+shapes the refinement pass, e.g.:
+
+`/yeetomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback`
+
 The command starts an LLM-driven worker with repository, shell, test, and
 network access. Because issue content can influence the worker's behavior,
 verify the issue before starting refinement.
@@ -112,9 +118,23 @@ An authorized maintainer comments:
 /yeetomatic issue-refinement
 ```
 
-The command must be the entire trimmed comment body. Matching is
-case-insensitive, but aliases, suffixes, arguments, Markdown wrappers, and
-commands embedded in quoted text are rejected.
+or, to steer the refinement pass:
+
+```text
+/yeetomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback
+```
+
+The command must appear at the start of the trimmed comment (matching is
+case-insensitive). When the command is the entire trimmed comment, refinement
+runs from the issue description only. When the command is followed by
+whitespace then additional text, that trailing text is treated as a steering
+prompt: it is recorded on the durable refinement attempt and surfaced to the
+worker as authoritative guidance for that pass (focus areas, requested
+changes, constraints) while the worker still investigates the issue and
+produces a self-contained Proposed Task. Embedded or quoted commands (e.g.
+`` `/yeetomatic issue-refinement` `` and `Please run /yeetomatic
+issue-refinement`) and Markdown wrappers around the command token itself are
+still rejected. The no-argument form is unchanged.
 
 After accepting the command, Yeetomatic:
 
@@ -197,21 +217,24 @@ The GitHub webhook signature authenticates that GitHub delivered the event; it
 does not by itself authorize the sender to refine an issue.
 
 The configured `admin_github_username` and explicit repository
-collaborators may run `/yeetomatic issue-refinement`. Authorization uses the
-signed webhook's `sender.login`. Collaborator membership is determined via
-`repos.checkCollaborator` (the GitHub collaborator-membership endpoint, which
-returns `204` for explicit collaborators and `404` otherwise), not via the
-effective permission level alone: public repositories grant an effective `read`
-permission to users who were never added as collaborators, so a permission
-level alone would over-authorize arbitrary public-repo visitors. The issue
-author role alone is not sufficient authorization.
+collaborators may run `/yeetomatic issue-refinement`. The command must start
+the trimmed comment (case-insensitive); trailing text after the command is
+treated as a steering prompt and does not change who may run the command.
+Authorization uses the signed webhook's `sender.login`. Collaborator membership
+is determined via `repos.checkCollaborator` (the GitHub collaborator-membership
+endpoint, which returns `204` for explicit collaborators and `404` otherwise),
+not via the effective permission level alone: public repositories grant an
+effective `read` permission to users who were never added as collaborators, so a
+permission level alone would over-authorize arbitrary public-repo visitors. The
+issue author role alone is not sufficient authorization.
 
 Every request must also satisfy these checks:
 
 - the webhook action is `created`;
 - the comment is on an open issue, not a pull request;
 - the sender is a human and is not the configured Yeetomatic account;
-- the command is an exact match;
+- the command starts with `/yeetomatic issue-refinement` (the trailing-text
+  steering-prompt form is accepted);
 - the repository is managed and refinement is enabled;
 - no implementation or refinement task is active; and
 - the issue does not already have a completed implementation session.
@@ -292,6 +315,7 @@ The durable record includes:
 - returned Proposed Task body and investigation summary;
 - instruction source (`repository-skill` or `prompt-defaults`);
 - repository commit used for refinement;
+- the steering prompt (when the maintainer supplied trailing text);
 - state, failure reason, and timestamps; and
 - the GitHub delivery ID used for deduplication.
 
@@ -347,7 +371,8 @@ the refinement command is sent.
 The implementation is expected to add or extend these boundaries:
 
 - deterministic `issues.opened` instruction-comment handling;
-- exact `/yeetomatic issue-refinement` command parsing before ordinary feedback;
+- `/yeetomatic issue-refinement` command parsing (start-of-comment match with
+  optional steering-prompt suffix) before ordinary feedback;
 - administrator authorization from signed webhook identity;
 - repository `issue-refinement` skill selection with a missing-skill fallback
   to built-in prompt defaults;
@@ -367,8 +392,9 @@ The implementation is expected to add or extend these boundaries:
   includes the worker access and issue-verification warning.
 - Opening an issue does not launch a refinement worker.
 - The configured `admin_github_username` and explicit repository collaborators can start refinement.
-- The exact `/yeetomatic issue-refinement` command starts a fresh instance of
-  the existing Docker worker workflow.
+- The `/yeetomatic issue-refinement` command (with or without a trailing
+  steering prompt) starts a fresh instance of the
+  existing Docker worker workflow.
 - The worker follows the target repository's `issue-refinement` skill when it
   exists.
 - A missing repository skill uses Yeetomatic's built-in issue-refinement prompt
