@@ -156,6 +156,46 @@ describe("RefinementStore", () => {
 		expect(updated.id).toBe(attempt.id);
 	});
 
+	it("round-trips a steering prompt through createAttempt and getLatestAttempt", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 8,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+			steeringPrompt: "Focus on rollback",
+		});
+		expect(created.steeringPrompt).toBe("Focus on rollback");
+
+		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 8);
+		expect(latest).not.toBeNull();
+		expect(latest!.steeringPrompt).toBe("Focus on rollback");
+
+		const byId = store.getAttempt(created.id);
+		expect(byId!.steeringPrompt).toBe("Focus on rollback");
+	});
+
+	it("defaults steeringPrompt to undefined when not supplied", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 9,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+		expect(created.steeringPrompt).toBeUndefined();
+		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 9);
+		expect(latest!.steeringPrompt).toBeUndefined();
+	});
+
 	it("returns null when no instruction comment is recorded", () => {
 		expect(store.getInstructionComment("unknown", "repo", 1)).toBeNull();
 	});

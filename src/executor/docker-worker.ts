@@ -90,11 +90,12 @@ export class DockerWorkerExecutor implements ExecutionService {
 	executeRefinement(
 		state: SessionState,
 		repoSkillContent: string | undefined,
+		steeringPrompt?: string,
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<RefinementResult> {
-		const prompt = buildIssueRefinementPrompt(state, repoSkillContent);
+		const prompt = buildIssueRefinementPrompt(state, repoSkillContent, steeringPrompt);
 		return this.runWorker(
 			state,
 			{ kind: "issue-refinement", text: prompt },

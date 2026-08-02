@@ -26,6 +26,7 @@ export interface RefinementAttempt {
 	state: RefinementState;
 	failureReason?: string;
 	deliveryId?: string;
+	steeringPrompt?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -56,6 +57,7 @@ export interface RefinementAttemptCreate {
 	state: RefinementState;
 	failureReason?: string;
 	deliveryId?: string;
+	steeringPrompt?: string;
 }
 
 export class RefinementStore {
@@ -82,8 +84,8 @@ export class RefinementStore {
 				id, owner, repo, issue_number, instruction_comment_id, command_comment_id, requester,
 				original_title, original_body, original_body_fingerprint, proposed_task_body, summary,
 				investigation, instruction_source, repo_commit, state, failure_reason, delivery_id,
-				created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				steering_prompt, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 		stmt.run(
 			attempt.id,
@@ -104,6 +106,7 @@ export class RefinementStore {
 			attempt.state,
 			attempt.failureReason ?? null,
 			attempt.deliveryId ?? null,
+			attempt.steeringPrompt ?? null,
 			attempt.createdAt,
 			attempt.updatedAt,
 		);
@@ -222,6 +225,7 @@ export class RefinementStore {
 			state: String(row.state) as RefinementState,
 			failureReason: row.failure_reason == null ? undefined : String(row.failure_reason),
 			deliveryId: row.delivery_id == null ? undefined : String(row.delivery_id),
+			steeringPrompt: row.steering_prompt == null ? undefined : String(row.steering_prompt),
 			createdAt: String(row.created_at),
 			updatedAt: String(row.updated_at),
 		};

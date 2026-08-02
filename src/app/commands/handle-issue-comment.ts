@@ -2,7 +2,7 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
-import { hasYeetomaticVisibleLabel, isIssueRefinementCommand, isStopCommand } from "../../domain/workflow/policy.js";
+import { hasYeetomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import {
 	issueSessionKey,
 	startIssueExecution,
@@ -80,8 +80,9 @@ export class HandleIssueComment {
 			return;
 		}
 
-		if (isIssueRefinementCommand(payload.comment.body) && this.deps.refinement) {
-			await this.deps.refinement.execute(payload);
+		const refinement = parseIssueRefinementCommand(payload.comment.body);
+		if (refinement.matched && this.deps.refinement) {
+			await this.deps.refinement.execute(payload, refinement.steeringPrompt);
 			return;
 		}
 
