@@ -6,7 +6,7 @@ import {
 	createOllamaDebugLogger,
 	DEFAULT_OLLAMA_CONTAINER_NAME,
 	DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS,
-	OLLAMA_SIGNIN_DEBUG_ENV,
+	DEBUG_LOG_ENV,
 	type OllamaExecFile,
 } from "./signin-status.js";
 
@@ -224,7 +224,7 @@ describe("createOllamaDebugLogger", () => {
 	it("writes a prefixed line to stdout when the env var is enabled", () => {
 		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 		try {
-			const logger = createOllamaDebugLogger({ [OLLAMA_SIGNIN_DEBUG_ENV]: "1" } as NodeJS.ProcessEnv);
+			const logger = createOllamaDebugLogger({ [DEBUG_LOG_ENV]: "1" } as NodeJS.ProcessEnv);
 			logger("hello");
 			expect(write).toHaveBeenCalledWith("[ollama-signin] hello\n");
 		} finally {
@@ -246,7 +246,7 @@ describe("createOllamaDebugLogger", () => {
 	it("is a no-op when the env var is a non-truthy value", () => {
 		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 		try {
-			const logger = createOllamaDebugLogger({ [OLLAMA_SIGNIN_DEBUG_ENV]: "false" } as NodeJS.ProcessEnv);
+			const logger = createOllamaDebugLogger({ [DEBUG_LOG_ENV]: "false" } as NodeJS.ProcessEnv);
 			logger("hello");
 			expect(write).not.toHaveBeenCalled();
 		} finally {
