@@ -84,6 +84,76 @@ export class BareRepoManager {
 		}
 	}
 
+	/**
+	 * Resolve the SHA of `refs/heads/${branchName}` in the bare repo, or `null`
+	 * when the local ref does not exist.
+	 */
+	async resolveLocalBranchSha(bareRepoPath: string, branchName: string): Promise<string | null> {
+		try {
+			const { stdout } = await this.git.run(
+				"git",
+				["rev-parse", "--verify", "--quiet", `refs/heads/${branchName}`],
+				{ cwd: bareRepoPath },
+			);
+			const sha = stdout.trim();
+			return sha.length > 0 ? sha : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Resolve the SHA pointed at by `origin/${branchName}` in the bare repo.
+	 * Throws when the remote-tracking ref does not exist.
+	 */
+	async resolveRemoteBranchSha(bareRepoPath: string, branchName: string): Promise<string> {
+		const { stdout } = await this.git.run(
+			"git",
+			["rev-parse", `origin/${branchName}`],
+			{ cwd: bareRepoPath },
+		);
+		const sha = stdout.trim();
+		if (sha.length === 0) {
+			throw new Error(`origin/${branchName} resolved to an empty SHA`);
+		}
+		return sha;
+	}
+
+	/**
+	 * Fetch origin (prune), verify `origin/${branchName}` exists, then
+	 * fast-forward/create the local ref `refs/heads/${branchName}` to point at
+	 * `origin/${branchName}`. Returns the before/after SHAs so callers can
+	 * report whether the local ref changed. This never rewrites the remote
+	 * ref and never touches any other local ref (e.g. worktree branches).
+	 */
+	async updateLocalBranchToOrigin(
+		bareRepoPath: string,
+		branchName: string,
+	): Promise<{ branch: string; before: string | null; after: string; updated: boolean }> {
+		await this.fetchOrigin(bareRepoPath);
+
+		if (!(await this.remoteBranchExists(bareRepoPath, branchName))) {
+			throw new Error(
+				`origin/${branchName} does not exist in ${bareRepoPath}; cannot update local ${branchName} ref`,
+			);
+		}
+
+		const before = await this.resolveLocalBranchSha(bareRepoPath, branchName);
+		const after = await this.resolveRemoteBranchSha(bareRepoPath, branchName);
+
+		if (before !== after) {
+			// `git branch -f <branch> <ref>` creates the branch when it does not
+			// exist and fast-forwards it to the target when it does. It only
+			// touches `refs/heads/<branch>`; it never rewrites origin/<branch>
+			// or any other ref.
+			await this.git.run("git", ["branch", "-f", branchName, `origin/${branchName}`], {
+				cwd: bareRepoPath,
+			});
+		}
+
+		return { branch: branchName, before, after, updated: before !== after };
+	}
+
 	async resolveBaseRef(bareRepoPath: string): Promise<string> {
 		const candidates = [
 			"origin/HEAD",

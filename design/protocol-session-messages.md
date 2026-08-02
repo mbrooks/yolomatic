@@ -377,6 +377,10 @@ parameters):
 - `set_status` (`state?`, `assignee?`)
 - `set_labels` (`labels?`, `addLabels?`, `removeLabels?`)
 - `update_issue` (`title?`, `body?`, `state?`, `labels?`, `assignees?`)
+- `update_main_from_origin` (no params; refreshes the control-plane bare repo's
+  local default-branch ref from `origin/{effectiveDefaultBranch}` for the
+  session repo, returns `{ branch, before, after, updated }`; scoped to the
+  session repo, never accepts `owner`/`repo`/`branch`)
 
 PR tools (scoped to the session's linked PR or an open PR on the session
 branch `yeetomatic/issue-{n}`; accept an optional in-scope `pr_number`):

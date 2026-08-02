@@ -7,8 +7,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWorkerMessage, type AnyWorkerProtocolMessage, type WorkerProtocolMessage } from "../worker/protocol.js";
 import type { PendingWorkerRpcConnection, WorkerRpcConnection, WorkerRpcServer } from "../worker/rpc-server.js";
-import { WorkerGitHubGateway, type GatewayToolResponse } from "../worker/github-gateway.js";
+import { WorkerGitHubGateway, type GatewayToolResponse, type WorkerWorkspaceGateway } from "../worker/github-gateway.js";
 import type { GitHubGatewayService } from "../ports/github-gateway-service.js";
+
+function makeFakeWorkspace(): WorkerWorkspaceGateway {
+	return {
+		updateDefaultBranchFromOrigin: vi.fn(async () => ({
+			branch: "main",
+			before: "old".repeat(10),
+			after: "new".repeat(10),
+			updated: true,
+		})),
+	};
+}
 
 const { execFileMock, spawnMock, recordSessionLogMock } = vi.hoisted(() => ({
 	execFileMock: vi.fn(),
@@ -997,7 +1008,7 @@ describe("DockerWorkerExecutor", () => {
 			const github: GitHubGatewayService = {
 				getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 			} as unknown as GitHubGatewayService;
-			const gateway = new WorkerGitHubGateway(github);
+			const gateway = new WorkerGitHubGateway(github, makeFakeWorkspace());
 			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
 			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 				if (args[0] === "remote" && args[1] === "get-url") {
@@ -1060,7 +1071,7 @@ describe("DockerWorkerExecutor", () => {
 					throw new Error("must not be called");
 				}),
 			} as unknown as GitHubGatewayService;
-			const gateway = new WorkerGitHubGateway(github);
+			const gateway = new WorkerGitHubGateway(github, makeFakeWorkspace());
 			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
 			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 				if (args[0] === "remote" && args[1] === "get-url") {

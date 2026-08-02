@@ -34,6 +34,20 @@ export interface GatewayToolResponse {
 }
 
 /**
+ * Narrow workspace port used by {@link WorkerGitHubGateway} to refresh the
+ * session repo's effective default branch from origin on the worker's behalf.
+ * Kept as a small interface (rather than the full WorkspaceManager) so the
+ * gateway stays unit-testable with a fake and does not gain unrelated
+ * workspace capabilities.
+ */
+export interface WorkerWorkspaceGateway {
+	updateDefaultBranchFromOrigin(
+		owner: string,
+		repo: string,
+	): Promise<{ branch: string; before: string | null; after: string; updated: boolean }>;
+}
+
+/**
  * Control-plane gateway that performs scoped GitHub operations on behalf of a
  * disposable worker. The worker never receives the GitHub token; it sends
  * {@link GatewayToolRequest}s over the worker session WebSocket and this
@@ -52,7 +66,10 @@ export interface GatewayToolResponse {
  * operation itself is never performed for an out-of-scope PR.
  */
 export class WorkerGitHubGateway {
-	constructor(private readonly github: GitHubGatewayService) {}
+	constructor(
+		private readonly github: GitHubGatewayService,
+		private readonly workspace: WorkerWorkspaceGateway,
+	) {}
 
 	async handle(state: SessionState, request: GatewayToolRequest): Promise<GatewayToolResponse> {
 		try {
@@ -98,6 +115,9 @@ export class WorkerGitHubGateway {
 
 			case "list_pr_review_comments":
 				return this.listPrReviewComments(state, request.params);
+
+			case "update_main_from_origin":
+				return this.updateMainFromOrigin(state);
 
 			default:
 				throw new Error(`Unknown gateway tool: ${request.tool}`);
@@ -297,6 +317,20 @@ export class WorkerGitHubGateway {
 	private async listBranchPrs(state: SessionState): Promise<GatewayPullRequestSummary[]> {
 		const head = `yeetomatic/issue-${state.issueNumber}`;
 		return this.github.listPullRequestsForHead(state.owner, state.repo, head, "open");
+	}
+
+	/**
+	 * Refresh the control-plane bare repo's local default-branch ref from
+	 * origin for the session repo. No parameters are accepted: the target is
+	 * always the live session's `owner`/`repo` and the effective default
+	 * branch resolved by the workspace layer. Missing-remote-branch and fetch
+	 * failures are ordinary gateway errors (`ok: false`, no `scopeError`); this
+	 * tool cannot be called with a target, so scope errors are not expected.
+	 */
+	private async updateMainFromOrigin(
+		state: SessionState,
+	): Promise<{ branch: string; before: string | null; after: string; updated: boolean }> {
+		return this.workspace.updateDefaultBranchFromOrigin(state.owner, state.repo);
 	}
 }
 
