@@ -86,6 +86,7 @@ export function DashboardScreen({
 					<div className="activity-list">
 						<div className="activity-list-header">
 							<div className="activity-repo">Repo</div>
+							<div className="activity-repo">Type</div>
 							<div className="activity-issue">Issue</div>
 							<div className="activity-status">Status</div>
 							<div className="activity-time">Activity</div>
@@ -106,6 +107,9 @@ export function DashboardScreen({
 							>
 								<div className="activity-repo">
 									{session.owner}/{session.repo}
+								</div>
+								<div className="activity-repo">
+									{session.owner}/{session.kind}
 								</div>
 								<div className="activity-issue">
 									#{session.issueNumber}
