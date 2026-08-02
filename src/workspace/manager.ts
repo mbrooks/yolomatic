@@ -51,6 +51,21 @@ export class WorkspaceManager implements WorkspaceService {
 		return getBranchName(issueNumber);
 	}
 
+	async updateDefaultBranchFromOrigin(
+		owner: string,
+		repo: string,
+	): Promise<{ branch: string; before: string | null; after: string; updated: boolean }> {
+		const normalizedOwner = normalizeSegment(owner, "owner");
+		const normalizedRepo = normalizeSegment(repo, "repo");
+		await mkdir(this.config.workspacesDir, { recursive: true });
+		const bareRepoPath = await this.bareRepos.ensureBareRepo(normalizedOwner, normalizedRepo);
+		const branch =
+			this.config.resolveDefaultBranch?.(normalizedOwner, normalizedRepo) ??
+			this.config.defaultBranch ??
+			"main";
+		return this.bareRepos.updateLocalBranchToOrigin(bareRepoPath, branch);
+	}
+
 	async initializeRepo(owner: string, repo: string): Promise<void> {
 		await mkdir(this.config.workspacesDir, { recursive: true });
 		await this.bareRepos.ensureBareRepo(owner, repo);

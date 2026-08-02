@@ -1259,4 +1259,114 @@ describe("WorkspaceManager", () => {
 		expect(removeCalls).toHaveLength(1);
 		expect(removeCalls[0]![1]).toContain(refinementPath);
 	});
+
+	describe("updateDefaultBranchFromOrigin", () => {
+		it("ensures the bare repo and delegates the local ref update to BareRepoManager", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-"));
+			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			await mkdir(bareRepoPath, { recursive: true });
+			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+				if (args[0] === "rev-parse" && args[1] === "--git-dir") {
+					return { stdout: ".\n", stderr: "" };
+				}
+				if (args[0] === "rev-parse" && args.includes("--quiet")) {
+					throw new Error("missing local ref");
+				}
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					return { stdout: "after1234\n", stderr: "" };
+				}
+				if (args[0] === "rev-parse") {
+					return { stdout: "after1234\n", stderr: "" };
+				}
+				if (args[0] === "remote" && args[1] === "set-url") return { stdout: "", stderr: "" };
+				if (args[0] === "fetch") return { stdout: "", stderr: "" };
+				if (args[0] === "branch" && args[1] === "-f") return { stdout: "", stderr: "" };
+				return { stdout: "", stderr: "" };
+			});
+			const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+
+			expect(result).toEqual({ branch: "main", before: null, after: "after1234", updated: true });
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["branch", "-f", "main", "origin/main"],
+				{ cwd: bareRepoPath },
+			);
+		});
+
+		it("respects a per-repo resolveDefaultBranch override", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-override-"));
+			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			await mkdir(bareRepoPath, { recursive: true });
+			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
+				if (args[0] === "rev-parse" && args.includes("--quiet")) {
+					throw new Error("missing local ref");
+				}
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					return { stdout: "after1234\n", stderr: "" };
+				}
+				if (args[0] === "rev-parse") {
+					return { stdout: "after1234\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const manager = new WorkspaceManager(
+				{ ...createConfig(root), resolveDefaultBranch: () => "develop" },
+				runCommand,
+			);
+
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+
+			expect(result).toEqual({ branch: "develop", before: null, after: "after1234", updated: true });
+			expect(runCommand).toHaveBeenCalledWith(
+				"git",
+				["branch", "-f", "develop", "origin/develop"],
+				{ cwd: bareRepoPath },
+			);
+		});
+
+		it("reports updated=false when already up to date", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-noop-"));
+			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			await mkdir(bareRepoPath, { recursive: true });
+			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
+				if (args[0] === "rev-parse") return { stdout: "same1234\n", stderr: "" };
+				return { stdout: "", stderr: "" };
+			});
+			const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+
+			expect(result).toEqual({ branch: "main", before: "same1234", after: "same1234", updated: false });
+			const branchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>)
+				.filter(([cmd, args]) => cmd === "git" && args[0] === "branch" && args[1] === "-f");
+			expect(branchCalls).toHaveLength(0);
+		});
+
+		it("propagates the missing-origin-branch error and performs no branch mutation", async () => {
+			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-missing-"));
+			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			await mkdir(bareRepoPath, { recursive: true });
+			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
+				if (args[0] === "rev-parse" && args.includes("--verify")) {
+					const ref = args[args.length - 1];
+					if (ref === "origin/main") throw new Error("missing ref origin/main");
+					return { stdout: "before5678\n", stderr: "" };
+				}
+				return { stdout: "", stderr: "" };
+			});
+			const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+			await expect(manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic")).rejects.toThrow(
+				"origin/main does not exist",
+			);
+			const branchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>)
+				.filter(([cmd, args]) => cmd === "git" && args[0] === "branch" && args[1] === "-f");
+			expect(branchCalls).toHaveLength(0);
+		});
+	});
 });

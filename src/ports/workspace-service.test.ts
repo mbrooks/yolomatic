@@ -6,6 +6,7 @@ describe("WorkspaceService", () => {
 	it("includes path-based push operations in the contract", () => {
 		const service: WorkspaceService = {
 			createOrGetWorktree: async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1" }),
+			updateDefaultBranchFromOrigin: async () => ({ branch: "main", before: null, after: "sha", updated: true }),
 			syncWorktree: async () => undefined,
 			removeWorktree: async () => undefined,
 			commitAndPush: async () => true,
