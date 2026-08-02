@@ -3,8 +3,10 @@ import {
 	checkOllamaSignInStatus,
 	parseOllamaSignInOutput,
 	DefaultOllamaSignInService,
+	createOllamaDebugLogger,
 	DEFAULT_OLLAMA_CONTAINER_NAME,
 	DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS,
+	OLLAMA_SIGNIN_DEBUG_ENV,
 	type OllamaExecFile,
 } from "./signin-status.js";
 
@@ -164,6 +166,93 @@ describe("checkOllamaSignInStatus", () => {
 		expect(result.error).toBe("something broke");
 		expect(result.message).toBe("something broke");
 	});
+
+	describe("debug logging", () => {
+		it("logs the issued command and the successful result", async () => {
+			const exec = fakeExec(true, "You are already signed in as user 'bob'\n");
+			const debug = vi.fn();
+			await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec, debug });
+			expect(debug).toHaveBeenCalledWith(
+				expect.stringContaining("issuing: docker exec -it yeetomatic-ollama ollama login"),
+			);
+			expect(debug).toHaveBeenCalledWith(
+				expect.stringContaining("result: exit 0"),
+			);
+			const resultLine = debug.mock.calls.find((c) => String(c[0]).startsWith("result:"))?.[0] as string;
+			expect(resultLine).toContain("already signed in as user 'bob'");
+		});
+
+		it("logs the issued command and the failure details", async () => {
+			const exec = failingExec(Object.assign(new Error("Command failed"), {
+				stdout: "",
+				stderr: "Error: No such container: yeetomatic-ollama",
+				code: 1,
+				signal: undefined,
+				killed: false,
+			}));
+			const debug = vi.fn();
+			await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec, debug });
+			expect(debug).toHaveBeenCalledWith(
+				expect.stringContaining("issuing: docker exec -it yeetomatic-ollama ollama login"),
+			);
+			const resultLine = debug.mock.calls.find((c) => String(c[0]).startsWith("result:"))?.[0] as string;
+			expect(resultLine).toContain("code=1");
+			expect(resultLine).toContain("No such container");
+			expect(resultLine).toContain("Command failed");
+		});
+
+		it("includes the timeout value in the issued-command line", async () => {
+			const exec = fakeExec(true, "You are already signed in as user 'bob'\n");
+			const debug = vi.fn();
+			await checkOllamaSignInStatus({ containerName: "ollama", execFile: exec, timeoutMs: 1500, debug });
+			expect(debug).toHaveBeenCalledWith(expect.stringContaining("timeout 1500ms"));
+		});
+
+		it("truncates long output in debug lines", async () => {
+			const long = "x".repeat(5000);
+			const exec = fakeExec(true, long, "");
+			const debug = vi.fn();
+			await checkOllamaSignInStatus({ containerName: "ollama", execFile: exec, debug });
+			const resultLine = debug.mock.calls.find((c) => String(c[0]).startsWith("result:"))?.[0] as string;
+			expect(resultLine.length).toBeLessThan(long.length);
+			expect(resultLine).toContain("...");
+		});
+	});
+});
+
+describe("createOllamaDebugLogger", () => {
+	it("writes a prefixed line to stdout when the env var is enabled", () => {
+		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const logger = createOllamaDebugLogger({ [OLLAMA_SIGNIN_DEBUG_ENV]: "1" } as NodeJS.ProcessEnv);
+			logger("hello");
+			expect(write).toHaveBeenCalledWith("[ollama-signin] hello\n");
+		} finally {
+			write.mockRestore();
+		}
+	});
+
+	it("is a no-op when the env var is unset", () => {
+		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const logger = createOllamaDebugLogger({} as NodeJS.ProcessEnv);
+			logger("hello");
+			expect(write).not.toHaveBeenCalled();
+		} finally {
+			write.mockRestore();
+		}
+	});
+
+	it("is a no-op when the env var is a non-truthy value", () => {
+		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const logger = createOllamaDebugLogger({ [OLLAMA_SIGNIN_DEBUG_ENV]: "false" } as NodeJS.ProcessEnv);
+			logger("hello");
+			expect(write).not.toHaveBeenCalled();
+		} finally {
+			write.mockRestore();
+		}
+	});
 });
 
 describe("DefaultOllamaSignInService", () => {
@@ -198,5 +287,17 @@ describe("DefaultOllamaSignInService", () => {
 		const service = new DefaultOllamaSignInService(store, exec);
 		await service.checkSignInStatus({ containerName: "   " });
 		expect(exec).toHaveBeenCalledWith("docker", ["exec", "-it", "settings-ollama", "ollama", "login"], expect.anything());
+	});
+
+	it("forwards the injected debug logger to the check", async () => {
+		const exec = fakeExec(true, "You are already signed in as user 'carol'\n");
+		const store = makeStore();
+		const debug = vi.fn();
+		const service = new DefaultOllamaSignInService(store, exec, debug);
+		await service.checkSignInStatus();
+		expect(debug).toHaveBeenCalledWith(
+			expect.stringContaining("issuing: docker exec -it"),
+		);
+		expect(debug).toHaveBeenCalledWith(expect.stringContaining("result: exit 0"));
 	});
 });
