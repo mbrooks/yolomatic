@@ -7,7 +7,9 @@
  * {@link WorkerGitHubGateway} and awaits the matching `tool_response`.
  *
  * The worker runtime ({@link ../worker/runtime.js}) installs a transport before
- * the agent session starts; the extension simply calls into this singleton.
+ * the agent session starts; the extension calls through the same process-wide
+ * registry even when its TypeScript source and the compiled worker load separate
+ * instances of this module.
  */
 
 export interface GatewayCallResult {
@@ -21,14 +23,27 @@ export interface GatewayTransport {
 	call(request: { tool: string; params: Record<string, unknown> }): Promise<GatewayCallResult>;
 }
 
-let transport: GatewayTransport | undefined;
+const GATEWAY_TRANSPORT_KEY = Symbol.for("yeetomatic.worker.github-gateway-transport");
+
+type GatewayTransportRegistry = typeof globalThis & {
+	[key: symbol]: GatewayTransport | undefined;
+};
+
+function getTransportRegistry(): GatewayTransportRegistry {
+	return globalThis as GatewayTransportRegistry;
+}
 
 /**
  * Install the transport used to reach the control-plane gateway. Called once
  * by the worker runtime after the session WebSocket is established.
  */
 export function setGitHubGatewayTransport(next: GatewayTransport | undefined): void {
-	transport = next;
+	const registry = getTransportRegistry();
+	if (next) {
+		registry[GATEWAY_TRANSPORT_KEY] = next;
+		return;
+	}
+	delete registry[GATEWAY_TRANSPORT_KEY];
 }
 
 /**
@@ -40,6 +55,7 @@ export async function callGitHubGateway(
 	tool: string,
 	params: Record<string, unknown>,
 ): Promise<unknown> {
+	const transport = getTransportRegistry()[GATEWAY_TRANSPORT_KEY];
 	if (!transport) {
 		throw new Error(
 			`GitHub gateway transport is not available; cannot call ${tool} outside a worker session`,

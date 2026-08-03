@@ -24,6 +24,24 @@ describe("github-gateway-client", () => {
 		}
 	});
 
+	it("shares the installed transport across separate module instances", async () => {
+		const transport: GatewayTransport = {
+			call: vi.fn(async () => ({ ok: true, data: { number: 535 } })),
+		};
+		setGitHubGatewayTransport(transport);
+
+		try {
+			vi.resetModules();
+			const isolatedClient = await import("./github-gateway-client.js");
+
+			expect(isolatedClient.setGitHubGatewayTransport).not.toBe(setGitHubGatewayTransport);
+			await expect(isolatedClient.callGitHubGateway("fetch_issue", {})).resolves.toEqual({ number: 535 });
+			expect(transport.call).toHaveBeenCalledWith({ tool: "fetch_issue", params: {} });
+		} finally {
+			setGitHubGatewayTransport(undefined);
+		}
+	});
+
 	it("prefixes scope errors distinctly from generic gateway errors", async () => {
 		const transport: GatewayTransport = {
 			call: vi.fn(async () => ({ ok: false, error: "pr_number 9 is out of scope", scopeError: true })),
