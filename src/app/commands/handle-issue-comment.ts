@@ -52,13 +52,18 @@ export class HandleIssueComment {
 			prReview?: { execute: (payload: import("./handle-pr-review.js").PRReviewPayload) => Promise<void> };
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		},
 	) {
 		this.executor = new ExecuteSession(deps.executor);
 	}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
-		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
 	}
 
 	async execute(payload: CommentEventPayload): Promise<void> {

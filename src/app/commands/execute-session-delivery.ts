@@ -18,11 +18,16 @@ export class ExecuteSessionDelivery {
 			reporter: ExecuteSessionReporter;
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		},
 	) {}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
-		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
 	}
 
 	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {

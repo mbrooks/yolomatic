@@ -57,6 +57,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			issueNewCommentEnabled?: boolean;
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -90,6 +92,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			issueNewCommentEnabled: deps.issueNewCommentEnabled,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
 
 		const execDeps = {
@@ -105,6 +109,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			selfReportEnabled: deps.selfReportEnabled,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		};
 
 		this.handleIssueEventCmd = new HandleIssueEvent({
@@ -122,6 +128,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			inFlight: this.inFlight,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
 
 		this.handlePRReviewCmd = new HandlePRReview({
@@ -148,6 +156,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			prReview: this.handlePRReviewCmd,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
 
 		this.resumeSessionCmd = new ResumeInterruptedSession({
