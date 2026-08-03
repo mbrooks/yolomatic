@@ -122,7 +122,15 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 			},
 		});
 
-		const executor = new PiAgentExecutor({ soulPath: options.soulPath });
+		const executor = new PiAgentExecutor({
+			soulPath: options.soulPath,
+			trustedExtensionPath: path.join(
+				path.dirname(options.soulPath),
+				".pi",
+				"extensions",
+				"github-issues.ts",
+			),
+		});
 
 		ws.on("message", (raw) => {
 			const message = decodeWorkerWebSocketMessage(raw);

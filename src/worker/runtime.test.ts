@@ -162,6 +162,7 @@ vi.mock("../executor/index.js", () => ({
 	})),
 }));
 
+import { PiAgentExecutor } from "../executor/index.js";
 import { runWorkerRuntime } from "./runtime.js";
 import { callGitHubGateway } from "./github-gateway-client.js";
 
@@ -243,6 +244,10 @@ describe("runWorkerRuntime", () => {
 		});
 
 		expect(mockSession.steer).toHaveBeenCalledWith("Please adjust course");
+		expect(PiAgentExecutor).toHaveBeenCalledWith({
+			soulPath: "/tmp/SOUL.md",
+			trustedExtensionPath: "/tmp/.pi/extensions/github-issues.ts",
+		});
 		expect(seenMessages.some((message) => message.type === "event_batch")).toBe(true);
 		expect(seenMessages.some((message) => message.type === "complete")).toBe(true);
 	});

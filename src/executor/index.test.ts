@@ -31,9 +31,9 @@ vi.mock("../logging/session-log-store.js", () => ({
 	recordSessionLog: vi.fn(),
 }));
 
-import { PiAgentExecutor } from "./index.js";
+import { PiAgentExecutor, preferTrustedExtension } from "./index.js";
 
-import { createAgentSession } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { createYeetomaticModelRegistry } from "./model-registry.js";
 
 describe("PiAgentExecutor", () => {
@@ -89,6 +89,64 @@ describe("PiAgentExecutor", () => {
 	it("constructor stores soulPath", () => {
 		const executor = new PiAgentExecutor({ soulPath: "/tmp/SOUL.md" });
 		expect(executor).toBeInstanceOf(PiAgentExecutor);
+	});
+
+	it("prefers a trusted worker extension over stale workspace tools", () => {
+		const extension = (extensionPath: string, resolvedPath: string, toolNames: string[]) => ({
+			path: extensionPath,
+			resolvedPath,
+			tools: new Map(toolNames.map((toolName) => [toolName, {}])),
+		});
+		const trusted = extension(
+			"/app/.pi/extensions/github-issues.ts",
+			"/app/.pi/extensions/github-issues.ts",
+			["github_fetch_issue", "github_fetch_pr"],
+		);
+		const staleWorkspaceCopy = extension(
+			"/app/workspaces/repo/.pi/extensions/github-issues.ts",
+			"/app/workspaces/repo/.pi/extensions/github-issues.ts",
+			["github_fetch_issue", "github_fetch_pr"],
+		);
+		const unrelated = extension("/app/workspaces/repo/.pi/extensions/other.ts", "/other.ts", ["other_tool"]);
+		const base = {
+			extensions: [trusted, staleWorkspaceCopy, unrelated],
+			errors: [
+				{
+					path: staleWorkspaceCopy.path,
+					error: `Tool "github_fetch_issue" conflicts with ${trusted.path}`,
+				},
+				{ path: unrelated.path, error: "unrelated warning" },
+			],
+			runtime: {},
+		} as never;
+
+		const result = preferTrustedExtension(base, trusted.resolvedPath);
+
+		expect(result.extensions).toEqual([trusted, unrelated]);
+		expect(result.errors).toEqual([{ path: unrelated.path, error: "unrelated warning" }]);
+	});
+
+	it("leaves extensions unchanged when the trusted worker extension is unavailable", () => {
+		const base = { extensions: [], errors: [], runtime: {} } as never;
+		expect(preferTrustedExtension(base, "/missing/github-issues.ts")).toBe(base);
+	});
+
+	it("configures the trusted worker extension on the resource loader", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		mockSuccessfulSession();
+		const trustedExtensionPath = "/app/.pi/extensions/github-issues.ts";
+		const executor = new PiAgentExecutor({ soulPath, trustedExtensionPath });
+
+		await executor.execute(makeState());
+
+		const loaderOptions = (DefaultResourceLoader as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
+			additionalExtensionPaths?: string[];
+			extensionsOverride?: (base: never) => unknown;
+		};
+		expect(loaderOptions.additionalExtensionPaths).toEqual([trustedExtensionPath]);
+		const base = { extensions: [], errors: [], runtime: {} } as never;
+		expect(loaderOptions.extensionsOverride?.(base)).toBe(base);
 	});
 
 	it("executes end-to-end with mocked Pi dependencies", async () => {
