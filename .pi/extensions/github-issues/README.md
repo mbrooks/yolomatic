@@ -5,9 +5,10 @@ This extension provides scoped GitHub issue and pull-request management tools fo
 ## How it works
 
 1. The worker runtime (`src/worker/runtime.ts`) opens the per-session WebSocket to the control plane and installs a gateway transport (`src/worker/github-gateway-client.ts`).
-2. The pi extension registers tools that call `callGitHubGateway(tool, params)`.
-3. Each call is sent as a `tool_request` protocol message; the control plane acks receipt, validates the request against the live `SessionState`, performs the GitHub operation through the control plane's `GitHubService` (which holds the token), and replies with a `tool_response` carrying the result.
-4. The worker extension never reads `GITHUB_TOKEN`, never builds an Octokit, and never calls the GitHub API directly.
+2. The worker loads this extension from its trusted runtime image and suppresses stale workspace copies, so an older issue worktree cannot redirect the tools to an outdated gateway client.
+3. The pi extension registers tools that call `callGitHubGateway(tool, params)`.
+4. Each call is sent as a `tool_request` protocol message; the control plane acks receipt, validates the request against the live `SessionState`, performs the GitHub operation through the control plane's `GitHubService` (which holds the token), and replies with a `tool_response` carrying the result.
+5. The worker extension never reads `GITHUB_TOKEN`, never builds an Octokit, and never calls the GitHub API directly.
 
 See `design/protocol-session-messages.md` for the `tool_request` / `tool_response` protocol and `src/worker/github-gateway.ts` for the scoping rules.
 
