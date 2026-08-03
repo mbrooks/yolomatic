@@ -4,8 +4,10 @@ import {
 	createAgentSession,
 	DefaultResourceLoader,
 	getAgentDir,
+	type LoadExtensionsResult,
 	SessionManager as PiSessionManager,
 } from "@earendil-works/pi-coding-agent";
+import path from "node:path";
 import { createYeetomaticModelRegistry } from "./model-registry.js";
 
 import { LlmLogger } from "../logging/llm-logger.js";
@@ -29,10 +31,16 @@ type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverr
 export class PiAgentExecutor implements ExecutionService {
 	private readonly soulPath: string;
 	private readonly modelConfig: ModelConfigProvider;
+	private readonly trustedExtensionPath: string | undefined;
 
-	constructor(options: { soulPath: string; modelConfig?: ModelConfigProvider }) {
+	constructor(options: {
+		soulPath: string;
+		modelConfig?: ModelConfigProvider;
+		trustedExtensionPath?: string;
+	}) {
 		this.soulPath = options.soulPath;
 		this.modelConfig = options.modelConfig;
+		this.trustedExtensionPath = options.trustedExtensionPath;
 	}
 
 	execute(
@@ -114,6 +122,13 @@ export class PiAgentExecutor implements ExecutionService {
 		const loader = new DefaultResourceLoader({
 			cwd: state.workspacePath,
 			agentDir: getAgentDir(),
+			...(this.trustedExtensionPath
+				? {
+					additionalExtensionPaths: [this.trustedExtensionPath],
+					extensionsOverride: (base: LoadExtensionsResult) =>
+						preferTrustedExtension(base, this.trustedExtensionPath!),
+				}
+				: {}),
 			agentsFilesOverride: (current) => ({
 				agentsFiles: [
 					...current.agentsFiles,
@@ -323,4 +338,38 @@ export class PiAgentExecutor implements ExecutionService {
 		}
 		return this.modelConfig;
 	}
+}
+
+export function preferTrustedExtension(
+	base: LoadExtensionsResult,
+	trustedExtensionPath: string,
+): LoadExtensionsResult {
+	const resolvedTrustedPath = path.resolve(trustedExtensionPath);
+	const trustedExtension = base.extensions.find(
+		(extension) => path.resolve(extension.resolvedPath) === resolvedTrustedPath,
+	);
+	if (!trustedExtension) return base;
+
+	const trustedToolNames = new Set(trustedExtension.tools.keys());
+	const removedPaths = new Set<string>();
+	const extensions = base.extensions.filter((extension) => {
+		if (extension === trustedExtension) return true;
+		const conflictsWithTrustedExtension = [...extension.tools.keys()].some((toolName) =>
+			trustedToolNames.has(toolName),
+		);
+		if (conflictsWithTrustedExtension) {
+			removedPaths.add(extension.path);
+			return false;
+		}
+		return true;
+	});
+	const errors = base.errors.filter(
+		(error) =>
+			!removedPaths.has(error.path) ||
+			![...trustedToolNames].some((toolName) =>
+				error.error.startsWith(`Tool "${toolName}" conflicts with `),
+			),
+	);
+
+	return { ...base, extensions, errors };
 }
