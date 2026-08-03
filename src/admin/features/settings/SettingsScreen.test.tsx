@@ -164,6 +164,39 @@ const MOCK_SETTINGS = [
 		category: "issues",
 	},
 	{
+		key: "pi_agent_model",
+		value: "kimi-k2.7-code:cloud",
+		description: "LLM model identifier",
+		type: "string",
+		default: undefined,
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
+		key: "pi_agent_provider",
+		value: "ollama",
+		description: "LLM provider used by worker containers.",
+		type: "string",
+		default: "ollama",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
+		key: "ollama_container_name",
+		value: "yeetomatic-ollama",
+		description: "Name of the Ollama Docker container.",
+		type: "string",
+		default: "yeetomatic-ollama",
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
 		key: "admin_base_url",
 		value: "http://host:6767/yeetomatic/admin",
 		description: "Absolute public base URL of the admin UI.",
@@ -197,6 +230,25 @@ function mockFetchWithSave(response: { updated: string[]; requiresRestart: strin
 		}
 		return Promise.reject(new Error(`Unexpected fetch: ${url}`));
 	});
+}
+
+function mockSettingsAndOllama(ollamaStatus: unknown) {
+	return vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+		const url = typeof input === "string" ? input : input.url;
+		if (url === "/api/settings") {
+			return Promise.resolve(jsonResponse({ settings: MOCK_SETTINGS }));
+		}
+		if (url === "/api/ollama/signin") {
+			return Promise.resolve(jsonResponse(ollamaStatus));
+		}
+		return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+	});
+}
+
+function aiLlmSettingsWithProvider(provider: string) {
+	return MOCK_SETTINGS.map((setting) =>
+		setting.key === "pi_agent_provider" ? { ...setting, value: provider } : setting,
+	);
 }
 
 describe("SettingsScreen", () => {
@@ -524,5 +576,88 @@ describe("SettingsScreen", () => {
 		const baseBlock = css.match(/\.repo-tab\s*\{[^}]*\}/u);
 		expect(baseBlock, "expected a base .repo-tab rule to exist").not.toBeNull();
 		expect(baseBlock![0]).toContain("background: var(--surface)");
+	});
+
+	it("renders pi_agent_provider as a dropdown whose only option is ollama", async () => {
+		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "ok" });
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const provider = await screen.findByRole("combobox", { name: /pi_agent_provider/ }) as HTMLSelectElement;
+		expect(provider.tagName).toBe("SELECT");
+		expect(Array.from(provider.options, (option) => option.value)).toEqual(["ollama"]);
+	});
+
+	it("does not render the Ollama status panel when the provider is not ollama", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: aiLlmSettingsWithProvider("other") }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByRole("combobox", { name: /pi_agent_provider/ })).not.toBeNull();
+		});
+		expect(screen.queryByText("Ollama sign-in status")).toBeNull();
+		expect(globalThis.fetch).not.toHaveBeenCalledWith("/api/ollama/signin", expect.anything());
+	});
+
+	it("renders the Ollama status panel for a signed-in account", async () => {
+		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "You are already signed in as user 'alice'" });
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByText(/Signed in as/)).not.toBeNull();
+		});
+		expect(screen.getByText("alice")).not.toBeNull();
+	});
+
+	it("renders the connect URL and CLI command when not signed in", async () => {
+		mockSettingsAndOllama({
+			signedIn: false,
+			signInUrl: "https://ollama.com/connect?name=x&key=y",
+			message: "You need to be signed in to Ollama to run Cloud models.",
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const link = await screen.findByText("https://ollama.com/connect?name=x&key=y");
+		expect(link.tagName).toBe("A");
+		expect(link.getAttribute("target")).toBe("_blank");
+		expect(screen.getByText("Not signed in.")).not.toBeNull();
+		expect(screen.getByText(/docker exec -it yeetomatic-ollama ollama login/)).not.toBeNull();
+	});
+
+	it("renders an error with a retry control when the Ollama container cannot be reached", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: MOCK_SETTINGS }));
+			}
+			if (url === "/api/ollama/signin") {
+				return Promise.resolve(jsonResponse({
+					signedIn: false,
+					error: "No such container: yeetomatic-ollama",
+					message: "Ollama container \"yeetomatic-ollama\" was not found.",
+				}));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByText(/Could not reach the Ollama container/)).not.toBeNull();
+		});
+		expect(screen.getByRole("button", { name: /Re-check status/ })).not.toBeNull();
+
+		const recheck = screen.getByRole("button", { name: /Re-check status/ });
+		fireEvent.click(recheck);
+		await waitFor(() => {
+			expect(fetchSpy.mock.calls.filter(([input]) => {
+				const url = typeof input === "string" ? input : input.url;
+				return url === "/api/ollama/signin";
+			}).length).toBeGreaterThanOrEqual(2);
+		});
 	});
 });

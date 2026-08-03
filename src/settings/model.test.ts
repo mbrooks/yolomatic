@@ -142,5 +142,27 @@ describe("settings/model", () => {
       expect(getSettingDefinition("github_event_mode")?.default).toBe("webhook");
       expect(getSettingDefinition("github_poll_interval_ms")?.default).toBe("60000");
     });
+
+    it("defaults pi_agent_provider to ollama and keeps it in the ai-llm category", () => {
+      const provider = getSettingDefinition("pi_agent_provider");
+      expect(provider).toBeDefined();
+      expect(provider?.default).toBe("ollama");
+      expect(provider?.envVar).toBe("PI_AGENT_PROVIDER");
+      expect(provider?.category).toBe("ai-llm");
+    });
+
+    it("exposes a configurable ollama_container_name setting defaulting to yeetomatic-ollama", () => {
+      const container = getSettingDefinition("ollama_container_name");
+      expect(container).toBeDefined();
+      expect(container?.default).toBe("yeetomatic-ollama");
+      expect(container?.envVar).toBe("OLLAMA_CONTAINER_NAME");
+      expect(container?.category).toBe("ai-llm");
+      expect(container?.type).toBe("string");
+    });
+
+    it("coerces the ollama container name env value", () => {
+      expect(coerceEnvValue("ollama_container_name", "  my-ollama  ")).toBe("my-ollama");
+      expect(coerceEnvValue("ollama_container_name", "  ")).toBeUndefined();
+    });
   });
 });
