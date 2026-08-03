@@ -93,6 +93,18 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		resolveRepoDefaultBranch(findManaged(owner, repo), config.defaultBranch);
 	const resolveGitHubEventMode = (owner: string, repo: string) =>
 		resolveRepoGitHubEventMode(findManaged(owner, repo), config.githubEventMode);
+	// Admin-link settings advertise requiresRestart: false, so read them live
+	// from the SettingsStore at comment-post time instead of snapshotting the
+	// bootstrap-time config value. This lets operators toggle
+	// issue_admin_link_in_comments_enabled / admin_base_url in the admin UI
+	// and see the Track status footer update on subsequently posted comments
+	// without restarting the process.
+	const resolveAdminBaseUrl = () => {
+		const raw = settingsStore.get("admin_base_url")?.trim();
+		return raw || undefined;
+	};
+	const resolveIssueAdminLinkInCommentsEnabled = () =>
+		settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true);
 
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
 	const workspaceManager = new WorkspaceManager({
@@ -139,6 +151,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		issueNewCommentEnabled: config.issueNewCommentEnabled,
 		issueAdminLinkInCommentsEnabled: config.issueAdminLinkInCommentsEnabled,
 		adminBaseUrl: config.adminBaseUrl,
+		resolveAdminBaseUrl,
+		resolveIssueAdminLinkInCommentsEnabled,
 	});
 
 	const staleDetector = new StaleSessionDetector(

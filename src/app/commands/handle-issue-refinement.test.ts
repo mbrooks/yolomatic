@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { HandleIssueRefinement, buildNewIssueComment, ISSUE_REFINEMENT_STARTING_COMMENT } from "./handle-issue-refinement.js";
 import { RefinementStore } from "../../refinement/store.js";
+import { SettingsStore } from "../../settings/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 import type { SessionState } from "../../session/store.js";
@@ -121,6 +122,59 @@ describe("HandleIssueRefinement", () => {
 			buildNewIssueComment("yeetomatic-bot", expectedUrl),
 		);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain(`Track status: ${expectedUrl}`);
+	});
+
+	it("re-reads admin link settings from the resolver at each comment without reconstructing the handler", async () => {
+		const settingsStore = new SettingsStore(path.join(tmpDir, "bot-state.sqlite"));
+		settingsStore.set("admin_base_url", "http://host:6767/old/admin");
+		settingsStore.set("issue_admin_link_in_comments_enabled", "true");
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			resolveAdminBaseUrl: () => {
+				const raw = settingsStore.get("admin_base_url")?.trim();
+				return raw || undefined;
+			},
+			resolveIssueAdminLinkInCommentsEnabled: () =>
+				settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true),
+		});
+
+		await handler.postInstructions(createInstructionPayload({ issue: { number: 10, user: { login: "human" } } }) as never);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain(
+			"Track status: http://host:6767/old/admin#/repos/mbrooks/yeetomatic/issues/10",
+		);
+
+		// Change admin_base_url in the SettingsStore without reconstructing the handler.
+		settingsStore.set("admin_base_url", "http://host:6767/new/admin");
+		await handler.postInstructions(createInstructionPayload({ issue: { number: 11, user: { login: "human" } } }) as never);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[1][3]).toContain(
+			"Track status: http://host:6767/new/admin#/repos/mbrooks/yeetomatic/issues/11",
+		);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[1][3]).not.toContain(
+			"http://host:6767/old/admin",
+		);
+
+		// Toggling the feature flag off removes the footer on subsequent comments.
+		settingsStore.set("issue_admin_link_in_comments_enabled", "false");
+		await handler.postInstructions(createInstructionPayload({ issue: { number: 12, user: { login: "human" } } }) as never);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[2][3]).not.toContain("Track status:");
+
+		// Toggling it back on restores the footer, still reading the live base URL.
+		settingsStore.set("issue_admin_link_in_comments_enabled", "true");
+		await handler.postInstructions(createInstructionPayload({ issue: { number: 13, user: { login: "human" } } }) as never);
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[3][3]).toContain(
+			"Track status: http://host:6767/new/admin#/repos/mbrooks/yeetomatic/issues/13",
+		);
 	});
 
 	it("interpolates the configured Yeetomatic username in the new-issue comment", async () => {

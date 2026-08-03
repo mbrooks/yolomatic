@@ -260,6 +260,35 @@ describe("buildRuntimeGraph", () => {
 		expect(handlerDeps.resolveGitHubEventMode("mbrooks", "yeetomatic")).toBe("polling");
 		expect(handlerDeps.resolveGitHubEventMode("other", "repo")).toBe("webhook");
 	});
+
+	it("passes admin-link resolvers that read live from the SettingsStore", () => {
+		const deps = makeDeps();
+		const settingsValues: Record<string, string> = {
+			admin_base_url: "http://host:6767/old/admin",
+			issue_admin_link_in_comments_enabled: "true",
+		};
+		(deps.settingsStore as { get: (k: string) => string | undefined }).get = vi.fn((k: string) => settingsValues[k]);
+		(deps.settingsStore as { getBoolean: (k: string, d?: boolean) => boolean }).getBoolean = vi.fn(
+			(k: string, d?: boolean) => (settingsValues[k] === undefined ? (d ?? false) : settingsValues[k] === "true"),
+		);
+		buildRuntimeGraph(baseConfig, deps);
+		const handlerDeps = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
+			resolveAdminBaseUrl: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled: () => boolean | undefined;
+		};
+		expect(handlerDeps.resolveAdminBaseUrl()).toBe("http://host:6767/old/admin");
+		expect(handlerDeps.resolveIssueAdminLinkInCommentsEnabled()).toBe(true);
+
+		// Operator changes the settings in the admin UI without a restart.
+		settingsValues.admin_base_url = "http://host:6767/new/admin";
+		settingsValues.issue_admin_link_in_comments_enabled = "false";
+		expect(handlerDeps.resolveAdminBaseUrl()).toBe("http://host:6767/new/admin");
+		expect(handlerDeps.resolveIssueAdminLinkInCommentsEnabled()).toBe(false);
+
+		// Empty/whitespace base URL resolves to undefined (link omitted).
+		settingsValues.admin_base_url = "   ";
+		expect(handlerDeps.resolveAdminBaseUrl()).toBeUndefined();
+	});
 });
 
 describe("startRuntime", () => {

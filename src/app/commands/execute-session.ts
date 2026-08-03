@@ -29,6 +29,8 @@ export interface ExecuteSessionDeps {
 	selfReportEnabled: boolean;
 	issueAdminLinkInCommentsEnabled?: boolean;
 	adminBaseUrl?: string;
+	resolveAdminBaseUrl?: () => string | undefined;
+	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 }
 
 export class ExecuteSession {
@@ -43,6 +45,8 @@ export class ExecuteSession {
 			selfReportEnabled: deps.selfReportEnabled,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
 		this.delivery = new ExecuteSessionDelivery({
 			sessions: deps.sessions,
@@ -53,6 +57,8 @@ export class ExecuteSession {
 			reporter: this.reporter,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
 	}
 
@@ -332,7 +338,10 @@ export class ExecuteSession {
 	}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
-		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
 	}
 
 	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
