@@ -33,6 +33,8 @@ Read the live session issue: `title`, `body`, `state`, `labels`, `assignees`, an
 
 - `include_comments` (optional, default `true`): include issue comments (author, body, timestamps, `html_url`).
 
+The tool renders the issue body, state, labels, assignees, and comments into the model-visible text content (not just the title), so the agent can actually read the issue description. The full structured payload is also attached to the tool result `details` for logs/UI.
+
 ### `github_set_comment`
 
 Add a comment to the live session issue.
@@ -64,6 +66,8 @@ Read the PR associated with the session (metadata + issue-style comments).
 
 - `pr_number` (optional): an in-scope PR number; defaults to the session's linked PR (or the open PR on the session branch).
 - `include_comments` (optional, default `true`).
+
+The tool renders the PR body, branch, state, and comments into the model-visible text content (not just the title). The full structured payload is also attached to the tool result `details` for logs/UI.
 
 ### `github_set_pr_comment`
 
