@@ -90,6 +90,8 @@ export class HandleIssueRefinement {
 			issueNewCommentEnabled?: boolean;
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		},
 	) {}
 
@@ -117,14 +119,7 @@ export class HandleIssueRefinement {
 		}
 
 		process.stdout.write(`[refinement] posting instructions for ${owner}/${repo}#${issueNumber}\n`);
-		const adminIssueUrl = resolveAdminIssueUrl(
-			this.deps.adminBaseUrl,
-			this.deps.issueAdminLinkInCommentsEnabled,
-			owner,
-			repo,
-			issueNumber,
-		);
-		const comment = buildNewIssueComment(this.deps.githubUsername, adminIssueUrl);
+		const comment = buildNewIssueComment(this.deps.githubUsername, this.adminIssueUrl(owner, repo, issueNumber));
 		const commentId = await this.deps.github.postComment(owner, repo, issueNumber, comment);
 		this.deps.refinementStore.recordInstructionComment(owner, repo, issueNumber, commentId);
 		this.log(owner, repo, issueNumber, "info", "Posted issue-refinement instructions");
@@ -419,11 +414,15 @@ export class HandleIssueRefinement {
 		recordSessionLog(issueSessionKey(owner, repo, issueNumber), { level, message, details });
 	}
 
+	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
 	private withAdminLink(owner: string, repo: string, issueNumber: number, body: string): string {
-		return appendAdminLink(
-			body,
-			resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber),
-		);
+		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
 
 	private isEligibleForInstructions(payload: IssueRefinementInstructionPayload): boolean {

@@ -27,6 +27,8 @@ export class ExecuteSessionReporter {
 			selfReportEnabled: boolean;
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		},
 	) {}
 
@@ -406,7 +408,10 @@ export class ExecuteSessionReporter {
 	}
 
 	private adminUrl(owner: string, repo: string, issueNumber: number): string | undefined {
-		return resolveAdminIssueUrl(this.deps.adminBaseUrl, this.deps.issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
 	}
 
 	private async postComment(
