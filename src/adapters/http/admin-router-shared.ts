@@ -48,6 +48,7 @@ const missingDependencyErrors = {
 	startIssueSession: "Session executor not configured",
 	repositoryStore: "Repository store not configured",
 	refinementStore: "Refinement store not configured",
+	ollamaSignInService: "Ollama sign-in service not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
 
 export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
@@ -178,6 +179,7 @@ export interface AdminRouterDeps {
 	onOnboardingComplete?: () => void | Promise<void>;
 	adminPath?: string;
 	adminDefaultPage?: string;
+	ollamaSignInService?: import("../../ollama/signin-status.js").OllamaSignInService;
 }
 
 export function resolveAdminPath(deps: AdminRouterDeps): string {

@@ -22,6 +22,7 @@ import type { RepositoryStore } from "../repos/repository-store.js";
 import type { RefinementStore } from "../refinement/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
+import { DefaultOllamaSignInService } from "../ollama/signin-status.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -100,5 +101,6 @@ export function createWebhookServerDeps(
 		cleanupCommand: new CleanupOldSessions(sessionRepo, workspaceService),
 		adminPath,
 		adminDefaultPage,
+		ollamaSignInService: settingsStore ? new DefaultOllamaSignInService(settingsStore) : undefined,
 	};
 }
