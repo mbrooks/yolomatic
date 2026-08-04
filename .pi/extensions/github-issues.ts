@@ -32,6 +32,13 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { callGitHubGateway } from "../../src/worker/github-gateway-client.js";
+import {
+	formatIssue,
+	formatPullRequest,
+	type FetchedComment,
+	type FetchedIssue,
+	type FetchedPullRequest,
+} from "../../src/worker/github-issues-format.js";
 
 
 function ok(text: string, details: Record<string, unknown>): AgentToolResult<unknown> {
@@ -79,8 +86,8 @@ export default function githubIssuesExtension(pi: ExtensionAPI) {
 			try {
 				const result = (await callGitHubGateway("fetch_issue", {
 					include_comments: params.include_comments ?? true,
-				})) as { issue: { number: number; title: string }; comments: unknown };
-				return ok(`Fetched issue #${result.issue.number}: ${result.issue.title}`, {
+				})) as { issue: FetchedIssue; comments: FetchedComment[] };
+				return ok(formatIssue(result.issue, result.comments ?? []), {
 					issue: result.issue,
 					comments: result.comments,
 					success: true,
@@ -200,8 +207,8 @@ export default function githubIssuesExtension(pi: ExtensionAPI) {
 				const result = (await callGitHubGateway("fetch_pr", {
 					...(params.pr_number !== undefined ? { pr_number: params.pr_number } : {}),
 					include_comments: params.include_comments ?? true,
-				})) as { pr: { number: number; title: string }; comments: unknown };
-				return ok(`Fetched PR #${result.pr.number}: ${result.pr.title}`, {
+				})) as { pr: FetchedPullRequest; comments: FetchedComment[] };
+				return ok(formatPullRequest(result.pr, result.comments ?? []), {
 					pr: result.pr,
 					comments: result.comments,
 					success: true,
