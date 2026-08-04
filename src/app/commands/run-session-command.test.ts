@@ -252,7 +252,7 @@ describe("RunSessionCommand", () => {
 		const result = await command.execute("mbrooks", "yeetomatic", 1, "delete");
 		expect(result.success).toBe(true);
 		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
-		expect(repo.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(repo.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "implementation");
 	});
 
 	it("rejects deleting a working session", async () => {

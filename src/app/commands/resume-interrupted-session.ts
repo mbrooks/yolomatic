@@ -19,23 +19,9 @@ export class ResumeInterruptedSession {
 
 	async execute(owner: string, repo: string, issueNumber: number): Promise<void> {
 		const key = issueSessionKey(owner, repo, issueNumber);
-		const session = await this.deps.sessions.get(owner, repo, issueNumber);
+		const session = await this.deps.sessions.get(owner, repo, issueNumber, "implementation");
 		if (!session) {
 			process.stdout.write(`[resume] no session for ${key}\n`);
-			return;
-		}
-
-		if (session.kind === "refinement") {
-			if (!isTerminalStatus(session.status)) {
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", {
-					summary: "interrupted by restart",
-					staleReason: "interrupted by restart",
-					resumeOnBoot: undefined,
-					queuedComments: undefined,
-					taskFinishedAt: new Date().toISOString(),
-				});
-			}
-			process.stdout.write(`[resume] refinement session ${key} is not resumable, skipping\n`);
 			return;
 		}
 
@@ -74,7 +60,7 @@ export class ResumeInterruptedSession {
 				await this.executor.run(session, queuedComment);
 			}
 		} finally {
-			const latest = await this.deps.sessions.get(owner, repo, issueNumber);
+			const latest = await this.deps.sessions.get(owner, repo, issueNumber, "implementation");
 			if (latest && (latest.resumeOnBoot || latest.queuedComments)) {
 				latest.resumeOnBoot = undefined;
 				latest.queuedComments = undefined;

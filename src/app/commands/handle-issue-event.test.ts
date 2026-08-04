@@ -155,6 +155,29 @@ describe("HandleIssueEvent", () => {
 		expect(handler.isInFlight("mbrooks", "yeetomatic", 2)).toBe(false);
 	});
 
+	it("reports refinement work as in flight", () => {
+		const deps = createDeps();
+		const refinement = { isInFlight: vi.fn(() => true), postInstructions: vi.fn() };
+		const handler = new HandleIssueEvent({ ...(deps as any), refinement });
+
+		expect(handler.isInFlight("mbrooks", "yeetomatic", 1)).toBe(true);
+		expect(refinement.isInFlight).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+	});
+
+	it("posts refinement instructions for newly opened issues", async () => {
+		const deps = createDeps();
+		const refinement = { isInFlight: vi.fn(() => false), postInstructions: vi.fn(async () => undefined) };
+		const handler = new HandleIssueEvent({ ...(deps as any), refinement });
+		const payload = createPayload({
+			issue: { ...createPayload().issue, assignee: null, assignees: [] },
+		});
+
+		await handler.execute(payload);
+
+		expect(refinement.postInstructions).toHaveBeenCalledWith(payload);
+		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
+	});
+
 	it("ignores unassigned events when Yeetomatic is still assigned", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
@@ -188,6 +211,19 @@ describe("HandleIssueEvent", () => {
 		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Yeetomatic unassigned. Pausing work.");
 	});
 
+	it("pauses waiting-feedback sessions when Yeetomatic is unassigned", async () => {
+		const deps = createDeps();
+		deps.sessions.get = vi.fn(async () => ({ status: "waiting-feedback" }) as any);
+		const handler = new HandleIssueEvent(deps as any);
+
+		await handler.execute(createPayload({
+			action: "unassigned",
+			issue: { ...createPayload().issue, assignee: null, assignees: [] },
+		}));
+
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending");
+	});
+
 	it("steers active execution on edited events", async () => {
 		const deps = createDeps();
 		deps.sessions.get = vi.fn(async () => ({ status: "working" } as any));
@@ -200,6 +236,23 @@ describe("HandleIssueEvent", () => {
 
 		expect(deps.tasks.steer).toHaveBeenCalled();
 		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Issue description updated. Steering to Yeetomatic.");
+	});
+
+	it("reports when an edited issue cannot be steered", async () => {
+		const deps = createDeps();
+		deps.sessions.get = vi.fn(async () => ({ status: "working" }) as any);
+		deps.tasks.isActive = vi.fn(() => true);
+		deps.tasks.steer = vi.fn(async () => false);
+		const handler = new HandleIssueEvent(deps as any);
+
+		await handler.execute(createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] } }));
+
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			"Issue description updated but could not be steered.",
+		);
 	});
 
 	it("ignores edited events when not a Yeetomatic issue and no session", async () => {
@@ -288,6 +341,7 @@ describe("HandleIssueEvent", () => {
 		const deps = createDeps();
 		(deps.sessions.get as any)
 			.mockResolvedValueOnce(null)
+			.mockResolvedValueOnce(null)
 			.mockResolvedValue({
 				owner: "mbrooks",
 				repo: "yeetomatic",
@@ -311,6 +365,7 @@ describe("HandleIssueEvent", () => {
 			"Test issue",
 			"Issue body",
 			"/tmp/worktree",
+			"implementation",
 			[],
 		);
 	});
@@ -350,7 +405,7 @@ describe("HandleIssueEvent", () => {
 			1,
 			"Deploy in progress. Task will resume after restart.",
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending", { resumeOnBoot: true });
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending", { resumeOnBoot: true }, "implementation");
 	});
 
 	it("auto-starts execution for accepted issues", async () => {
@@ -358,7 +413,7 @@ describe("HandleIssueEvent", () => {
 		let getCallCount = 0;
 		deps.sessions.get = vi.fn(async () => {
 			getCallCount++;
-			if (getCallCount === 1) return null;
+			if (getCallCount <= 2) return null;
 			return {
 				owner: "mbrooks",
 				repo: "yeetomatic",
@@ -396,6 +451,7 @@ describe("HandleIssueEvent", () => {
 		const initializeEmptyRepo = vi.fn(async () => {});
 		const deps = createDeps({ createOrGetWorktree, initializeEmptyRepo });
 		(deps.sessions.get as any)
+			.mockResolvedValueOnce(null)
 			.mockResolvedValueOnce(null)
 			.mockResolvedValue({
 				owner: "mbrooks",

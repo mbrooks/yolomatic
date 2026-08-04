@@ -8,6 +8,7 @@ import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
+		kind: "implementation",
 		owner: "mbrooks",
 		repo: "yeetomatic",
 		issueNumber: 1,
@@ -25,6 +26,9 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		staleDetectedAt: null,
 		staleReason: null,
 		stale: null,
+		taskStartedAt: null,
+		taskFinishedAt: null,
+		totalExecutionTimeMs: null,
 		...overrides,
 	};
 }
@@ -77,6 +81,19 @@ describe("DashboardScreen", () => {
 		expect(within(recentActivity as HTMLElement).getByText("#1")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("mbrooks/case")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("#2")).not.toBeNull();
+	});
+
+	it("renders implementation and refinement rows for the same issue", () => {
+		const sessions = [
+			makeSession({ kind: "implementation", issueNumber: 534 }),
+			makeSession({ kind: "refinement", issueNumber: 534 }),
+		];
+		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
+
+		expect(document.querySelectorAll(".activity-row")).toHaveLength(2);
+		expect(document.querySelectorAll(".activity-issue")[1].textContent).toBe("#534");
+		expect(document.querySelector(".type-badge.implementation")?.textContent).toBe("Issue");
+		expect(document.querySelector(".type-badge.refinement")?.textContent).toBe("Refinement");
 	});
 
 	it("calls onSelectSession when a row is clicked", () => {

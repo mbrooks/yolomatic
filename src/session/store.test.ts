@@ -119,9 +119,31 @@ describe("SessionStore (SQLite-backed)", () => {
 
 	it("computes correct paths", () => {
 		const store = new SessionStore(dbPath, "/tmp/sessions");
-		expect(store.getSessionKey("mbrooks", "yeetomatic", 1)).toBe("github-mbrooks-yeetomatic-issue-1");
+		expect(store.getSessionKey("mbrooks", "yeetomatic", 1)).toBe("github-mbrooks-yeetomatic-issue-1-implementation");
+		expect(store.getSessionKey("mbrooks", "yeetomatic", 1, "refinement")).toBe("github-mbrooks-yeetomatic-issue-1-refinement");
 		expect(store.getSessionPath("mbrooks", "yeetomatic", 1)).toBe("/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl");
+		expect(store.getSessionPath("mbrooks", "yeetomatic", 1, "refinement")).toBe("/tmp/sessions/github-mbrooks-yeetomatic/issue-1-refinement.jsonl");
 		expect(store.getStatePath("mbrooks", "yeetomatic", 1)).toBe("/tmp/sessions/github-mbrooks-yeetomatic/issue-1.state.json");
+	});
+
+	it("stores implementation and refinement rows independently for one issue", async () => {
+		const store = new SessionStore(dbPath, dir);
+		const base = {
+			issueNumber: 7,
+			repo: "yeetomatic",
+			owner: "mbrooks",
+			body: "Body",
+			status: "pending" as const,
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+		await store.set({ ...base, kind: "implementation", title: "Implementation", sessionPath: "/tmp/implementation.jsonl" });
+		await store.set({ ...base, kind: "refinement", title: "Refinement", sessionPath: "/tmp/refinement.jsonl" });
+
+		expect(await store.get("mbrooks", "yeetomatic", 7, "implementation")).toMatchObject({ title: "Implementation" });
+		expect(await store.get("mbrooks", "yeetomatic", 7, "refinement")).toMatchObject({ title: "Refinement" });
+		expect(await store.getAll()).toHaveLength(2);
 	});
 
 	it("getAll returns all active sessions", async () => {

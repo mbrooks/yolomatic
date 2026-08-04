@@ -70,11 +70,11 @@ describe("handleRefinementRoutes", () => {
 		const res = response();
 		const deps = makeDeps({ refinementStore: undefined, getRefinementLog: undefined, listRefinementAttempts: undefined });
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/log", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/log", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/log"),
-			"/api/refinements/mbrooks/yeetomatic/1/log",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/log"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/log",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -85,11 +85,11 @@ describe("handleRefinementRoutes", () => {
 		const res = response();
 		const deps = makeDeps({ refinementStore: undefined, getRefinementLog: undefined, listRefinementAttempts: undefined });
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/attempts", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/attempts", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/attempts"),
-			"/api/refinements/mbrooks/yeetomatic/1/attempts",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/attempts"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/attempts",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
@@ -109,11 +109,11 @@ describe("handleRefinementRoutes", () => {
 			} as unknown as AdminRouterDeps["getRefinementLog"],
 		});
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/log?since=2026-08-01T00:00:00.000Z", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/log?since=2026-08-01T00:00:00.000Z", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/log?since=2026-08-01T00:00:00.000Z"),
-			"/api/refinements/mbrooks/yeetomatic/1/log",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/log?since=2026-08-01T00:00:00.000Z"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/log",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
@@ -129,11 +129,11 @@ describe("handleRefinementRoutes", () => {
 			} as unknown as AdminRouterDeps["getRefinementLog"],
 		});
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/log", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/log", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/log"),
-			"/api/refinements/mbrooks/yeetomatic/1/log",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/log"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/log",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(404);
@@ -150,11 +150,11 @@ describe("handleRefinementRoutes", () => {
 			} as unknown as AdminRouterDeps["listRefinementAttempts"],
 		});
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/attempts", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/attempts", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/attempts"),
-			"/api/refinements/mbrooks/yeetomatic/1/attempts",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/attempts"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/attempts",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
@@ -170,11 +170,11 @@ describe("handleRefinementRoutes", () => {
 			} as unknown as AdminRouterDeps["listRefinementAttempts"],
 		});
 		const handled = await handleRefinementRoutes(
-			request("/api/refinements/mbrooks/yeetomatic/1/attempts", "GET"),
+			request("/api/refinements/mbrooks/yeetomatic/1/refinement/attempts", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/attempts"),
-			"/api/refinements/mbrooks/yeetomatic/1/attempts",
+			new URL("http://localhost/api/refinements/mbrooks/yeetomatic/1/refinement/attempts"),
+			"/api/refinements/mbrooks/yeetomatic/1/refinement/attempts",
 		);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);

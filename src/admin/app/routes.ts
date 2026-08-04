@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import type { Session } from "./types.js";
+
+type SessionKind = Session["kind"];
 
 export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "server", label: "Server" },
@@ -19,8 +22,8 @@ export const DEFAULT_SETTINGS_TAB: SettingsCategoryTab = SETTINGS_CATEGORY_TABS[
 export type Route =
 	| { screen: "dashboard" }
 	| { screen: "repos" }
-	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; tab?: "sessions" | "skills" | "issues" | "settings" }
-	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number }
+	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; kind?: SessionKind; tab?: "sessions" | "skills" | "issues" | "settings" }
+	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number; kind?: SessionKind }
 	| { screen: "new-issue"; owner?: string; repo?: string }
 	| { screen: "settings"; tab?: "skills" | "invitations" | SettingsCategoryTab };
 
@@ -50,6 +53,7 @@ export function parseHash(hash: string): Route {
 			const owner = decodeURIComponent(path[1]);
 			const repo = decodeURIComponent(path[2]);
 			let issueNumber: number | undefined;
+			let kind: SessionKind | undefined;
 			let tab: "sessions" | "skills" | "issues" | "settings" = "sessions";
 			if (path[3]) {
 				if (path[3] === "skills" || path[3] === "issues" || path[3] === "sessions" || path[3] === "settings") {
@@ -60,14 +64,16 @@ export function parseHash(hash: string): Route {
 							issueNumber = num;
 						}
 					}
+					if (path[5] === "implementation" || path[5] === "refinement") kind = path[5];
 				} else {
 					issueNumber = Number.parseInt(path[3], 10);
 					if (Number.isNaN(issueNumber)) {
 						issueNumber = undefined;
 					}
+					if (path[4] === "implementation" || path[4] === "refinement") kind = path[4];
 				}
 			}
-			return { screen: "repo", owner, repo, issueNumber, tab };
+			return { screen: "repo", owner, repo, issueNumber, kind, tab };
 		}
 		return { screen: "repos" };
 	}
@@ -75,7 +81,8 @@ export function parseHash(hash: string): Route {
 		const owner = path[1] ? decodeURIComponent(path[1]) : undefined;
 		const repo = path[2] ? decodeURIComponent(path[2]) : undefined;
 		const issueNumber = path[3] ? Number.parseInt(path[3], 10) : undefined;
-		return { screen: "working", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber };
+		const kind = path[4] === "implementation" || path[4] === "refinement" ? path[4] : undefined;
+		return { screen: "working", owner, repo, issueNumber: Number.isNaN(issueNumber) ? undefined : issueNumber, kind };
 	}
 	return { screen: "dashboard" };
 }
@@ -101,14 +108,14 @@ export function buildHash(route: Route): string {
 		const base = `#/repos/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
 		const tab = route.tab === "skills" ? "/skills" : route.tab === "issues" ? "/issues" : route.tab === "settings" ? "/settings" : "";
 		if (route.issueNumber !== undefined) {
-			return `${base}${tab}/${route.issueNumber}`;
+			return `${base}${tab}/${route.issueNumber}/${route.kind ?? "implementation"}`;
 		}
 		return `${base}${tab}`;
 	}
 	if (route.screen === "working") {
 		const base = "#/working";
 		if (route.owner && route.repo && route.issueNumber !== undefined) {
-			return `${base}/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}/${route.issueNumber}`;
+			return `${base}/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}/${route.issueNumber}/${route.kind ?? "implementation"}`;
 		}
 		return base;
 	}

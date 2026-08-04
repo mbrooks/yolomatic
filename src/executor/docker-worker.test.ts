@@ -55,8 +55,8 @@ describe("DockerWorkerExecutor", () => {
 			expect(args).toContain("run");
 			expect(args).toContain("--mount");
 			expect(args).not.toContain("GITHUB_TOKEN");
-			expect(options.env.YEETOMATIC_SESSION_KEY).toBe("mbrooks/yeetomatic#418");
-			expect(options.env.YEETOMATIC_SESSION_WS_URL).toContain("sessionKey=mbrooks%2Fyeetomatic%23418");
+			expect(options.env.YEETOMATIC_SESSION_KEY).toBe("github-mbrooks-yeetomatic-issue-418-implementation");
+			expect(options.env.YEETOMATIC_SESSION_WS_URL).toContain("sessionKey=github-mbrooks-yeetomatic-issue-418-implementation");
 
 			void connectMockWorker(
 				harness.workerRpcServer,
@@ -66,12 +66,12 @@ describe("DockerWorkerExecutor", () => {
 					const launch = message as WorkerProtocolMessage<"launch_config">;
 					expect(launch.payload.session.workspacePath).toBe(harness.workspacePath);
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#418", "ack-1", {
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-418-implementation", "ack-1", {
 							ackMessageId: launch.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("event_batch", "mbrooks/yeetomatic#418", "events-1", {
+						createWorkerMessage("event_batch", "github-mbrooks-yeetomatic-issue-418-implementation", "events-1", {
 							events: [
 								{
 									type: "session_log",
@@ -86,7 +86,7 @@ describe("DockerWorkerExecutor", () => {
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#418", "complete-1", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-418-implementation", "complete-1", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -116,11 +116,11 @@ describe("DockerWorkerExecutor", () => {
 
 			expect(result.status).toBe("complete");
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/yeetomatic#418",
+				"github-mbrooks-yeetomatic-issue-418-implementation",
 				expect.objectContaining({ message: "Launching worker container yeetomatic-session-mbrooks-yeetomatic-418" }),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/yeetomatic#418",
+				"github-mbrooks-yeetomatic-issue-418-implementation",
 				expect.objectContaining({ message: "Prompt sent" }),
 			);
 		} finally {
@@ -140,12 +140,12 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#419", "ack-build", {
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-419-implementation", "ack-build", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#419", "complete-build", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-419-implementation", "complete-build", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -205,12 +205,12 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#424", "ack-rebuild", {
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-424-implementation", "ack-rebuild", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#424", "complete-rebuild", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-424-implementation", "complete-rebuild", {
 							result: {
 								status: "complete",
 								summary: "done",
@@ -275,8 +275,8 @@ describe("DockerWorkerExecutor", () => {
 		expect((executor as any).buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
 		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
 		expect((executor as any).appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
-		expect((executor as any).buildWorkerSessionUrl("mbrooks/yeetomatic#1", "token-1")).toBe(
-			"wss://control.example.test/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%231&token=token-1",
+		expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yeetomatic-issue-1-implementation", "token-1")).toBe(
+			"wss://control.example.test/yeetomatic-worker/ws?sessionKey=github-mbrooks-yeetomatic-issue-1-implementation&token=token-1",
 		);
 		expect(() => (executor as any).resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
 	});
@@ -322,8 +322,8 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
-			expect((executor as any).buildWorkerSessionUrl("mbrooks/yeetomatic#1", "token-1")).toBe(
-				"ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%231&token=token-1",
+			expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yeetomatic-issue-1-implementation", "token-1")).toBe(
+				"ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=github-mbrooks-yeetomatic-issue-1-implementation&token=token-1",
 			);
 
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
@@ -414,7 +414,7 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("error", "mbrooks/yeetomatic#420", "error-1", {
+						createWorkerMessage("error", "github-mbrooks-yeetomatic-issue-420-implementation", "error-1", {
 							message: "worker blew up",
 						}),
 					);
@@ -461,7 +461,7 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type === "launch_config") {
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/yeetomatic#421", "ack-launch", {
+							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-421-implementation", "ack-launch", {
 								ackMessageId: message.messageId,
 							}),
 						);
@@ -470,12 +470,12 @@ describe("DockerWorkerExecutor", () => {
 					if (message.type === "control") {
 						sawStop = message.payload.action === "stop";
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/yeetomatic#421", "ack-stop", {
+							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-421-implementation", "ack-stop", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "mbrooks/yeetomatic#421", "complete-stop", {
+							createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-421-implementation", "complete-stop", {
 								result: {
 									status: "cancelled",
 									summary: "stopped",
@@ -522,7 +522,7 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send(
-					createWorkerMessage("hello", "mbrooks/yeetomatic#999", "hello-wrong-session", {
+					createWorkerMessage("hello", "github-mbrooks-yeetomatic-issue-999-implementation", "hello-wrong-session", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -559,7 +559,7 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send({
-					...createWorkerMessage("hello", "mbrooks/yeetomatic#423", "hello-bad-version", {
+					...createWorkerMessage("hello", "github-mbrooks-yeetomatic-issue-423-implementation", "hello-bad-version", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -609,12 +609,12 @@ describe("DockerWorkerExecutor", () => {
 					async (connection, message) => {
 						if (message.type !== "launch_config") return;
 						await connection.send(
-							createWorkerMessage("ack", "mbrooks/yeetomatic#425", "ack-retry", {
+							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-425-implementation", "ack-retry", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "mbrooks/yeetomatic#425", "complete-retry", {
+							createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-425-implementation", "complete-retry", {
 								result: {
 									status: "complete",
 									summary: "recovered",
@@ -645,7 +645,7 @@ describe("DockerWorkerExecutor", () => {
 				expect.any(Function),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/yeetomatic#425",
+				"github-mbrooks-yeetomatic-issue-425-implementation",
 				expect.objectContaining({
 					message: "Removed stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-425; retrying launch",
 				}),
@@ -699,7 +699,7 @@ describe("DockerWorkerExecutor", () => {
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/yeetomatic#428",
+				"github-mbrooks-yeetomatic-issue-428-implementation",
 				expect.objectContaining({
 					message: "Could not inspect conflicting worker container yeetomatic-session-mbrooks-yeetomatic-428",
 				}),
@@ -730,7 +730,7 @@ describe("DockerWorkerExecutor", () => {
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"mbrooks/yeetomatic#429",
+				"github-mbrooks-yeetomatic-issue-429-implementation",
 				expect.objectContaining({
 					message: "Could not remove stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-429",
 				}),
@@ -807,10 +807,10 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#431", "ack-safe", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-431-implementation", "ack-safe", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#431", "complete-safe", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-431-implementation", "complete-safe", {
 							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 						}),
 					);
@@ -847,10 +847,10 @@ describe("DockerWorkerExecutor", () => {
 					if (message.type !== "launch_config") return;
 					expect((message as WorkerProtocolMessage<"launch_config">).payload.prompt.kind).toBe("issue-refinement");
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#450", "ack-refine", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-450-refinement", "ack-refine", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#450", "complete-refine", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-450-refinement", "complete-refine", {
 							result: {
 								proposedTaskBody: "## Summary\nRefined.",
 								summary: "Better description.",
@@ -894,10 +894,10 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#451", "ack-bad", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-451-refinement", "ack-bad", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#451", "complete-bad", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-451-refinement", "complete-bad", {
 							result: { proposedTaskBody: "", summary: "", investigation: "" } as any,
 						}),
 					);
@@ -940,10 +940,10 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#452", "ack-fallback", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-452-implementation", "ack-fallback", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#452", "complete-fallback", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-452-implementation", "complete-fallback", {
 							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 						}),
 					);
@@ -979,10 +979,10 @@ describe("DockerWorkerExecutor", () => {
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "mbrooks/yeetomatic#453", "ack-noremote", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-453-implementation", "ack-noremote", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "mbrooks/yeetomatic#453", "complete-noremote", {
+						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-453-implementation", "complete-noremote", {
 							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 						}),
 					);
@@ -1026,10 +1026,10 @@ describe("DockerWorkerExecutor", () => {
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "mbrooks/yeetomatic#460", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-460-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "mbrooks/yeetomatic#460", "tool-1", {
+								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-460-implementation", "tool-1", {
 									tool: "get_authenticated_user",
 									params: {},
 								}),
@@ -1039,7 +1039,7 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							expect((message.payload as { ok: boolean }).ok).toBe(true);
 							await connection.send(
-								createWorkerMessage("complete", "mbrooks/yeetomatic#460", "complete-1", {
+								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-460-implementation", "complete-1", {
 									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 								}),
 							);
@@ -1054,7 +1054,7 @@ describe("DockerWorkerExecutor", () => {
 				expect(result.status).toBe("complete");
 				expect(github.getAuthenticatedUser).toHaveBeenCalled();
 				expect(recordSessionLogMock).toHaveBeenCalledWith(
-					"mbrooks/yeetomatic#460",
+					"github-mbrooks-yeetomatic-issue-460-implementation",
 					expect.objectContaining({ message: "gateway get_authenticated_user done" }),
 				);
 			} finally {
@@ -1090,10 +1090,10 @@ describe("DockerWorkerExecutor", () => {
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "mbrooks/yeetomatic#461", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-461-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "mbrooks/yeetomatic#461", "tool-2", {
+								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-461-implementation", "tool-2", {
 									tool: "set_pr_comment",
 									params: { body: "hi", pr_number: 999 },
 								}),
@@ -1103,7 +1103,7 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							responsePayload = message.payload as unknown as GatewayToolResponse;
 							await connection.send(
-								createWorkerMessage("complete", "mbrooks/yeetomatic#461", "complete-2", {
+								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-461-implementation", "complete-2", {
 									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 								}),
 							);
@@ -1121,7 +1121,7 @@ describe("DockerWorkerExecutor", () => {
 				expect(github.postPRComment).not.toHaveBeenCalled();
 				expect(github.listPullRequestsForHead).toHaveBeenCalled();
 				expect(recordSessionLogMock).toHaveBeenCalledWith(
-					"mbrooks/yeetomatic#461",
+					"github-mbrooks-yeetomatic-issue-461-implementation",
 					expect.objectContaining({ message: "gateway set_pr_comment scope-rejected" }),
 				);
 			} finally {
@@ -1148,10 +1148,10 @@ describe("DockerWorkerExecutor", () => {
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "mbrooks/yeetomatic#462", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-462-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "mbrooks/yeetomatic#462", "tool-3", {
+								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-462-implementation", "tool-3", {
 									tool: "fetch_issue",
 									params: {},
 								}),
@@ -1161,7 +1161,7 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							responsePayload = message.payload as unknown as GatewayToolResponse;
 							await connection.send(
-								createWorkerMessage("complete", "mbrooks/yeetomatic#462", "complete-3", {
+								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-462-implementation", "complete-3", {
 									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
 								}),
 							);

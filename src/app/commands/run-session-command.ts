@@ -5,6 +5,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import { isTerminalStatus } from "../../domain/session/model.js";
 import { canDelete, canPause, canRestart, canResume } from "../../domain/workflow/policy.js";
 import { clearSessionLogs } from "../../logging/session-log-store.js";
+import { sessionStorageKey } from "../../session/store.js";
 import { fail, ok, type AppResult } from "../result.js";
 
 export type SessionCommand =
@@ -99,6 +100,7 @@ export class RunSessionCommand {
 		}
 
 		const key = `${owner}/${repo}#${issueNumber}`;
+		const logKey = sessionStorageKey(owner, repo, issueNumber, "implementation");
 		const now = this.clock.now().toISOString();
 
 		switch (command) {
@@ -137,7 +139,7 @@ export class RunSessionCommand {
 					return fail("internal", "Session restart dispatcher is not configured");
 				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
-				clearSessionLogs(key);
+				clearSessionLogs(logKey);
 				const restarted = await this.sessions.restartSession(owner, repo, issueNumber);
 				if (draining) {
 					const queued = await this.sessions.updateStatus(owner, repo, issueNumber, "pending", {
@@ -201,8 +203,8 @@ export class RunSessionCommand {
 					return fail("invalid_state", deleteCheck.reason);
 				}
 				await this.workspaces.removeWorktree(owner, repo, issueNumber);
-				clearSessionLogs(key);
-				await this.sessions.delete(owner, repo, issueNumber);
+				clearSessionLogs(logKey);
+				await this.sessions.delete(owner, repo, issueNumber, "implementation");
 				return ok<DeleteResult>({
 					deleted: true,
 					message: "Session and workspace deleted.",

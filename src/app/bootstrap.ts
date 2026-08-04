@@ -309,7 +309,7 @@ export async function startRuntime(
 				resumeOnBoot: undefined,
 				queuedComments: undefined,
 				taskFinishedAt: new Date().toISOString(),
-			});
+			}, "refinement");
 		}
 
 		const sessionsToResume = sessions.filter(

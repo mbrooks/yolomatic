@@ -34,7 +34,9 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 
 function makeDeps(session: SessionState | null) {
 	const sessions: SessionRepository = {
-		get: vi.fn(async () => session),
+		get: vi.fn(async (_owner, _repo, _issueNumber, kind = "implementation") =>
+			session && (session.kind ?? "implementation") === kind ? session : null,
+		),
 		save: vi.fn(async (s) => s),
 		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
 			...session!,
@@ -76,24 +78,17 @@ describe("ResumeInterruptedSession", () => {
 		writeSpy.mockRestore();
 	});
 
-	it("marks interrupted refinement sessions failed instead of resuming implementation", async () => {
+	it("does not resume a refinement session through the implementation command", async () => {
 		const deps = makeDeps(makeSession({ kind: "refinement", status: "working", resumeOnBoot: true }));
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
 		const command = new ResumeInterruptedSession(deps);
 		await command.execute("mbrooks", "yeetomatic", 7);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith(
-			"mbrooks",
-			"yeetomatic",
-			7,
-			"failed",
-			expect.objectContaining({
-				summary: "interrupted by restart",
-				staleReason: "interrupted by restart",
-				resumeOnBoot: undefined,
-			}),
-		);
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalled();
 		expect(deps.github.postComment).not.toHaveBeenCalled();
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("no session for"));
+		writeSpy.mockRestore();
 	});
 
 	it("posts a resume comment and re-runs a working session", async () => {

@@ -135,6 +135,7 @@ describe("workflow helpers", () => {
 				resumeOnBoot: true,
 				queuedComments: ["existing", "new one", "new two"],
 			}),
+			"implementation",
 		);
 	});
 
@@ -168,7 +169,7 @@ describe("workflow helpers", () => {
 			expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		});
 
-		it("replaces a terminal refinement session when implementation starts", async () => {
+		it("creates an implementation session without replacing a terminal refinement session", async () => {
 			const existing = makeSession({
 				kind: "refinement",
 				status: "complete",
@@ -176,13 +177,9 @@ describe("workflow helpers", () => {
 				workspacePath: "/tmp/refinement",
 			});
 			const sessions = {
-				get: vi.fn(async () => existing),
-				createSession: vi.fn(),
-				updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
-					...existing,
-					...updates,
-					status,
-				})),
+				get: vi.fn(async (_owner, _repo, _issueNumber, kind) => kind === "refinement" ? existing : null),
+				createSession: vi.fn(async () => makeSession({ kind: "implementation", status: "pending", workspacePath: "/tmp/implementation", branch: "yeetomatic/issue-56" })),
+				updateStatus: vi.fn(),
 			};
 			const workspaces = {
 				createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/implementation", branch: "yeetomatic/issue-56" })),
@@ -206,9 +203,19 @@ describe("workflow helpers", () => {
 				status: "pending",
 				workspacePath: "/tmp/implementation",
 				branch: "yeetomatic/issue-56",
-				summary: undefined,
 			});
-			expect(sessions.createSession).not.toHaveBeenCalled();
+			expect(sessions.createSession).toHaveBeenCalledWith(
+				"mbrooks",
+				"yeetomatic",
+				56,
+				"Title",
+				"Body",
+				"/tmp/implementation",
+				"implementation",
+				["bug"],
+			);
+			expect(existing).toMatchObject({ kind: "refinement", status: "complete", summary: "Refined" });
+			expect(sessions.updateStatus).not.toHaveBeenCalled();
 		});
 
 		it("creates a worktree and session when none exists", async () => {
@@ -244,6 +251,7 @@ describe("workflow helpers", () => {
 				"Title",
 				"Body",
 				"/tmp/ws",
+				"implementation",
 				["yeetomatic"],
 			);
 			expect(github.initializeEmptyRepo).not.toHaveBeenCalled();
@@ -357,6 +365,7 @@ describe("workflow helpers", () => {
 				56,
 				"pending",
 				{ resumeOnBoot: true },
+				"implementation",
 			);
 			expect(github.postComment).toHaveBeenCalledWith(
 				"mbrooks",
@@ -395,6 +404,7 @@ describe("workflow helpers", () => {
 					resumeOnBoot: true,
 					queuedComments: ["existing", "new comment"],
 				}),
+				"implementation",
 			);
 			expect(github.postComment).toHaveBeenCalledWith(
 				"mbrooks",
@@ -749,6 +759,7 @@ describe("workflow helpers", () => {
 				56,
 				"working",
 				expect.objectContaining({ resumeOnBoot: true, queuedComments: ["existing", "new"] }),
+				"implementation",
 			);
 		});
 	});

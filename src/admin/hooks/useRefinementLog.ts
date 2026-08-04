@@ -122,7 +122,7 @@ export function useRefinementLog(
 			}
 		});
 
-		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, (entry) => {
+		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, "refinement", (entry) => {
 			if (cancelled) return;
 			wsConnectedRef.current = true;
 			sinceRef.current = entry.timestamp;

@@ -6,15 +6,15 @@ import { AdminRouteRegistry, ValidationError, mapResultToStatus, type AdminRoute
 const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
-		pattern: /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/log$/u,
+		pattern: /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/(implementation|refinement)\/log$/u,
 		handler: async (ctx) => {
-			const [owner, repo, issueNumberStr] = ctx.params;
+			const [owner, repo, issueNumberStr, kind] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
 			if (Number.isNaN(issueNumber)) {
 				throw new ValidationError("Invalid issue number");
 			}
 			const since = ctx.requestUrl?.searchParams.get("since") ?? undefined;
-			const result = await ctx.deps.getSessionLog.execute(owner, repo, issueNumber, since);
+			const result = await ctx.deps.getSessionLog.execute(owner, repo, issueNumber, kind as "implementation" | "refinement", since);
 			if (!result.success) {
 				sendJson(ctx.response, mapResultToStatus(result.code), { error: result.message });
 				return;
@@ -27,10 +27,10 @@ const registry = new AdminRouteRegistry()
 		payload?: Record<string, unknown>;
 	}>({
 		method: "POST",
-		pattern: /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/commands$/u,
+		pattern: /^\/api\/sessions\/([^/]+)\/([^/]+)\/(-?\d+)\/(implementation|refinement)\/commands$/u,
 		parseBody: true,
 		handler: async (ctx) => {
-			const [owner, repo, issueNumberStr] = ctx.params;
+			const [owner, repo, issueNumberStr, kind] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
 			if (Number.isNaN(issueNumber)) {
 				throw new ValidationError("Invalid issue number");
@@ -41,6 +41,9 @@ const registry = new AdminRouteRegistry()
 			};
 			if (!body.command) {
 				throw new ValidationError("Missing command");
+			}
+			if (kind !== "implementation") {
+				throw new ValidationError("Commands are only available for implementation sessions");
 			}
 			const result = await ctx.deps.runSessionCommand.execute(
 				owner,

@@ -1,5 +1,6 @@
 import type { ExecutionResult, RefinementResult } from "../executor/results.js";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
+import type { SessionKind } from "../session/store.js";
 
 export const WORKER_PROTOCOL_VERSION = 1;
 
@@ -7,6 +8,7 @@ export interface WorkerSessionState {
 	owner: string;
 	repo: string;
 	issueNumber: number;
+	kind?: SessionKind;
 	workspacePath: string;
 	title: string;
 	body: string;

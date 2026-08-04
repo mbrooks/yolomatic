@@ -19,7 +19,7 @@ describe("refinements api", () => {
 
 			await fetchRefinementLog("mbrooks", "yeetomatic", 42);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/log");
+			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/refinement/log");
 		});
 
 		it("appends the encoded since cursor when provided", async () => {
@@ -28,7 +28,7 @@ describe("refinements api", () => {
 			await fetchRefinementLog("mbrooks", "yeetomatic", 42, "2026-01-01T00:00:00Z");
 
 			expect(apiGet).toHaveBeenCalledWith(
-				"/api/refinements/mbrooks/yeetomatic/42/log?since=2026-01-01T00%3A00%3A00Z",
+				"/api/refinements/mbrooks/yeetomatic/42/refinement/log?since=2026-01-01T00%3A00%3A00Z",
 			);
 		});
 
@@ -38,7 +38,7 @@ describe("refinements api", () => {
 			await fetchRefinementLog("owner org", "my repo", 7);
 
 			expect(apiGet).toHaveBeenCalledWith(
-				"/api/refinements/owner%20org/my%20repo/7/log",
+				"/api/refinements/owner%20org/my%20repo/7/refinement/log",
 			);
 		});
 	});
@@ -49,7 +49,7 @@ describe("refinements api", () => {
 
 			await fetchRefinementAttempts("mbrooks", "yeetomatic", 42);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/attempts");
+			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/refinement/attempts");
 		});
 
 		it("URL-encodes owner and repo segments", async () => {
@@ -57,7 +57,7 @@ describe("refinements api", () => {
 
 			await fetchRefinementAttempts("owner org", "my repo", 7);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/refinements/owner%20org/my%20repo/7/attempts");
+			expect(apiGet).toHaveBeenCalledWith("/api/refinements/owner%20org/my%20repo/7/refinement/attempts");
 		});
 	});
 });

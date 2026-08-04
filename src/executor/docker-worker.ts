@@ -7,9 +7,8 @@ import type { ExecutionResult, RefinementResult } from "./results.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { parseRefinementResult } from "./results.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
-import { sessionKey as buildSessionKey } from "../domain/session/model.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
-import type { SessionState } from "../session/store.js";
+import { sessionStorageKey, type SessionState } from "../session/store.js";
 import {
 	WORKER_PROTOCOL_VERSION,
 	createWorkerMessage,
@@ -97,7 +96,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	): Promise<RefinementResult> {
 		const prompt = buildIssueRefinementPrompt(state, repoSkillContent, steeringPrompt);
 		return this.runWorker(
-			state,
+			{ ...state, kind: "refinement" },
 			{ kind: "issue-refinement", text: prompt },
 			abortSignal,
 			onSessionCreated,
@@ -114,7 +113,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	): Promise<ExecutionResult | RefinementResult> {
 		await this.ensureWorkerImage();
 
-		const sessionKey = buildSessionKey(state.owner, state.repo, state.issueNumber);
+		const sessionKey = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
 		const containerName = this.buildContainerName(state, prompt.kind);
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
 		await this.validateLaunch(state.workspacePath);
@@ -412,6 +411,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 						owner: state.owner,
 						repo: state.repo,
 						issueNumber: state.issueNumber,
+						kind: state.kind ?? "implementation",
 						workspacePath: workspacePathInWorker,
 						title: state.title,
 						body: state.body,

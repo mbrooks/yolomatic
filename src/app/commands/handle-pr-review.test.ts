@@ -539,6 +539,7 @@ describe("HandlePRReview", () => {
 				resumeOnBoot: true,
 				queuedComments: ["older note", "Please add more tests."],
 			}),
+			"implementation",
 		);
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",

@@ -51,7 +51,7 @@ describe("CleanupOldSessions", () => {
 		expect(result).toEqual({ deleted: 1, failed: 0 });
 		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
 		expect(workspaces.removeWorktree).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 342);
-		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
+		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341, "implementation");
 
 		writeSpy.mockRestore();
 	});
@@ -101,7 +101,7 @@ describe("CleanupOldSessions", () => {
 
 		expect(result).toEqual({ deleted: 1, failed: 0 });
 		expect(workspaces.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
-		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341);
+		expect(sessions.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 341, "implementation");
 
 		writeSpy.mockRestore();
 	});
