@@ -14,7 +14,8 @@ import type { RepositoryStore } from "../../repos/repository-store.js";
 import type { RefinementStore } from "../../refinement/store.js";
 import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../../config.js";
 import { sendJson } from "./response-helpers.js";
-import { requireAdminJson, requireAdminText } from "./admin-auth.js";
+import type { AdminSessionAuth } from "./admin-auth.js";
+import type { UserStore } from "../../users/store.js";
 import { readBody } from "../../webhook/http-utils.js";
 
 export class ValidationError extends Error {}
@@ -32,6 +33,7 @@ export interface AdminRouteContext {
 export interface AdminRouteDefinition<TBody extends object = Record<string, unknown>> {
 	method: string;
 	pattern: RegExp;
+	/** Authorize the request before invoking the handler. `false` is a public route. */
 	auth?: boolean;
 	parseBody?: boolean;
 	required?: string[];
@@ -49,6 +51,8 @@ const missingDependencyErrors = {
 	repositoryStore: "Repository store not configured",
 	refinementStore: "Refinement store not configured",
 	ollamaSignInService: "Ollama sign-in service not configured",
+	sessionAuth: "Admin authentication not configured",
+	userStore: "User store not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
 
 export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
@@ -166,8 +170,8 @@ export interface AdminRouterDeps {
 	startIssueSession?: StartIssueSession;
 	taskController: TaskControlService;
 	githubService?: import("../../ports/github-service.js").GitHubService;
-	adminUsername?: string;
-	adminPassword?: string;
+	sessionAuth?: AdminSessionAuth;
+	userStore?: UserStore;
 	adminAssetsDir: string;
 	settingsStore?: SettingsStore;
 	skillStore?: SkillStore;
@@ -226,39 +230,25 @@ export function getRequiredDeps<T extends RequiredAdminRouteDep>(
 	return deps as unknown as RouteDepsFor<T>;
 }
 
-export function getCredentials(deps: AdminRouterDeps): { username?: string; password?: string } {
-	if (deps.adminUsername && deps.adminPassword) {
-		return { username: deps.adminUsername, password: deps.adminPassword };
-	}
-	const u = deps.settingsStore?.get("admin_username") ?? undefined;
-	const p = deps.settingsStore?.get("admin_password") ?? undefined;
-	if (u && p) {
-		return { username: u, password: p };
-	}
-	return {};
-}
-
 export function checkAdminJson(
 	request: IncomingMessage,
 	response: ServerResponse,
 	deps: AdminRouterDeps,
 ): boolean {
-	const { username, password } = getCredentials(deps);
-	if (!username || !password) {
+	if (!deps.sessionAuth) {
 		sendJson(response, 503, { error: "Server is in onboarding mode. Complete setup first." });
 		return false;
 	}
-	return requireAdminJson(request, response, username, password);
+	return deps.sessionAuth.requireAdminJson(request, response);
 }
 
 export function checkAdminTextAllowOnboarding(
-	request: IncomingMessage,
-	response: ServerResponse,
-	deps: AdminRouterDeps,
+	_request: IncomingMessage,
+	_response: ServerResponse,
+	_deps: AdminRouterDeps,
 ): boolean {
-	const { username, password } = getCredentials(deps);
-	if (!username || !password) {
-		return true;
-	}
-	return requireAdminText(request, response, username, password);
+	// The admin HTML shell and its static assets are always served so the SPA
+	// can render the login screen; protected data is gated by the JSON API
+	// routes via checkAdminJson.
+	return true;
 }

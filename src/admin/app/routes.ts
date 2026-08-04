@@ -11,6 +11,7 @@ export const SETTINGS_CATEGORY_TABS = [
 	{ slug: "git-worktrees", label: "Git & Worktrees" },
 	{ slug: "agent-behavior", label: "Worker Behavior" },
 	{ slug: "ai-llm", label: "AI / LLM" },
+	{ slug: "users", label: "Users" },
 ] as const;
 
 export type SettingsCategoryTab = typeof SETTINGS_CATEGORY_TABS[number]["slug"];
@@ -25,7 +26,7 @@ export type Route =
 	| { screen: "repo"; owner: string; repo: string; issueNumber?: number; kind?: SessionKind; tab?: "sessions" | "skills" | "issues" | "settings" }
 	| { screen: "working"; owner?: string; repo?: string; issueNumber?: number; kind?: SessionKind }
 	| { screen: "new-issue"; owner?: string; repo?: string }
-	| { screen: "settings"; tab?: "skills" | "invitations" | SettingsCategoryTab };
+	| { screen: "settings"; tab?: "skills" | "invitations" | "users" | SettingsCategoryTab };
 
 export function parseHash(hash: string): Route {
 	const path = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
@@ -37,7 +38,7 @@ export function parseHash(hash: string): Route {
 	}
 	if (path[0] === "settings") {
 		const slug = path[1];
-		if (slug === "skills" || slug === "invitations") {
+		if (slug === "skills" || slug === "invitations" || slug === "users") {
 			return { screen: "settings", tab: slug };
 		}
 		if (slug && SETTINGS_TAB_SLUGS.includes(slug as SettingsCategoryTab)) {
@@ -91,6 +92,7 @@ export function buildHash(route: Route): string {
 	if (route.screen === "settings") {
 		if (route.tab === "skills") return "#/settings/skills";
 		if (route.tab === "invitations") return "#/settings/invitations";
+		if (route.tab === "users") return "#/settings/users";
 		if (route.tab && SETTINGS_TAB_SLUGS.includes(route.tab)) {
 			return `#/settings/${route.tab}`;
 		}

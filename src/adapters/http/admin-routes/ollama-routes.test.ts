@@ -8,7 +8,7 @@ function request(url: string, method = "GET"): http.IncomingMessage {
 		url,
 		method,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 	} as http.IncomingMessage;
 }
@@ -33,8 +33,7 @@ function makeService(result: OllamaSignInResult): OllamaSignInService {
 
 function makeDeps(overrides: Record<string, unknown> = {}) {
 	return {
-		adminUsername: "admin",
-		adminPassword: "secret",
+		sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 		settingsStore: {
 			getString: vi.fn((_key: string, fallback?: string) => fallback ?? "yeetomatic-ollama"),
 		},
@@ -105,7 +104,7 @@ describe("handleOllamaRoutes", () => {
 		const handled = await handleOllamaRoutes(
 			request("/api/ollama/signin"),
 			res,
-			{ adminUsername: "admin", adminPassword: "secret", ollamaSignInService: makeService({ signedIn: false, message: "" }) } as any,
+			{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never, ollamaSignInService: makeService({ signedIn: false, message: "" }) } as any,
 			"/api/ollama/signin",
 		);
 		expect(handled).toBe(true);
@@ -118,7 +117,7 @@ describe("handleOllamaRoutes", () => {
 		const handled = await handleOllamaRoutes(
 			request("/api/ollama/signin"),
 			res,
-			{ adminUsername: "admin", adminPassword: "secret", settingsStore: { getString: () => "ollama" } } as any,
+			{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never, settingsStore: { getString: () => "ollama" } } as any,
 			"/api/ollama/signin",
 		);
 		expect(handled).toBe(true);
@@ -131,7 +130,7 @@ describe("handleOllamaRoutes", () => {
 		const handled = await handleOllamaRoutes(
 			{ method: "GET", url: "/api/ollama/signin", headers: {} } as never,
 			res,
-			{ adminUsername: "admin", adminPassword: "secret", settingsStore: { getString: () => "ollama" }, ollamaSignInService: makeService({ signedIn: false, message: "" }) } as any,
+			{ sessionAuth: { requireAdminJson: (_req: any, r: any) => { r.statusCode = 401; r.end('{"error":"Unauthorized"}'); return false; }, requireAdminText: () => false, isAdminAuthorized: () => false, hasUsers: () => true } as never, settingsStore: { getString: () => "ollama" }, ollamaSignInService: makeService({ signedIn: false, message: "" }) } as any,
 			"/api/ollama/signin",
 		);
 		expect(handled).toBe(true);

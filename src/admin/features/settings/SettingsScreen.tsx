@@ -8,9 +8,10 @@ import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
+import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
-export type SettingsTab = SettingsCategoryTab | "skills" | "invitations";
+export type SettingsTab = SettingsCategoryTab | "skills" | "invitations" | "users";
 
 const SERVER_SETTINGS_SECTIONS = [
 	{ category: "server", label: "Server" },
@@ -110,7 +111,7 @@ export function SettingsScreen({
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
-	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories"
+	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
 		? []
 		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
@@ -166,6 +167,8 @@ export function SettingsScreen({
 				<InvitationsSection />
 			) : tab === "repositories" ? (
 				<RepositoriesSettingsSection />
+			) : tab === "users" ? (
+				<UsersScreen />
 			) : (
 				<>
 					{pendingRestart && (

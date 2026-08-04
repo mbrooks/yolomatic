@@ -23,6 +23,8 @@ import type { RefinementStore } from "../refinement/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 import { DefaultOllamaSignInService } from "../ollama/signin-status.js";
+import type { UserStore } from "../users/store.js";
+import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -51,8 +53,6 @@ export { fallbackWorkspaceService };
 
 export function createWebhookServerDeps(
 	sessionStore: SessionStore,
-	adminUsername?: string,
-	adminPassword?: string,
 	taskController?: TaskController,
 	workspaceManager?: WorkspaceManager,
 	staleDetector?: StaleSessionDetector,
@@ -67,6 +67,8 @@ export function createWebhookServerDeps(
 	adminDefaultPage: string = DEFAULT_ADMIN_DEFAULT_PAGE,
 	refinementStore?: RefinementStore,
 	restartSession?: RestartSessionDispatcher,
+	userStore?: UserStore,
+	sessionAuth?: AdminSessionAuth,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -90,8 +92,8 @@ export function createWebhookServerDeps(
 		startIssueSession: prebuiltStartIssueSession,
 		taskController: taskService,
 		githubService,
-		adminUsername,
-		adminPassword,
+		sessionAuth,
+		userStore,
 		adminAssetsDir,
 		settingsStore,
 		repositoryStore,

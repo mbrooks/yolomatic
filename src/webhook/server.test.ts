@@ -87,8 +87,6 @@ describe("createWebhookServer", () => {
 		createWebhookServerDeps.mockImplementation(
 			(
 				_sessionStore: unknown,
-				adminUsername?: string,
-				adminPassword?: string,
 				_taskController?: unknown,
 				_workspaceManager?: unknown,
 				_staleDetector?: unknown,
@@ -98,15 +96,7 @@ describe("createWebhookServer", () => {
 				settingsStore?: unknown,
 				_executor?: unknown,
 			) => ({
-				adminUsername,
-				adminPassword,
-				settingsStore: settingsStore ?? {
-					get: vi.fn((key: string) => {
-						if (key === "admin_username") return "stored-admin";
-						if (key === "admin_password") return "stored-secret";
-						return undefined;
-					}),
-				},
+				settingsStore: settingsStore ?? {},
 				getAdminStatus: {
 					execute: vi.fn(async () => ({ success: true, data: { agent: "online" } })),
 				},
@@ -120,26 +110,20 @@ describe("createWebhookServer", () => {
 		onSessionLogEvent.mockReturnValue(vi.fn());
 	});
 
-	it("passes explicit admin credentials and status provider to the websocket server", async () => {
+	it("threads the session-auth provider and status provider to the websocket server", async () => {
 		const { createWebhookServer } = await import("./server.js");
-		createWebhookServer("secret", {} as never, {} as never, "admin", "secret");
+		const sessionAuth = { isAdminAuthorized: vi.fn(() => true) } as never;
+		createWebhookServer("secret", {} as never, {} as never, undefined, undefined, undefined, undefined, { sessionAuth });
 
-		const [, credentialProvider, statusProvider] = createAdminWebSocketServer.mock.calls[0];
-		expect(credentialProvider.getCredentials()).toEqual({ username: "admin", password: "secret" });
+		const [, authProvider, statusProvider] = createAdminWebSocketServer.mock.calls[0];
+		expect(authProvider.isAuthorized).toBeTypeOf("function");
+		expect(authProvider.isAuthorized({ headers: {} })).toBe(true);
 		await expect(statusProvider.getStatus()).resolves.toEqual({ agent: "online" });
 	});
 
-	it("falls back to settings-store credentials when env credentials are absent", async () => {
+	it("allows all websocket upgrades in onboarding mode (no session auth)", async () => {
 		createWebhookServerDeps.mockReturnValue({
-			adminUsername: undefined,
-			adminPassword: undefined,
-			settingsStore: {
-				get: vi.fn((key: string) => {
-					if (key === "admin_username") return "stored-admin";
-					if (key === "admin_password") return "stored-secret";
-					return undefined;
-				}),
-			},
+			sessionAuth: undefined,
 			getAdminStatus: {
 				execute: vi.fn(async () => ({ success: true, data: { agent: "online" } })),
 			},
@@ -148,11 +132,8 @@ describe("createWebhookServer", () => {
 		const { createWebhookServer } = await import("./server.js");
 		createWebhookServer("secret", {} as never, {} as never);
 
-		const [, credentialProvider] = createAdminWebSocketServer.mock.calls[0];
-		expect(credentialProvider.getCredentials()).toEqual({
-			username: "stored-admin",
-			password: "stored-secret",
-		});
+		const [, authProvider] = createAdminWebSocketServer.mock.calls[0];
+		expect(authProvider.isAuthorized({ headers: {} })).toBe(true);
 	});
 
 	it("returns 404 for non-webhook requests when admin routes do not handle them", async () => {
@@ -392,8 +373,6 @@ describe("createWebhookServer", () => {
 			"secret",
 			{} as never,
 			{} as never,
-			undefined,
-			undefined,
 			undefined,
 			undefined,
 			undefined,

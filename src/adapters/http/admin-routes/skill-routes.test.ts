@@ -8,7 +8,7 @@ function request(url: string, method = "GET", body?: string): http.IncomingMessa
 		method,
 		url,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {
@@ -50,8 +50,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { listAll },
 			} as never,
 			"/api/skills",
@@ -70,8 +69,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { create },
 			} as never,
 			"/api/skills",
@@ -87,8 +85,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills", "POST", JSON.stringify({ name: "n" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { create: vi.fn() },
 			} as never,
 			"/api/skills",
@@ -106,8 +103,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/s1"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { get },
 			} as never,
 			"/api/skills/s1",
@@ -122,8 +118,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/s1"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { get: vi.fn(async () => null) },
 			} as never,
 			"/api/skills/s1",
@@ -141,8 +136,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/s1", "PATCH", JSON.stringify({ name: "n2" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { update },
 			} as never,
 			"/api/skills/s1",
@@ -158,8 +152,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/s1", "PATCH", JSON.stringify({ name: "n2" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { update: vi.fn(async () => null) },
 			} as never,
 			"/api/skills/s1",
@@ -175,8 +168,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/s1", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { delete: deleteSkill },
 			} as never,
 			"/api/skills/s1",
@@ -192,8 +184,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
 		);
@@ -211,8 +202,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { listRepoSkills },
 				skillStore: { listAll },
 			} as never,
@@ -233,8 +223,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { saveRepoSkill, listRepoSkills },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
@@ -250,8 +239,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { saveRepoSkill: vi.fn() },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
@@ -267,8 +255,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { saveRepoSkill, listRepoSkills: vi.fn(async () => []) },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
@@ -290,8 +277,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { getRepoSkill },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/found",
@@ -307,8 +293,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/missing"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { getRepoSkill: vi.fn(async () => null) },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/missing",
@@ -323,8 +308,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: {
 					getRepoSkill: vi.fn(async () => null),
 				},
@@ -342,8 +326,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: {
 					getRepoSkill: vi.fn(async () => ({
 						name: "triage",
@@ -373,8 +356,7 @@ describe("handleSkillRoutes", () => {
 			),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: {
 					getRepoSkill: vi.fn(async () => ({
 						name: "triage",
@@ -406,8 +388,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { deleteRepoSkill },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/old",
@@ -424,8 +405,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { deleteRepoSkill },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/old",
@@ -440,8 +420,7 @@ describe("handleSkillRoutes", () => {
 			request("/api/skills/skill-1", "PATCH", JSON.stringify({ name: "x" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/skills/skill-1",
 		);
@@ -459,8 +438,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { listAll: vi.fn(async () => { throw new Error("db fail"); }) },
 			} as never,
 			"/api/skills",
@@ -476,8 +454,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/skills", "POST", "not-json"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { create: vi.fn() },
 			} as never,
 			"/api/skills",
@@ -492,8 +469,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/skills/s1"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { get: vi.fn(async () => { throw new Error("db fail"); }) },
 			} as never,
 			"/api/skills/s1",
@@ -509,8 +485,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/skills/s1", "PATCH", "not-json"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { update: vi.fn() },
 			} as never,
 			"/api/skills/s1",
@@ -525,8 +500,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/skills/s1", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { delete: vi.fn(async () => { throw new Error("db fail"); }) },
 			} as never,
 			"/api/skills/s1",
@@ -542,8 +516,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { listRepoSkills: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
@@ -559,8 +532,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", "not-json"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { saveRepoSkill: vi.fn() },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
@@ -575,8 +547,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { getRepoSkill: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/found",
@@ -592,8 +563,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", "not-json"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { getRepoSkill: vi.fn() },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/triage",
@@ -608,8 +578,7 @@ describe("handleSkillRoutes error cases", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { deleteRepoSkill: vi.fn(async () => { throw new Error("git fail"); }) },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/old",
@@ -629,8 +598,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/skills"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/skills",
 		);
@@ -644,8 +612,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/skills",
 		);
@@ -659,8 +626,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/skills/s1"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/skills/s1",
 		);
@@ -674,8 +640,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/skills/s1", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/skills/s1",
 		);
@@ -689,8 +654,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",
 		);
@@ -704,8 +668,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/found"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/found",
 		);
@@ -719,8 +682,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ description: "Updated" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/triage",
 		);
@@ -734,8 +696,7 @@ describe("handleSkillRoutes missing service branches", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/old", "DELETE"),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills/old",
 		);
@@ -765,8 +726,7 @@ describe("handleSkillRoutes additional branches", () => {
 			request("/api/skills", "POST", JSON.stringify({ name: "n", description: "d" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				skillStore: { create: vi.fn() },
 			} as never,
 			"/api/skills",
@@ -783,8 +743,7 @@ describe("handleSkillRoutes additional branches", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills/triage", "PATCH", JSON.stringify({ name: "triage" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: {
 					getRepoSkill: vi.fn(async () => ({
 						name: "triage",
@@ -819,8 +778,7 @@ describe("handleSkillRoutes final coverage", () => {
 			request("/api/repos/mbrooks/yeetomatic/skills", "POST", JSON.stringify({ name: "n", content: "c" })),
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				repoSkillService: { saveRepoSkill, listRepoSkills },
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/skills",

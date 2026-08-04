@@ -20,12 +20,14 @@ import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
 import { createWebhookServerDeps, fallbackWorkspaceService } from "./server-deps.js";
 import { readBody, verifySignature } from "./http-utils.js";
-import { createAdminWebSocketServer, type CredentialProvider, type StatusProvider } from "./websocket-server.js";
+import { createAdminWebSocketServer, type WebSocketAuthProvider, type StatusProvider } from "./websocket-server.js";
 import { DEFAULT_ADMIN_DEFAULT_PAGE, DEFAULT_ADMIN_PATH } from "../config.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
+import type { UserStore } from "../users/store.js";
+import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
 type WebhookServerOptions = {
 	adminAssetsDir?: string;
@@ -35,6 +37,8 @@ type WebhookServerOptions = {
 	adminPath?: string;
 	adminDefaultPage?: string;
 	restartSession?: RestartSessionDispatcher;
+	userStore?: UserStore;
+	sessionAuth?: AdminSessionAuth;
 };
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -43,8 +47,6 @@ export function createWebhookServer(
 	secret: string,
 	handlers: WebhookHandlers,
 	sessionStore: SessionStore,
-	adminUsername?: string,
-	adminPassword?: string,
 	taskController?: TaskController,
 	workspaceManager?: WorkspaceManager,
 	staleDetector?: StaleSessionDetector,
@@ -62,8 +64,6 @@ export function createWebhookServer(
 	const adminDefaultPage = options.adminDefaultPage ?? DEFAULT_ADMIN_DEFAULT_PAGE;
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
-		adminUsername,
-		adminPassword,
 		taskController,
 		workspaceManager,
 		staleDetector,
@@ -78,24 +78,23 @@ export function createWebhookServer(
 		adminDefaultPage,
 		refinementStore,
 		options.restartSession,
+		options.userStore,
+		options.sessionAuth,
 	);
 
 	serverDeps.skillStore = skillStore;
 	serverDeps.repoSkillService = repoSkillService;
 	serverDeps.onOnboardingComplete = options.onOnboardingComplete;
 
-	const credentialProvider: CredentialProvider = {
-		getCredentials(): { username?: string; password?: string } {
-			if (serverDeps.adminUsername && serverDeps.adminPassword) {
-				return { username: serverDeps.adminUsername, password: serverDeps.adminPassword };
+	const authProvider: WebSocketAuthProvider = {
+		isAuthorized: (request) => {
+			const auth = serverDeps.sessionAuth;
+			if (!auth) {
+				// Onboarding mode: no admin users exist yet. Allow the dashboard
+				// to load so the wizard can create the master admin account.
+				return true;
 			}
-			const store = serverDeps.settingsStore;
-			if (store) {
-				const u = store.get("admin_username");
-				const p = store.get("admin_password");
-				if (u && p) return { username: u, password: p };
-			}
-			return {};
+			return auth.isAdminAuthorized(request);
 		},
 	};
 
@@ -162,7 +161,7 @@ export function createWebhookServer(
 
 	const wsServer = createAdminWebSocketServer(
 		server,
-		credentialProvider,
+		authProvider,
 		statusProvider,
 		serverDeps.taskController,
 		adminPath,

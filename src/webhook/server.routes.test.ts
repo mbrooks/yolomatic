@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync, rmSync } from "node:fs";
 import http from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -14,6 +15,34 @@ import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
 import { SettingsStore } from "../settings/store.js";
 import type { SessionStatus } from "../session/store.js";
+import { UserStore } from "../users/store.js";
+import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
+
+// Shared admin account + session cookie used by the admin-route tests. The
+// old Basic Auth path is gone, so tests mint a real signed session cookie via
+// AdminSessionAuth.login and send it as a Cookie header instead.
+const userDbPath = join(tmpdir(), "yeetomatic-server-routes-users.sqlite");
+if (existsSync(userDbPath)) rmSync(userDbPath);
+const userStore = new UserStore(userDbPath);
+userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
+const sessionAuth = new AdminSessionAuth(userStore);
+
+function mintSessionCookie(auth: AdminSessionAuth, username: string, password: string): string {
+	let cookie = "";
+	const res = {
+		setHeader(name: string, value: string) {
+			if (name.toLowerCase() === "set-cookie") cookie = String(value);
+		},
+		getHeader() {
+			return undefined;
+		},
+	} as unknown as http.ServerResponse;
+	const req = { headers: {}, socket: {} } as unknown as http.IncomingMessage;
+	const user = auth.login(req, res, username, password);
+	if (!user) throw new Error("failed to mint session cookie");
+	return cookie.split(";")[0];
+}
+const validCookie = mintSessionCookie(sessionAuth, "admin", "secret");
 
 function makeRequest(
 	port: number,
@@ -2344,22 +2373,22 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 401 for /yeetomatic/admin without auth header when credentials are configured", async () => {
+	it("returns 401 for /api/status without auth header", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/api/status" });
 		expect(response.statusCode).toBe(401);
-		expect(response.body).toBe("Unauthorized");
+		expect(JSON.parse(response.body).error).toBe("Unauthorized");
 
 		server.close();
 	});
 
-	it("returns 401 for /api/status with wrong credentials", async () => {
+	it("returns 401 for /api/status with an invalid session cookie", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2367,11 +2396,11 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:wrong").toString("base64"),
+				Cookie: "yeetomatic_admin_session=invalid",
 			},
 		});
 		expect(response.statusCode).toBe(401);
-		expect(response.body).toBe("Invalid credentials");
+		expect(JSON.parse(response.body).error).toBe("Unauthorized");
 
 		server.close();
 	});
@@ -2383,7 +2412,7 @@ describe("createWebhookServer", () => {
 			join(adminAssetsDir, "index.html"),
 			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div><script type="module" src="/yeetomatic/admin/assets/main.js"></script></body></html>',
 		);
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2392,7 +2421,7 @@ describe("createWebhookServer", () => {
 				method: "GET",
 				path: "/yeetomatic/admin",
 				headers: {
-					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+					Cookie: validCookie,
 				},
 			});
 			expect(response.statusCode).toBe(200);
@@ -2411,7 +2440,7 @@ describe("createWebhookServer", () => {
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2420,7 +2449,7 @@ describe("createWebhookServer", () => {
 				method: "GET",
 				path: "/yeetomatic/admin/assets/main.js",
 				headers: {
-					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+					Cookie: validCookie,
 				},
 			});
 			expect(response.statusCode).toBe(200);
@@ -2432,19 +2461,19 @@ describe("createWebhookServer", () => {
 		}
 	});
 
-	it("requires auth for /yeetomatic/admin bundled assets", async () => {
+	it("serves /yeetomatic/admin bundled assets without a session (login screen)", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", undefined, undefined, undefined, undefined, { adminAssetsDir });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		try {
 			const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin/assets/main.js" });
-			expect(response.statusCode).toBe(401);
-			expect(response.body).toBe("Unauthorized");
+			expect(response.statusCode).toBe(200);
+			expect(response.body).toContain("console.log");
 		} finally {
 			server.close();
 			await rm(adminAssetsDir, { force: true, recursive: true });
@@ -2475,7 +2504,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2483,7 +2512,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2524,7 +2553,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2532,7 +2561,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2596,7 +2625,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2604,7 +2633,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2653,7 +2682,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2661,7 +2690,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2686,7 +2715,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2694,7 +2723,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(500);
@@ -2752,7 +2781,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2760,7 +2789,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2783,7 +2812,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2791,7 +2820,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -2846,7 +2875,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../task-controller.js").TaskController;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", taskController);
+		const server = createWebhookServer("secret", handlers, mockStore, taskController, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2854,7 +2883,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "cancel" }));
@@ -2897,7 +2926,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../task-controller.js").TaskController;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", taskController);
+		const server = createWebhookServer("secret", handlers, mockStore, taskController, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2905,7 +2934,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "cancel" }));
@@ -2930,7 +2959,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined);
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2938,7 +2967,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "cancel" }));
@@ -2973,7 +3002,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -2981,7 +3010,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/89/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "mark-failed" }));
@@ -3026,7 +3055,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../workspace/manager.js").WorkspaceManager;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret", undefined, workspaceManager);
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, workspaceManager, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3034,7 +3063,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "delete" }));
@@ -3072,7 +3101,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3080,7 +3109,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/4/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "delete" }));
@@ -3105,7 +3134,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3113,7 +3142,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "delete" }));
@@ -3177,7 +3206,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3185,7 +3214,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "pause" }));
@@ -3221,7 +3250,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3229,7 +3258,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "pause" }));
@@ -3264,7 +3293,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3272,7 +3301,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "pause" }));
@@ -3296,7 +3325,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3304,7 +3333,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "pause" }));
@@ -3353,7 +3382,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3361,7 +3390,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "resume" }));
@@ -3397,7 +3426,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3405,7 +3434,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "resume" }));
@@ -3429,7 +3458,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3437,7 +3466,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "resume" }));
@@ -3499,13 +3528,11 @@ describe("createWebhookServer", () => {
 			"secret",
 			handlers,
 			mockStore,
-			"admin",
-			"secret",
 			undefined,
 			workspaceManager,
 			undefined,
 			undefined,
-			{ restartSession },
+			{ restartSession, userStore, sessionAuth },
 		);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -3514,7 +3541,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/5/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "restart" }));
@@ -3572,13 +3599,11 @@ describe("createWebhookServer", () => {
 			"secret",
 			handlers,
 			mockStore,
-			"admin",
-			"secret",
 			undefined,
 			workspaceManager,
 			undefined,
 			undefined,
-			{ restartSession },
+			{ restartSession, userStore, sessionAuth },
 		);
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
@@ -3587,7 +3612,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/6/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "restart" }));
@@ -3624,7 +3649,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3632,7 +3657,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/7/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "restart" }));
@@ -3667,7 +3692,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3675,7 +3700,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/8/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "restart" }));
@@ -3699,7 +3724,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3707,7 +3732,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		}, JSON.stringify({ command: "restart" }));
@@ -3735,13 +3760,13 @@ describe("createWebhookServer", () => {
 
 	it("returns 401 for log without auth header when credentials are configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log" });
 		expect(response.statusCode).toBe(401);
-		expect(response.body).toBe("Unauthorized");
+		expect(JSON.parse(response.body).error).toBe("Unauthorized");
 
 		server.close();
 	});
@@ -3758,7 +3783,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3766,7 +3791,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/log",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(404);
@@ -3803,7 +3828,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3812,7 +3837,7 @@ describe("createWebhookServer", () => {
 				method: "GET",
 				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 				headers: {
-					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+					Cookie: validCookie,
 				},
 			});
 			expect(response.statusCode).toBe(200);
@@ -3850,7 +3875,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3858,7 +3883,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -3897,7 +3922,7 @@ describe("createWebhookServer", () => {
 		} as unknown as import("../session/store.js").SessionStore;
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3906,7 +3931,7 @@ describe("createWebhookServer", () => {
 				method: "GET",
 				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 				headers: {
-					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+					Cookie: validCookie,
 				},
 			});
 			expect(response.statusCode).toBe(200);
@@ -3921,7 +3946,7 @@ describe("createWebhookServer", () => {
 
 	it("returns 404 for log with invalid issue number", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3929,7 +3954,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/sessions/mbrooks/yeetomatic/abc/implementation/log",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(404);
@@ -3975,7 +4000,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -3983,7 +4008,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status/working",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -4007,7 +4032,7 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, mockStore, "admin", "secret");
+		const server = createWebhookServer("secret", handlers, mockStore, undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -4015,7 +4040,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status/working",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -4036,7 +4061,7 @@ describe("createWebhookServer", () => {
 			unregister: vi.fn(),
 		} as unknown as import("../task-controller.js").TaskController;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", taskController);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), taskController, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -4044,7 +4069,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/maintenance",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		expect(response.statusCode).toBe(200);
@@ -4064,7 +4089,7 @@ describe("createWebhookServer", () => {
 			unregister: vi.fn(),
 		} as unknown as import("../task-controller.js").TaskController;
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret", taskController);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), taskController, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -4072,7 +4097,7 @@ describe("createWebhookServer", () => {
 			method: "POST",
 			path: "/api/maintenance",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 				"Content-Type": "application/json",
 			},
 		},
@@ -4103,18 +4128,15 @@ describe("createWebhookServer", () => {
 		expect(result).toEqual({ deleted: 0, failed: 0 });
 	});
 
-	it("creates websocket endpoint with credentials from settingsStore", async () => {
+	it("creates websocket endpoint using the admin session", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const store = new SettingsStore(":memory:");
-		store.set("admin_username", "admin");
-		store.set("admin_password", "secret");
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, undefined, undefined, {}, undefined, store);
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -4129,7 +4151,7 @@ describe("createWebhookServer", () => {
 
 	it("accepts websocket connections using the admin session cookie", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), "admin", "secret");
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
@@ -4137,18 +4159,15 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/yeetomatic/admin",
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
 		expect(response.statusCode).toBe(200);
-		const cookieHeader = response.headers["set-cookie"];
-		expect(cookieHeader).toBeTruthy();
-		const cookie = Array.isArray(cookieHeader) ? cookieHeader[0].split(";")[0] : String(cookieHeader).split(";")[0];
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Cookie: cookie,
+				Cookie: validCookie,
 			},
 		});
 
@@ -4185,7 +4204,7 @@ describe("createWebhookServer", () => {
 			join(adminAssetsDir, "index.html"),
 			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div></body></html>',
 		);
-		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, undefined, undefined, { adminAssetsDir, adminPath: "/custom/admin", adminDefaultPage: "#/repos" });
+		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, adminPath: "/custom/admin", adminDefaultPage: "#/repos" });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
