@@ -1,5 +1,5 @@
 import type { SessionRepository } from "../ports/session-repository.js";
-import type { SessionStore, SessionState, SessionStatus } from "./store.js";
+import type { SessionKind, SessionStore, SessionState, SessionStatus } from "./store.js";
 import { isTerminalStatus } from "./store.js";
 
 export class SessionManager implements SessionRepository {
@@ -8,12 +8,12 @@ export class SessionManager implements SessionRepository {
 		private readonly store: SessionStore,
 	) {}
 
-	getSessionKey(owner: string, repo: string, issueNumber: number): string {
-		return this.store.getSessionKey(owner, repo, issueNumber);
+	getSessionKey(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		return this.store.getSessionKey(owner, repo, issueNumber, kind);
 	}
 
-	getSessionPath(owner: string, repo: string, issueNumber: number): string {
-		return this.store.getSessionPath(owner, repo, issueNumber);
+	getSessionPath(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		return this.store.getSessionPath(owner, repo, issueNumber, kind);
 	}
 
 	async createSession(
@@ -23,24 +23,27 @@ export class SessionManager implements SessionRepository {
 		title: string,
 		body: string,
 		workspacePath: string,
+		kindOrLabels: SessionKind | string[] = "implementation",
 		labels?: string[],
 	): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+		const kind = Array.isArray(kindOrLabels) ? "implementation" : kindOrLabels;
+		const sessionLabels = Array.isArray(kindOrLabels) ? kindOrLabels : labels;
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (existing) {
 			return existing;
 		}
 
 		const state: SessionState = {
-			kind: "implementation",
+			kind,
 			issueNumber,
 			repo,
 			owner,
 			title,
 			body,
 			status: "pending",
-			sessionPath: this.getSessionPath(owner, repo, issueNumber),
+			sessionPath: this.getSessionPath(owner, repo, issueNumber, kind),
 			workspacePath,
-			labels,
+			labels: sessionLabels,
 			lastActivity: new Date().toISOString(),
 			createdAt: new Date().toISOString(),
 			seeded: false,
@@ -49,12 +52,12 @@ export class SessionManager implements SessionRepository {
 		return this.store.set(state);
 	}
 
-	async getSession(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
-		return this.store.get(owner, repo, issueNumber);
+	async getSession(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState | null> {
+		return this.store.get(owner, repo, issueNumber, kind);
 	}
 
-	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
-		return this.getSession(owner, repo, issueNumber);
+	async get(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState | null> {
+		return this.getSession(owner, repo, issueNumber, kind);
 	}
 
 	async resumeSession(
@@ -79,8 +82,9 @@ export class SessionManager implements SessionRepository {
 		issueNumber: number,
 		status: SessionStatus,
 		updates: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">> = {},
+		kind: SessionKind = "implementation",
 	): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
@@ -285,8 +289,8 @@ export class SessionManager implements SessionRepository {
 		return this.store.set(state);
 	}
 
-	async delete(owner: string, repo: string, issueNumber: number): Promise<void> {
-		return this.store.delete(owner, repo, issueNumber);
+	async delete(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<void> {
+		return this.store.delete(owner, repo, issueNumber, kind);
 	}
 
 	async archive(state: SessionState, archiveDir: string): Promise<void> {

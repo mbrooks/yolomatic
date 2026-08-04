@@ -13,8 +13,7 @@ import { createYeetomaticModelRegistry } from "./model-registry.js";
 import { LlmLogger } from "../logging/llm-logger.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
-import { sessionKey as buildSessionKey } from "../domain/session/model.js";
-import type { SessionState } from "../session/store.js";
+import { sessionStorageKey, type SessionState } from "../session/store.js";
 import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
 import { getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
@@ -101,7 +100,7 @@ export class PiAgentExecutor implements ExecutionService {
 		const notifyActivity = () => {
 			onActivity?.();
 		};
-		const key = buildSessionKey(state.owner, state.repo, state.issueNumber);
+		const key = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
 
 		let prompt: string;
 		if (overridePrompt) {

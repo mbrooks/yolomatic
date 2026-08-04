@@ -8,6 +8,10 @@ import { runMigrations } from "../migrations/index.js";
 export type SessionStatus = "pending" | "working" | "waiting-feedback" | "paused" | "complete" | "failed" | "cancelled";
 export type SessionKind = "implementation" | "refinement";
 
+export function sessionStorageKey(owner: string, repo: string, issueNumber: number, kind: SessionKind): string {
+	return `github-${owner}-${repo}-issue-${issueNumber}-${kind}`;
+}
+
 export const TERMINAL_STATUSES: readonly SessionStatus[] = ["complete", "failed", "cancelled"];
 
 export function isTerminalStatus(status: SessionStatus): boolean {
@@ -101,28 +105,32 @@ export class SessionStore {
 		);
 	}
 
-	getSessionKey(owner: string, repo: string, issueNumber: number): string {
-		return `github-${owner}-${repo}-issue-${issueNumber}`;
+	getSessionKey(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		return sessionStorageKey(owner, repo, issueNumber, kind);
 	}
 
-	getSessionPath(owner: string, repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.jsonl`);
+	getSessionPath(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		const suffix = kind === "implementation" ? "" : `-${kind}`;
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}${suffix}.jsonl`);
 	}
 
-	getStatePath(owner: string, repo: string, issueNumber: number): string {
-		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
+	getStatePath(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		const suffix = kind === "implementation" ? "" : `-${kind}`;
+		return path.join(this.sessionsDir, `github-${owner}-${repo}`, `issue-${issueNumber}${suffix}.state.json`);
 	}
 
-	getArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number): string {
-		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}.state.json`);
+	getArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		const suffix = kind === "implementation" ? "" : `-${kind}`;
+		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}${suffix}.state.json`);
 	}
 
-	getSessionArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number): string {
-		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}.jsonl`);
+	getSessionArchivePath(archiveDir: string, owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): string {
+		const suffix = kind === "implementation" ? "" : `-${kind}`;
+		return path.join(archiveDir, `github-${owner}-${repo}`, `issue-${issueNumber}${suffix}.jsonl`);
 	}
 
-	async get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
-		const key = this.getSessionKey(owner, repo, issueNumber);
+	async get(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState | null> {
+		const key = this.getSessionKey(owner, repo, issueNumber, kind);
 		const cached = this.cache.get(key);
 		if (cached && !cached.archived) {
 			return cached.state;
@@ -141,7 +149,7 @@ export class SessionStore {
 
 	async set(state: SessionState): Promise<SessionState> {
 		const normalizedState: SessionState = { ...state, kind: state.kind ?? "implementation" };
-		const key = this.getSessionKey(normalizedState.owner, normalizedState.repo, normalizedState.issueNumber);
+		const key = this.getSessionKey(normalizedState.owner, normalizedState.repo, normalizedState.issueNumber, normalizedState.kind!);
 		const stateJson = JSON.stringify(normalizedState, null, 2);
 		this.upsertStmt.run(
 			key,
@@ -157,8 +165,8 @@ export class SessionStore {
 		return normalizedState;
 	}
 
-	async exists(owner: string, repo: string, issueNumber: number): Promise<boolean> {
-		const key = this.getSessionKey(owner, repo, issueNumber);
+	async exists(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<boolean> {
+		const key = this.getSessionKey(owner, repo, issueNumber, kind);
 		const cached = this.cache.get(key);
 		if (cached && !cached.archived) {
 			return true;
@@ -167,14 +175,14 @@ export class SessionStore {
 		return !!row && !row.archived_at;
 	}
 
-	async delete(owner: string, repo: string, issueNumber: number): Promise<void> {
-		const key = this.getSessionKey(owner, repo, issueNumber);
+	async delete(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<void> {
+		const key = this.getSessionKey(owner, repo, issueNumber, kind);
 		this.cache.delete(key);
 		this.deleteStmt.run(key);
 
 		// Remove any legacy on-disk state/transcript files too (idempotent).
-		const statePath = this.getStatePath(owner, repo, issueNumber);
-		const sessionPath = this.getSessionPath(owner, repo, issueNumber);
+		const statePath = this.getStatePath(owner, repo, issueNumber, kind);
+		const sessionPath = this.getSessionPath(owner, repo, issueNumber, kind);
 		await this.silentRemove(statePath);
 		await this.silentRemove(sessionPath);
 	}
@@ -192,10 +200,11 @@ export class SessionStore {
 	}
 
 	async archive(state: SessionState, archiveDir: string): Promise<void> {
-		const archiveStatePath = this.getArchivePath(archiveDir, state.owner, state.repo, state.issueNumber);
-		const archiveSessionPath = this.getSessionArchivePath(archiveDir, state.owner, state.repo, state.issueNumber);
-		const currentStatePath = this.getStatePath(state.owner, state.repo, state.issueNumber);
-		const currentSessionPath = this.getSessionPath(state.owner, state.repo, state.issueNumber);
+		const kind = state.kind ?? "implementation";
+		const archiveStatePath = this.getArchivePath(archiveDir, state.owner, state.repo, state.issueNumber, kind);
+		const archiveSessionPath = this.getSessionArchivePath(archiveDir, state.owner, state.repo, state.issueNumber, kind);
+		const currentStatePath = this.getStatePath(state.owner, state.repo, state.issueNumber, kind);
+		const currentSessionPath = this.getSessionPath(state.owner, state.repo, state.issueNumber, kind);
 
 		await mkdir(path.dirname(archiveStatePath), { recursive: true });
 		await mkdir(path.dirname(archiveSessionPath), { recursive: true });
@@ -220,7 +229,7 @@ export class SessionStore {
 			// session transcript may not exist (e.g. never started); ignore
 		}
 
-		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber);
+		const key = this.getSessionKey(state.owner, state.repo, state.issueNumber, kind);
 		this.deleteStmt.run(key);
 		this.cache.delete(key);
 	}
@@ -262,7 +271,7 @@ export class SessionStore {
 					if (!parsed || typeof parsed.owner !== "string" || typeof parsed.repo !== "string" || typeof parsed.issueNumber !== "number") {
 						continue;
 					}
-					const key = this.getSessionKey(parsed.owner, parsed.repo, parsed.issueNumber);
+					const key = this.getSessionKey(parsed.owner, parsed.repo, parsed.issueNumber, parsed.kind!);
 					const existing = this.getStmt.get(key) as { session_key: string } | undefined;
 					if (existing) {
 						// Already in SQLite; leave the file in place as a compatibility copy.

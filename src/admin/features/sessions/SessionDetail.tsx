@@ -216,9 +216,10 @@ function SessionActionControl({
 		}
 		const response = await sendSessionCommand(
 			session.owner,
-			session.repo,
-			session.issueNumber,
-			action.command(session),
+				session.repo,
+				session.issueNumber,
+				session.kind,
+				action.command(session),
 		);
 		if (response.ok) {
 			onMutate();

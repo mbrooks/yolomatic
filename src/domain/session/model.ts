@@ -60,6 +60,10 @@ export interface RepoSummary {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
+	implementationSessionCount: number;
+	implementationActiveCount: number;
+	refinementSessionCount: number;
+	refinementActiveCount: number;
 	lastActivity: string | null;
 }
 
@@ -67,10 +71,19 @@ export function buildRepoSummaries(sessions: SessionState[]): RepoSummary[] {
 	const map = new Map<string, RepoSummary>();
 	for (const s of sessions) {
 		const key = `${s.owner}/${s.repo}`;
+		const kind = s.kind ?? "implementation";
+		const active = !isTerminalStatus(s.status);
 		const existing = map.get(key);
 		if (existing) {
 			existing.sessionCount++;
-			if (!isTerminalStatus(s.status)) existing.activeCount++;
+			if (active) existing.activeCount++;
+			if (kind === "refinement") {
+				existing.refinementSessionCount++;
+				if (active) existing.refinementActiveCount++;
+			} else {
+				existing.implementationSessionCount++;
+				if (active) existing.implementationActiveCount++;
+			}
 			if (s.lastActivity > (existing.lastActivity ?? "")) {
 				existing.lastActivity = s.lastActivity;
 			}
@@ -79,7 +92,11 @@ export function buildRepoSummaries(sessions: SessionState[]): RepoSummary[] {
 				owner: s.owner,
 				repo: s.repo,
 				sessionCount: 1,
-				activeCount: isTerminalStatus(s.status) ? 0 : 1,
+				activeCount: active ? 1 : 0,
+				implementationSessionCount: kind === "implementation" ? 1 : 0,
+				implementationActiveCount: kind === "implementation" && active ? 1 : 0,
+				refinementSessionCount: kind === "refinement" ? 1 : 0,
+				refinementActiveCount: kind === "refinement" && active ? 1 : 0,
 				lastActivity: s.lastActivity,
 			});
 		}

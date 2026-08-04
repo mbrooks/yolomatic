@@ -6,7 +6,7 @@ export class GetSession {
 	constructor(private readonly sessions: SessionRepository) {}
 
 	async execute(owner: string, repo: string, issueNumber: number): Promise<AppResult<SessionState>> {
-		const session = await this.sessions.get(owner, repo, issueNumber);
+		const session = await this.sessions.get(owner, repo, issueNumber, "implementation");
 		if (!session) {
 			return fail("not_found", "Session not found");
 		}

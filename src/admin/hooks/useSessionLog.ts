@@ -20,7 +20,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 	const sinceRef = useRef<string | undefined>(undefined);
 	const pausedRef = useRef(paused);
 	pausedRef.current = paused;
-	const sessionKey = session ? `${session.owner}/${session.repo}#${session.issueNumber}` : null;
+	const sessionKey = session ? `${session.owner}/${session.repo}#${session.issueNumber}/${session.kind}` : null;
 	const prevSessionKeyRef = useRef<string | null>(null);
 	const wsConnectedRef = useRef(false);
 
@@ -36,7 +36,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 			return;
 		}
 
-		const { owner, repo, issueNumber, status } = session;
+		const { owner, repo, issueNumber, kind, status } = session;
 		let cancelled = false;
 
 		async function load(initial = false): Promise<void> {
@@ -50,7 +50,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 				});
 			}
 			try {
-				const data = await fetchSessionLog(owner, repo, issueNumber, sinceRef.current);
+				const data = await fetchSessionLog(owner, repo, issueNumber, kind, sinceRef.current);
 				if (!cancelled) {
 					if (data.available && data.logs.length > 0) {
 						sinceRef.current = data.logs[data.logs.length - 1].timestamp;
@@ -95,7 +95,7 @@ export function useSessionLog(session: Session | null, paused = false): LogLoadS
 			}
 		});
 
-		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, (entry) => {
+		const unsubscribe = webSocketManager.subscribeLog(owner, repo, issueNumber, kind, (entry) => {
 			if (cancelled || pausedRef.current) return;
 			wsConnectedRef.current = true;
 			sinceRef.current = entry.timestamp;

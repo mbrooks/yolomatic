@@ -146,7 +146,7 @@ describe("GitHubIssueHandlers", () => {
 			})),
 			getSession: vi.fn(async () => {
 				getSessionCallCount++;
-				return getSessionCallCount === 1
+				return getSessionCallCount <= 2
 					? null
 					: {
 							issueNumber: 99,
@@ -238,6 +238,7 @@ describe("GitHubIssueHandlers", () => {
 			"Test issue",
 			"Test body",
 			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
+			"implementation",
 			["yeetomatic-working"],
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1530,6 +1531,7 @@ describe("GitHubIssueHandlers", () => {
 			1,
 			"pending",
 			expect.objectContaining({ resumeOnBoot: true }),
+			"implementation",
 		);
 	});
 
@@ -1936,6 +1938,7 @@ describe("GitHubIssueHandlers", () => {
 			1,
 			"waiting-feedback",
 			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["Proceed"] }),
+			"implementation",
 		);
 	});
 
@@ -2037,6 +2040,7 @@ describe("GitHubIssueHandlers", () => {
 			1,
 			"complete",
 			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["LGTM but needs tests"] }),
+			"implementation",
 		);
 	});
 });
@@ -2762,8 +2766,8 @@ describe("createWebhookServer", () => {
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
 		expect(body.repos).toHaveLength(2);
-		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: expect.any(String) });
-		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, lastActivity: expect.any(String) });
+		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
 
 		server.close();
 	});
@@ -2805,7 +2809,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(503);
 
@@ -2848,7 +2852,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2899,7 +2903,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2932,7 +2936,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -2975,7 +2979,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/89/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/89/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3028,7 +3032,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/3/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3039,7 +3043,7 @@ describe("createWebhookServer", () => {
 		expect(body.deleted).toBe(true);
 		expect(body.message).toBe("Session and workspace deleted.");
 		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3);
-		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3);
+		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3, "implementation");
 
 		server.close();
 	});
@@ -3074,7 +3078,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/4/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/4/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3107,7 +3111,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3128,7 +3132,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3143,7 +3147,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3179,7 +3183,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3223,7 +3227,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3266,7 +3270,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/3/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3298,7 +3302,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3319,7 +3323,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3355,7 +3359,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3399,7 +3403,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3431,7 +3435,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3452,7 +3456,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3508,7 +3512,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/5/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/5/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3581,7 +3585,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/6/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/6/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3626,7 +3630,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/7/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/7/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3669,7 +3673,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/8/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/8/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3701,7 +3705,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/commands",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				"Content-Type": "application/json",
@@ -3722,7 +3726,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/1/log",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 		});
 		expect(response.statusCode).toBe(503);
 
@@ -3735,7 +3739,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yeetomatic/1/log" });
+		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log" });
 		expect(response.statusCode).toBe(401);
 		expect(response.body).toBe("Unauthorized");
 
@@ -3760,7 +3764,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/999/log",
+			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -3774,8 +3778,8 @@ describe("createWebhookServer", () => {
 
 	it("returns log lines when log file exists", async () => {
 		_resetSessionLogs();
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "prompt" });
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "response" });
+		recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "prompt" });
+		recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "response" });
 
 		const mockStore = {
 			get: vi.fn(async () => ({
@@ -3806,7 +3810,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/yeetomatic/1/log",
+				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -3852,7 +3856,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/1/log",
+			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},
@@ -3868,7 +3872,7 @@ describe("createWebhookServer", () => {
 	it("truncates log when it exceeds 10,000 lines", async () => {
 		_resetSessionLogs();
 		for (let i = 0; i < 5_001; i++) {
-			recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "line " + i });
+			recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "line " + i });
 		}
 
 		const mockStore = {
@@ -3900,7 +3904,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/yeetomatic/1/log",
+				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 				headers: {
 					Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 				},
@@ -3923,7 +3927,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/abc/log",
+			path: "/api/sessions/mbrooks/yeetomatic/abc/implementation/log",
 			headers: {
 				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
 			},

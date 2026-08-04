@@ -433,6 +433,7 @@ describe("startRuntime", () => {
 			517,
 			"failed",
 			expect.objectContaining({ summary: "interrupted by restart", resumeOnBoot: undefined }),
+			"refinement",
 		);
 		const handlersInstance = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
 		expect(handlersInstance.resumeInterruptedSession).not.toHaveBeenCalled();

@@ -146,7 +146,7 @@ export class HandlePRReview {
 	): Promise<{ issueNumber: number; session: import("../../session/store.js").SessionState } | null> {
 		const branchIssueNumber = extractIssueNumberFromBranch(branch);
 		if (branchIssueNumber) {
-			const session = await this.deps.sessions.get(owner, repo, branchIssueNumber);
+			const session = await this.deps.sessions.get(owner, repo, branchIssueNumber, "implementation");
 			if (!session || session.prNumber !== prNumber) {
 				return null;
 			}

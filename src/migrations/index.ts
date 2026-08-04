@@ -191,6 +191,46 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 9,
+		name: "make_session_keys_kind_aware",
+		up(db) {
+			const rows = db.prepare(
+				"SELECT session_key, owner, repo, issue_number, state_json FROM sessions",
+			).all() as Array<{
+				session_key: string;
+				owner: string;
+				repo: string;
+				issue_number: number;
+				state_json: string;
+			}>;
+			const updateSession = db.prepare("UPDATE sessions SET session_key = ?, state_json = ? WHERE session_key = ?");
+			const updateLogs = db.prepare("UPDATE session_logs SET session_key = ? WHERE session_key = ?");
+
+			db.exec("BEGIN IMMEDIATE");
+			try {
+				for (const row of rows) {
+					let state: Record<string, unknown>;
+					try {
+						state = JSON.parse(row.state_json) as Record<string, unknown>;
+					} catch {
+						continue;
+					}
+					const kind = state.kind === "refinement" ? "refinement" : "implementation";
+					state.kind = kind;
+					const nextKey = `github-${row.owner}-${row.repo}-issue-${row.issue_number}-${kind}`;
+					if (row.session_key !== nextKey) {
+						updateLogs.run(nextKey, row.session_key);
+					}
+					updateSession.run(nextKey, JSON.stringify(state, null, 2), row.session_key);
+				}
+				db.exec("COMMIT");
+			} catch (error) {
+				db.exec("ROLLBACK");
+				throw error;
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

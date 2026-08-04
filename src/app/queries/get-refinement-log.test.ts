@@ -5,6 +5,7 @@ import os from "node:os";
 import { RefinementStore } from "../../refinement/store.js";
 import { GetRefinementLog } from "./get-refinement-log.js";
 import { recordSessionLog, getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
+import { sessionStorageKey } from "../../session/store.js";
 
 describe("GetRefinementLog", () => {
 	let tmpDir: string;
@@ -44,8 +45,9 @@ describe("GetRefinementLog", () => {
 			instructionSource: "prompt-defaults",
 			state: "applied",
 		});
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "Refinement started" });
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "Applied refined issue body" });
+		const key = sessionStorageKey("mbrooks", "yeetomatic", 1, "refinement");
+		recordSessionLog(key, { level: "info", message: "Refinement started" });
+		recordSessionLog(key, { level: "info", message: "Applied refined issue body" });
 
 		const result = await query.execute("mbrooks", "yeetomatic", 1);
 		expect(result.success).toBe(true);
@@ -88,11 +90,12 @@ describe("GetRefinementLog", () => {
 			instructionSource: "prompt-defaults",
 			state: "applied",
 		});
-		recordSessionLog("mbrooks/yeetomatic#2", { level: "info", message: "first" });
+		const key = sessionStorageKey("mbrooks", "yeetomatic", 2, "refinement");
+		recordSessionLog(key, { level: "info", message: "first" });
 		await new Promise((r) => setTimeout(r, 10));
-		const all = getSessionLogs("mbrooks/yeetomatic#2");
+		const all = getSessionLogs(key);
 		const since = all[0].timestamp;
-		recordSessionLog("mbrooks/yeetomatic#2", { level: "info", message: "second" });
+		recordSessionLog(key, { level: "info", message: "second" });
 
 		const result = await query.execute("mbrooks", "yeetomatic", 2, since);
 		expect(result.success).toBe(true);

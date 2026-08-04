@@ -8,6 +8,28 @@ import { SessionManager } from "./manager.js";
 import { SessionStore } from "./store.js";
 
 describe("SessionManager", () => {
+	it("creates and updates implementation and refinement sessions independently", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sessions-"));
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "yeetomatic", 534, "Implement", "Body", "/tmp/implementation", "implementation");
+		await manager.createSession("mbrooks", "yeetomatic", 534, "Refine", "Body", "/tmp/refinement", "refinement");
+		await manager.updateStatus("mbrooks", "yeetomatic", 534, "complete", { summary: "Refined" }, "refinement");
+
+		expect(await manager.get("mbrooks", "yeetomatic", 534, "implementation")).toMatchObject({
+			kind: "implementation",
+			status: "pending",
+			title: "Implement",
+		});
+		expect(await manager.get("mbrooks", "yeetomatic", 534, "refinement")).toMatchObject({
+			kind: "refinement",
+			status: "complete",
+			title: "Refine",
+			summary: "Refined",
+		});
+	});
+
 	it("creates 1:1 issue session paths with owner and repo", async () => {
 		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-sessions-"));
 		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);

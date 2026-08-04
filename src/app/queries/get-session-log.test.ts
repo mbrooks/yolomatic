@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GetSessionLog } from "./get-session-log.js";
 import { _resetSessionLogs, recordSessionLog } from "../../logging/session-log-store.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
-import type { SessionState } from "../../session/store.js";
+import { sessionStorageKey, type SessionState } from "../../session/store.js";
 
 describe("GetSessionLog", () => {
 	it("returns logs when session exists and logs are recorded", async () => {
@@ -22,8 +22,9 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "info", message: "Prompt sent" });
-		recordSessionLog("mbrooks/yeetomatic#1", { level: "tool", message: "read file" });
+		const key = sessionStorageKey("mbrooks", "yeetomatic", 1, "implementation");
+		recordSessionLog(key, { level: "info", message: "Prompt sent" });
+		recordSessionLog(key, { level: "tool", message: "read file" });
 
 		const query = new GetSessionLog(repo);
 		const result = await query.execute("mbrooks", "yeetomatic", 1);
@@ -80,9 +81,10 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		recordSessionLog("mbrooks/yeetomatic#3", { level: "info", message: "old" });
+		const key = sessionStorageKey("mbrooks", "yeetomatic", 3, "implementation");
+		recordSessionLog(key, { level: "info", message: "old" });
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		recordSessionLog("mbrooks/yeetomatic#3", { level: "info", message: "new" });
+		recordSessionLog(key, { level: "info", message: "new" });
 
 		const query = new GetSessionLog(repo);
 		const full = await query.execute("mbrooks", "yeetomatic", 3);

@@ -3,7 +3,7 @@ import type { GitHubService } from "../../ports/github-service.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
-import { isTerminalStatus, type SessionState } from "../../session/store.js";
+import type { SessionState } from "../../session/store.js";
 import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
@@ -145,6 +145,11 @@ export async function prepareIssueSession(
 	},
 	options: { requirePending?: boolean; commentBodies?: string[] } = {},
 ): Promise<PrepareIssueSessionResult> {
+	const refinement = await deps.sessions.get(ctx.owner, ctx.repo, ctx.issueNumber, "refinement");
+	if (refinement?.kind === "refinement" && refinement.status === "working") {
+		return { skip: true, kind: "status", status: refinement.status };
+	}
+
 	const session = await ensureSessionExists(
 		deps.sessions,
 		deps.workspaces,
@@ -157,10 +162,6 @@ export async function prepareIssueSession(
 		ctx.labels,
 		ctx.defaultBranch,
 	);
-
-	if (session.kind === "refinement" && session.status === "working") {
-		return { skip: true, kind: "status", status: session.status };
-	}
 
 	if (options.requirePending && session.status !== "pending") {
 		return { skip: true, kind: "status", status: session.status };
@@ -305,7 +306,7 @@ export async function stopSessionByAdmin(
 		return "stopping";
 	}
 
-	const session = await sessions.get(owner, repo, sessionIssueNumber);
+	const session = await sessions.get(owner, repo, sessionIssueNumber, "implementation");
 	if (session?.status === "working") {
 		await sessions.cancelSession(owner, repo, sessionIssueNumber);
 		await github.removeLabel(owner, repo, sessionIssueNumber, "yeetomatic-working");
@@ -327,7 +328,7 @@ export async function queueResumeOnBoot(
 	await sessions.updateStatus(session.owner, session.repo, session.issueNumber, session.status, {
 		resumeOnBoot: true,
 		queuedComments: queued,
-	});
+	}, session.kind ?? "implementation");
 }
 
 export async function ensureSessionExists(
@@ -342,9 +343,8 @@ export async function ensureSessionExists(
 	labels: string[] | undefined,
 	defaultBranch: string,
 ): Promise<SessionState> {
-	let session = await sessions.get(owner, repo, issueNumber);
-	const replacesTerminalRefinement = session?.kind === "refinement" && isTerminalStatus(session.status);
-	if (session && !replacesTerminalRefinement) {
+	let session = await sessions.get(owner, repo, issueNumber, "implementation");
+	if (session) {
 		return session;
 	}
 
@@ -360,31 +360,6 @@ export async function ensureSessionExists(
 		}
 	}
 
-	if (session && replacesTerminalRefinement) {
-		return sessions.updateStatus(owner, repo, issueNumber, "pending", {
-			kind: "implementation",
-			title,
-			body,
-			labels: labels ?? [],
-			workspacePath: worktree.path,
-			branch: worktree.branch,
-			seeded: false,
-			summary: undefined,
-			prUrl: undefined,
-			prNumber: undefined,
-			iterationCount: undefined,
-			restartCount: undefined,
-			restartedFrom: undefined,
-			staleDetectedAt: undefined,
-			staleReason: undefined,
-			resumeOnBoot: undefined,
-			queuedComments: undefined,
-			taskStartedAt: undefined,
-			taskFinishedAt: undefined,
-			totalExecutionTimeMs: undefined,
-		});
-	}
-
 	session = await sessions.createSession(
 		owner,
 		repo,
@@ -392,6 +367,7 @@ export async function ensureSessionExists(
 		title,
 		body,
 		worktree.path,
+		"implementation",
 		labels ?? [],
 	);
 	return session;
@@ -419,7 +395,7 @@ export async function handleDrainingMode(
 	} else {
 		await sessions.updateStatus(session.owner, session.repo, session.issueNumber, "pending", {
 			resumeOnBoot: true,
-		});
+		}, session.kind ?? "implementation");
 		await github.postComment(
 			session.owner,
 			session.repo,

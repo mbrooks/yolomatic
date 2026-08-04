@@ -108,8 +108,8 @@ describe("GetAdminStatus", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.repos).toHaveLength(2);
-			expect(result.data.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" });
-			expect(result.data.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" });
+			expect(result.data.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: "2026-01-01T00:00:00Z" });
+			expect(result.data.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: "2026-01-01T00:00:00Z" });
 		}
 	});
 
@@ -196,7 +196,7 @@ describe("GetAdminStatus", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.repos).toEqual([
-				{ owner: "mbrooks", repo: "valid", sessionCount: 0, activeCount: 0, lastActivity: null },
+				{ owner: "mbrooks", repo: "valid", sessionCount: 0, activeCount: 0, implementationSessionCount: 0, implementationActiveCount: 0, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: null },
 			]);
 		}
 	});
@@ -257,8 +257,8 @@ describe("GetAdminStatus", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.repos).toEqual([
-				{ owner: "mbrooks", repo: "new-repo", sessionCount: 0, activeCount: 0, lastActivity: null },
-				{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 1, lastActivity: "2026-01-01T00:00:00Z" },
+				{ owner: "mbrooks", repo: "new-repo", sessionCount: 0, activeCount: 0, implementationSessionCount: 0, implementationActiveCount: 0, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: null },
+				{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: "2026-01-01T00:00:00Z" },
 			]);
 		}
 	});

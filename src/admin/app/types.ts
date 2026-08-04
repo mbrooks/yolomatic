@@ -104,6 +104,10 @@ export type RepoSummary = {
 	repo: string;
 	sessionCount: number;
 	activeCount: number;
+	implementationSessionCount: number;
+	implementationActiveCount: number;
+	refinementSessionCount: number;
+	refinementActiveCount: number;
 	lastActivity: string | null;
 };
 
