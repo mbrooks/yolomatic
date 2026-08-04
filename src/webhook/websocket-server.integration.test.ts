@@ -4,6 +4,31 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import WebSocket from "ws";
 import { createAdminWebSocketServer } from "./websocket-server.js";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
+import { UserStore } from "../users/store.js";
+import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
+
+// Shared admin account + signed session cookie for the protected upgrade tests.
+const userDbPath = `/tmp/yeetomatic-ws-integration-users-${process.pid}.sqlite`;
+const userStore = new UserStore(userDbPath);
+userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
+const sessionAuth = new AdminSessionAuth(userStore);
+
+function mintSessionCookie(username: string, password: string): string {
+	let cookie = "";
+	const res = {
+		setHeader(name: string, value: string) {
+			if (name.toLowerCase() === "set-cookie") cookie = String(value);
+		},
+		getHeader() {
+			return undefined;
+		},
+	} as unknown as Server; // ServerResponse stand-in
+	const req = { headers: {}, socket: {} } as never;
+	const user = sessionAuth.login(req, res as never, username, password);
+	if (!user) throw new Error("failed to mint session cookie");
+	return cookie.split(";")[0];
+}
+const validCookie = mintSessionCookie("admin", "secret");
 
 describe("createAdminWebSocketServer", () => {
 	let httpServer: Server;
@@ -58,7 +83,7 @@ describe("createAdminWebSocketServer", () => {
 	it("accepts connections without auth in onboarding mode", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({}),
+			isAuthorized: () => true,
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
@@ -72,7 +97,7 @@ describe("createAdminWebSocketServer", () => {
 	it("rejects connections with invalid auth", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
@@ -87,12 +112,12 @@ describe("createAdminWebSocketServer", () => {
 	it("accepts connections with valid basic auth header", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 		await new Promise<void>((resolve, reject) => {
@@ -105,22 +130,12 @@ describe("createAdminWebSocketServer", () => {
 	it("accepts connections with a valid admin session cookie", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
-
-		const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-		const signature = createHmac("sha256", "secret")
-			.update(`admin:${expiresAt}`)
-			.digest("base64url");
-		const token = Buffer.from(JSON.stringify({
-			username: "admin",
-			expiresAt,
-			signature,
-		}), "utf8").toString("base64url");
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Cookie: `yeetomatic_admin_session=${token}`,
+				Cookie: validCookie,
 			},
 		});
 		await new Promise<void>((resolve, reject) => {
@@ -133,12 +148,12 @@ describe("createAdminWebSocketServer", () => {
 	it("broadcasts log entries to subscribed clients", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -176,12 +191,12 @@ describe("createAdminWebSocketServer", () => {
 	it("does not broadcast log entries to unsubscribed clients", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -215,12 +230,12 @@ describe("createAdminWebSocketServer", () => {
 			getStatus: vi.fn().mockResolvedValue({ agent: "online" }),
 		};
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		}, statusProvider);
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -251,12 +266,12 @@ describe("createAdminWebSocketServer", () => {
 			getStatus: vi.fn().mockResolvedValue({ agent: "online" }),
 		};
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		}, statusProvider);
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -278,12 +293,12 @@ describe("createAdminWebSocketServer", () => {
 	it("disconnects client on error event", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -305,12 +320,12 @@ describe("createAdminWebSocketServer", () => {
 	it("directly broadcasts status to subscribers", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -339,12 +354,12 @@ describe("createAdminWebSocketServer", () => {
 	it("ignores invalid JSON messages", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({ username: "admin", password: "secret" }),
+			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
 		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
 			headers: {
-				Authorization: "Basic " + Buffer.from("admin:secret").toString("base64"),
+				Cookie: validCookie,
 			},
 		});
 
@@ -363,7 +378,7 @@ describe("createAdminWebSocketServer", () => {
 	it("handles close gracefully", async () => {
 		if (socketBindingUnavailable) return;
 		wsServer = createAdminWebSocketServer(httpServer, {
-			getCredentials: () => ({}),
+			isAuthorized: () => true,
 		});
 		await expect(wsServer.close()).resolves.toBeUndefined();
 	});

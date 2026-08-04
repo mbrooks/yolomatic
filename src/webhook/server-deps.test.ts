@@ -16,7 +16,7 @@ function createSessionStore() {
 
 describe("createWebhookServerDeps", () => {
 	it("provides working fallback services when optional deps are omitted", async () => {
-		const deps = createWebhookServerDeps(createSessionStore(), "admin", "secret");
+		const deps = createWebhookServerDeps(createSessionStore());
 		const fallbackTaskController = deps.taskController;
 		const fallbackWorkspaceService = (deps.cleanupCommand as any).workspaces;
 
@@ -96,8 +96,6 @@ describe("createWebhookServerDeps", () => {
 
 		const deps = createWebhookServerDeps(
 			sessionStore,
-			"admin",
-			"secret",
 			taskController as never,
 			workspaceManager as never,
 			staleDetector as never,
@@ -133,8 +131,6 @@ describe("createWebhookServerDeps", () => {
 		expect(status.success).toBe(true);
 		expect(staleDetector.detectStaleSessions).toHaveBeenCalled();
 		expect(deps.githubService).toBe(githubService);
-		expect(deps.adminUsername).toBe("admin");
-		expect(deps.adminPassword).toBe("secret");
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
 		expect(deps.adminPath).toBe("/yeetomatic/admin");
 		expect(deps.adminDefaultPage).toBe("#/dashboard");
@@ -146,8 +142,6 @@ describe("createWebhookServerDeps", () => {
 		const repositoryStore = { listSync: vi.fn(() => []) } as never;
 		const deps = createWebhookServerDeps(
 			createSessionStore(),
-			"admin",
-			"secret",
 			undefined,
 			undefined,
 			undefined,
@@ -170,8 +164,6 @@ describe("createWebhookServerDeps", () => {
 
 		const deps = createWebhookServerDeps(
 			createSessionStore(),
-			"admin",
-			"secret",
 			undefined,
 			undefined,
 			undefined,
@@ -189,8 +181,6 @@ describe("createWebhookServerDeps", () => {
 	it("threads the configured admin path and default page into the deps", () => {
 		const deps = createWebhookServerDeps(
 			createSessionStore(),
-			"admin",
-			"secret",
 			undefined,
 			undefined,
 			undefined,
@@ -207,5 +197,32 @@ describe("createWebhookServerDeps", () => {
 
 		expect(deps.adminPath).toBe("/custom/admin");
 		expect(deps.adminDefaultPage).toBe("#/repos");
+	});
+
+	it("threads the user store and session auth into the deps", () => {
+		const userStore = { hasAnySync: vi.fn(() => true) } as never;
+		const sessionAuth = { isAdminAuthorized: vi.fn() } as never;
+		const deps = createWebhookServerDeps(
+			createSessionStore(),
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			userStore,
+			sessionAuth,
+		);
+
+		expect(deps.userStore).toBe(userStore);
+		expect(deps.sessionAuth).toBe(sessionAuth);
 	});
 });

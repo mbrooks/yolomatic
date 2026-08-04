@@ -24,7 +24,7 @@ function request(url: string, method: string, body?: string): http.IncomingMessa
 		url,
 		method,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {
@@ -69,8 +69,7 @@ describe("handleRepoRoutes", () => {
 
 	function makeDeps(overrides?: Partial<AdminRouterDeps>): AdminRouterDeps {
 		return {
-			adminUsername: "admin",
-			adminPassword: "secret",
+			sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 			githubService: githubService as unknown as AdminRouterDeps["githubService"],
 			settingsStore: settingsStore as unknown as AdminRouterDeps["settingsStore"],
 			startIssueSession: startIssueSession as unknown as AdminRouterDeps["startIssueSession"],
@@ -151,8 +150,7 @@ describe("handleRepoRoutes", () => {
 			{ method: "GET", url: "/api/repos/mbrooks/yeetomatic/issues", headers: {} } as never,
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: (_req: any, r: any) => { r.statusCode = 401; r.end('{"error":"Unauthorized"}'); return false; }, requireAdminText: () => false, isAdminAuthorized: () => false, hasUsers: () => true } as never,
 			} as never,
 			"/api/repos/mbrooks/yeetomatic/issues",
 		);
@@ -657,8 +655,7 @@ describe("handleRepoRoutes", () => {
 				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 				} as never,
 				"/api/repos/mbrooks/yeetomatic/issues/42/start-session",
 			);
@@ -675,8 +672,7 @@ describe("handleRepoRoutes", () => {
 				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -698,8 +694,7 @@ describe("handleRepoRoutes", () => {
 				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -724,8 +719,7 @@ describe("handleRepoRoutes", () => {
 				request("/api/repos/mbrooks/yeetomatic/issues/42/start-session", "POST"),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -757,8 +751,7 @@ describe("handleRepoRoutes", () => {
 				),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -793,8 +786,7 @@ describe("handleRepoRoutes", () => {
 				),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -832,8 +824,7 @@ describe("handleRepoRoutes", () => {
 				),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
@@ -869,8 +860,7 @@ describe("handleRepoRoutes", () => {
 				),
 				res,
 				{
-					adminUsername: "admin",
-					adminPassword: "secret",
+					sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 					githubService: {
 						updateIssueAssignees: vi.fn(),
 						getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),

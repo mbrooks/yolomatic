@@ -3,18 +3,12 @@ import {
 	AdminRouteRegistry,
 	type AdminRouteContext,
 	mapResultToStatus,
-	getCredentials,
 	checkAdminJson,
 	checkAdminTextAllowOnboarding,
 	requireDeps,
 	resolveAdminPath,
 	resolveAdminDefaultPage,
 } from "./admin-router-shared.js";
-
-vi.mock("./admin-auth.js", () => ({
-	requireAdminJson: vi.fn(() => true),
-	requireAdminText: vi.fn(() => true),
-}));
 
 describe("admin-router-shared", () => {
 	function mockResponse() {
@@ -45,60 +39,30 @@ describe("admin-router-shared", () => {
 		expect(mapResultToStatus("conflict")).toBe(409);
 	});
 
-	it("returns credentials from adminUsername/adminPassword when set", () => {
-		const result = getCredentials({
-			adminUsername: "admin",
-			adminPassword: "secret",
-		} as never);
-		expect(result).toEqual({ username: "admin", password: "secret" });
-	});
-
-	it("returns credentials from settingsStore when admin credentials are not set", () => {
-		const result = getCredentials({
-			settingsStore: {
-				get: (key: string) => (key === "admin_username" ? "stored-admin" : key === "admin_password" ? "stored-secret" : undefined),
-			},
-		} as never);
-		expect(result).toEqual({ username: "stored-admin", password: "stored-secret" });
-	});
-
-	it("returns empty credentials when nothing is set", () => {
-		const result = getCredentials({} as never);
-		expect(result).toEqual({});
-	});
-
-	it("checkAdminJson returns false when credentials are missing", () => {
+	it("checkAdminJson returns 503 when sessionAuth is missing (onboarding mode)", () => {
 		const request = { headers: {} } as never;
-		const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() } as never;
-		const result = checkAdminJson(request, response, {} as never);
+		const response = mockResponse();
+		const result = checkAdminJson(request, response as never, {} as never);
 		expect(result).toBe(false);
+		expect(response.statusCode).toBe(503);
 	});
 
-	it("checkAdminJson returns result from requireAdminJson when credentials exist", () => {
+	it("checkAdminJson delegates to sessionAuth when configured", () => {
 		const request = { headers: {} } as never;
-		const response = { statusCode: 0 } as never;
-		const result = checkAdminJson(request, response, {
-			adminUsername: "admin",
-			adminPassword: "secret",
+		const response = mockResponse();
+		const result = checkAdminJson(request, response as never, {
+			sessionAuth: { requireAdminJson: () => true } as never,
 		} as never);
 		expect(result).toBe(true);
 	});
 
-	it("checkAdminTextAllowOnboarding returns true when credentials are missing", () => {
+	it("checkAdminTextAllowOnboarding always allows (login screen is served by the SPA)", () => {
 		const request = { headers: {} } as never;
 		const response = { statusCode: 0 } as never;
-		const result = checkAdminTextAllowOnboarding(request, response, {} as never);
-		expect(result).toBe(true);
-	});
-
-	it("checkAdminTextAllowOnboarding returns result from requireAdminText when credentials exist", () => {
-		const request = { headers: {} } as never;
-		const response = { statusCode: 0 } as never;
-		const result = checkAdminTextAllowOnboarding(request, response, {
-			adminUsername: "admin",
-			adminPassword: "secret",
-		} as never);
-		expect(result).toBe(true);
+		expect(checkAdminTextAllowOnboarding(request, response, {} as never)).toBe(true);
+		expect(checkAdminTextAllowOnboarding(request, response, {
+			sessionAuth: { requireAdminText: () => false } as never,
+		} as never)).toBe(true);
 	});
 
 	it("requireDeps sends the configured dependency error response", () => {

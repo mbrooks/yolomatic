@@ -108,7 +108,7 @@ describe("settings/model", () => {
 
     it("groups settings into expected categories", () => {
       expect(getSettingDefinition("github_token")?.category).toBe("github-integration");
-      expect(getSettingDefinition("admin_username")?.category).toBe("authentication");
+      expect(getSettingDefinition("admin_github_username")?.category).toBe("authentication");
       expect(getSettingDefinition("port")?.category).toBe("server");
       expect(getSettingDefinition("workspaces_dir")?.category).toBe("file-system");
       expect(getSettingDefinition("max_worktrees")?.category).toBe("git-worktrees");

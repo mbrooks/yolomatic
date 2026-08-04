@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerState } from "../hooks/useServerState.js";
 import { useRoute, navigate, DEFAULT_SETTINGS_TAB, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
@@ -10,6 +10,8 @@ import { SettingsScreen } from "../features/settings/SettingsScreen.js";
 import { RepoSkillsScreen } from "../features/skills/RepoSkillsScreen.js";
 import { IssuesScreen } from "../features/issues/IssuesScreen.js";
 import { RepoSettingsScreen } from "../features/repos/RepoSettingsScreen.js";
+import { LoginScreen } from "../features/auth/LoginScreen.js";
+import { fetchMe, logout, type AuthUser } from "../api/auth.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
 import type { AgentStatus, RepoSummary, Session } from "./types.js";
 
@@ -17,6 +19,30 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 	const [tick, setTick] = useState(0);
 	const serverState = useServerState(tick);
 	const route = useRoute();
+	const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
+
+	useEffect(() => {
+		let cancelled = false;
+		fetchMe()
+			.then((result) => {
+				if (!cancelled) setAuthUser(result.user);
+			})
+			.catch(() => {
+				if (!cancelled) setAuthUser(null);
+			});
+		return () => {
+				cancelled = true;
+			};
+	}, [tick]);
+
+	const handleLogout = useCallback(async () => {
+		try {
+			await logout();
+		} catch {
+			// ignore
+		}
+		setAuthUser(null);
+	}, []);
 
 	const agentStatus: AgentStatus = serverState.status === "ready" ? serverState.data.agent : "offline";
 	const sessions = serverState.status === "ready" ? serverState.data.sessions : [];
@@ -110,6 +136,13 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 		return sessions.filter((s) => s.owner === route.owner && s.repo === route.repo);
 	}, [sessions, route]);
 
+	if (authUser === null) {
+		return <LoginScreen onLoggedIn={() => setTick((t) => t + 1)} />;
+	}
+	if (authUser === undefined) {
+		return <div className="empty">Loading...</div>;
+	}
+
 	return (
 		<div className="app">
 			{serverState.status === "ready" && serverState.data.draining && <RestartBanner />}
@@ -117,6 +150,8 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 				agentStatus={agentStatus}
 				isSettingsActive={isSettingsActive}
 				onSettings={handleSelectSettings}
+				onLogout={handleLogout}
+				authUser={authUser ?? undefined}
 			/>
 
 			{serverState.status === "error" ? (
@@ -153,21 +188,37 @@ function AppHeader({
 	agentStatus,
 	isSettingsActive,
 	onSettings,
+	onLogout,
+	authUser,
 }: {
 	agentStatus: AgentStatus;
 	isSettingsActive: boolean;
 	onSettings: () => void;
+	onLogout: () => void;
+	authUser?: AuthUser;
 }): React.ReactElement {
 	return (
 		<header>
 			<h1>Yeetomatic Admin</h1>
 			<div className="header-actions">
+				{authUser ? (
+					<span style={{ color: "var(--muted)", fontSize: "0.875rem", marginRight: "0.5rem" }}>
+						Signed in as {authUser.username}
+					</span>
+				) : null}
 				<button
 					className={`global-tab${isSettingsActive ? " active" : ""}`}
 					onClick={onSettings}
 					type="button"
 				>
 					Settings
+				</button>
+				<button
+					className="global-tab"
+					onClick={onLogout}
+					type="button"
+				>
+					Sign out
 				</button>
 			</div>
 		</header>
