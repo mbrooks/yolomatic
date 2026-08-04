@@ -1,12 +1,12 @@
 import type { SessionRepository } from "../../ports/session-repository.js";
-import type { SessionState, SessionStatus } from "../../session/store.js";
+import type { SessionKind, SessionState, SessionStatus } from "../../session/store.js";
 import { isTerminalStatus } from "../../session/store.js";
 
 export class SessionStoreRepositoryAdapter implements SessionRepository {
 	constructor(private readonly store: import("../../session/store.js").SessionStore) {}
 
-	get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null> {
-		return this.store.get(owner, repo, issueNumber);
+	get(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState | null> {
+		return this.store.get(owner, repo, issueNumber, kind);
 	}
 
 	getAll(): Promise<SessionState[]> {
@@ -17,8 +17,8 @@ export class SessionStoreRepositoryAdapter implements SessionRepository {
 		return this.store.set(state);
 	}
 
-	delete(owner: string, repo: string, issueNumber: number): Promise<void> {
-		return this.store.delete(owner, repo, issueNumber);
+	delete(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<void> {
+		return this.store.delete(owner, repo, issueNumber, kind);
 	}
 
 	archive(state: SessionState, archiveDir: string): Promise<void> {
@@ -32,23 +32,26 @@ export class SessionStoreRepositoryAdapter implements SessionRepository {
 		title: string,
 		body: string,
 		workspacePath: string,
+		kindOrLabels: SessionKind | string[] = "implementation",
 		labels?: string[],
 	): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+		const kind = Array.isArray(kindOrLabels) ? "implementation" : kindOrLabels;
+		const sessionLabels = Array.isArray(kindOrLabels) ? kindOrLabels : labels;
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (existing) {
 			return existing;
 		}
 		const state: SessionState = {
-			kind: "implementation",
+			kind,
 			issueNumber,
 			repo,
 			owner,
 			title,
 			body,
 			status: "pending",
-			sessionPath: this.store.getSessionPath(owner, repo, issueNumber),
+			sessionPath: this.store.getSessionPath(owner, repo, issueNumber, kind),
 			workspacePath,
-			labels,
+			labels: sessionLabels,
 			lastActivity: new Date().toISOString(),
 			createdAt: new Date().toISOString(),
 			seeded: false,
@@ -62,8 +65,9 @@ export class SessionStoreRepositoryAdapter implements SessionRepository {
 		issueNumber: number,
 		status: SessionStatus,
 		updates?: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">>,
+		kind: SessionKind = "implementation",
 	): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}

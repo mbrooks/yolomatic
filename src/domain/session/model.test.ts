@@ -82,14 +82,29 @@ describe("buildRepoSummaries", () => {
 		];
 		const summaries = buildRepoSummaries(sessions);
 		expect(summaries).toHaveLength(2);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, lastActivity: expect.any(String) });
-		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, lastActivity: expect.any(String) });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
 	});
 
 	it("counts first terminal session as inactive", () => {
 		const sessions = [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "complete" })];
 		const summaries = buildRepoSummaries(sessions);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 0, implementationSessionCount: 1, implementationActiveCount: 0, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+	});
+
+	it("reports implementation and refinement counts separately while preserving aggregate totals", () => {
+		const sessions = [
+			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation", status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement", status: "complete" }),
+		];
+		expect(buildRepoSummaries(sessions)[0]).toMatchObject({
+			sessionCount: 2,
+			activeCount: 1,
+			implementationSessionCount: 1,
+			implementationActiveCount: 1,
+			refinementSessionCount: 1,
+			refinementActiveCount: 0,
+		});
 	});
 
 	it("returns empty array for no sessions", () => {

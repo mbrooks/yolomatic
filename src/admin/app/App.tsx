@@ -34,7 +34,10 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 		return (
 			sessions.find(
 				(s) =>
-					s.owner === route.owner && s.repo === route.repo && s.issueNumber === route.issueNumber,
+					s.owner === route.owner &&
+					s.repo === route.repo &&
+					s.issueNumber === route.issueNumber &&
+					(s.kind ?? "implementation") === (route.kind ?? "implementation"),
 			) ?? null
 		);
 	}, [sessions, route]);
@@ -59,19 +62,21 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 		(session: Session) => {
 			const next: Route =
 				route.screen === "repo"
-					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, tab: route.tab }
+					? { screen: "repo", owner: route.owner, repo: route.repo, issueNumber: session.issueNumber, kind: session.kind, tab: route.tab }
 					: route.screen === "working"
 						? {
 							screen: "working",
 							owner: session.owner,
 							repo: session.repo,
 							issueNumber: session.issueNumber,
+							kind: session.kind,
 						}
 							: {
 								screen: "repo",
 								owner: session.owner,
 								repo: session.repo,
 								issueNumber: session.issueNumber,
+								kind: session.kind,
 								tab: "sessions",
 							};
 			navigate(next);

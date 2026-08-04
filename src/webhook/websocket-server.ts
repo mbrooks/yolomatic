@@ -5,10 +5,11 @@ import type { SessionLogEntry } from "../logging/session-log-store.js";
 import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 import { adminWebSocketPath, DEFAULT_ADMIN_PATH } from "../config.js";
+import { sessionStorageKey, type SessionKind } from "../session/store.js";
 
 export type ClientMessage =
-	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number }
-	| { type: "unsubscribe-log"; owner: string; repo: string; issueNumber: number }
+	| { type: "subscribe-log"; owner: string; repo: string; issueNumber: number; kind: SessionKind }
+	| { type: "unsubscribe-log"; owner: string; repo: string; issueNumber: number; kind: SessionKind }
 	| { type: "subscribe-status" }
 	| { type: "unsubscribe-status" };
 
@@ -106,9 +107,9 @@ export function createAdminWebSocketServer(
 						: Buffer.from(raw).toString("utf8");
 				const msg = JSON.parse(text) as ClientMessage;
 				if (msg.type === "subscribe-log") {
-					subscriptions.add(`log:${msg.owner}/${msg.repo}#${msg.issueNumber}`);
+					subscriptions.add(`log:${sessionStorageKey(msg.owner, msg.repo, msg.issueNumber, msg.kind)}`);
 				} else if (msg.type === "unsubscribe-log") {
-					subscriptions.delete(`log:${msg.owner}/${msg.repo}#${msg.issueNumber}`);
+					subscriptions.delete(`log:${sessionStorageKey(msg.owner, msg.repo, msg.issueNumber, msg.kind)}`);
 				} else if (msg.type === "subscribe-status") {
 					subscriptions.add("status");
 					if (hasStatusSubscribers()) {

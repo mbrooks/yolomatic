@@ -17,7 +17,7 @@ export class CleanupOldSessions {
 		for (const session of stale) {
 			try {
 				await this.workspaces.removeWorktree(session.owner, session.repo, session.issueNumber);
-				await this.sessions.delete(session.owner, session.repo, session.issueNumber);
+				await this.sessions.delete(session.owner, session.repo, session.issueNumber, session.kind ?? "implementation");
 				deleted++;
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);

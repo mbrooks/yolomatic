@@ -94,10 +94,33 @@ describe("webSocketManager", () => {
 		expect(socket.url).toBe("ws://localhost:6767/yeetomatic/admin/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
 		expect(socket.sent).toContain(
-			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1 }),
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" }),
 		);
 
 		unsub();
+	});
+
+	it("keeps refinement log subscriptions on their own channel", () => {
+		const cb = vi.fn();
+		const unsub = webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, "refinement", cb);
+		const socket = sockets[0];
+		socket.triggerOpen();
+
+		expect(socket.sent).toContain(
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement" }),
+		);
+
+		socket.triggerMessage({
+			type: "log-entry",
+			sessionKey: "github-mbrooks-yeetomatic-issue-1-refinement",
+			entry: { timestamp: "2025-01-01T00:00:00Z", level: "info", message: "refining" },
+		});
+		expect(cb).toHaveBeenCalledWith(expect.objectContaining({ message: "refining" }));
+
+		unsub();
+		expect(socket.sent).toContain(
+			JSON.stringify({ type: "unsubscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement" }),
+		);
 	});
 
 	it("receives log entries via websocket", () => {
@@ -108,7 +131,7 @@ describe("webSocketManager", () => {
 
 		socket.triggerMessage({
 			type: "log-entry",
-			sessionKey: "mbrooks/yeetomatic#1",
+			sessionKey: "github-mbrooks-yeetomatic-issue-1-implementation",
 			entry: { timestamp: "2025-01-01T00:00:00Z", level: "info", message: "hello" },
 		});
 
@@ -202,7 +225,7 @@ describe("webSocketManager", () => {
 
 		webSocketManager.subscribeLog("owner", "repo", 99, () => {});
 		expect(sendSpy).toHaveBeenCalledWith(
-			JSON.stringify({ type: "subscribe-log", owner: "owner", repo: "repo", issueNumber: 99 }),
+			JSON.stringify({ type: "subscribe-log", owner: "owner", repo: "repo", issueNumber: 99, kind: "implementation" }),
 		);
 	});
 

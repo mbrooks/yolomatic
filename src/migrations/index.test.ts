@@ -88,6 +88,42 @@ describe("migrations", () => {
 		db.close();
 	});
 
+	it("migrates legacy session rows and logs to kind-aware keys", () => {
+		const db = new DatabaseSync(dbPath);
+		for (const migration of MIGRATIONS.filter((entry) => entry.id < 9)) migration.up(db);
+		const legacyKey = "github-mbrooks-yeetomatic-issue-534";
+		const state = {
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 534,
+			title: "Legacy implementation",
+			body: "Body",
+			status: "working",
+			sessionPath: "/tmp/issue-534.jsonl",
+			workspacePath: "/tmp/issue-534",
+			lastActivity: "2026-08-01T00:00:00.000Z",
+			seeded: false,
+		};
+		db.prepare(
+			"INSERT INTO sessions (session_key, owner, repo, issue_number, status, archived_at, state_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		).run(legacyKey, "mbrooks", "yeetomatic", 534, "working", null, JSON.stringify(state), state.lastActivity);
+		db.prepare(
+			"INSERT INTO session_logs (session_key, timestamp, level, message) VALUES (?, ?, ?, ?)",
+		).run(legacyKey, state.lastActivity, "info", "legacy log");
+
+		runMigrations(db);
+
+		const expectedKey = "github-mbrooks-yeetomatic-issue-534-implementation";
+		const row = db.prepare("SELECT session_key, state_json FROM sessions").get() as {
+			session_key: string;
+			state_json: string;
+		};
+		expect(row.session_key).toBe(expectedKey);
+		expect(JSON.parse(row.state_json)).toMatchObject({ kind: "implementation", sessionPath: state.sessionPath });
+		expect(db.prepare("SELECT session_key FROM session_logs").get()).toEqual({ session_key: expectedKey });
+		db.close();
+	});
+
 	it("repairs missing tables when migration bookkeeping is ahead of schema", () => {
 		const db = new DatabaseSync(dbPath);
 		db.exec(`

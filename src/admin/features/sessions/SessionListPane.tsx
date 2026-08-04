@@ -25,10 +25,11 @@ export function SessionListPane({
 					const isSelected =
 						selected?.owner === session.owner &&
 						selected?.repo === session.repo &&
-						selected?.issueNumber === session.issueNumber;
+						selected?.issueNumber === session.issueNumber &&
+						selected?.kind === session.kind;
 					return (
 						<div
-							key={`${session.owner}/${session.repo}#${session.issueNumber}`}
+							key={`${session.owner}/${session.repo}#${session.issueNumber}/${session.kind}`}
 							className={`list-row${isSelected ? " selected" : ""}`}
 							onClick={() => onSelect(session)}
 							tabIndex={0}

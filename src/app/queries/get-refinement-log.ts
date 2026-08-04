@@ -1,6 +1,6 @@
-import { sessionKey } from "../../domain/session/model.js";
 import { getSessionLogs, type SessionLogEntry } from "../../logging/session-log-store.js";
 import type { RefinementStore } from "../../refinement/store.js";
+import { sessionStorageKey } from "../../session/store.js";
 import { fail, ok, type AppResult } from "../result.js";
 
 export interface RefinementLogView {
@@ -24,7 +24,7 @@ export class GetRefinementLog {
 			return fail("not_found", "No refinement activity for this issue");
 		}
 
-		const key = sessionKey(owner, repo, issueNumber);
+		const key = sessionStorageKey(owner, repo, issueNumber, "refinement");
 		const logs = getSessionLogs(key, since);
 		return ok({ available: true, logs });
 	}

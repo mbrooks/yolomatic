@@ -19,6 +19,10 @@ function makeRepo(overrides: Partial<RepoSummary> = {}): RepoSummary {
 		repo: "yeetomatic",
 		sessionCount: 1,
 		activeCount: 0,
+		implementationSessionCount: 1,
+		implementationActiveCount: 0,
+		refinementSessionCount: 0,
+		refinementActiveCount: 0,
 		lastActivity: "2026-01-01T00:00:00Z",
 		...overrides,
 	};
@@ -55,6 +59,24 @@ describe("RepoInventoryScreen", () => {
 
 		expect(screen.getByText("mbrooks/yeetomatic")).not.toBeNull();
 		expect(screen.getByText("octocat/hello-world")).not.toBeNull();
+	});
+
+	it("shows implementation and refinement activity separately", () => {
+		render(
+			<RepoInventoryScreen
+				{...defaultProps}
+				repos={[makeRepo({
+					sessionCount: 3,
+					activeCount: 2,
+					implementationSessionCount: 2,
+					implementationActiveCount: 1,
+					refinementSessionCount: 1,
+					refinementActiveCount: 1,
+				})]}
+			/>,
+		);
+		expect(screen.getByText("1 active / 2 total")).not.toBeNull();
+		expect(screen.getByText("1 active / 1 total")).not.toBeNull();
 	});
 
 	it("calls onSelectRepo when a row is clicked", () => {

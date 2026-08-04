@@ -1,10 +1,10 @@
-import type { SessionState, SessionStatus } from "../session/store.js";
+import type { SessionKind, SessionState, SessionStatus } from "../session/store.js";
 
 export interface SessionRepository {
-	get(owner: string, repo: string, issueNumber: number): Promise<SessionState | null>;
+	get(owner: string, repo: string, issueNumber: number, kind?: SessionKind): Promise<SessionState | null>;
 	getAll(): Promise<SessionState[]>;
 	save(state: SessionState): Promise<SessionState>;
-	delete(owner: string, repo: string, issueNumber: number): Promise<void>;
+	delete(owner: string, repo: string, issueNumber: number, kind?: SessionKind): Promise<void>;
 	archive(state: SessionState, archiveDir: string): Promise<void>;
 	createSession(
 		owner: string,
@@ -13,6 +13,7 @@ export interface SessionRepository {
 		title: string,
 		body: string,
 		workspacePath: string,
+		kind?: SessionKind | string[],
 		labels?: string[],
 	): Promise<SessionState>;
 	updateStatus(
@@ -21,6 +22,7 @@ export interface SessionRepository {
 		issueNumber: number,
 		status: SessionStatus,
 		updates?: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">>,
+		kind?: SessionKind,
 	): Promise<SessionState>;
 	markSeeded(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
 	associatePR(owner: string, repo: string, issueNumber: number, prNumber: number, prUrl: string): Promise<SessionState>;

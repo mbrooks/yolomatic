@@ -62,7 +62,7 @@ describe("useSessionLog websocket", () => {
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(mockLogResponse());
 		subscribeLogSpy = vi.spyOn(webSocketManager, "subscribeLog").mockImplementation(
-			(_owner, _repo, _issueNumber, callback) => {
+			(_owner, _repo, _issueNumber, _kind, callback) => {
 				logCallback = callback;
 				return () => {
 					logCallback = null;
@@ -96,7 +96,7 @@ describe("useSessionLog websocket", () => {
 			await Promise.resolve();
 		});
 
-		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, expect.any(Function));
+		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "implementation", expect.any(Function));
 	});
 
 	it("appends log entries received via websocket", async () => {

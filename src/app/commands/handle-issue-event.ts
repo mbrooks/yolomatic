@@ -97,7 +97,7 @@ export class HandleIssueEvent {
 				return;
 			}
 			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (Yeetomatic unassigned)\n`);
-			const state = await this.deps.sessions.get(owner, repo, issue.number);
+			const state = await this.deps.sessions.get(owner, repo, issue.number, "implementation");
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
 				await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending");
 				await removeWorkflowLabels(this.deps.github, owner, repo, issue.number);
@@ -112,7 +112,7 @@ export class HandleIssueEvent {
 				process.stdout.write(`[webhook] issues.edited ignored: not a Yeetomatic issue\n`);
 				return;
 			}
-			const state = await this.deps.sessions.get(owner, repo, issue.number);
+			const state = await this.deps.sessions.get(owner, repo, issue.number, "implementation");
 			if (!state) {
 				process.stdout.write(`[webhook] issues.edited ignored: no session for ${key}\n`);
 				return;

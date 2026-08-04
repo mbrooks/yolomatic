@@ -13,6 +13,7 @@ import { isAdmin, parseIssueRefinementCommand } from "../../domain/workflow/poli
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { statSync } from "node:fs";
+import { sessionStorageKey } from "../../session/store.js";
 
 export interface IssueRefinementEventPayload {
 	action: string;
@@ -202,8 +203,10 @@ export class HandleIssueRefinement {
 			return;
 		}
 
-		const activeSession = await this.deps.sessions.get(owner, repo, issueNumber);
-		if (activeSession?.status === "working") {
+		const activeImplementation = await this.deps.sessions.get(owner, repo, issueNumber, "implementation");
+		const activeRefinement = await this.deps.sessions.get(owner, repo, issueNumber, "refinement");
+		const activeSession = [activeImplementation, activeRefinement].find((session) => session?.status === "working");
+		if (activeSession) {
 			process.stdout.write(`[refinement] ignored: ${key} has an active ${activeSession.kind ?? "implementation"} session\n`);
 			this.log(owner, repo, issueNumber, "warn", `Refinement skipped: an active ${activeSession.kind ?? "implementation"} session exists`);
 			await this.deps.github.postComment(
@@ -244,6 +247,7 @@ export class HandleIssueRefinement {
 				title,
 				body,
 				this.deps.workspaces.getWorktreePath(owner, repo, issueNumber),
+				"refinement",
 				payload.issue.labels?.map((label) => label.name).filter((name): name is string => !!name),
 			);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
@@ -266,7 +270,7 @@ export class HandleIssueRefinement {
 				taskStartedAt,
 				taskFinishedAt: undefined,
 				totalExecutionTimeMs: undefined,
-			});
+			}, "refinement");
 			sessionStarted = true;
 
 			process.stdout.write(`[refinement] starting for ${owner}/${repo}#${issueNumber}\n`);
@@ -316,9 +320,9 @@ export class HandleIssueRefinement {
 
 			const state = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
 				workspacePath: worktreePath,
-			});
+			}, "refinement");
 			const result = await this.deps.executor.executeRefinement(state, skillInfo.content, steering);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", { summary: result.summary });
+			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", { summary: result.summary }, "refinement");
 
 			this.deps.refinementStore.updateAttempt(attemptId, {
 				proposedTaskBody: result.proposedTaskBody,
@@ -363,7 +367,7 @@ export class HandleIssueRefinement {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete", {
 				summary: result.summary,
 				taskFinishedAt: this.deps.clock.now().toISOString(),
-			});
+			}, "refinement");
 			this.log(owner, repo, issueNumber, "info", "Applied refined issue body");
 			await this.deps.github.postComment(
 				owner,
@@ -411,7 +415,7 @@ export class HandleIssueRefinement {
 		message: string,
 		details?: Record<string, unknown>,
 	): void {
-		recordSessionLog(issueSessionKey(owner, repo, issueNumber), { level, message, details });
+		recordSessionLog(sessionStorageKey(owner, repo, issueNumber, "refinement"), { level, message, details });
 	}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
@@ -490,11 +494,11 @@ export class HandleIssueRefinement {
 			summary: reason,
 			staleReason: reason,
 			taskFinishedAt: this.deps.clock.now().toISOString(),
-		});
+		}, "refinement");
 	}
 
 	private async ensureTerminalSession(owner: string, repo: string, issueNumber: number): Promise<void> {
-		const session = await this.deps.sessions.get(owner, repo, issueNumber);
+		const session = await this.deps.sessions.get(owner, repo, issueNumber, "refinement");
 		if (session?.kind === "refinement" && session.status === "working") {
 			await this.failSession(owner, repo, issueNumber, "refinement ended without a terminal outcome");
 		}
