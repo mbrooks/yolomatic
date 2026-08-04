@@ -226,19 +226,19 @@ describe("buildHash", () => {
 	it("builds repo detail with issue number (sessions default)", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "sessions" }),
-		).toBe("#/repos/mbrooks/yeetomatic/140");
+		).toBe("#/repos/mbrooks/yeetomatic/140/implementation");
 	});
 
 	it("builds repo detail with issues tab and issue number", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "issues" }),
-		).toBe("#/repos/mbrooks/yeetomatic/issues/140");
+		).toBe("#/repos/mbrooks/yeetomatic/issues/140/implementation");
 	});
 
 	it("builds repo detail with skills tab and issue number", () => {
 		expect(
 			buildHash({ screen: "repo", owner: "mbrooks", repo: "yeetomatic", issueNumber: 140, tab: "skills" }),
-		).toBe("#/repos/mbrooks/yeetomatic/skills/140");
+		).toBe("#/repos/mbrooks/yeetomatic/skills/140/implementation");
 	});
 
 	it("builds new-issue view with owner and repo", () => {

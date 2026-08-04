@@ -34,7 +34,7 @@ describe("useRefinementLog", () => {
 	beforeEach(() => {
 		fetchSpy = vi.spyOn(globalThis, "fetch");
 		subscribeLogSpy = vi.spyOn(webSocketManager, "subscribeLog").mockImplementation(
-			(_owner, _repo, _issueNumber, callback) => {
+			(_owner, _repo, _issueNumber, _kind, callback) => {
 				logCallback = callback;
 				return () => {
 					logCallback = null;
@@ -85,7 +85,7 @@ describe("useRefinementLog", () => {
 		expect(result.current.attempts).toHaveLength(1);
 		expect(result.current.attempts[0].state).toBe("applied");
 		expect(result.current.logs.some((l) => l.message === "Refinement started")).toBe(true);
-		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, expect.any(Function));
+		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "refinement", expect.any(Function));
 	});
 
 	it("appends log entries received via websocket", async () => {

@@ -95,7 +95,7 @@ export function DashboardScreen({
 							const isRefinement = session.kind === "refinement";
 							return (
 								<div
-									key={`${session.owner}/${session.repo}#${session.issueNumber}`}
+									key={`${session.owner}/${session.repo}#${session.issueNumber}/${session.kind}`}
 									className="activity-row"
 									onClick={() => onSelectSession(session)}
 									tabIndex={0}

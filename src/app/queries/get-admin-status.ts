@@ -7,12 +7,11 @@ import {
 	buildRepoSummaries,
 	computeAgentStatus,
 	detectSessionRisk,
-	sessionKey,
 	sortSessionsByRecency,
 } from "../../domain/session/model.js";
 import { formatUptime } from "../../domain/workflow/policy.js";
 import type { StaleSessionInfo } from "../../session/stale-detector.js";
-import type { SessionKind } from "../../session/store.js";
+import { sessionStorageKey, type SessionKind } from "../../session/store.js";
 import { ok, type AppResult } from "../result.js";
 
 export interface AdminStatusSessionView {
@@ -71,7 +70,7 @@ export class GetAdminStatus {
 		try {
 			const staleInfos = await this.stale.detectStaleSessions();
 			for (const info of staleInfos) {
-				staleMap.set(sessionKey(info.session.owner, info.session.repo, info.session.issueNumber), info);
+				staleMap.set(sessionStorageKey(info.session.owner, info.session.repo, info.session.issueNumber, info.session.kind ?? "implementation"), info);
 			}
 		} catch {
 			// ignore stale detection errors
@@ -92,6 +91,10 @@ export class GetAdminStatus {
 					repo: configured.repo,
 					sessionCount: 0,
 					activeCount: 0,
+					implementationSessionCount: 0,
+					implementationActiveCount: 0,
+					refinementSessionCount: 0,
+					refinementActiveCount: 0,
 					lastActivity: null,
 				});
 			}
@@ -107,7 +110,7 @@ export class GetAdminStatus {
 			draining: this.taskControl.isDraining(),
 			repos,
 			sessions: sorted.map((s) => {
-				const stale = staleMap.get(sessionKey(s.owner, s.repo, s.issueNumber));
+				const stale = staleMap.get(sessionStorageKey(s.owner, s.repo, s.issueNumber, s.kind ?? "implementation"));
 				return {
 					kind: s.kind ?? "implementation",
 					owner: s.owner,

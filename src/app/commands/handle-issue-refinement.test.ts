@@ -7,7 +7,9 @@ import { RefinementStore } from "../../refinement/store.js";
 import { SettingsStore } from "../../settings/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
-import type { SessionState } from "../../session/store.js";
+import { sessionStorageKey, type SessionKind, type SessionState } from "../../session/store.js";
+
+const REFINEMENT_SESSION_KEY = sessionStorageKey("mbrooks", "yeetomatic", 1, "refinement");
 
 describe("HandleIssueRefinement", () => {
 	let tmpDir: string;
@@ -92,7 +94,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("yeetomatic-bot", undefined));
 		const record = store.getInstructionComment("mbrooks", "yeetomatic", 1);
 		expect(record).not.toBeNull();
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(true);
 	});
 
@@ -216,7 +218,7 @@ describe("HandleIssueRefinement", () => {
 		await handler.postInstructions(createInstructionPayload() as never);
 		expect(github.postComment).not.toHaveBeenCalled();
 		expect(store.getInstructionComment("mbrooks", "yeetomatic", 1)).toBeNull();
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(false);
 	});
 
@@ -335,6 +337,35 @@ describe("HandleIssueRefinement", () => {
 		});
 	});
 
+	it("does not modify an existing implementation session", async () => {
+		const implementation: SessionState = {
+			kind: "implementation",
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 1,
+			title: "Implementation",
+			body: "Original implementation body",
+			status: "waiting-feedback",
+			sessionPath: "/tmp/implementation.jsonl",
+			workspacePath: "/tmp/implementation",
+			branch: "yeetomatic/issue-1",
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			lastActivity: "2026-07-31T00:00:00.000Z",
+			seeded: true,
+		};
+		await sessions.save(implementation);
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(await sessions.get("mbrooks", "yeetomatic", 1, "implementation")).toEqual(implementation);
+		expect(await sessions.get("mbrooks", "yeetomatic", 1, "refinement")).toMatchObject({
+			kind: "refinement",
+			status: "complete",
+		});
+	});
+
 	it("records activity logs for a successful refinement", async () => {
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		executor.executeRefinement.mockResolvedValue({
@@ -345,7 +376,7 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		const messages = logs.map((l) => l.message);
 		expect(messages).toContain("Refinement command received from @admin");
 		expect(messages).toContain("Refinement started");
@@ -363,7 +394,7 @@ describe("HandleIssueRefinement", () => {
 				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
 			}) as never,
 		);
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.level === "warn" && l.message.includes("not a repository collaborator"))).toBe(true);
 		expect(logs.some((l) => l.message === "Refinement started")).toBe(false);
 	});
@@ -371,7 +402,7 @@ describe("HandleIssueRefinement", () => {
 	it("records a warning activity log when an implementation task is active", async () => {
 		tasks.isActive.mockReturnValue(true);
 		await handler.execute(createCommandPayload() as never);
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.level === "warn" && l.message.includes("implementation task is active"))).toBe(true);
 	});
 
@@ -379,7 +410,7 @@ describe("HandleIssueRefinement", () => {
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		executor.executeRefinement.mockRejectedValue(new Error("worker crashed"));
 		await handler.execute(createCommandPayload() as never);
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.level === "error" && l.message.startsWith("Refinement failed"))).toBe(true);
 	});
 
@@ -393,7 +424,7 @@ describe("HandleIssueRefinement", () => {
 			investigation: "Investigation",
 		});
 		await handler.execute(createCommandPayload() as never);
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.level === "warn" && l.message.includes("marked stale"))).toBe(true);
 		expect(logs.some((l) => l.message === "Applied refined issue body")).toBe(false);
 	});
@@ -565,7 +596,7 @@ describe("HandleIssueRefinement", () => {
 			"add criteria",
 		);
 
-		const logs = getSessionLogs("mbrooks/yeetomatic#1");
+		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		const entry = logs.find((l) => l.message === "Refinement command received from @admin");
 		expect(entry).toBeDefined();
 		expect(entry!.details).toEqual({ steeringPrompt: "add criteria" });
@@ -810,17 +841,20 @@ describe("HandleIssueRefinement", () => {
 	}
 
 	function createSessionsMock() {
-		let current: SessionState | null = null;
+		const states = new Map<SessionKind, SessionState>();
 		return {
-			get: vi.fn(async () => current),
+			get: vi.fn(async (_owner?: string, _repo?: string, _issueNumber?: number, kind?: SessionKind) =>
+				kind ? states.get(kind) ?? null : states.get("refinement") ?? states.get("implementation") ?? null,
+			),
 			save: vi.fn(async (state: SessionState) => {
-				current = state;
+				states.set(state.kind ?? "implementation", state);
 				return state;
 			}),
-			createSession: vi.fn(async (owner, repo, issueNumber, title, body, workspacePath, labels) => {
+			createSession: vi.fn(async (owner, repo, issueNumber, title, body, workspacePath, kind: SessionKind, labels) => {
+				let current = states.get(kind);
 				if (!current) {
 					current = {
-						kind: "implementation",
+						kind,
 						owner,
 						repo,
 						issueNumber,
@@ -833,13 +867,16 @@ describe("HandleIssueRefinement", () => {
 						seeded: false,
 						labels,
 					};
+					states.set(kind, current);
 				}
 				return current;
 			}),
-			updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates = {}) => {
+			updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates = {}, kind: SessionKind = "implementation") => {
+				const current = states.get(kind);
 				if (!current) throw new Error("No session");
-				current = { ...current, ...updates, status, lastActivity: new Date().toISOString() };
-				return current;
+				const updated = { ...current, ...updates, status, lastActivity: new Date().toISOString() };
+				states.set(kind, updated);
+				return updated;
 			}),
 		};
 	}

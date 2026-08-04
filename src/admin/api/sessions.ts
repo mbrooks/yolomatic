@@ -5,11 +5,15 @@ export function fetchSessionLog(
 	owner: string,
 	repo: string,
 	issueNumber: number,
+	kindOrSince: Session["kind"] | string = "implementation",
 	since?: string,
 ): Promise<SessionLogResponse> {
-	const qs = since ? `?since=${encodeURIComponent(since)}` : "";
+	const isKind = kindOrSince === "implementation" || kindOrSince === "refinement";
+	const kind: Session["kind"] = isKind ? kindOrSince : "implementation";
+	const resolvedSince = isKind ? since : kindOrSince;
+	const qs = resolvedSince ? `?since=${encodeURIComponent(resolvedSince)}` : "";
 	return apiGet<SessionLogResponse>(
-		`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log${qs}`,
+		`/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/${kind}/log${qs}`,
 	);
 }
 
@@ -30,9 +34,12 @@ export async function sendSessionCommand(
 	owner: string,
 	repo: string,
 	issueNumber: number,
-	command: SessionCommand,
+	kindOrCommand: Session["kind"] | SessionCommand,
+	maybeCommand?: SessionCommand,
 ): Promise<CommandResult> {
-	const path = `/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/commands`;
+	const kind: Session["kind"] = typeof kindOrCommand === "string" ? kindOrCommand : "implementation";
+	const command = typeof kindOrCommand === "string" ? maybeCommand! : kindOrCommand;
+	const path = `/api/sessions/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/${kind}/commands`;
 	const payload = command.type === "prune-worktree" ? { confirmDirty: command.confirmDirty ?? true } : undefined;
 	try {
 		const data = await apiPost<{ message?: string; error?: string }>(path, {

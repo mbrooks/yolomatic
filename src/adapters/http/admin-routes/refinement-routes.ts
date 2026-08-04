@@ -5,7 +5,7 @@ import { AdminRouteRegistry, mapResultToStatus, type AdminRouterDeps } from "../
 const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
-		pattern: /^\/api\/refinements\/([^/]+)\/([^/]+)\/(-?\d+)\/log$/u,
+		pattern: /^\/api\/refinements\/([^/]+)\/([^/]+)\/(-?\d+)\/refinement\/log$/u,
 		requiresDeps: ["refinementStore"],
 		handler: async (ctx) => {
 			const [owner, repo, issueNumberStr] = ctx.params;
@@ -21,7 +21,7 @@ const registry = new AdminRouteRegistry()
 	})
 	.route({
 		method: "GET",
-		pattern: /^\/api\/refinements\/([^/]+)\/([^/]+)\/(-?\d+)\/attempts$/u,
+		pattern: /^\/api\/refinements\/([^/]+)\/([^/]+)\/(-?\d+)\/refinement\/attempts$/u,
 		requiresDeps: ["refinementStore"],
 		handler: async (ctx) => {
 			const [owner, repo, issueNumberStr] = ctx.params;

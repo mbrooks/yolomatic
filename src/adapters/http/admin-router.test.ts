@@ -352,7 +352,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/sessions/:owner/:repo/:issue/log returns log", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/log",
+			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -367,7 +367,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands runs command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ command: "stop" }),
@@ -534,7 +534,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/log",
+			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
 			method: "GET",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 		});
@@ -547,7 +547,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands rejects missing command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({}),
@@ -571,7 +571,7 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/commands",
+			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
 			method: "POST",
 			headers: { authorization: makeBasicAuth("admin", "secret") },
 			body: JSON.stringify({ command: "stop" }),

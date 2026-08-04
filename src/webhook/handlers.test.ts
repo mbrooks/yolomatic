@@ -173,7 +173,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
 	});
 
 	it("delegates review submission events to the active PR review command", async () => {
@@ -197,7 +197,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			review: { id: 101, body: "LGTM", state: "approved", user: { login: "user" } },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
 	});
 
 	it("throws when runExecution is called without a session", async () => {
@@ -466,7 +466,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			repo: "yeetomatic",
 			pull_number: 99,
 		});
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
 		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith(
 			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
@@ -504,7 +504,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(executor.execute).not.toHaveBeenCalled();

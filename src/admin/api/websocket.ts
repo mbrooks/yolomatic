@@ -1,4 +1,4 @@
-import type { LogEntry } from "../app/types.js";
+import type { LogEntry, Session } from "../app/types.js";
 
 export type WebSocketStatus = "connecting" | "open" | "closed" | "error";
 
@@ -28,12 +28,24 @@ type ServerMessage = StatusMessage | LogMessage | { type: "error"; message: stri
 type LogCallback = (entry: LogEntry) => void;
 type StatusCallback = (data: unknown) => void;
 
+interface LogSubscription {
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	kind: Session["kind"];
+	callbacks: Set<LogCallback>;
+}
+
+function logSessionKey(owner: string, repo: string, issueNumber: number, kind: Session["kind"]): string {
+	return `github-${owner}-${repo}-issue-${issueNumber}-${kind}`;
+}
+
 class WebSocketManager {
 	private ws: WebSocket | null = null;
 	private reconnectDelay = 1000;
 	private readonly maxReconnectDelay = 30000;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	private logListeners = new Map<string, Set<LogCallback>>();
+	private logListeners = new Map<string, LogSubscription>();
 	private statusListeners = new Set<StatusCallback>();
 	private status: WebSocketStatus = "closed";
 	private statusSubscribers = new Set<(status: WebSocketStatus) => void>();
@@ -71,15 +83,14 @@ class WebSocketManager {
 			this.reconnectDelay = 1000;
 			this.setStatus("open");
 			// Re-subscribe to any active log channels
-			for (const sessionKey of this.logListeners.keys()) {
-				const parts = sessionKey.match(/^(.+)\/(.+)#(.+)$/u);
-				if (parts) {
-					const [, owner, repo, issueNumberStr] = parts;
-					const issueNumber = Number.parseInt(issueNumberStr, 10);
-					if (!Number.isNaN(issueNumber)) {
-						this.send({ type: "subscribe-log", owner, repo, issueNumber });
-					}
-				}
+			for (const subscription of this.logListeners.values()) {
+				this.send({
+					type: "subscribe-log",
+					owner: subscription.owner,
+					repo: subscription.repo,
+					issueNumber: subscription.issueNumber,
+					kind: subscription.kind,
+				});
 			}
 			if (this.statusListeners.size > 0) {
 				this.send({ type: "subscribe-status" });
@@ -90,9 +101,9 @@ class WebSocketManager {
 			try {
 				const msg = JSON.parse(String(event.data)) as ServerMessage;
 				if (msg.type === "log-entry") {
-					const callbacks = this.logListeners.get(msg.sessionKey);
-					if (callbacks) {
-						for (const cb of callbacks) {
+					const subscription = this.logListeners.get(msg.sessionKey);
+					if (subscription) {
+						for (const cb of subscription.callbacks) {
 							cb(msg.entry);
 						}
 					}
@@ -134,25 +145,35 @@ class WebSocketManager {
 		this.setStatus("closed");
 	}
 
-	subscribeLog(owner: string, repo: string, issueNumber: number, callback: LogCallback): () => void {
-		const sessionKey = `${owner}/${repo}#${issueNumber}`;
-		let callbacks = this.logListeners.get(sessionKey);
-		if (!callbacks) {
-			callbacks = new Set();
-			this.logListeners.set(sessionKey, callbacks);
+	subscribeLog(owner: string, repo: string, issueNumber: number, callback: LogCallback): () => void;
+	subscribeLog(owner: string, repo: string, issueNumber: number, kind: Session["kind"], callback: LogCallback): () => void;
+	subscribeLog(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		kindOrCallback: Session["kind"] | LogCallback,
+		maybeCallback?: LogCallback,
+	): () => void {
+		const kind: Session["kind"] = typeof kindOrCallback === "function" ? "implementation" : kindOrCallback;
+		const callback = typeof kindOrCallback === "function" ? kindOrCallback : maybeCallback!;
+		const sessionKey = logSessionKey(owner, repo, issueNumber, kind);
+		let subscription = this.logListeners.get(sessionKey);
+		if (!subscription) {
+			subscription = { owner, repo, issueNumber, kind, callbacks: new Set() };
+			this.logListeners.set(sessionKey, subscription);
 			if (this.ws?.readyState === WebSocket.OPEN) {
-				this.send({ type: "subscribe-log", owner, repo, issueNumber });
+				this.send({ type: "subscribe-log", owner, repo, issueNumber, kind });
 			} else {
 				this.connect();
 			}
 		}
-		callbacks.add(callback);
+		subscription.callbacks.add(callback);
 		return () => {
-			callbacks?.delete(callback);
-			if (callbacks && callbacks.size === 0) {
+			subscription?.callbacks.delete(callback);
+			if (subscription && subscription.callbacks.size === 0) {
 				this.logListeners.delete(sessionKey);
 				if (this.ws?.readyState === WebSocket.OPEN) {
-					this.send({ type: "unsubscribe-log", owner, repo, issueNumber });
+					this.send({ type: "unsubscribe-log", owner, repo, issueNumber, kind });
 				}
 				this.disconnectIfIdle();
 			}

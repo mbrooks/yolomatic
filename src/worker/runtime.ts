@@ -5,7 +5,7 @@ import path from "node:path";
 import WebSocket, { type RawData } from "ws";
 
 import { PiAgentExecutor, type RefinementResult } from "../executor/index.js";
-import { sessionKey as buildSessionKey } from "../domain/session/model.js";
+import { sessionStorageKey } from "../session/store.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
 import { setGitHubGatewayTransport, type GatewayCallResult } from "./github-gateway-client.js";
@@ -92,7 +92,7 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 		);
 
 		const state = launchConfig.payload.session;
-		const sessionLogKey = buildSessionKey(state.owner, state.repo, state.issueNumber);
+		const sessionLogKey = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
 		logListenerCleanup = onSessionLogEvent((key, entry) => {
 			if (key !== sessionLogKey) return;
 			void sendMessage(

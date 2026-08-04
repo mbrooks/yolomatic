@@ -202,6 +202,8 @@ export function RepoInventoryScreen({
 								<th className="repo-th" onClick={() => handleSort("activeCount")}>
 									Active{sortIndicator("activeCount")}
 								</th>
+								<th className="repo-th">Implementation</th>
+								<th className="repo-th">Refinement</th>
 								<th className="repo-th" onClick={() => handleSort("sessionCount")}>
 									Total{sortIndicator("sessionCount")}
 								</th>
@@ -231,6 +233,12 @@ export function RepoInventoryScreen({
 										</strong>
 									</td>
 									<td className="repo-td">{repo.activeCount}</td>
+									<td className="repo-td">
+										{repo.implementationActiveCount} active / {repo.implementationSessionCount} total
+									</td>
+									<td className="repo-td">
+										{repo.refinementActiveCount} active / {repo.refinementSessionCount} total
+									</td>
 									<td className="repo-td">{repo.sessionCount}</td>
 									<td className="repo-td">
 										{repo.lastActivity ? formatRelative(repo.lastActivity) : "–"}

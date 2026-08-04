@@ -31,7 +31,7 @@ describe("sessions api", () => {
 
 			await fetchSessionLog("mbrooks", "yeetomatic", 42);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/log");
+			expect(apiGet).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/implementation/log");
 		});
 
 		it("appends the encoded since cursor when provided", async () => {
@@ -40,7 +40,7 @@ describe("sessions api", () => {
 			await fetchSessionLog("mbrooks", "yeetomatic", 42, "2026-01-01T00:00:00Z");
 
 			expect(apiGet).toHaveBeenCalledWith(
-				"/api/sessions/mbrooks/yeetomatic/42/log?since=2026-01-01T00%3A00%3A00Z",
+				"/api/sessions/mbrooks/yeetomatic/42/implementation/log?since=2026-01-01T00%3A00%3A00Z",
 			);
 		});
 
@@ -49,7 +49,13 @@ describe("sessions api", () => {
 
 			await fetchSessionLog("my org", "my/repo", 1);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/sessions/my%20org/my%2Frepo/1/log");
+			expect(apiGet).toHaveBeenCalledWith("/api/sessions/my%20org/my%2Frepo/1/implementation/log");
+		});
+
+		it("includes refinement kind in the session log path", async () => {
+			vi.mocked(apiGet).mockResolvedValueOnce({ entries: [] });
+			await fetchSessionLog("mbrooks", "yeetomatic", 42, "refinement");
+			expect(apiGet).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/refinement/log");
 		});
 	});
 
@@ -60,7 +66,7 @@ describe("sessions api", () => {
 			const result = await sendSessionCommand("mbrooks", "yeetomatic", 42, { type: "cancel" });
 
 			expect(result).toEqual({ ok: true, message: "stopped" });
-			expect(apiPost).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/commands", {
+			expect(apiPost).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/implementation/commands", {
 				command: "cancel",
 				payload: undefined,
 			});
@@ -79,7 +85,7 @@ describe("sessions api", () => {
 
 			await sendSessionCommand("mbrooks", "yeetomatic", 42, { type: "prune-worktree" });
 
-			expect(apiPost).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/commands", {
+			expect(apiPost).toHaveBeenCalledWith("/api/sessions/mbrooks/yeetomatic/42/implementation/commands", {
 				command: "prune-worktree",
 				payload: { confirmDirty: true },
 			});
@@ -98,7 +104,7 @@ describe("sessions api", () => {
 
 			await sendSessionCommand("my org", "my/repo", 9, { type: "archive" });
 
-			expect(apiPost).toHaveBeenCalledWith("/api/sessions/my%20org/my%2Frepo/9/commands", {
+			expect(apiPost).toHaveBeenCalledWith("/api/sessions/my%20org/my%2Frepo/9/implementation/commands", {
 				command: "archive",
 				payload: undefined,
 			});

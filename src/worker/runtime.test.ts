@@ -173,7 +173,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("handshakes, forwards session logs, handles steering, and sends completion", async () => {
-		const sessionKey = "mbrooks/yeetomatic#12";
+		const sessionKey = "github-mbrooks-yeetomatic-issue-12-implementation";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 		let resolvePrompt!: () => void;
 		const promptReleased = new Promise<void>((resolve) => {
@@ -277,7 +277,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-99",
-				sessionKey: "mbrooks/yeetomatic#99",
+				sessionKey: "github-mbrooks-yeetomatic-issue-99-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unexpected session key");
@@ -293,7 +293,7 @@ describe("runWorkerRuntime", () => {
 					{
 						type: "launch_config",
 						protocolVersion: 99,
-						sessionKey: "mbrooks/yeetomatic#100",
+						sessionKey: "github-mbrooks-yeetomatic-issue-100-implementation",
 						messageId: "launch-version",
 						payload: {
 							session: {
@@ -314,7 +314,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-100",
-				sessionKey: "mbrooks/yeetomatic#100",
+				sessionKey: "github-mbrooks-yeetomatic-issue-100-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unsupported protocol version");
@@ -342,7 +342,7 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "mbrooks/yeetomatic#55", "launch-stop", {
+						createWorkerMessage("launch_config", "github-mbrooks-yeetomatic-issue-55-implementation", "launch-stop", {
 							session: {
 								owner: "mbrooks",
 								repo: "yeetomatic",
@@ -361,7 +361,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "mbrooks/yeetomatic#55", "control-stop", {
+							createWorkerMessage("control", "github-mbrooks-yeetomatic-issue-55-implementation", "control-stop", {
 								action: "stop",
 							}),
 						);
@@ -372,7 +372,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-55",
-			sessionKey: "mbrooks/yeetomatic#55",
+			sessionKey: "github-mbrooks-yeetomatic-issue-55-implementation",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -402,7 +402,7 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "mbrooks/yeetomatic#56", "launch-steer", {
+						createWorkerMessage("launch_config", "github-mbrooks-yeetomatic-issue-56-implementation", "launch-steer", {
 							session: {
 								owner: "mbrooks",
 								repo: "yeetomatic",
@@ -421,7 +421,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "mbrooks/yeetomatic#56", "control-steer", {
+							createWorkerMessage("control", "github-mbrooks-yeetomatic-issue-56-implementation", "control-steer", {
 								action: "steer",
 								message: "too soon",
 							}),
@@ -436,7 +436,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-56",
-			sessionKey: "mbrooks/yeetomatic#56",
+			sessionKey: "github-mbrooks-yeetomatic-issue-56-implementation",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -462,14 +462,14 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-57",
-				sessionKey: "mbrooks/yeetomatic#57",
+				sessionKey: "github-mbrooks-yeetomatic-issue-57-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Worker RPC connection closed before launch config arrived");
 	});
 
 	it("routes gateway tool calls to the control plane and resolves the tool_response", async () => {
-		const sessionKey = "mbrooks/yeetomatic#77";
+		const sessionKey = "github-mbrooks-yeetomatic-issue-77-implementation";
 		const seenToolRequests: string[] = [];
 
 		executeWithOverride.mockImplementation(async () => {
@@ -526,7 +526,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("surfaces gateway scope errors from the control plane as thrown errors", async () => {
-		const sessionKey = "mbrooks/yeetomatic#78";
+		const sessionKey = "github-mbrooks-yeetomatic-issue-78-implementation";
 
 		executeWithOverride.mockImplementation(async () => {
 			await expect(callGitHubGateway("fetch_pr", { pr_number: 999 })).rejects.toThrow(

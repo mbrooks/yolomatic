@@ -9,7 +9,7 @@ export function fetchRefinementLog(
 ): Promise<RefinementLogResponse> {
 	const qs = since ? `?since=${encodeURIComponent(since)}` : "";
 	return apiGet<RefinementLogResponse>(
-		`/api/refinements/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/log${qs}`,
+		`/api/refinements/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/refinement/log${qs}`,
 	);
 }
 
@@ -19,6 +19,6 @@ export function fetchRefinementAttempts(
 	issueNumber: number,
 ): Promise<RefinementAttemptsResponse> {
 	return apiGet<RefinementAttemptsResponse>(
-		`/api/refinements/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/attempts`,
+		`/api/refinements/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${issueNumber}/refinement/attempts`,
 	);
 }

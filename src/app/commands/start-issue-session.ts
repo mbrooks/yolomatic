@@ -54,9 +54,9 @@ export class StartIssueSession {
 				typeof this.defaultBranchOrResolver === "function"
 					? this.defaultBranchOrResolver(owner, repo)
 					: this.defaultBranchOrResolver;
-			const existingSession = await this.sessions.get(owner, repo, issueNumber);
+			const activeRefinement = await this.sessions.get(owner, repo, issueNumber, "refinement");
 
-			if (existingSession?.kind === "refinement" && existingSession.status === "working") {
+			if (activeRefinement?.kind === "refinement" && activeRefinement.status === "working") {
 				return fail("conflict", "Issue refinement is currently running");
 			}
 
