@@ -7,6 +7,7 @@ import {
 	listAccessibleRepositories,
 	initializeWorkspaces,
 	submitOnboarding,
+	fetchOnboardingOllamaSignInStatus,
 } from "./onboarding.js";
 
 function mockOkResponse(data: unknown): Response {
@@ -146,6 +147,47 @@ describe("onboarding API", () => {
 			expect(calls[0][0]).toBe("/api/onboarding");
 			const body = JSON.parse(calls[0][1].body as string);
 			expect(body.github_token).toBe("tok");
+		});
+	});
+
+	describe("fetchOnboardingOllamaSignInStatus", () => {
+		it("GETs /api/onboarding/ollama-signin and returns the parsed status", async () => {
+			fetchSpy.mockImplementation(async () => {
+				return mockOkResponse({
+					signedIn: true,
+					user: "alice",
+					message: "You are already signed in as user 'alice'",
+				});
+			});
+			const result = await fetchOnboardingOllamaSignInStatus();
+			expect(result.signedIn).toBe(true);
+			expect(result.user).toBe("alice");
+			const calls = fetchSpy.mock.calls as [string, RequestInit | undefined][];
+			expect(calls[0][0]).toBe("/api/onboarding/ollama-signin");
+			expect(calls[0][1]).toBeUndefined();
+		});
+
+		it("passes through the not-signed-in shape with a sign-in URL", async () => {
+			fetchSpy.mockImplementation(async () => {
+				return mockOkResponse({
+					signedIn: false,
+					signInUrl: "https://ollama.com/connect?name=x&key=y",
+					message: "You need to be signed in.",
+				});
+			});
+			const result = await fetchOnboardingOllamaSignInStatus();
+			expect(result.signedIn).toBe(false);
+			expect(result.signInUrl).toBe("https://ollama.com/connect?name=x&key=y");
+			});
+
+		it("throws when the response is not ok", async () => {
+			fetchSpy.mockImplementation(async () => {
+				return new Response(JSON.stringify({ error: "boom" }), {
+					status: 500,
+					headers: { "content-type": "application/json" },
+				});
+			});
+			await expect(fetchOnboardingOllamaSignInStatus()).rejects.toThrow("HTTP 500");
 		});
 	});
 });

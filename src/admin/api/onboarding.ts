@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./client.js";
+import type { OllamaSignInStatus } from "./ollama.js";
 
 export interface OnboardingStatus {
 	complete: boolean;
@@ -78,4 +79,16 @@ export function submitOnboarding(
 	body: Record<string, string>,
 ): Promise<{ success: boolean; activated: boolean; requiresRestart: string[] }> {
 	return apiPost<{ success: boolean; activated: boolean; requiresRestart: string[] }>("/api/onboarding", body);
+}
+
+export type { OllamaSignInStatus };
+
+/**
+ * Fetches Ollama sign-in status via the onboarding-scoped endpoint, which is
+ * reachable before any admin session exists (the wizard runs during first-run
+ * onboarding when the auth-gated `/api/ollama/signin` route would return 503).
+ * Returns the same `OllamaSignInStatus` shape as `fetchOllamaSignInStatus`.
+ */
+export function fetchOnboardingOllamaSignInStatus(): Promise<OllamaSignInStatus> {
+	return apiGet<OllamaSignInStatus>("/api/onboarding/ollama-signin");
 }

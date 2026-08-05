@@ -31,6 +31,7 @@ vi.mock("../../api/onboarding.js", async (importOriginal) => {
 		...actual,
 		fetchOnboardingConfig: vi.fn(async (): Promise<OnboardingConfig> => emptyConfig()),
 		fetchOnboardingStatus: vi.fn(async () => ({ complete: false, missing: ["github_token"] })),
+		fetchOnboardingOllamaSignInStatus: vi.fn(async () => ({ signedIn: false, message: "not signed in" })),
 		verifyGitHubToken: vi.fn(async () => ({ username: "octocat" })),
 		generateWebhookSecret: vi.fn(async () => ({ secret: "a".repeat(192) })),
 		listAccessibleRepositories: vi.fn(async () => ({
@@ -61,6 +62,18 @@ async function advanceThroughGitHubIntegration(): Promise<void> {
 	fireEvent.click(screen.getByText("Verify"));
 	await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 	fireEvent.click(screen.getByText("Next"));
+}
+
+/**
+ * Advances the wizard from the AI / LLM step (step 4) to the workspace-init
+ * step (step 5) by filling the model field and clicking Next. Assumes an event
+ * mode has already been selected on step 3 and the operator has clicked Next.
+ */
+async function advanceThroughAiLlmStep(model = "test-model"): Promise<void> {
+	await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+	fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: model } });
+	fireEvent.click(screen.getByText("Next"));
+	await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
 }
 
 describe("OnboardingWizard", () => {
@@ -206,7 +219,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await waitForReady();
 			fireEvent.click(screen.getByText("Next"));
-			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 2 of 5")).not.toBeNull());
 			const tokenInput = screen.getByLabelText("GitHub PAT (Personal Access Token)") as HTMLInputElement;
 			expect(tokenInput.value).toBe("");
 			expect(tokenInput.placeholder).toContain("Leave unchanged");
@@ -252,7 +265,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await waitForReady();
 			fireEvent.click(screen.getByText("Next"));
-			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 2 of 5")).not.toBeNull());
 			const tokenInput = screen.getByLabelText("GitHub PAT (Personal Access Token)") as HTMLInputElement;
 			fireEvent.change(tokenInput, { target: { value: "ghp_new" } });
 			expect(tokenInput.value).toBe("ghp_new");
@@ -270,7 +283,7 @@ describe("OnboardingWizard", () => {
 			config.github_event_mode = "webhook";
 			config.webhook_secret = { configured: true };
 			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
-			// No accessible repositories: the wizard auto-fetches on step 4 but has
+			// No accessible repositories: the wizard auto-fetches on step 5 but has
 			// nothing to initialize, so init-workspaces stays uncalled.
 			(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockResolvedValue({ repositories: [], configured: [] });
 			render(<OnboardingWizard />);
@@ -278,13 +291,14 @@ describe("OnboardingWizard", () => {
 			// Step 1: admin password protected, proceed.
 			fireEvent.click(screen.getByText("Next"));
 			// Step 2: token protected, username pre-confirmed, proceed.
-			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 2 of 5")).not.toBeNull());
 			fireEvent.click(screen.getByText("Next"));
 			// Step 3: webhook mode with protected secret, proceed.
-			await waitFor(() => expect(screen.queryByText("Step 3 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 3 of 5")).not.toBeNull());
 			fireEvent.click(screen.getByText("Next"));
-			// Step 4: finish (no repos selected; token is protected so init is skipped).
-			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+			// Step 4: AI / LLM — fill the model and proceed.
+			await advanceThroughAiLlmStep();
+			// Step 5: finish (no repos selected; token is protected so init is skipped).
 			fireEvent.click(screen.getByText("Initialize & Finish"));
 			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
 
@@ -297,6 +311,9 @@ describe("OnboardingWizard", () => {
 			expect(body.webhook_secret).toBe("");
 			expect(body.github_username).toBe("configured-user");
 			expect(body.github_event_mode).toBe("webhook");
+			expect(body.pi_agent_provider).toBe("ollama");
+			expect(body.pi_agent_model).toBe("test-model");
+			expect(body.ollama_container_name).toBe("yeetomatic-ollama");
 		});
 
 		it("fetches repositories and initializes workspaces using the stored token when it is protected", async () => {
@@ -313,15 +330,16 @@ describe("OnboardingWizard", () => {
 			// Step 1: admin password protected, proceed.
 			fireEvent.click(screen.getByText("Next"));
 			// Step 2: token protected, username pre-confirmed, proceed.
-			await waitFor(() => expect(screen.queryByText("Step 2 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 2 of 5")).not.toBeNull());
 			fireEvent.click(screen.getByText("Next"));
 			// Step 3: webhook mode with protected secret, proceed.
-			await waitFor(() => expect(screen.queryByText("Step 3 of 4")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("Step 3 of 5")).not.toBeNull());
 			fireEvent.click(screen.getByText("Next"));
-			// Step 4: token is protected, so the list auto-loads and the Refresh
+			// Step 4: AI / LLM — fill the model and proceed.
+			await advanceThroughAiLlmStep();
+			// Step 5: token is protected, so the list auto-loads and the Refresh
 			// button is available. The backend resolves the stored token from the
 			// empty submitted value.
-			await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
 			expect(screen.queryByText("Using the configured GitHub token.")).not.toBeNull();
 			await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
@@ -366,6 +384,28 @@ describe("OnboardingWizard", () => {
 			expect(state.webhookSecretProtected).toBe(false);
 			expect(state.githubUsernameConfirmed).toBe(false);
 			expect(state.githubEventMode).toBe("");
+			expect(state.piAgentProvider).toBe("ollama");
+			expect(state.piAgentModel).toBe("");
+			expect(state.ollamaContainerName).toBe("yeetomatic-ollama");
+		});
+
+		it("pre-populates the AI / LLM fields from configuration", () => {
+			const config: OnboardingConfig = {
+				admin_username: "",
+				admin_password: { configured: false },
+				github_token: { configured: false },
+				github_username: "",
+				github_event_mode: "",
+				github_poll_interval_ms: "",
+				webhook_secret: { configured: false },
+				pi_agent_provider: "ollama",
+				pi_agent_model: "kimi-k2.7-code:cloud",
+				ollama_container_name: "custom-ollama",
+			};
+			const state = buildInitialState(config);
+			expect(state.piAgentProvider).toBe("ollama");
+			expect(state.piAgentModel).toBe("kimi-k2.7-code:cloud");
+			expect(state.ollamaContainerName).toBe("custom-ollama");
 		});
 
 		it("preserves in-progress localStorage state over config for edited fields", () => {
@@ -448,7 +488,7 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		await waitForReady();
 		expect(screen.queryByText("Welcome to Yeetomatic")).not.toBeNull();
-		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 1 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
 	});
@@ -490,7 +530,7 @@ describe("OnboardingWizard", () => {
 		await waitForReady();
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("GitHub PAT (Personal Access Token)")).not.toBeNull();
 	});
 
@@ -518,7 +558,7 @@ describe("OnboardingWizard", () => {
 			render(<OnboardingWizard />);
 			await advanceThroughGitHubIntegration();
 
-			expect(screen.queryByText("Step 3 of 4")).not.toBeNull();
+			expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
 			const select = screen.getByLabelText("GitHub Event Mode") as HTMLSelectElement;
 			const optionValues = Array.from(select.options).map((o) => o.value);
 			expect(optionValues).toEqual(["", "webhook", "polling", "both"]);
@@ -675,14 +715,14 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByLabelText("GitHub Username")).not.toBeNull());
 		fireEvent.click(screen.getByText("Next"));
 
-		expect(screen.queryByText("Step 3 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 3 of 5")).not.toBeNull();
 		fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
 		await waitFor(() => {
 			expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
 		});
 		fireEvent.click(screen.getByText("Next"));
 
-		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
+		await advanceThroughAiLlmStep();
 		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
@@ -697,6 +737,9 @@ describe("OnboardingWizard", () => {
 		expect(body.github_event_mode).toBe("webhook");
 		expect(body.webhook_secret).toBeDefined();
 		expect(body.github_poll_interval_ms).toBeUndefined();
+		expect(body.pi_agent_provider).toBe("ollama");
+		expect(body.pi_agent_model).toBe("test-model");
+		expect(body.ollama_container_name).toBe("yeetomatic-ollama");
 	});
 
 	it("submits a polling interval and omits a webhook secret for polling mode", async () => {
@@ -714,7 +757,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
 		fireEvent.click(screen.getByText("Next"));
 
-		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
+		await advanceThroughAiLlmStep();
 		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
@@ -724,6 +767,8 @@ describe("OnboardingWizard", () => {
 		expect(body.github_event_mode).toBe("polling");
 		expect(body.github_poll_interval_ms).toBe("15000");
 		expect(body.webhook_secret).toBeUndefined();
+		expect(body.pi_agent_provider).toBe("ollama");
+		expect(body.pi_agent_model).toBe("test-model");
 	});
 
 	it("preserves state in localStorage", async () => {
@@ -755,7 +800,7 @@ describe("OnboardingWizard", () => {
 		);
 		render(<OnboardingWizard />);
 		await waitForReady();
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).toBeNull();
 	});
 
@@ -764,10 +809,10 @@ describe("OnboardingWizard", () => {
 		await waitForReady();
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
 		fireEvent.click(screen.getByText("Next"));
-		expect(screen.queryByText("Step 2 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 2 of 5")).not.toBeNull();
 
 		fireEvent.click(screen.getByText("Back"));
-		expect(screen.queryByText("Step 1 of 4")).not.toBeNull();
+		expect(screen.queryByText("Step 1 of 5")).not.toBeNull();
 	});
 
 	it("disables next when step 1 fields are empty", async () => {
@@ -799,7 +844,7 @@ describe("OnboardingWizard", () => {
 		expect(showCheckbox.checked).toBe(true);
 	});
 
-	it("allows manually configuring a shorter webhook secret and proceeding to step 4", async () => {
+	it("allows manually configuring a shorter webhook secret and proceeding to the AI / LLM step", async () => {
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
 
@@ -816,14 +861,17 @@ describe("OnboardingWizard", () => {
 		expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value).toBe(manualSecret);
 
 		fireEvent.click(screen.getByText("Next"));
-		expect(screen.queryByText("Step 4 of 4")).not.toBeNull();
+		await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+		// The AI / LLM step renders the provider select and Ollama sign-in panel.
+		expect((screen.getByLabelText("LLM Provider") as HTMLSelectElement).value).toBe("ollama");
+		expect(screen.queryByText("Ollama sign-in status")).not.toBeNull();
 	});
 
-	it("deselects and selects all repositories in step 4", async () => {
+	it("deselects and selects all repositories in the workspace-init step", async () => {
 		localStorage.setItem(
 			"yeetomatic-onboarding-wizard",
 			JSON.stringify({
-				step: 4,
+				step: 5,
 				adminUsername: "admin",
 				adminPassword: "password",
 				adminPasswordProtected: false,
@@ -844,7 +892,7 @@ describe("OnboardingWizard", () => {
 		);
 		render(<OnboardingWizard />);
 		await waitForReady();
-		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
 
 		const repositoryCheckboxes = [
 			screen.getByLabelText("mbrooks/yeetomatic") as HTMLInputElement,
@@ -859,7 +907,7 @@ describe("OnboardingWizard", () => {
 		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
 	});
 
-	it("auto-loads the repository list on reaching step 4 without clicking Fetch", async () => {
+	it("auto-loads the repository list on reaching the workspace-init step without clicking Fetch", async () => {
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
 
@@ -867,14 +915,14 @@ describe("OnboardingWizard", () => {
 		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
 		fireEvent.click(screen.getByText("Next"));
 
-		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await advanceThroughAiLlmStep();
 		// The list is populated automatically; the legacy Fetch button is gone.
 		expect(screen.queryByRole("button", { name: /fetch repositories/i })).toBeNull();
 		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 		expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeNull();
 	});
 
-	it("marks already-configured repositories as enabled and pre-selects only them in step 4", async () => {
+	it("marks already-configured repositories as enabled and pre-selects only them in the workspace-init step", async () => {
 		const onboarding = await import("../../api/onboarding.js");
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
@@ -890,7 +938,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
 		fireEvent.click(screen.getByText("Next"));
 
-		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await advanceThroughAiLlmStep();
 		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
 
 		// Rerunning the wizard with configured repos only pre-selects the
@@ -922,10 +970,168 @@ describe("OnboardingWizard", () => {
 		fireEvent.change(screen.getByLabelText("Polling Interval (ms)"), { target: { value: "15000" } });
 		fireEvent.click(screen.getByText("Next"));
 
-		await waitFor(() => expect(screen.queryByText("Step 4 of 4")).not.toBeNull());
+		await advanceThroughAiLlmStep();
 		await waitFor(() => expect(fetchCount).toBe(1));
 
 		fireEvent.click(screen.getByRole("button", { name: /refresh/i }));
 		await waitFor(() => expect(fetchCount).toBe(2));
+	});
+
+	describe("step 4 - AI / LLM", () => {
+		it("renders the provider select, Ollama container name, sign-in panel, and model input", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			const providerSelect = screen.getByLabelText("LLM Provider") as HTMLSelectElement;
+			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama"]);
+			expect(providerSelect.value).toBe("ollama");
+			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("yeetomatic-ollama");
+			expect(screen.queryByText("Ollama sign-in status")).not.toBeNull();
+			expect(screen.queryByRole("button", { name: /Re-check status/u })).not.toBeNull();
+			expect(screen.queryByLabelText("LLM Model")).not.toBeNull();
+		});
+
+		it("disables Next when the model field is empty", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			// Provider defaults to ollama and container name is pre-filled, but the
+			// model is empty, so Next is disabled.
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+		});
+
+		it("enables Next once the model field is filled", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			});
+
+		it("disables Next when the container name is cleared for ollama", async () => {
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			fireEvent.change(screen.getByLabelText("Ollama Container Name"), { target: { value: "" } });
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+			});
+
+		it("keeps Next enabled and lets the wizard finish when Ollama is not reachable", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingOllamaSignInStatus as ReturnType<typeof vi.fn>).mockRejectedValue(
+				new Error("Could not reach the Ollama container."),
+			);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			// Sign-in check failure surfaces as an error banner but does not disable Next.
+			await waitFor(() => expect(screen.queryByText("Could not reach the Ollama container.")).not.toBeNull());
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+
+			fireEvent.click(screen.getByText("Next"));
+			await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
+			fireEvent.click(screen.getByText("Initialize & Finish"));
+			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
+			});
+
+		it("passes the current container name into the onboarding sign-in fetcher", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingOllamaSignInStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				signedIn: false,
+				signInUrl: "https://ollama.com/connect?name=x&key=y",
+				message: "You need to be signed in.",
+			});
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			fireEvent.change(screen.getByLabelText("Ollama Container Name"), { target: { value: "custom-ollama" } });
+			// The panel reflects the current container name in the docker exec command.
+			await waitFor(() => expect(onboarding.fetchOnboardingOllamaSignInStatus).toHaveBeenCalled());
+			await waitFor(() =>
+				expect(screen.queryByText("docker exec -it custom-ollama ollama login")).not.toBeNull(),
+			);
+			});
+
+		it("pre-populates the provider, container name, and model on rerun", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.pi_agent_provider = "ollama";
+			config.pi_agent_model = "kimi-k2.7-code:cloud";
+			config.ollama_container_name = "custom-ollama";
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			expect((screen.getByLabelText("LLM Provider") as HTMLSelectElement).value).toBe("ollama");
+			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("custom-ollama");
+			expect((screen.getByLabelText("LLM Model") as HTMLInputElement).value).toBe("kimi-k2.7-code:cloud");
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			});
+
+		it("mounts the OllamaSignInPanel fresh on entry so it issues a status check", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingOllamaSignInStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+				signedIn: true,
+				user: "alice",
+				message: "signed in",
+			});
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			// Mounting the step triggers the panel's mount-time status check.
+			await waitFor(() => expect(onboarding.fetchOnboardingOllamaSignInStatus).toHaveBeenCalledTimes(1));
+			expect(screen.queryByText("Signed in as")).not.toBeNull();
+			});
 	});
 });
