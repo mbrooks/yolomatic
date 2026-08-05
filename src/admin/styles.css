@@ -108,21 +108,15 @@ h1 {
 }
 
 .type-badge {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: 4px;
 	font-size: 0.7rem;
-	padding: 0.1rem 0.35rem;
 	text-transform: uppercase;
 }
 
 .type-badge.implementation {
-	border-color: var(--blue);
 	color: var(--blue);
 }
 
 .type-badge.refinement {
-	border-color: var(--yellow);
 	color: var(--yellow);
 }
 
@@ -136,11 +130,7 @@ h1 {
 }
 
 .status-badge {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: 4px;
 	font-size: 0.7rem;
-	padding: 0.1rem 0.35rem;
 	text-transform: uppercase;
 }
 
@@ -150,33 +140,26 @@ h1 {
 
 .status-badge.working {
 	color: var(--yellow);
-	border-color: var(--yellow);
 }
 
 .status-badge.waiting-feedback {
 	color: var(--blue);
-	border-color: var(--blue);
 }
 
 .status-badge.paused {
 	color: var(--red);
-	border-color: var(--red);
 }
 
 .status-badge.complete {
 	color: var(--green);
-	border-color: var(--green);
 }
 
 .status-badge.failed {
 	color: var(--red);
-	border-color: var(--red);
-
 }
 
 .status-badge.cancelled {
 	color: var(--red);
-	border-color: var(--red);
 }
 
 .stale-dot {
@@ -295,12 +278,9 @@ h1 {
 }
 
 .stale-badge {
-	background: rgba(210, 153, 34, 0.15);
-	border: 1px solid var(--yellow);
-	border-radius: 4px;
 	color: var(--yellow);
 	font-size: 0.75rem;
-	padding: 0.15rem 0.4rem;
+	text-transform: uppercase;
 }
 
 .detail-actions {
@@ -1716,17 +1696,14 @@ a:hover {
 /* Refinement activity panel */
 .status-badge.applied {
 	color: var(--green);
-	border-color: var(--green);
 }
 
 .status-badge.running {
 	color: var(--yellow);
-	border-color: var(--yellow);
 }
 
 .status-badge.stale {
 	color: var(--yellow);
-	border-color: var(--yellow);
 }
 
 .status-badge.instructed {
