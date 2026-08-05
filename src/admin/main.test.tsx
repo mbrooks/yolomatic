@@ -77,12 +77,20 @@ function mockStatusResponse(data: unknown): Response {
 	});
 }
 
+function mockMeResponse(): Response {
+	return new Response(JSON.stringify({ user: { id: "u1", fullName: "Admin", username: "admin", createdAt: "", updatedAt: "" } }), {
+		status: 200,
+		headers: { "content-type": "application/json" },
+	});
+}
+
 describe("App", () => {
 	let fetchSpy: any;
 
 	beforeEach(() => {
 		window.location.hash = "#/dashboard";
-		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any) => {
+			if (String(input).includes("/api/me")) return mockMeResponse();
 			return mockStatusResponse({
 				agent: "online",
 				uptime: "1m",
@@ -216,7 +224,8 @@ describe("App", () => {
 	});
 
 	it("shows empty state in working view when no active tasks", async () => {
-		fetchSpy.mockImplementation(async () => {
+		fetchSpy.mockImplementation(async (input: any) => {
+			if (String(input).includes("/api/me")) return mockMeResponse();
 			return mockStatusResponse({
 				agent: "online",
 				uptime: "1m",
@@ -307,7 +316,8 @@ describe("App", () => {
 	});
 
 	it("shows restart banner when draining is true", async () => {
-		fetchSpy.mockImplementation(async () => {
+		fetchSpy.mockImplementation(async (input: any) => {
+			if (String(input).includes("/api/me")) return mockMeResponse();
 			return mockStatusResponse({
 				agent: "online",
 				uptime: "1m",

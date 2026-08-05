@@ -221,7 +221,7 @@ describe("buildRuntimeGraph", () => {
 	it("passes session start and restart dispatchers through webhook server options", async () => {
 		const graph = buildRuntimeGraph(baseConfig, makeDeps());
 		const callArgs = (createWebhookServerMock as ReturnType<typeof vi.fn>).mock.calls[0];
-		const options = callArgs?.[9] as {
+		const options = callArgs?.[7] as {
 			prebuiltStartIssueSession: typeof graph.startIssueSession;
 			repositoryStore: unknown;
 			restartSession: (owner: string, repo: string, issueNumber: number) => Promise<void>;

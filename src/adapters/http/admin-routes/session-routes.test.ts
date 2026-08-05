@@ -33,8 +33,7 @@ function response() {
 }
 
 const deps: AdminRouterDeps = {
-	adminUsername: "admin",
-	adminPassword: "secret",
+	sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 	adminAssetsDir: "",
 	getSessionLog: {
 		execute: vi.fn(async () => {

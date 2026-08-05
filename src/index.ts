@@ -5,6 +5,8 @@ import { getConfig, isBootstrapComplete } from "./config.js";
 import { SettingsStore } from "./settings/store.js";
 import { SessionStore } from "./session/store.js";
 import { RepositoryStore } from "./repos/repository-store.js";
+import { UserStore } from "./users/store.js";
+import { AdminSessionAuth } from "./adapters/http/admin-auth.js";
 import { SessionLogStore, configureSessionLogPersistence, loadPersistedSessionLogs } from "./logging/session-log-store.js";
 import { TaskController } from "./task-controller.js";
 import { createWebhookServer } from "./webhook/server.js";
@@ -41,9 +43,11 @@ export async function main(): Promise<void> {
 	loadPersistedSessionLogs();
 	const taskController = new TaskController();
 	const repositoryStore = new RepositoryStore(path.join(memoryDir, "bot-state.sqlite"));
+	const userStore = new UserStore(path.join(memoryDir, "bot-state.sqlite"));
+	const hasAdminUser = userStore.hasAnySync();
 
-	if (!isBootstrapComplete(config)) {
-		process.stdout.write("[onboarding] Required settings missing. Starting in onboarding mode.\n");
+	if (!isBootstrapComplete(config) || !hasAdminUser) {
+		process.stdout.write("[onboarding] Required settings missing or no admin user. Starting in onboarding mode.\n");
 
 		let onboardingServer: ReturnType<typeof createWebhookServer> | undefined;
 		let activated = false;
@@ -52,8 +56,6 @@ export async function main(): Promise<void> {
 			config.webhookSecret || "dummy-onboarding-secret",
 			noOpHandlers,
 			sessionStore,
-			undefined,
-			undefined,
 			taskController,
 			undefined,
 			undefined,
@@ -62,7 +64,7 @@ export async function main(): Promise<void> {
 				onOnboardingComplete: async () => {
 					if (activated) return;
 					const nextConfig = getConfig(settingsStore);
-					if (!isBootstrapComplete(nextConfig)) return;
+					if (!isBootstrapComplete(nextConfig) || !userStore.hasAnySync()) return;
 					activated = true;
 					if (onboardingServer) {
 						await new Promise<void>((resolve, reject) => {
@@ -73,11 +75,13 @@ export async function main(): Promise<void> {
 						});
 					}
 					process.stdout.write("[onboarding] Settings loaded. Starting full runtime.\n");
-					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController, repositoryStore });
+					await startRuntime(nextConfig, { settingsStore, sessionStore, taskController, repositoryStore, userStore });
 				},
 				repositoryStore,
 				adminPath: config.adminPath,
 				adminDefaultPage: config.adminDefaultPage,
+				userStore,
+				sessionAuth: new AdminSessionAuth(userStore),
 			},
 			undefined,
 			settingsStore,
@@ -89,7 +93,7 @@ export async function main(): Promise<void> {
 		return;
 	}
 
-	await startRuntime(config, { settingsStore, sessionStore, taskController, repositoryStore });
+	await startRuntime(config, { settingsStore, sessionStore, taskController, repositoryStore, userStore });
 }
 
 /* v8 ignore start */

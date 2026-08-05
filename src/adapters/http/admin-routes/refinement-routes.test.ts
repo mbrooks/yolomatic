@@ -9,7 +9,7 @@ function request(url: string, method: string): http.IncomingMessage {
 		url,
 		method,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			yield* [];
@@ -31,8 +31,7 @@ function response() {
 
 function makeDeps(overrides: Partial<AdminRouterDeps> = {}): AdminRouterDeps {
 	return {
-		adminUsername: "admin",
-		adminPassword: "secret",
+		sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 		adminAssetsDir: "",
 		refinementStore: {} as AdminRouterDeps["refinementStore"],
 		getRefinementLog: {

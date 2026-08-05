@@ -231,6 +231,23 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 10,
+		name: "create_users_table",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS users (
+					id TEXT PRIMARY KEY,
+					full_name TEXT NOT NULL,
+					username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+					password_hash TEXT NOT NULL,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

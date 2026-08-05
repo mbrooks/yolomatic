@@ -59,6 +59,23 @@ function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
 		repositoryStore: repoStore,
+		userStore: {
+			hasAnySync: () => onboardingHasUsers,
+			firstSync: () =>
+				onboardingHasUsers
+					? { id: "u1", fullName: "Admin", username: onboardingMasterUsername, passwordHash: "", createdAt: "", updatedAt: "" }
+					: null,
+			createSync: vi.fn(() => {
+				onboardingHasUsers = true;
+				return { id: "u1", fullName: "Admin", username: "admin", passwordHash: "", createdAt: "", updatedAt: "" };
+			}),
+			updateFullNameSync: vi.fn(() => null),
+			updatePasswordSync: vi.fn(() => null),
+			listSync: vi.fn(() => []),
+			getByIdSync: vi.fn(() => null),
+			getByUsernameSync: vi.fn(() => null),
+			deleteSync: vi.fn(() => true),
+		} as never,
 		getAdminStatus: { execute: vi.fn() },
 		getSession: {} as never,
 		getSessionLog: { execute: vi.fn() },
@@ -74,7 +91,12 @@ function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 	} as never;
 }
 
+let onboardingHasUsers = true;
+let onboardingMasterUsername = "admin";
+
 afterEach(() => {
+	onboardingHasUsers = true;
+	onboardingMasterUsername = "admin";
 	vi.restoreAllMocks();
 });
 
@@ -110,8 +132,6 @@ describe("handleOnboardingRoutes", () => {
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "webhook");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
 			const res = mockResponse();
@@ -130,8 +150,6 @@ describe("handleOnboardingRoutes", () => {
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "webhook");
 			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
@@ -151,8 +169,6 @@ describe("handleOnboardingRoutes", () => {
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "bogus");
 			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
@@ -172,8 +188,6 @@ describe("handleOnboardingRoutes", () => {
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "polling");
 			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
@@ -192,8 +206,6 @@ describe("handleOnboardingRoutes", () => {
 			const store = await tmpStore();
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "webhook");
 			store.set("onboarding_complete", "true");
 			const req = mockRequest({ url: "/api/onboarding/status", method: "GET" });
@@ -212,8 +224,6 @@ describe("handleOnboardingRoutes", () => {
 			const store = await tmpStore();
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "polling");
 			store.set("github_poll_interval_ms", "15000");
 			store.set("onboarding_complete", "true");
@@ -234,8 +244,6 @@ describe("handleOnboardingRoutes", () => {
 			store.set("github_token", "tok");
 			store.set("github_username", "user");
 			store.set("webhook_secret", "shh");
-			store.set("admin_username", "admin");
-			store.set("admin_password", "pass");
 			store.set("github_event_mode", "polling");
 			store.set("github_poll_interval_ms", "15000");
 			store.set("onboarding_complete", "true");
@@ -542,6 +550,7 @@ describe("handleOnboardingRoutes", () => {
 	describe("GET /api/onboarding/config", () => {
 		it("returns empty defaults when nothing is configured", async () => {
 			const store = await tmpStore();
+			onboardingHasUsers = false;
 			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
 			const res = mockResponse();
 
@@ -561,7 +570,7 @@ describe("handleOnboardingRoutes", () => {
 
 		it("returns configured non-sensitive values as strings", async () => {
 			const store = await tmpStore();
-			store.set("admin_username", "alice");
+			onboardingMasterUsername = "alice";
 			store.set("github_username", "alice-gh");
 			store.set("github_event_mode", "polling");
 			store.set("github_poll_interval_ms", "15000");
@@ -582,7 +591,6 @@ describe("handleOnboardingRoutes", () => {
 		it("reports configured secrets as configured without exposing the value", async () => {
 			const store = await tmpStore();
 			store.set("github_token", "ghp_secret_value");
-			store.set("admin_password", "super-secret");
 			store.set("webhook_secret", "wh-secret");
 			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
 			const res = mockResponse();
@@ -629,6 +637,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
@@ -676,6 +685,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "invalid",
@@ -701,6 +711,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "polling",
@@ -726,6 +737,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "polling",
@@ -750,6 +762,7 @@ describe("handleOnboardingRoutes", () => {
 				body: JSON.stringify({
 					github_token: "tok",
 					github_username: "user",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
@@ -774,6 +787,7 @@ describe("handleOnboardingRoutes", () => {
 				body: JSON.stringify({
 					github_token: "tok",
 					github_username: "user",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "polling",
@@ -800,6 +814,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "polling",
@@ -826,6 +841,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
@@ -849,6 +865,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 				}),
@@ -883,7 +900,6 @@ describe("handleOnboardingRoutes", () => {
 		it("preserves an existing github_token when submitted empty", async () => {
 			const store = await tmpStore();
 			store.set("github_token", "existing-ghp-token");
-			store.set("admin_password", "existing-admin-pass");
 			store.set("webhook_secret", "existing-wh-secret");
 			const req = mockRequest({
 				url: "/api/onboarding",
@@ -892,6 +908,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "new-pass",
 					github_event_mode: "webhook",
@@ -904,14 +921,13 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			expect(store.get("github_token")).toBe("existing-ghp-token");
-			expect(store.get("admin_password")).toBe("new-pass");
 			expect(store.get("webhook_secret")).toBe("shh");
 			expect(store.get("onboarding_complete")).toBe("true");
 		});
 
-		it("preserves an existing admin_password when submitted empty", async () => {
+		it("preserves an existing admin password when submitted empty", async () => {
 			const store = await tmpStore();
-			store.set("admin_password", "kept-admin-pass");
+			const deps = makeDeps(store);
 			const req = mockRequest({
 				url: "/api/onboarding",
 				method: "POST",
@@ -919,6 +935,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "shh",
+					admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "",
 					github_event_mode: "webhook",
@@ -926,11 +943,11 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
-			expect(store.get("admin_password")).toBe("kept-admin-pass");
+			expect((deps as { userStore: { updatePasswordSync: () => void } }).userStore.updatePasswordSync).not.toHaveBeenCalled();
 		});
 
 		it("preserves an existing webhook_secret in webhook mode when submitted empty", async () => {
@@ -943,6 +960,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
@@ -966,6 +984,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "",
 					github_username: "user",
 					webhook_secret: "shh",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
@@ -992,6 +1011,7 @@ describe("handleOnboardingRoutes", () => {
 					github_token: "tok",
 					github_username: "user",
 					webhook_secret: "",
+				admin_full_name: "Admin User",
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",

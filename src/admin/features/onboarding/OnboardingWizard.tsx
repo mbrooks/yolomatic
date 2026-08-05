@@ -17,6 +17,7 @@ export type GithubEventMode = "webhook" | "polling" | "both";
 
 interface WizardState {
 	step: number;
+	adminFullName: string;
 	adminUsername: string;
 	adminPassword: string;
 	adminPasswordProtected: boolean;
@@ -149,6 +150,7 @@ function saveState(state: WizardState): void {
 function getDefaultState(): WizardState {
 	return {
 		step: 1,
+		adminFullName: "Admin",
 		adminUsername: "admin",
 		adminPassword: generatePassword(),
 		adminPasswordProtected: false,
@@ -191,6 +193,10 @@ export function buildInitialState(config: OnboardingConfig | null): WizardState 
 }
 
 function applyConfig(state: WizardState, config: OnboardingConfig): void {
+	const adminFullName = config.admin_full_name;
+	if (typeof adminFullName === "string" && adminFullName.trim()) {
+		state.adminFullName = adminFullName;
+	}
 	const adminUsername = config.admin_username;
 	if (typeof adminUsername === "string" && adminUsername.trim()) {
 		state.adminUsername = adminUsername;
@@ -385,6 +391,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			const onboardingBody: Record<string, string> = {
 				github_token: state.githubToken.trim(),
 				github_username: state.githubUsername.trim(),
+				admin_full_name: state.adminFullName.trim(),
 				admin_username: state.adminUsername.trim(),
 				admin_password: state.adminPassword.trim(),
 				github_event_mode: state.githubEventMode,
@@ -419,7 +426,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	const canGoNext = useMemo(() => {
 		switch (state.step) {
 			case 1:
-				return state.adminUsername.trim().length > 0 && (state.adminPasswordProtected || state.adminPassword.trim().length > 0);
+				return state.adminFullName.trim().length > 0 && state.adminUsername.trim().length > 0 && (state.adminPasswordProtected || state.adminPassword.trim().length > 0);
 			case 2:
 				return (state.githubTokenProtected || state.githubToken.trim().length > 0) && state.githubUsernameConfirmed;
 			case 3:
@@ -595,7 +602,7 @@ export function isEventModeStepValid(
 function getStepSubtitle(step: number): string {
 	switch (step) {
 		case 1:
-			return "Set up your admin credentials for the dashboard.";
+			return "Create the master admin account for the dashboard.";
 		case 2:
 			return "Connect your GitHub account with a Personal Access Token.";
 		case 3:
@@ -620,6 +627,18 @@ function StepOneAdminCredentials({
 
 	return (
 		<div className="onboarding-form">
+			<div className="form-group">
+				<label htmlFor="admin_full_name">Admin Full Name</label>
+				<input
+					id="admin_full_name"
+					type="text"
+					value={state.adminFullName}
+					onChange={(e) => updateField("adminFullName", e.target.value)}
+					placeholder="Ada Lovelace"
+					required
+				/>
+				<span className="setting-description">Full name for the master admin account</span>
+			</div>
 			<div className="form-group">
 				<label htmlFor="admin_username">Admin Username</label>
 				<input

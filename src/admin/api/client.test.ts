@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { apiDelete, apiGet, apiPost } from "./client.js";
+import { apiDelete, apiGet, apiPatch, apiPost } from "./client.js";
 
 describe("client", () => {
 	beforeEach(() => {
@@ -57,5 +57,33 @@ describe("client", () => {
 	it("apiDelete falls back to statusText when body has no error", async () => {
 		mockFetch({ ok: false, status: 500, statusText: "Internal Server Error", json: async () => ({}) });
 		await expect(apiDelete("/api/foo")).rejects.toThrow("Internal Server Error");
+	});
+
+	it("apiPatch sends body and returns JSON", async () => {
+		mockFetch({ ok: true, status: 200, json: async () => ({ updated: true }) });
+		const result = await apiPatch("/api/foo", { name: "y" });
+		expect(result).toEqual({ updated: true });
+		expect(fetch).toHaveBeenCalledWith("/api/foo", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name: "y" }),
+		});
+	});
+
+	it("apiPatch sends no body when undefined", async () => {
+		mockFetch({ ok: true, status: 200, json: async () => ({ ok: true }) });
+		const result = await apiPatch("/api/foo");
+		expect(result).toEqual({ ok: true });
+		expect(fetch).toHaveBeenCalledWith("/api/foo", { method: "PATCH" });
+	});
+
+	it("apiPatch throws error message from body", async () => {
+		mockFetch({ ok: false, status: 400, statusText: "Bad Request", json: async () => ({ error: "bad patch" }) });
+		await expect(apiPatch("/api/foo", {})).rejects.toThrow("bad patch");
+	});
+
+	it("apiPatch falls back to statusText when body has no error", async () => {
+		mockFetch({ ok: false, status: 500, statusText: "Internal Server Error", json: async () => ({}) });
+		await expect(apiPatch("/api/foo")).rejects.toThrow("Internal Server Error");
 	});
 });

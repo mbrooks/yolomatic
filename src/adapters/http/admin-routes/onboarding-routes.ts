@@ -13,25 +13,24 @@ import {
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
+import type { User } from "../../../users/store.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
 	"github_token",
 	"github_username",
-	"admin_username",
-	"admin_password",
 	"github_event_mode",
 ];
 const ONBOARDING_COMPLETE_SETTING = "onboarding_complete";
+const ADMIN_USER_MISSING_KEY = "admin_user";
 
 /**
  * Onboarding-related settings exposed to the wizard for pre-population.
- * Sensitive settings are reported as `{ configured }` so the stored secret
- * is never sent to the client; the wizard submits an empty value to preserve
- * the existing secret when the operator does not replace it.
+ * The master admin account fields (`admin_full_name`, `admin_username`,
+ * `admin_password`) are sourced from the `users` table rather than settings;
+ * `admin_password` is reported as `{ configured }` so the stored hash is
+ * never sent to the client.
  */
 export const ONBOARDING_CONFIG_KEYS = [
-	"admin_username",
-	"admin_password",
 	"github_token",
 	"github_username",
 	"github_event_mode",
@@ -41,7 +40,6 @@ export const ONBOARDING_CONFIG_KEYS = [
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
-	"admin_password",
 	"webhook_secret",
 ]);
 
@@ -51,10 +49,21 @@ export interface OnboardingConfigField {
 
 export type OnboardingConfigResponse = Record<string, string | OnboardingConfigField>;
 
+/**
+ * Build the onboarding config payload shown to the wizard. Master admin
+ * account fields come from `masterUser` (the first admin account); the
+ * remaining settings are read via `get`. Sensitive settings are reported as
+ * `{ configured }` rather than their stored value.
+ */
 export function buildOnboardingConfig(
 	get: (key: string) => string | undefined,
+	masterUser: User | null,
 ): OnboardingConfigResponse {
-	const result: OnboardingConfigResponse = {};
+	const result: OnboardingConfigResponse = {
+		admin_full_name: masterUser?.fullName ?? "",
+		admin_username: masterUser?.username ?? "",
+		admin_password: { configured: masterUser !== null },
+	};
 	for (const key of ONBOARDING_CONFIG_KEYS) {
 		const value = get(key);
 		if (SENSITIVE_ONBOARDING_KEYS.has(key)) {
@@ -139,10 +148,48 @@ function getMissingOnboardingSettings(deps: AdminRouterDeps): string[] {
 	if (isWebhookMode(modeRaw) && (deps.settingsStore!.get("webhook_secret") === undefined || deps.settingsStore!.get("webhook_secret") === "")) {
 		missing.push("webhook_secret");
 	}
+	if (!deps.userStore!.hasAnySync()) {
+		missing.push(ADMIN_USER_MISSING_KEY);
+	}
 	if (deps.settingsStore!.get(ONBOARDING_COMPLETE_SETTING) !== "true") {
 		missing.push(ONBOARDING_COMPLETE_SETTING);
 	}
 	return missing;
+}
+
+/**
+ * Create or refresh the master admin account from the wizard's submission.
+ * When no admin user exists, a new master admin is created from the supplied
+ * full name, username, and password. When a master admin already exists
+ * (re-running onboarding), the existing account is updated in place — its
+ * full name is replaced and its password is reset only when a new password is
+ * supplied — rather than deleting existing users.
+ */
+function applyMasterAdmin(
+	deps: AdminRouterDeps,
+	fullName: string,
+	username: string,
+	password: string,
+): void {
+	const store = deps.userStore!;
+	if (!store.hasAnySync()) {
+		if (!fullName.trim() || !username.trim() || !password) {
+			throw new ValidationError("Missing required fields: admin_full_name, admin_username, admin_password");
+		}
+		store.createSync({ fullName: fullName.trim(), username: username.trim(), password });
+		return;
+	}
+	const existing = store.firstSync();
+	if (!existing) {
+		store.createSync({ fullName: fullName.trim(), username: username.trim(), password });
+		return;
+	}
+	if (fullName.trim() && fullName.trim() !== existing.fullName) {
+		store.updateFullNameSync(existing.id, fullName.trim());
+	}
+	if (password) {
+		store.updatePasswordSync(existing.id, password);
+	}
 }
 
 const registry = new AdminRouteRegistry()
@@ -150,11 +197,11 @@ const registry = new AdminRouteRegistry()
 		method: "GET",
 		pattern: /^\/api\/onboarding\/status$/u,
 		auth: false,
-		requiresDeps: ["settingsStore"],
+		requiresDeps: ["settingsStore", "userStore"],
 		handler: async (ctx) => {
 			const settingsDeps = {
 				...ctx.deps,
-				...getRequiredDeps(ctx.deps, ["settingsStore"]),
+				...getRequiredDeps(ctx.deps, ["settingsStore", "userStore"]),
 			};
 			const missing = getMissingOnboardingSettings(settingsDeps);
 			return { status: 200, body: { complete: missing.length === 0, missing } };
@@ -164,10 +211,10 @@ const registry = new AdminRouteRegistry()
 		method: "GET",
 		pattern: /^\/api\/onboarding\/config$/u,
 		auth: false,
-		requiresDeps: ["settingsStore"],
+		requiresDeps: ["settingsStore", "userStore"],
 		handler: async (ctx) => {
-			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
-			return { status: 200, body: buildOnboardingConfig((key) => settingsStore.get(key)) };
+			const { settingsStore, userStore } = getRequiredDeps(ctx.deps, ["settingsStore", "userStore"]);
+			return { status: 200, body: buildOnboardingConfig((key) => settingsStore.get(key), userStore.firstSync()) };
 		},
 	})
 	.route<{ token?: string }>({
@@ -210,20 +257,12 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const body = ctx.body as { token?: string };
-			// The wizard submits an empty token when the GitHub PAT is already
-			// configured (protected). Fall back to the stored value so the
-			// operator can still fetch repositories without re-entering the
-			// secret.
 			const token = resolveSecretSetting((k) => settingsStore.get(k), "github_token", body.token);
 			if (!token) {
 				throw new ValidationError("Token is required");
 			}
 			const gh = new GitHubServiceAdapter({ githubToken: token });
 			const repos = await gh.listAccessibleRepositories();
-			// Include the currently configured repositories so the wizard can
-			// pre-select them when re-running onboarding. The repositoryStore is
-			// optional here so the endpoint keeps working before the store is
-			// wired up.
 			let configured: Array<{ owner: string; repo: string }> = [];
 			if (ctx.deps.repositoryStore) {
 				configured = (await ctx.deps.repositoryStore.list()).map((repo) => ({ owner: repo.owner, repo: repo.repo }));
@@ -244,18 +283,13 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const settingsDeps = {
 				...ctx.deps,
-				...getRequiredDeps(ctx.deps, ["settingsStore"]),
+				...getRequiredDeps(ctx.deps, ["settingsStore", "repositoryStore"]),
 			};
 			const body = ctx.body as {
 				token?: string;
 				username?: string;
 				repos?: Array<{ owner: string; repo: string }>;
 			};
-			// The wizard submits an empty token when the GitHub PAT is already
-			// configured (protected). Fall back to the stored value so the
-			// operator can still initialize workspaces without re-entering the
-			// secret. The username is non-sensitive and normally pre-populated,
-			// but fall back to the stored value as a safety net.
 			const token = resolveSecretSetting((k) => settingsDeps.settingsStore.get(k), "github_token", body.token);
 			const username = body.username?.trim() || settingsDeps.settingsStore.get("github_username")?.trim();
 			const repos = body.repos ?? [];
@@ -294,24 +328,30 @@ const registry = new AdminRouteRegistry()
 		pattern: /^\/api\/onboarding$/u,
 		auth: false,
 		parseBody: true,
-		requiresDeps: ["settingsStore"],
+		requiresDeps: ["settingsStore", "userStore"],
 		handler: async (ctx) => {
-			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
+			const { settingsStore, userStore } = getRequiredDeps(ctx.deps, ["settingsStore", "userStore"]);
 			const body = ctx.body as Record<string, string>;
 			const resolveSecret = (key: string): string | undefined =>
 				resolveSecretSetting((k) => settingsStore.get(k), key, body[key]);
 			const githubToken = resolveSecret("github_token");
-			const adminPassword = resolveSecret("admin_password");
 			const webhookSecret = resolveSecret("webhook_secret");
 			const missing: string[] = [];
 			for (const key of REQUIRED_ONBOARDING_SETTINGS) {
 				if (key === "github_token") {
 					if (!githubToken) missing.push(key);
-				} else if (key === "admin_password") {
-					if (!adminPassword) missing.push(key);
 				} else if (!body[key]?.trim()) {
 					missing.push(key);
 				}
+			}
+			const hasMasterAdmin = userStore.hasAnySync();
+			const adminFullName = body.admin_full_name?.trim() ?? "";
+			const adminUsername = body.admin_username?.trim() ?? "";
+			const adminPassword = body.admin_password?.trim() ?? "";
+			if (!hasMasterAdmin) {
+				if (!adminFullName) missing.push("admin_full_name");
+				if (!adminUsername) missing.push("admin_username");
+				if (!adminPassword) missing.push("admin_password");
 			}
 			if (missing.length > 0) {
 				sendJson(ctx.response, 400, {
@@ -340,10 +380,9 @@ const registry = new AdminRouteRegistry()
 					return;
 				}
 			}
+			applyMasterAdmin(ctx.deps, adminFullName, adminUsername, adminPassword);
 			settingsStore.set("github_token", githubToken!);
 			settingsStore.set("github_username", body.github_username.trim());
-			settingsStore.set("admin_username", body.admin_username.trim());
-			settingsStore.set("admin_password", adminPassword!);
 			settingsStore.set("github_event_mode", eventMode);
 			if (isWebhookMode(eventMode)) {
 				settingsStore.set("webhook_secret", webhookSecret!);
@@ -355,6 +394,7 @@ const registry = new AdminRouteRegistry()
 			const storedMissing = getMissingOnboardingSettings({
 				...ctx.deps,
 				settingsStore,
+				userStore,
 			});
 			const activated = storedMissing.length === 0;
 			if (activated && ctx.deps.onOnboardingComplete) {

@@ -65,8 +65,6 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBeTruthy();
 		expect(config.soulPath).toBeTruthy();
 		expect(config.selfReportEnabled).toBe(true);
-		expect(config.adminUsername).toBeUndefined();
-		expect(config.adminPassword).toBeUndefined();
 		expect(config.onboardingComplete).toBe(false);
 		expect(config.githubEventMode).toBe("webhook");
 		expect(config.githubPollIntervalMs).toBe(60000);
@@ -115,8 +113,6 @@ describe("getConfig", () => {
 		expect(config.workspacesDir).toBe("/tmp/workspaces");
 		expect(config.soulPath).toBe("/tmp/SOUL.md");
 		expect(config.selfReportEnabled).toBe(true);
-		expect(config.adminUsername).toBe("admin");
-		expect(config.adminPassword).toBe("secret");
 		expect(config.onboardingComplete).toBe(true);
 		expect(config.githubEventMode).toBe("both");
 		expect(config.githubPollIntervalMs).toBe(30000);
@@ -176,8 +172,6 @@ describe("isBootstrapComplete", () => {
 			webhookSecret: "secret",
 			githubToken: "token",
 			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
 			onboardingComplete: false,
 		} as unknown as import("./config.js").AppConfig)).toBe(false);
 	});
@@ -187,8 +181,6 @@ describe("isBootstrapComplete", () => {
 			webhookSecret: "secret",
 			githubToken: "token",
 			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
 			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig)).toBe(true);
 	});
@@ -199,8 +191,6 @@ describe("isBootstrapComplete", () => {
 			githubEventMode: "polling",
 			githubToken: "token",
 			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
 			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig)).toBe(true);
 	});
@@ -211,8 +201,6 @@ describe("isBootstrapComplete", () => {
 			githubEventMode: "webhook",
 			githubToken: "token",
 			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
 			onboardingComplete: true,
 		} as unknown as import("./config.js").AppConfig)).toBe(false);
 	});
@@ -340,60 +328,50 @@ describe("admin config settings", () => {
 	});
 });
 
-describe("getBootstrapMissingFields", () => {
-	it("lists all missing fields", () => {
-		const missing = getBootstrapMissingFields({
-			webhookSecret: "",
-			githubToken: "tok",
-			githubUsername: "",
-			adminUsername: undefined,
-			adminPassword: "pass",
-			onboardingComplete: false,
-		} as unknown as import("./config.js").AppConfig);
-		expect(missing).toContain("webhook_secret");
-		expect(missing).toContain("github_username");
-		expect(missing).toContain("admin_username");
-		expect(missing).not.toContain("github_token");
-		expect(missing).not.toContain("admin_password");
-		expect(missing).toContain("onboarding_complete");
-	});
+	describe("getBootstrapMissingFields", () => {
+		it("lists all missing fields", () => {
+			const missing = getBootstrapMissingFields({
+				webhookSecret: "",
+				githubToken: "tok",
+				githubUsername: "",
+				onboardingComplete: false,
+			} as unknown as import("./config.js").AppConfig);
+			expect(missing).toContain("webhook_secret");
+			expect(missing).toContain("github_username");
+			expect(missing).not.toContain("github_token");
+			expect(missing).toContain("onboarding_complete");
+		});
 
-	it("returns empty when all fields are present", () => {
-		const missing = getBootstrapMissingFields({
-			webhookSecret: "secret",
-			githubToken: "token",
-			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
-			onboardingComplete: true,
-		} as unknown as import("./config.js").AppConfig);
-		expect(missing).toHaveLength(0);
-	});
+		it("returns empty when all fields are present", () => {
+			const missing = getBootstrapMissingFields({
+				webhookSecret: "secret",
+				githubToken: "token",
+				githubUsername: "user",
+				onboardingComplete: true,
+			} as unknown as import("./config.js").AppConfig);
+			expect(missing).toHaveLength(0);
+		});
 
-	it("does not require a webhook secret for polling mode", () => {
-		const missing = getBootstrapMissingFields({
-			webhookSecret: "",
-			githubEventMode: "polling",
-			githubToken: "token",
-			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
-			onboardingComplete: true,
-		} as unknown as import("./config.js").AppConfig);
-		expect(missing).not.toContain("webhook_secret");
-		expect(missing).toHaveLength(0);
-	});
+		it("does not require a webhook secret for polling mode", () => {
+			const missing = getBootstrapMissingFields({
+				webhookSecret: "",
+				githubEventMode: "polling",
+				githubToken: "token",
+				githubUsername: "user",
+				onboardingComplete: true,
+			} as unknown as import("./config.js").AppConfig);
+			expect(missing).not.toContain("webhook_secret");
+			expect(missing).toHaveLength(0);
+		});
 
-	it("requires a webhook secret for webhook mode", () => {
-		const missing = getBootstrapMissingFields({
-			webhookSecret: "",
-			githubEventMode: "webhook",
-			githubToken: "token",
-			githubUsername: "user",
-			adminUsername: "admin",
-			adminPassword: "pass",
-			onboardingComplete: true,
-		} as unknown as import("./config.js").AppConfig);
-		expect(missing).toContain("webhook_secret");
+		it("requires a webhook secret for webhook mode", () => {
+			const missing = getBootstrapMissingFields({
+				webhookSecret: "",
+				githubEventMode: "webhook",
+				githubToken: "token",
+				githubUsername: "user",
+				onboardingComplete: true,
+			} as unknown as import("./config.js").AppConfig);
+			expect(missing).toContain("webhook_secret");
+		});
 	});
-});

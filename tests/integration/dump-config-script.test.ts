@@ -20,7 +20,7 @@ describe("dump-config script", () => {
 		expect(values.port).toBe(7777);
 		expect(values.default_branch).toBe("main");
 		expect(values.onboarding_complete).toBe(true);
-		expect(values.admin_username).toBeNull();
+		expect(values.admin_github_username).toBeNull();
 	});
 
 	it("includes configured sensitive values", () => {
