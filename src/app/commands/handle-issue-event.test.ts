@@ -288,6 +288,29 @@ describe("HandleIssueEvent", () => {
 		expect(deps.github.postComment).not.toHaveBeenCalled();
 	});
 
+	it("ignores a polling issues.edited event that matches an applied refinement body", async () => {
+		const deps = createDeps();
+		const refinement = {
+			isInFlight: vi.fn(() => false),
+			postInstructions: vi.fn(),
+			isAppliedBodyEdit: vi.fn(() => true),
+		};
+		const handler = new HandleIssueEvent({ ...(deps as any), refinement });
+		const payload = createPayload({
+			action: "edited",
+			source: "polling",
+			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }], body: "Refined body" },
+		});
+
+		await handler.execute(payload);
+
+		expect(refinement.isAppliedBodyEdit).toHaveBeenCalledWith(payload);
+		expect(deps.sessions.get).not.toHaveBeenCalled();
+		expect(deps.tasks.steer).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalled();
+		expect(deps.github.postComment).not.toHaveBeenCalled();
+	});
+
 	it("updates session body/title on edited events when not active", async () => {
 		const deps = createDeps();
 		deps.sessions.get = vi.fn(async () => ({ status: "working" } as any));

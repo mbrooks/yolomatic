@@ -91,4 +91,17 @@ describe("GitHubEventStore", () => {
 		expect(store.listPollingSubjects()[0]?.lastActivityAt).toBe("2026-06-01T01:00:00.000Z");
 		expect(store.listPollingSubjects()[0]?.lastCheckedAt).toBeNull();
 	});
+
+	it("persists per-repo polling baselines", () => {
+		const store = new GitHubEventStore(TEST_DB);
+		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBeNull();
+
+		store.setRepoPollBaseline("mbrooks", "yeetomatic", "2026-06-01T12:00:00.000Z");
+		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBe("2026-06-01T12:00:00.000Z");
+
+		store.setRepoPollBaseline("mbrooks", "yeetomatic", "2026-06-02T12:00:00.000Z");
+		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBe("2026-06-02T12:00:00.000Z");
+
+		expect(store.getRepoPollBaseline("other", "repo")).toBeNull();
+	});
 });

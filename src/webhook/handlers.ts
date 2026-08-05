@@ -84,6 +84,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			workspaces,
 			executor: deps.executor as DockerWorkerExecutor,
 			clock: systemClock,
+			eventStore: deps.eventStore,
 			adminGithubUsername: deps.adminGithubUsername,
 			githubUsername: deps.githubUsername,
 			defaultBranch: deps.defaultBranch,

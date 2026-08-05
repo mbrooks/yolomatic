@@ -258,6 +258,22 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 12,
+		name: "create_github_poll_repo_baselines",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS github_poll_repo_baselines (
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					baseline_at TEXT NOT NULL,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL,
+					PRIMARY KEY (owner, repo)
+				)
+			`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

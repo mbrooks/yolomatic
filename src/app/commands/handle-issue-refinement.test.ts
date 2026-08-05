@@ -965,6 +965,148 @@ describe("HandleIssueRefinement", () => {
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
 
+	it("does not post instructions for a polling source issue before the repo baseline", async () => {
+		const eventStore = createEventStoreMock("2026-08-02T00:00:00.000Z");
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			eventStore: eventStore as never,
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		const issue = { ...createInstructionPayload().issue, created_at: "2026-08-01T00:00:00.000Z" };
+		await handler.postInstructions(createInstructionPayload({ source: "polling", issue }) as never);
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("does not post instructions for a polling source issue when no baseline exists", async () => {
+		const eventStore = createEventStoreMock(null);
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			eventStore: eventStore as never,
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		const issue = { ...createInstructionPayload().issue, created_at: "2026-08-02T00:00:00.000Z" };
+		await handler.postInstructions(createInstructionPayload({ source: "polling", issue }) as never);
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("posts instructions for a polling source issue created after the repo baseline", async () => {
+		const eventStore = createEventStoreMock("2026-08-01T00:00:00.000Z");
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			eventStore: eventStore as never,
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		const issue = { ...createInstructionPayload().issue, created_at: "2026-08-02T00:00:00.000Z" };
+		await handler.postInstructions(createInstructionPayload({ source: "polling", issue }) as never);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("yeetomatic-bot", undefined));
+	});
+
+	it("ignores the polling baseline for webhook source events", async () => {
+		const eventStore = createEventStoreMock(null);
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			eventStore: eventStore as never,
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		await handler.postInstructions(createInstructionPayload({ source: "webhook" }) as never);
+		expect(github.postComment).toHaveBeenCalled();
+	});
+
+	it("identifies a polling issues.edited event as the applied refinement body", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+		await handler.execute(createCommandPayload({ source: "polling" }) as never);
+
+		const applied = handler.isAppliedBodyEdit({
+			source: "polling",
+			issue: { number: 1, body: "Refined body" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+		});
+		expect(applied).toBe(true);
+
+		const mismatch = handler.isAppliedBodyEdit({
+			source: "polling",
+			issue: { number: 1, body: "Different body" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+		});
+		expect(mismatch).toBe(false);
+
+		const webhook = handler.isAppliedBodyEdit({
+			source: "webhook",
+			issue: { number: 1, body: "Refined body" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+		});
+		expect(webhook).toBe(false);
+	});
+
+	it("runs refinement end-to-end from a polled comment", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(
+			createCommandPayload({
+				source: "polling",
+				comment: { id: 110, body: "/yeetomatic issue-refinement Focus on polling", user: { login: "admin" } },
+			}) as never,
+			"Focus on polling",
+		);
+
+		expect(executor.executeRefinement).toHaveBeenCalledWith(expect.anything(), undefined, "Focus on polling");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt).not.toBeNull();
+		expect(attempt!.state).toBe("applied");
+		expect(attempt!.steeringPrompt).toBe("Focus on polling");
+	});
+
 	function createGitHubMock() {
 		return {
 			postComment: vi.fn(async () => 1),
@@ -1037,6 +1179,21 @@ describe("HandleIssueRefinement", () => {
 			),
 			createRefinementWorktree: vi.fn(async () => path.join(tmp, "refinement", "issue-1")),
 			removeRefinementWorktree: vi.fn(async () => {}),
+		};
+	}
+
+	function createEventStoreMock(baseline: string | null = null) {
+		return {
+			getLastEventReceivedAt: vi.fn(() => "2026-08-01T00:00:00.000Z"),
+			initializeLastEventReceivedAt: vi.fn(),
+			updateLastEventReceivedAt: vi.fn(),
+			hasSeen: vi.fn(() => false),
+			markSeen: vi.fn(),
+			upsertPollingSubject: vi.fn(),
+			listPollingSubjects: vi.fn(() => []),
+			markPollingSubjectChecked: vi.fn(),
+			getRepoPollBaseline: vi.fn(() => baseline),
+			setRepoPollBaseline: vi.fn(),
 		};
 	}
 
