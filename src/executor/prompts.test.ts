@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt } from "./prompts.js";
 
 describe("buildIssuePrompt", () => {
 	it("includes issue metadata", () => {
@@ -45,6 +45,42 @@ describe("buildFeedbackPrompt", () => {
 		const prompt = buildFeedbackPrompt("  trim me  ");
 		expect(prompt).toContain("trim me");
 		expect(prompt).not.toContain("  trim me  ");
+	});
+});
+
+describe("buildStatusCorrectionPrompt", () => {
+	it("contains all three allowed markers", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("YEETOMATIC_STATUS: working");
+		expect(prompt).toContain("YEETOMATIC_STATUS: waiting-feedback");
+		expect(prompt).toContain("YEETOMATIC_STATUS: complete");
+	});
+
+	it("explains that the previous response was rejected for lacking a marker", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("rejected");
+		expect(prompt).toContain("valid status marker");
+	});
+
+	it("requires the marker on the first line", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("first line");
+	});
+
+	it("forbids additional work and delivery by the worker", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("Do not repeat implementation work");
+		expect(prompt).toContain("do not modify any files");
+		expect(prompt).toContain("do not commit");
+		expect(prompt).toContain("do not push");
+		expect(prompt).toContain("do not open a pull request");
+		expect(prompt).toContain("control plane owns delivery");
+	});
+
+	it("warns against inferring status from prose or Markdown", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("Do not infer a status");
+		expect(prompt).toContain("Status: complete");
 	});
 });
 

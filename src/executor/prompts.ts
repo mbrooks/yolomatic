@@ -36,6 +36,23 @@ export function buildFeedbackPrompt(comment: string): string {
 	].join("\n");
 }
 
+export function buildStatusCorrectionPrompt(): string {
+	return [
+		"Your previous response was rejected because it did not contain a valid status marker.",
+		"",
+		"Status protocol:",
+		"- The first line of your response must be exactly one of:",
+		"  YEETOMATIC_STATUS: working",
+		"  YEETOMATIC_STATUS: waiting-feedback",
+		"  YEETOMATIC_STATUS: complete",
+		"- Do not infer a status from prose such as \"Done\", a Markdown `Status: complete` bullet, or any other natural-language phrasing or formatting. Only the exact marker lines above are valid.",
+		"",
+		"Restate only your status and a short summary.",
+		"Do not repeat implementation work, do not modify any files, do not commit, do not push, and do not open a pull request.",
+		"The control plane owns delivery and will publish completed work itself.",
+	].join("\n");
+}
+
 export interface PRReviewComment {
 	body: string;
 	user: string;

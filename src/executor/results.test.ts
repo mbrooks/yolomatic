@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
 
-import { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult } from "./results.js";
+import { detectStatusMarker, extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult } from "./results.js";
+
+describe("detectStatusMarker", () => {
+	it("returns the status for an explicit working marker", () => {
+		expect(detectStatusMarker("YEETOMATIC_STATUS: working\nStill working.")).toBe("working");
+	});
+
+	it("returns the status for an explicit waiting-feedback marker", () => {
+		expect(detectStatusMarker("YEETOMATIC_STATUS: waiting-feedback\nNeed info.")).toBe("waiting-feedback");
+	});
+
+	it("returns the status for an explicit complete marker", () => {
+		expect(detectStatusMarker("YEETOMATIC_STATUS: complete\nDone.")).toBe("complete");
+	});
+
+	it("returns null when no marker is present", () => {
+		expect(detectStatusMarker("Just some text.")).toBeNull();
+		expect(detectStatusMarker("Done. Summary: fixed the bug.\nStatus: complete")).toBeNull();
+	});
+
+	it("returns null for an unsupported marker", () => {
+		expect(detectStatusMarker("YEETOMATIC_STATUS: done\nDone.")).toBeNull();
+		expect(detectStatusMarker("YEETOMATIC_STATUS: unknown\nOops.")).toBeNull();
+	});
+
+	it("returns null for an empty response", () => {
+		expect(detectStatusMarker("")).toBeNull();
+		expect(detectStatusMarker("   ")).toBeNull();
+	});
+
+	it("uses the last marker when multiple are present", () => {
+		expect(
+			detectStatusMarker("YEETOMATIC_STATUS: working\nGoing.\nYEETOMATIC_STATUS: complete\nDone."),
+		).toBe("complete");
+	});
+});
 
 describe("parseExecutionResult", () => {
 	it("parses working status", () => {
@@ -25,12 +60,22 @@ describe("parseExecutionResult", () => {
 		const result = parseExecutionResult("YEETOMATIC_STATUS: unknown\nOops.");
 		expect(result.status).toBe("working");
 		expect(result.summary).toBe("YEETOMATIC_STATUS: unknown\nOops.");
+		// An unsupported marker is not a valid explicit `working` response.
+		expect(detectStatusMarker(result.rawResponse)).toBeNull();
 	});
 
 	it("defaults to working when no status line is present", () => {
 		const result = parseExecutionResult("Just some text.");
 		expect(result.status).toBe("working");
 		expect(result.summary).toBe("Just some text.");
+		// A missing marker is distinguishable from an explicit `working` response.
+		expect(detectStatusMarker(result.rawResponse)).toBeNull();
+	});
+
+	it("keeps explicit working distinct from a missing marker", () => {
+		const explicit = parseExecutionResult("YEETOMATIC_STATUS: working\nStill working.");
+		expect(explicit.status).toBe("working");
+		expect(detectStatusMarker(explicit.rawResponse)).toBe("working");
 	});
 
 	it("trims whitespace", () => {
