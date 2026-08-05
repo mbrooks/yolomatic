@@ -118,6 +118,7 @@ function makeCommand(
 		updateIssueAssignees: vi.fn(),
 		closeIssue: vi.fn(),
 		updateIssueBody: vi.fn(),
+		updateIssueTitle: vi.fn(),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),

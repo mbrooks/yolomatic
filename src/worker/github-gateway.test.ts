@@ -51,6 +51,7 @@ function makeFakeGateway(overrides: Partial<GitHubGatewayService> = {}): GitHubG
 		updateIssueAssignees: vi.fn(async () => undefined),
 		closeIssue: vi.fn(async () => undefined),
 		updateIssueBody: vi.fn(async () => undefined),
+		updateIssueTitle: vi.fn(async () => undefined),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
