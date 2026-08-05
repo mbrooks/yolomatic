@@ -605,6 +605,18 @@ export class DockerWorkerExecutor implements ExecutionService {
 		if (process.env.PI_AGENT_MODEL?.trim()) {
 			args.push("-e", `PI_AGENT_MODEL=${process.env.PI_AGENT_MODEL.trim()}`);
 		}
+		const initScript = process.env.YEETOMATIC_WORKER_INIT_SCRIPT?.trim();
+		if (initScript) {
+			args.push("-e", `YEETOMATIC_WORKER_INIT_SCRIPT=${initScript}`);
+		}
+		const initSkip = process.env.YEETOMATIC_WORKER_INIT_SKIP?.trim();
+		if (initSkip) {
+			args.push("-e", `YEETOMATIC_WORKER_INIT_SKIP=${initSkip}`);
+		}
+		const initTimeout = process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS?.trim();
+		if (initTimeout) {
+			args.push("-e", `YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS=${initTimeout}`);
+		}
 		const ollamaHost = this.resolveWorkerOllamaHost();
 		if (ollamaHost) {
 			args.push("-e", `OLLAMA_HOST=${ollamaHost}`);

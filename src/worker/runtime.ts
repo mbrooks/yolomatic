@@ -7,6 +7,8 @@ import WebSocket, { type RawData } from "ws";
 import { PiAgentExecutor, type RefinementResult } from "../executor/index.js";
 import { sessionStorageKey } from "../session/store.js";
 import { onSessionLogEvent } from "../logging/log-events.js";
+import { recordSessionLog } from "../logging/session-log-store.js";
+import { runEnvironmentInit } from "./env-init.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
 import { setGitHubGatewayTransport, type GatewayCallResult } from "./github-gateway-client.js";
 import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
@@ -100,6 +102,14 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 					events: [{ type: "session_log", entry }],
 				}),
 			);
+		});
+
+		await runEnvironmentInit({
+			workspacePath: state.workspacePath,
+			log: (entry) => {
+				recordSessionLog(sessionLogKey, entry);
+			},
+			signal: abortController.signal,
 		});
 
 		tempDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-"));
