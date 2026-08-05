@@ -59,6 +59,12 @@ function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
 		repositoryStore: repoStore,
+		ollamaSignInService: {
+			checkSignInStatus: vi.fn(async () => ({
+				signedIn: false,
+				message: "not signed in",
+			})),
+		},
 		userStore: {
 			hasAnySync: () => onboardingHasUsers,
 			firstSync: () =>
@@ -588,6 +594,24 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.github_poll_interval_ms).toBe("15000");
 		});
 
+		it("exposes the AI / LLM settings (provider, model, container) for rerun pre-population", async () => {
+			const store = await tmpStore();
+			store.set("pi_agent_provider", "ollama");
+			store.set("pi_agent_model", "kimi-k2.7-code:cloud");
+			store.set("ollama_container_name", "custom-ollama");
+			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/config");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.pi_agent_provider).toBe("ollama");
+			expect(body.pi_agent_model).toBe("kimi-k2.7-code:cloud");
+			expect(body.ollama_container_name).toBe("custom-ollama");
+		});
+
 		it("reports configured secrets as configured without exposing the value", async () => {
 			const store = await tmpStore();
 			store.set("github_token", "ghp_secret_value");
@@ -620,6 +644,147 @@ describe("handleOnboardingRoutes", () => {
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toContain("Settings store not configured");
 		});
+	});
+
+	describe("GET /api/onboarding/ollama-signin", () => {
+		it("returns the signed-in status payload without requiring auth", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			((deps as { ollamaSignInService?: unknown }).ollamaSignInService = {
+				checkSignInStatus: vi.fn(async () => ({
+					signedIn: true,
+					user: "alice",
+					message: "You are already signed in as user 'alice'",
+				})),
+			});
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.signedIn).toBe(true);
+			expect(body.user).toBe("alice");
+			expect(body.message).toBe("You are already signed in as user 'alice'");
+		});
+
+		it("passes through the not-signed-in payload with a sign-in URL", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			((deps as { ollamaSignInService?: unknown }).ollamaSignInService = {
+				checkSignInStatus: vi.fn(async () => ({
+					signedIn: false,
+					signInUrl: "https://ollama.com/connect?name=x&key=y",
+					message: "You need to be signed in.",
+				})),
+			});
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.signedIn).toBe(false);
+			expect(body.signInUrl).toBe("https://ollama.com/connect?name=x&key=y");
+		});
+
+		it("passes through the error shape when the container is unreachable", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			((deps as { ollamaSignInService?: unknown }).ollamaSignInService = {
+				checkSignInStatus: vi.fn(async () => ({
+					signedIn: false,
+					message: "Ollama container was not found.",
+					error: "no such container",
+				})),
+			});
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.signedIn).toBe(false);
+			expect(body.error).toBe("no such container");
+			});
+
+		it("resolves the container name from settings and forwards it to the service", async () => {
+			const store = await tmpStore();
+			store.set("ollama_container_name", "custom-ollama");
+			const deps = makeDeps(store);
+			const checkSignInStatus = vi.fn(async () => ({ signedIn: false, message: "" }));
+			(deps as { ollamaSignInService?: unknown }).ollamaSignInService = { checkSignInStatus };
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(res.statusCode).toBe(200);
+			expect(checkSignInStatus).toHaveBeenCalledWith({ containerName: "custom-ollama" });
+			});
+
+		it("falls back to the default container name when unset", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			const checkSignInStatus = vi.fn(async () => ({ signedIn: false, message: "" }));
+			(deps as { ollamaSignInService?: unknown }).ollamaSignInService = { checkSignInStatus };
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(checkSignInStatus).toHaveBeenCalledWith({ containerName: "yeetomatic-ollama" });
+			});
+
+		it("does not require an admin session (no 503 onboarding-mode response)", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			// Deliberately omit sessionAuth to simulate first-run onboarding.
+			delete (deps as { sessionAuth?: unknown }).sessionAuth;
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.signedIn).toBe(false);
+			});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const deps = makeDeps();
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Settings store not configured");
+			});
+
+		it("returns 500 when ollamaSignInService is missing", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			delete (deps as { ollamaSignInService?: unknown }).ollamaSignInService;
+			const req = mockRequest({ url: "/api/onboarding/ollama-signin", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("Ollama sign-in service not configured");
+			});
 	});
 
 	describe("POST /api/onboarding", () => {
@@ -1027,6 +1192,96 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.error).toContain("webhook_secret");
 			expect(store.get("onboarding_complete")).toBeUndefined();
 		});
+
+		it("persists pi_agent_provider, pi_agent_model, and ollama_container_name", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "ollama",
+					pi_agent_model: "kimi-k2.7-code:cloud",
+					ollama_container_name: "custom-ollama",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("pi_agent_provider")).toBe("ollama");
+			expect(store.get("pi_agent_model")).toBe("kimi-k2.7-code:cloud");
+			expect(store.get("ollama_container_name")).toBe("custom-ollama");
+			expect(store.get("onboarding_complete")).toBe("true");
+			});
+
+		it("rejects an unsupported pi_agent_provider", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "openai",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("pi_agent_provider must be one of");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+			expect(store.get("pi_agent_provider")).toBeUndefined();
+			});
+
+		it("omits empty AI / LLM fields rather than overwriting stored values", async () => {
+			const store = await tmpStore();
+			store.set("pi_agent_provider", "ollama");
+			store.set("pi_agent_model", "stored-model");
+			store.set("ollama_container_name", "stored-ollama");
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "",
+					pi_agent_model: "",
+					ollama_container_name: "",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("pi_agent_provider")).toBe("ollama");
+			expect(store.get("pi_agent_model")).toBe("stored-model");
+			expect(store.get("ollama_container_name")).toBe("stored-ollama");
+			});
 	});
 
 	describe("GET /yeetomatic/admin", () => {

@@ -45,7 +45,8 @@ Open [http://127.0.0.1:6767/yeetomatic/admin](http://127.0.0.1:6767/yeetomatic/a
 1. Create the master admin account (full name, username, and password). Additional admin users can be added later from the dashboard.
 2. Verify your GitHub token.
 3. Generate a webhook secret.
-4. Select repositories and initialize their workspaces.
+4. Configure the AI / LLM provider (Ollama), the Ollama container name and sign-in status, and the LLM model.
+5. Select repositories and initialize their workspaces.
 
 Follow the logs with:
 

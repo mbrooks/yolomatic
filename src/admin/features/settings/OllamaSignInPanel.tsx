@@ -1,13 +1,25 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { fetchOllamaSignInStatus, type OllamaSignInStatus } from "../../api/ollama.js";
 
+/** Fetcher signature shared by the Settings-screen and onboarding callers. */
+export type FetchOllamaSignInStatus = () => Promise<OllamaSignInStatus>;
+
 /**
  * Surfaces the current Ollama sign-in status on the AI / LLM settings tab.
  * Only rendered when the selected provider is Ollama. Re-checks status via
  * `GET /api/ollama/signin` without a full page reload.
+ *
+ * The status fetcher is injectable so the onboarding wizard can pass the
+ * onboarding-scoped endpoint (reachable before any admin session exists)
+ * without changing the Settings-screen behavior, which defaults to
+ * `fetchOllamaSignInStatus`.
  */
-export function OllamaSignInPanel({ containerName = "yeetomatic-ollama" }: {
+export function OllamaSignInPanel({
+	containerName = "yeetomatic-ollama",
+	fetchStatus = fetchOllamaSignInStatus,
+}: {
 	containerName?: string;
+	fetchStatus?: FetchOllamaSignInStatus;
 }): React.ReactElement {
 	const [status, setStatus] = useState<OllamaSignInStatus | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -17,7 +29,7 @@ export function OllamaSignInPanel({ containerName = "yeetomatic-ollama" }: {
 		setLoading(true);
 		setError(null);
 		try {
-			const result = await fetchOllamaSignInStatus();
+			const result = await fetchStatus();
 			setStatus(result);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -26,7 +38,7 @@ export function OllamaSignInPanel({ containerName = "yeetomatic-ollama" }: {
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [fetchStatus]);
 
 	useEffect(() => {
 		void load();
