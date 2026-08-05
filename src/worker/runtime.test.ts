@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { emitSessionLogEvent } from "../logging/log-events.js";
 import { createWorkerMessage, type WorkerProtocolMessage } from "./protocol.js";
@@ -587,4 +590,152 @@ describe("runWorkerRuntime", () => {
 		});
 	});
 
+	it("runs yeetstrap.sh before constructing the executor when the script is present", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-init-"));
+		const markerPath = path.join(workspacePath, "init-marker.txt");
+		await writeFile(
+			path.join(workspacePath, "yeetstrap.sh"),
+				`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
+		);
+		const sessionKey = "github-mbrooks-yeetomatic-issue-801-implementation";
+		let executorConstructed = false;
+
+		executeWithOverride.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
+			executorConstructed = true;
+			onSessionCreated?.(mockSession);
+			expect(markerPath).not.toBe("");
+			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				if (message.type !== "hello") return;
+				await sendWorkerWebSocketMessage(
+					server as never,
+					createWorkerMessage("launch_config", sessionKey, "launch-init", {
+						session: {
+							owner: "mbrooks",
+							repo: "yeetomatic",
+							issueNumber: 801,
+							workspacePath,
+							title: "Init runs",
+							body: "Body",
+						},
+						prompt: { kind: "override", text: "custom prompt" },
+					}),
+				);
+			});
+		});
+
+		try {
+			await runWorkerRuntime({
+				wsUrl: "ws://worker.test/session-801",
+				sessionKey,
+				soulPath: "/tmp/SOUL.md",
+			});
+			expect(executorConstructed).toBe(true);
+			await expect(readFile(markerPath, "utf8")).resolves.toBe("ran");
+		} finally {
+			await rm(workspacePath, { recursive: true, force: true });
+		}
+	});
+
+	it("skips the init step and proceeds to the executor when yeetstrap.sh is absent", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-noinit-"));
+		const sessionKey = "github-mbrooks-yeetomatic-issue-802-implementation";
+		let executorConstructed = false;
+
+		executeWithOverride.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
+			executorConstructed = true;
+			onSessionCreated?.(mockSession);
+			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				if (message.type !== "hello") return;
+				await sendWorkerWebSocketMessage(
+					server as never,
+					createWorkerMessage("launch_config", sessionKey, "launch-noinit", {
+						session: {
+							owner: "mbrooks",
+							repo: "yeetomatic",
+							issueNumber: 802,
+							workspacePath,
+							title: "No init",
+							body: "Body",
+						},
+						prompt: { kind: "override", text: "custom prompt" },
+					}),
+				);
+			});
+		});
+
+		try {
+			await runWorkerRuntime({
+				wsUrl: "ws://worker.test/session-802",
+				sessionKey,
+				soulPath: "/tmp/SOUL.md",
+			});
+			expect(executorConstructed).toBe(true);
+		} finally {
+			await rm(workspacePath, { recursive: true, force: true });
+		}
+	});
+
+	it("aborts the runtime with a worker error when yeetstrap.sh exits non-zero", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-badinit-"));
+		await writeFile(
+			path.join(workspacePath, "yeetstrap.sh"),
+				"#!/usr/bin/env bash\nset -euo pipefail\necho 'nope' >&2\nexit 7\n",
+		);
+		const sessionKey = "github-mbrooks-yeetomatic-issue-803-implementation";
+		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
+		let executorConstructed = false;
+
+		executeWithOverride.mockImplementation(async () => {
+			executorConstructed = true;
+			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				seenMessages.push(message);
+				if (message.type !== "hello") return;
+				await sendWorkerWebSocketMessage(
+					server as never,
+					createWorkerMessage("launch_config", sessionKey, "launch-bad", {
+						session: {
+							owner: "mbrooks",
+							repo: "yeetomatic",
+							issueNumber: 803,
+							workspacePath,
+							title: "Bad init",
+							body: "Body",
+						},
+						prompt: { kind: "override", text: "custom prompt" },
+					}),
+				);
+			});
+		});
+
+		try {
+			await expect(
+				runWorkerRuntime({
+					wsUrl: "ws://worker.test/session-803",
+					sessionKey,
+					soulPath: "/tmp/SOUL.md",
+				}),
+			).rejects.toThrow(/Init script exited with code 7/);
+			expect(executorConstructed).toBe(false);
+			const workerError = seenMessages.find((message) => message.type === "error");
+			expect(workerError).toBeDefined();
+			expect((workerError as WorkerProtocolMessage<"error">).payload.message).toMatch(/Init script exited with code 7/);
+		} finally {
+			await rm(workspacePath, { recursive: true, force: true });
+		}
+	});
 });
