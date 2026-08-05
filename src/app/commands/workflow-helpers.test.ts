@@ -439,7 +439,7 @@ describe("workflow helpers", () => {
 
 			expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, ["yeetomatic-working"]);
 			expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "Picked up by Yeetomatic. Working on it...");
-			expect(executor.run).toHaveBeenCalledWith(session, undefined);
+			expect(executor.run).toHaveBeenCalledWith(session, undefined, undefined);
 		});
 
 		it("passes an optional comment body to the executor", async () => {
@@ -464,7 +464,7 @@ describe("workflow helpers", () => {
 				"hello",
 			);
 
-			expect(executor.run).toHaveBeenCalledWith(session, "hello");
+			expect(executor.run).toHaveBeenCalledWith(session, "hello", undefined);
 		});
 	});
 
@@ -650,7 +650,7 @@ describe("workflow helpers", () => {
 				"yeetomatic-bot",
 			);
 
-			expect(result).toEqual({ skip: false, isMentioned: true, isCreatedByYeetomatic: false });
+			expect(result).toEqual({ skip: false, isMentioned: true, isFeedbackCommand: false, isCreatedByYeetomatic: false });
 		});
 	});
 

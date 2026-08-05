@@ -16,6 +16,8 @@ import {
 	formatUptime,
 	DO_NOT_WORK_LABELS,
 	isAdminPermission,
+	commentTriggersFeedback,
+	isFeedbackCommand,
 } from "./policy.js";
 
 describe("hasLabel", () => {
@@ -267,7 +269,75 @@ describe("shouldIgnoreCommentEvent", () => {
 		expect(result.ignore).toBe(false);
 		if (!result.ignore) {
 			expect(result.isMentioned).toBe(true);
+			expect(result.isFeedbackCommand).toBe(false);
 		}
+	});
+
+	it("accepts a /yeetomatic feedback command on an assigned issue without a label", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "/yeetomatic feedback please retry", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+			},
+			"yeetomatic-bot",
+		);
+		expect(result.ignore).toBe(false);
+		if (!result.ignore) {
+			expect(result.isFeedbackCommand).toBe(true);
+			expect(result.isMentioned).toBe(false);
+		}
+	});
+
+	it("accepts a case-insensitive /Yeetomatic FEEDBACK command", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "/Yeetomatic FEEDBACK", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+			},
+			"yeetomatic-bot",
+		);
+		expect(result.ignore).toBe(false);
+		if (!result.ignore) {
+			expect(result.isFeedbackCommand).toBe(true);
+		}
+	});
+
+	it("ignores a /yeetomatic feedback command when Yeetomatic is not assigned", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "/yeetomatic feedback", user: { login: "user" } },
+				issue: { labels: [{ name: "yeetomatic" }], assignees: [] },
+			},
+			"yeetomatic-bot",
+		);
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+	});
+
+	it("ignores a plain comment on an assigned issue that has a Yeetomatic-visible label", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "just a status check, no trigger", user: { login: "user" } },
+				issue: { labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+			},
+			"yeetomatic-bot",
+		);
+		expect(result).toEqual({ ignore: true, reason: "no mention or /yeetomatic feedback command" });
+	});
+
+	it("ignores a mention on an unassigned issue even with a Yeetomatic-visible label", () => {
+		const result = shouldIgnoreCommentEvent(
+			{
+				action: "created",
+				comment: { body: "@yeetomatic please help", user: { login: "user" } },
+				issue: { labels: [{ name: "yeetomatic" }], assignees: [{ login: "someone-else" }] },
+			},
+			"yeetomatic-bot",
+		);
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
 	});
 
 	it("ignores mentions when github_username does not match the assignee", () => {
@@ -459,5 +529,57 @@ describe("formatUptime", () => {
 
 	it("includes days", () => {
 		expect(formatUptime(90061)).toBe("1d 1h 1m 1s");
+	});
+});
+
+describe("isFeedbackCommand", () => {
+	it("matches the exact /yeetomatic feedback command", () => {
+		expect(isFeedbackCommand("/yeetomatic feedback")).toBe(true);
+	});
+
+	it("is case-insensitive", () => {
+		expect(isFeedbackCommand("/Yeetomatic FEEDBACK")).toBe(true);
+		expect(isFeedbackCommand("/YEETOMATIC Feedback")).toBe(true);
+	});
+
+	it("matches as a substring anywhere in the body", () => {
+		expect(isFeedbackCommand("Please /yeetomatic feedback now")).toBe(true);
+	});
+
+	it("rejects bodies without the command", () => {
+		expect(isFeedbackCommand("@yeetomatic please help")).toBe(false);
+		expect(isFeedbackCommand("/yeetomatic stop")).toBe(false);
+		expect(isFeedbackCommand("/yeetomatic issue-refinement")).toBe(false);
+		expect(isFeedbackCommand("just a comment")).toBe(false);
+	});
+
+	it("does not match /yeetomaticfeedback without the separating space", () => {
+		expect(isFeedbackCommand("/yeetomaticfeedback")).toBe(false);
+	});
+});
+
+describe("commentTriggersFeedback", () => {
+	it("returns true for a mention of the configured account", () => {
+		expect(commentTriggersFeedback("Hey @yeetomatic-bot", "yeetomatic-bot")).toBe(true);
+	});
+
+	it("returns true for an @yeetomatic mention regardless of configured account", () => {
+		expect(commentTriggersFeedback("Hey @yeetomatic", "mbrooks")).toBe(true);
+	});
+
+	it("returns true for the /yeetomatic feedback command", () => {
+		expect(commentTriggersFeedback("/yeetomatic feedback", "yeetomatic-bot")).toBe(true);
+	});
+
+	it("returns false for a plain comment with no trigger", () => {
+		expect(commentTriggersFeedback("just a status check", "yeetomatic-bot")).toBe(false);
+	});
+
+	it("returns false for the stop command", () => {
+		expect(commentTriggersFeedback("/yeetomatic stop", "yeetomatic-bot")).toBe(false);
+	});
+
+	it("is case-insensitive for @yeetomatic", () => {
+		expect(commentTriggersFeedback("HEY @YEETOMATIC", "mbrooks")).toBe(true);
 	});
 });

@@ -1,8 +1,10 @@
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
-import type { GitHubService } from "../../ports/github-service.js";
-import { hasYeetomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import type { GitHubService, IssueComment } from "../../ports/github-service.js";
+import { commentTriggersFeedback, hasYeetomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import type { PriorDiscussionComment } from "../../executor/index.js";
+import { formatPriorDiscussion } from "../../executor/index.js";
 import {
 	issueSessionKey,
 	startIssueExecution,
@@ -29,7 +31,7 @@ export interface CommentEventPayload {
 		assignees?: { login: string }[];
 		user?: { login: string };
 	};
-	comment: { id?: number; body: string; user: { login: string; type?: string } };
+	comment: { id?: number; body: string; user: { login: string; type?: string }; created_at?: string };
 	repository: { name: string; owner: { login: string } };
 	sender: { login: string };
 }
@@ -140,22 +142,30 @@ export class HandleIssueComment {
 
 		if (guard.isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
-		} else if (guard.isCreatedByYeetomatic) {
-			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: created by ${this.deps.githubUsername}\n`);
+		} else if (guard.isFeedbackCommand) {
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: /yeetomatic feedback command\n`);
 		} else {
-			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: has yeetomatic label\n`);
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}\n`);
 		}
 
-		// Auto-label on mention so future comments pass via label gate
+		// Auto-label on mention so future comments carry the routing-marker label.
+		// The label is no longer part of the comment gate; this only refreshes the
+		// routing marker.
 		const hasYeetomaticLabel = hasYeetomaticVisibleLabel(payload.issue.labels);
 		if (guard.isMentioned && !hasYeetomaticLabel) {
 			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic"]);
 			process.stdout.write(`[webhook] added yeetomatic label to ${owner}/${repo}#${issueNumber}\n`);
 		}
 
-		// If Yeetomatic is actively executing, steer the comment instead of starting a new run
+		// Gather prior non-trigger comments as background context for the
+		// feedback/steering prompt. Degrades gracefully to the triggering comment
+		// alone when the read fails or returns nothing.
+		const priorComments = await this.gatherPriorContext(owner, repo, issueNumber, payload.comment);
+
+		// If Yeetomatic is actively executing, steer the comment (with prior
+		// context) instead of starting a new run.
 		if (this.deps.tasks.isActive(key)) {
-			const steered = await this.deps.tasks.steer(key, payload.comment.body);
+			const steered = await this.deps.tasks.steer(key, composeSteerMessage(payload.comment.body, priorComments));
 			if (steered) {
 				process.stdout.write(`[webhook] steered comment on active execution ${key}\n`);
 				await this.deps.github.postComment(owner, repo, issueNumber, "Steering comment received.");
@@ -207,10 +217,106 @@ export class HandleIssueComment {
 			"Feedback received. Resuming work.",
 			payload.comment.body,
 			this.adminIssueUrl(owner, repo, issueNumber),
+			priorComments,
 		);
+	}
+
+	private async gatherPriorContext(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		triggerComment: { id?: number; body: string; created_at?: string },
+	): Promise<PriorDiscussionComment[]> {
+		try {
+			const comments = await this.deps.github.listIssueComments(owner, repo, issueNumber);
+			return selectPriorContextComments(comments, triggerComment, this.deps.githubUsername);
+		} catch (error) {
+			process.stdout.write(
+				`[webhook] listIssueComments failed for ${owner}/${repo}#${issueNumber}: ${
+					error instanceof Error ? error.message : String(error)
+				}\n`,
+			);
+			return [];
+		}
 	}
 
 	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
 		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
+}
+
+/**
+ * Composes the message steered into an active execution: the triggering
+ * feedback comment preceded by a delimited "Prior discussion" section when
+ * prior context is available.
+ */
+export function composeSteerMessage(triggerBody: string, priorComments: PriorDiscussionComment[]): string {
+	const section = formatPriorDiscussion(priorComments);
+	if (section.length === 0) {
+		return triggerBody;
+	}
+	return `${section}\n${triggerBody.trim()}`;
+}
+
+/**
+ * Selects prior non-trigger comments to include as feedback context.
+ *
+ * A comment is included when it:
+ * - is not the triggering comment itself (by id when available),
+ * - was authored by someone other than the configured Yeetomatic account,
+ * - does not itself trigger feedback (no mention of the configured account or
+ *   `@yeetomatic`, and no `/yeetomatic feedback` command), and
+ * - is older than the triggering comment (by `created_at`, falling back to
+ *   comment `id` ordering when timestamps tie or are unavailable).
+ *
+ * Comments are returned in chronological order (by `created_at` then `id`).
+ */
+export function selectPriorContextComments(
+	comments: IssueComment[],
+	trigger: { id?: number; body: string; created_at?: string },
+	githubUsername: string,
+): PriorDiscussionComment[] {
+	const triggerId = trigger.id;
+	const triggerTs = parseTimestamp(trigger.created_at);
+
+	const selected = comments.filter((comment) => {
+		if (triggerId !== undefined && comment.id === triggerId) {
+			return false;
+		}
+		if (comment.author === githubUsername) {
+			return false;
+		}
+		if (commentTriggersFeedback(comment.body, githubUsername)) {
+			return false;
+		}
+		return isOlderThan(comment, triggerId, triggerTs);
+	});
+
+	return selected
+		.map((comment) => ({ author: comment.author, body: comment.body }));
+}
+
+function parseTimestamp(value: string | undefined): number {
+	if (!value) return NaN;
+	const ms = new Date(value).getTime();
+	return Number.isFinite(ms) ? ms : NaN;
+}
+
+function isOlderThan(
+	comment: IssueComment,
+	triggerId: number | undefined,
+	triggerTs: number,
+): boolean {
+	const commentTs = parseTimestamp(comment.created_at);
+	if (!Number.isNaN(triggerTs) && !Number.isNaN(commentTs)) {
+		if (commentTs !== triggerTs) {
+			return commentTs < triggerTs;
+		}
+		// Timestamps tie: fall back to id ordering.
+	}
+	if (triggerId !== undefined) {
+		return comment.id < triggerId;
+	}
+	// Cannot establish ordering relative to the trigger; exclude to be safe.
+	return false;
 }

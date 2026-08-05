@@ -1,4 +1,4 @@
-import type { ExecutionResult, PRReviewComment } from "../executor/index.js";
+import type { ExecutionResult, PRReviewComment, PriorDiscussionComment } from "../executor/index.js";
 import type { SessionState } from "../session/store.js";
 
 export interface LiveExecutionSession {
@@ -12,6 +12,7 @@ export interface ExecutionService {
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
+		priorComments?: PriorDiscussionComment[],
 	): Promise<ExecutionResult>;
 	executePRReview(
 		state: SessionState,
