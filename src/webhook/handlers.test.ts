@@ -271,7 +271,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Update", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -419,7 +419,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Please resume work", user: { login: "mbrooks", type: "User" } },
+			comment: { body: "@yeetomatic-bot Please resume work", user: { login: "mbrooks", type: "User" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "yeetomatic-bot" },
 		});
@@ -427,10 +427,11 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "working");
 		expect(executor.execute).toHaveBeenCalledWith(
 			expect.objectContaining({ issueNumber: 56 }),
-			"Please resume work",
+			"@yeetomatic-bot Please resume work",
 			expect.any(AbortSignal),
 			expect.any(Function),
 			expect.any(Function),
+			expect.any(Array),
 		);
 	});
 
@@ -548,7 +549,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Continue", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Continue", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -792,7 +793,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Update", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -847,7 +848,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Update", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -1016,13 +1017,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Do this instead", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Do this instead", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
-		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#56", "Do this instead");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#56", "@yeetomatic-bot Do this instead");
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Steering comment received." }),
@@ -1159,7 +1160,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 57, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Can you also add tests?", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Can you also add tests?", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});

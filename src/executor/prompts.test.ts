@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion } from "./prompts.js";
 
 describe("buildIssuePrompt", () => {
 	it("includes issue metadata", () => {
@@ -257,5 +257,57 @@ describe("buildIssueRefinementPrompt", () => {
 			expect(skillIdx).toBeLessThan(steeringIdx);
 			expect(steeringIdx).toBeLessThan(titleIdx);
 		});
+	});
+});
+
+describe("buildFeedbackPrompt prior discussion", () => {
+	it("renders a Prior discussion section above the triggering comment", () => {
+		const prompt = buildFeedbackPrompt("Please retry.", [
+			{ author: "mbrooks", body: "I think the tests are flaky." },
+			{ author: "tarsmbrooks", body: "Agreed, rerun." },
+		]);
+		expect(prompt).toContain("Prior discussion");
+		expect(prompt).toContain("@mbrooks:");
+		expect(prompt).toContain("I think the tests are flaky.");
+		expect(prompt).toContain("@tarsmbrooks:");
+		expect(prompt).toContain("Agreed, rerun.");
+		// Triggering comment still present
+		expect(prompt).toContain("Please retry.");
+		const priorIdx = prompt.indexOf("Prior discussion");
+		const triggerIdx = prompt.indexOf("Please retry.");
+		expect(priorIdx).toBeLessThan(triggerIdx);
+	});
+
+	it("omits the Prior discussion section when no prior comments are provided", () => {
+		const prompt = buildFeedbackPrompt("Please retry.");
+		expect(prompt).not.toContain("Prior discussion");
+		expect(prompt).toContain("Please retry.");
+	});
+
+	it("omits the Prior discussion section when the list is empty", () => {
+		const prompt = buildFeedbackPrompt("Please retry.", []);
+		expect(prompt).not.toContain("Prior discussion");
+	});
+
+	it("trims prior comment bodies", () => {
+		const prompt = buildFeedbackPrompt("Retry.", [
+			{ author: "mbrooks", body: "  surround me  " },
+		]);
+		expect(prompt).toContain("surround me");
+		expect(prompt).not.toContain("  surround me  ");
+	});
+});
+
+describe("formatPriorDiscussion", () => {
+	it("returns an empty string when there are no prior comments", () => {
+		expect(formatPriorDiscussion([])).toBe("");
+	});
+
+	it("returns a delimited section with author and body", () => {
+		const text = formatPriorDiscussion([{ author: "mbrooks", body: "Hello" }]);
+		expect(text).toContain("Prior discussion");
+		expect(text).toContain("@mbrooks:");
+		expect(text).toContain("Hello");
+		expect(text).toContain("---");
 	});
 });

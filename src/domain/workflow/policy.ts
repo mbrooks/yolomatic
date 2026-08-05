@@ -84,6 +84,35 @@ export function shouldIgnoreIssueEvent(
 	return { ignore: false };
 }
 
+/**
+ * The `/yeetomatic feedback` comment command, used as an explicit trigger for
+ * the feedback flow. Detected as a case-insensitive substring of the comment
+ * body, mirroring the `@yeetomatic` mention detection.
+ */
+export const FEEDBACK_COMMAND = "/yeetomatic feedback";
+
+/**
+ * Whether a comment body contains the `/yeetomatic feedback` command marker.
+ * Case-insensitive substring match, symmetric with the `@yeetomatic` mention
+ * check. This is a trigger marker, not a dispatch command routed to a handler.
+ */
+export function isFeedbackCommand(body: string): boolean {
+	return body.toLowerCase().includes(FEEDBACK_COMMAND);
+}
+
+/**
+ * Whether a comment body explicitly triggers feedback by mentioning the
+ * configured Yeetomatic account (`@{githubUsername}` or `@yeetomatic`) or by
+ * containing the `/yeetomatic feedback` command. The Yeetomatic-visible label
+ * is intentionally not part of this check.
+ */
+export function commentTriggersFeedback(body: string, githubUsername: string): boolean {
+	const isMentioned =
+		body.includes(`@${githubUsername}`) ||
+		body.toLowerCase().includes("@yeetomatic");
+	return isMentioned || isFeedbackCommand(body);
+}
+
 export function shouldIgnoreCommentEvent(
 	payload: {
 		action: string;
@@ -97,7 +126,7 @@ export function shouldIgnoreCommentEvent(
 		};
 	},
 	githubUsername: string,
-): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isCreatedByYeetomatic: boolean } {
+): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isFeedbackCommand: boolean; isCreatedByYeetomatic: boolean } {
 	if (payload.action !== "created") {
 		return { ignore: true, reason: `action is ${payload.action}` };
 	}
@@ -123,14 +152,16 @@ export function shouldIgnoreCommentEvent(
 	const isMentioned =
 		payload.comment.body.includes(`@${githubUsername}`) ||
 		payload.comment.body.toLowerCase().includes("@yeetomatic");
-	const hasYeetomaticLabel =
-		hasYeetomaticVisibleLabel(payload.issue.labels);
+	const isFeedbackCmd = isFeedbackCommand(payload.comment.body);
 
-	if (!hasYeetomaticLabel && !isMentioned) {
-		return { ignore: true, reason: "no yeetomatic label or mention" };
+	// The comment gate requires assignment AND an explicit trigger (mention or
+	// `/yeetomatic feedback`). The Yeetomatic-visible label is no longer part of
+	// the gate (neither required nor sufficient).
+	if (!isMentioned && !isFeedbackCmd) {
+		return { ignore: true, reason: "no mention or /yeetomatic feedback command" };
 	}
 
-	return { ignore: false, isMentioned, isCreatedByYeetomatic };
+	return { ignore: false, isMentioned, isFeedbackCommand: isFeedbackCmd, isCreatedByYeetomatic };
 }
 
 const ISSUE_REFINEMENT_COMMAND = "/yeetomatic issue-refinement";

@@ -124,6 +124,7 @@ function makeCommand(
 		getRepository: vi.fn(async () => null),
 		getCollaboratorPermissionLevel: vi.fn(async () => null),
 		isCollaborator: vi.fn(async () => false),
+		listIssueComments: vi.fn(async () => []),
 	};
 	const tasks: TaskControlService = overrides?.tasks ?? {
 		cancel: vi.fn(() => false),

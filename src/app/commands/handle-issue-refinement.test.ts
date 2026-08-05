@@ -973,6 +973,7 @@ describe("HandleIssueRefinement", () => {
 			getIssue: vi.fn<GitHubService["getIssue"]>(async () => ({ state: "open", body: "Body" })),
 			getCollaboratorPermissionLevel: vi.fn(async (): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> => null),
 			isCollaborator: vi.fn(async (): Promise<boolean> => false),
+			listIssueComments: vi.fn(async (): Promise<import("../../ports/github-service.js").IssueComment[]> => []),
 		};
 	}
 

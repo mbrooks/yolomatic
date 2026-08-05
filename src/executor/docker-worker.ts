@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { ExecutionResult, RefinementResult } from "./results.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 import { parseRefinementResult } from "./results.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
@@ -70,8 +70,9 @@ export class DockerWorkerExecutor implements ExecutionService {
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
+		priorComments?: PriorDiscussionComment[],
 	): Promise<ExecutionResult> {
-		const prompt = comment ? buildFeedbackPrompt(comment) : buildIssuePrompt(state);
+		const prompt = comment ? buildFeedbackPrompt(comment, priorComments ?? []) : buildIssuePrompt(state);
 		return this.runWorker(state, { kind: comment ? "comment" : "issue", text: prompt }, abortSignal, onSessionCreated, onActivity) as Promise<ExecutionResult>;
 	}
 
