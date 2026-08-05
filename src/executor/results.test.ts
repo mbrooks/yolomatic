@@ -275,4 +275,64 @@ describe("parseRefinementResult", () => {
 	it("returns null for JSON missing required fields", () => {
 		expect(parseRefinementResult(JSON.stringify({ summary: "only summary" }))).toBeNull();
 	});
+
+	it("parses a proposedTitle when supplied as a non-empty string", () => {
+		const raw = JSON.stringify({
+			proposedTaskBody: "Body",
+			summary: "S",
+			investigation: "I",
+			proposedTitle: "Clearer Title",
+		});
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTitle).toBe("Clearer Title");
+	});
+
+	it("omits proposedTitle when not supplied", () => {
+		const raw = JSON.stringify({
+			proposedTaskBody: "Body",
+			summary: "S",
+			investigation: "I",
+		});
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTitle).toBeUndefined();
+	});
+
+	it("omits proposedTitle when supplied empty or whitespace-only", () => {
+		for (const proposedTitle of ["", "   ", "\t\n"]) {
+			const raw = JSON.stringify({
+				proposedTaskBody: "Body",
+				summary: "S",
+				investigation: "I",
+				proposedTitle,
+			});
+			const result = parseRefinementResult(raw);
+			expect(result).not.toBeNull();
+			expect(result!.proposedTitle).toBeUndefined();
+		}
+	});
+
+	it("trims a supplied proposedTitle", () => {
+		const raw = JSON.stringify({
+			proposedTaskBody: "Body",
+			summary: "S",
+			investigation: "I",
+			proposedTitle: "  Clearer Title  ",
+		});
+		const result = parseRefinementResult(raw);
+		expect(result!.proposedTitle).toBe("Clearer Title");
+	});
+
+	it("ignores a non-string proposedTitle", () => {
+		const raw = JSON.stringify({
+			proposedTaskBody: "Body",
+			summary: "S",
+			investigation: "I",
+			proposedTitle: 42,
+		});
+		const result = parseRefinementResult(raw);
+		expect(result).not.toBeNull();
+		expect(result!.proposedTitle).toBeUndefined();
+	});
 });

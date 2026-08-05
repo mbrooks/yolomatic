@@ -179,6 +179,69 @@ describe("RefinementStore", () => {
 		expect(byId!.steeringPrompt).toBe("Focus on rollback");
 	});
 
+	it("round-trips a proposedTitle through createAttempt, updateAttempt, and reads", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 20,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+			proposedTitle: "Clearer Title",
+		});
+		expect(created.proposedTitle).toBe("Clearer Title");
+
+		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 20);
+		expect(latest).not.toBeNull();
+		expect(latest!.proposedTitle).toBe("Clearer Title");
+
+		const byId = store.getAttempt(created.id);
+		expect(byId!.proposedTitle).toBe("Clearer Title");
+	});
+
+	it("updates a proposedTitle via updateAttempt", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 21,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+		expect(created.proposedTitle).toBeUndefined();
+
+		const updated = store.updateAttempt(created.id, {
+			proposedTitle: "New Title",
+			state: "applied",
+		});
+		expect(updated.proposedTitle).toBe("New Title");
+		expect(updated.state).toBe("applied");
+
+		expect(store.getAttempt(created.id)!.proposedTitle).toBe("New Title");
+	});
+
+	it("defaults proposedTitle to undefined when not supplied", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 22,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+		expect(created.proposedTitle).toBeUndefined();
+		expect(store.getLatestAttempt("mbrooks", "yeetomatic", 22)!.proposedTitle).toBeUndefined();
+	});
+
 	it("defaults steeringPrompt to undefined when not supplied", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
