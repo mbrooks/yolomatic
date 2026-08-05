@@ -19,6 +19,7 @@ export interface RefinementAttempt {
 	originalBody: string;
 	originalBodyFingerprint: string;
 	proposedTaskBody?: string;
+	proposedTitle?: string;
 	summary?: string;
 	investigation?: string;
 	instructionSource: InstructionSource;
@@ -50,6 +51,7 @@ export interface RefinementAttemptCreate {
 	originalBody: string;
 	originalBodyFingerprint: string;
 	proposedTaskBody?: string;
+	proposedTitle?: string;
 	summary?: string;
 	investigation?: string;
 	instructionSource: InstructionSource;
@@ -82,10 +84,10 @@ export class RefinementStore {
 		const stmt = this.db.prepare(`
 			INSERT INTO refinement_attempts (
 				id, owner, repo, issue_number, instruction_comment_id, command_comment_id, requester,
-				original_title, original_body, original_body_fingerprint, proposed_task_body, summary,
-				investigation, instruction_source, repo_commit, state, failure_reason, delivery_id,
+				original_title, original_body, original_body_fingerprint, proposed_task_body, proposed_title,
+				summary, investigation, instruction_source, repo_commit, state, failure_reason, delivery_id,
 				steering_prompt, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 		stmt.run(
 			attempt.id,
@@ -99,6 +101,7 @@ export class RefinementStore {
 			attempt.originalBody,
 			attempt.originalBodyFingerprint,
 			attempt.proposedTaskBody ?? null,
+			attempt.proposedTitle ?? null,
 			attempt.summary ?? null,
 			attempt.investigation ?? null,
 			attempt.instructionSource,
@@ -126,6 +129,7 @@ export class RefinementStore {
 			"originalBody",
 			"originalBodyFingerprint",
 			"proposedTaskBody",
+			"proposedTitle",
 			"summary",
 			"investigation",
 			"instructionSource",
@@ -218,6 +222,7 @@ export class RefinementStore {
 			originalBody: String(row.original_body),
 			originalBodyFingerprint: String(row.original_body_fingerprint),
 			proposedTaskBody: row.proposed_task_body == null ? undefined : String(row.proposed_task_body),
+			proposedTitle: row.proposed_title == null ? undefined : String(row.proposed_title),
 			summary: row.summary == null ? undefined : String(row.summary),
 			investigation: row.investigation == null ? undefined : String(row.investigation),
 			instructionSource: String(row.instruction_source) as InstructionSource,

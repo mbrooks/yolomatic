@@ -7,6 +7,7 @@ import { RefinementStore } from "../../refinement/store.js";
 import { SettingsStore } from "../../settings/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
+import type { GitHubService } from "../../ports/github-service.js";
 import { sessionStorageKey, type SessionKind, type SessionState } from "../../session/store.js";
 
 const REFINEMENT_SESSION_KEY = sessionStorageKey("mbrooks", "yeetomatic", 1, "refinement");
@@ -755,6 +756,140 @@ describe("HandleIssueRefinement", () => {
 		expect(attempt!.state).toBe("failed");
 	});
 
+	it("applies a proposed title when the worker returns a changed one", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", title: "Test", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "Clearer Title",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueTitle).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Clearer Title");
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			"Issue refined at the request of @admin. The issue title and body now contain the Proposed Task. No implementation session was started.",
+		);
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt!.state).toBe("applied");
+		expect(attempt!.proposedTitle).toBe("Clearer Title");
+	});
+
+	it("does not apply a title when the worker omits proposedTitle", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", title: "Test", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueTitle).not.toHaveBeenCalled();
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			"Issue refined at the request of @admin. The issue body now contains the Proposed Task. No implementation session was started.",
+		);
+	});
+
+	it("does not apply a title when proposedTitle is empty", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", title: "Test", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "   ",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueTitle).not.toHaveBeenCalled();
+	});
+
+	it("does not apply a title when proposedTitle equals the original title", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", title: "Test", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "Test",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueTitle).not.toHaveBeenCalled();
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			"Issue refined at the request of @admin. The issue body now contains the Proposed Task. No implementation session was started.",
+		);
+	});
+
+	it("marks stale when the issue title changes during refinement", async () => {
+		github.getIssue
+			.mockResolvedValueOnce({ state: "open", title: "Test", body: "Body" })
+			.mockResolvedValueOnce({ state: "open", title: "Renamed by maintainer", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "Clearer Title",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueBody).not.toHaveBeenCalled();
+		expect(github.updateIssueTitle).not.toHaveBeenCalled();
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt!.state).toBe("stale");
+		expect(attempt!.failureReason).toBe("issue title changed during refinement");
+		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue title changed during refinement" });
+	});
+
+	it("rejects an oversized proposed title", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", title: "Test", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "x".repeat(257),
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(github.updateIssueBody).not.toHaveBeenCalled();
+		expect(github.updateIssueTitle).not.toHaveBeenCalled();
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt!.state).toBe("failed");
+		expect(attempt!.failureReason).toBe("proposed title exceeds GitHub size limit");
+	});
+
+	it("persists proposedTitle on the attempt even when body is stale", async () => {
+		github.getIssue
+			.mockResolvedValueOnce({ state: "open", title: "Test", body: "Body" })
+			.mockResolvedValueOnce({ state: "open", title: "Test", body: "Modified body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			proposedTitle: "Clearer Title",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(attempt!.proposedTitle).toBe("Clearer Title");
+		expect(attempt!.state).toBe("stale");
+	});
+
 	it("reports failure when the worker throws", async () => {
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		executor.executeRefinement.mockRejectedValue(new Error("worker crashed"));
@@ -834,7 +969,8 @@ describe("HandleIssueRefinement", () => {
 		return {
 			postComment: vi.fn(async () => 1),
 			updateIssueBody: vi.fn(async () => {}),
-			getIssue: vi.fn(async () => ({ state: "open", body: "Body" })),
+			updateIssueTitle: vi.fn(async () => {}),
+			getIssue: vi.fn<GitHubService["getIssue"]>(async () => ({ state: "open", body: "Body" })),
 			getCollaboratorPermissionLevel: vi.fn(async (): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> => null),
 			isCollaborator: vi.fn(async (): Promise<boolean> => false),
 			listIssueComments: vi.fn(async (): Promise<import("../../ports/github-service.js").IssueComment[]> => []),
@@ -906,7 +1042,7 @@ describe("HandleIssueRefinement", () => {
 
 	function createExecutorMock() {
 		return {
-			executeRefinement: vi.fn(async () => ({
+			executeRefinement: vi.fn<DockerWorkerExecutor["executeRefinement"]>(async () => ({
 				proposedTaskBody: "Body",
 				summary: "Summary",
 				investigation: "Investigation",

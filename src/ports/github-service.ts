@@ -106,7 +106,7 @@ export interface GitHubService {
 		repo: string,
 		options: { head: string; base: string; state: string },
 	): Promise<CreatedPR[]>;
-	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; body?: string } | null>;
+	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; title?: string; body?: string } | null>;
 	createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<CreatedIssue>;
 	initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void>;
 	fileSelfReport(title: string, body: string, labels: string[]): Promise<string>;
@@ -122,6 +122,7 @@ export interface GitHubService {
 	closeIssue(owner: string, repo: string, issueNumber: number): Promise<void>;
 	updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
 	listIssueComments(owner: string, repo: string, issueNumber: number): Promise<IssueComment[]>;
+	updateIssueTitle(owner: string, repo: string, issueNumber: number, title: string): Promise<void>;
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
 	getRepository(owner: string, repo: string): Promise<RepositoryInfo | null>;

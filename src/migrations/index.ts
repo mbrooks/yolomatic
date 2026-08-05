@@ -248,6 +248,16 @@ export const MIGRATIONS: Migration[] = [
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
 		},
 	},
+	{
+		id: 11,
+		name: "add_refinement_attempts_proposed_title",
+		up(db) {
+			const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+			if (!columns.some((c) => c.name === "proposed_title")) {
+				db.exec("ALTER TABLE refinement_attempts ADD COLUMN proposed_title TEXT");
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {
