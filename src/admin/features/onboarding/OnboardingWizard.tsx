@@ -6,12 +6,14 @@ import {
 	listAccessibleRepositories,
 	initializeWorkspaces,
 	fetchOnboardingConfig,
+	fetchOnboardingOllamaSignInStatus,
 	isSecretField,
 	type OnboardingConfig,
 	type OnboardingSecretField,
 } from "../../api/onboarding.js";
 import { Modal } from "../../components/Modal.js";
 import { RepoManager, type ManagedRepo } from "../repos/RepoManager.js";
+import { OllamaSignInPanel } from "../settings/OllamaSignInPanel.js";
 
 export type GithubEventMode = "webhook" | "polling" | "both";
 
@@ -29,12 +31,19 @@ interface WizardState {
 	githubPollIntervalMs: string;
 	webhookSecret: string;
 	webhookSecretProtected: boolean;
+	piAgentProvider: string;
+	piAgentModel: string;
+	ollamaContainerName: string;
 	repositories: ManagedRepo[];
 	error: string | null;
 }
 
 const STORAGE_KEY = "yeetomatic-onboarding-wizard";
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
+
+/** The only supported LLM provider today; structured for future extension. */
+export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama"];
+export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
 
 export const EVENT_MODE_OPTIONS: readonly GithubEventMode[] = ["webhook", "polling", "both"];
 export const MIN_POLL_INTERVAL_MS = 1000;
@@ -162,6 +171,9 @@ function getDefaultState(): WizardState {
 		githubPollIntervalMs: "",
 		webhookSecret: "",
 		webhookSecretProtected: false,
+		piAgentProvider: "ollama",
+		piAgentModel: "",
+		ollamaContainerName: DEFAULT_OLLAMA_CONTAINER_NAME,
 		repositories: [],
 		error: null,
 	};
@@ -223,6 +235,18 @@ function applyConfig(state: WizardState, config: OnboardingConfig): void {
 	}
 	if (isSecretField(config.webhook_secret) && config.webhook_secret.configured) {
 		state.webhookSecretProtected = true;
+	}
+	const provider = config.pi_agent_provider;
+	if (typeof provider === "string" && provider.trim()) {
+		state.piAgentProvider = provider.trim();
+	}
+	const model = config.pi_agent_model;
+	if (typeof model === "string" && model.trim()) {
+		state.piAgentModel = model.trim();
+	}
+	const container = config.ollama_container_name;
+	if (typeof container === "string" && container.trim()) {
+		state.ollamaContainerName = container.trim();
 	}
 }
 
@@ -358,12 +382,12 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	const hasAutoFetchedReposRef = useRef(false);
 
 	useEffect(() => {
-		// Auto-load the repository list when the operator reaches step 4 so they
+		// Auto-load the repository list when the operator reaches step 5 so they
 		// do not have to click Fetch. Only runs once per mount and only when a
 		// GitHub token is available (entered or already configured).
 		const hasToken = state.githubToken.trim().length > 0 || state.githubTokenProtected;
 		if (
-			state.step === 4 &&
+			state.step === 5 &&
 			hasToken &&
 			state.repositories.length === 0 &&
 			!loading &&
@@ -405,6 +429,9 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 					onboardingBody.github_poll_interval_ms = String(interval);
 				}
 			}
+			onboardingBody.pi_agent_provider = state.piAgentProvider.trim();
+			onboardingBody.pi_agent_model = state.piAgentModel.trim();
+			onboardingBody.ollama_container_name = state.ollamaContainerName.trim();
 			await submitOnboarding(onboardingBody);
 
 			localStorage.removeItem(STORAGE_KEY);
@@ -432,6 +459,8 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			case 3:
 				return isEventModeStepValid(state.githubEventMode, state.githubPollIntervalMs, state.webhookSecret, state.webhookSecretProtected);
 			case 4:
+				return isAiLlmStepValid(state.piAgentProvider, state.piAgentModel, state.ollamaContainerName);
+			case 5:
 				return true;
 			default:
 				return false;
@@ -524,6 +553,12 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 					/>
 				)}
 				{state.step === 4 && (
+					<StepFourAiLlm
+						state={state}
+						updateField={updateField}
+					/>
+				)}
+				{state.step === 5 && (
 					<StepFiveWorkspaceInit
 						state={state}
 						onFetchRepos={handleFetchRepos}
@@ -599,6 +634,31 @@ export function isEventModeStepValid(
 	return true;
 }
 
+/**
+ * Validates the AI / LLM wizard step. A provider must be selected; when the
+ * provider is `ollama` the container name and model fields must be non-empty.
+ * Ollama sign-in status is informational only and never gates advancing.
+ */
+export function isAiLlmStepValid(
+	provider: string,
+	model: string,
+	containerName: string,
+): boolean {
+	const providerTrimmed = provider.trim();
+	if (!providerTrimmed) {
+		return false;
+	}
+	if (providerTrimmed === "ollama") {
+		if (containerName.trim().length === 0) {
+			return false;
+		}
+	}
+	if (model.trim().length === 0) {
+		return false;
+	}
+	return true;
+}
+
 function getStepSubtitle(step: number): string {
 	switch (step) {
 		case 1:
@@ -608,6 +668,8 @@ function getStepSubtitle(step: number): string {
 		case 3:
 			return "Choose how Yeetomatic receives GitHub events by default.";
 		case 4:
+			return "Configure the AI / LLM provider, Ollama container, and model.";
+		case 5:
 			return "Initialize workspaces for the repositories you want Yeetomatic to manage.";
 		default:
 			return "";
@@ -886,6 +948,77 @@ function StepThreeEventMode({
 					<li>Click <strong>Add webhook</strong>.</li>
 				</ol>
 			</Modal>
+		</div>
+	);
+}
+
+function StepFourAiLlm({
+	state,
+	updateField,
+}: {
+	state: WizardState;
+	updateField: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
+}): React.ReactElement {
+	const isOllama = state.piAgentProvider.trim() === "ollama";
+	return (
+		<div className="onboarding-form">
+			<div className="form-group">
+				<label htmlFor="pi_agent_provider">LLM Provider</label>
+				<select
+					id="pi_agent_provider"
+					value={state.piAgentProvider}
+					onChange={(e) => updateField("piAgentProvider", e.target.value)}
+				>
+					{LLM_PROVIDER_OPTIONS.map((option) => (
+						<option key={option} value={option}>{option}</option>
+					))}
+				</select>
+				<span className="setting-description">
+					The only supported provider today is Ollama. Additional providers may be
+					added here in the future.
+				</span>
+			</div>
+
+			{isOllama && (
+				<>
+					<div className="form-group">
+						<label htmlFor="ollama_container_name">Ollama Container Name</label>
+						<input
+							id="ollama_container_name"
+							type="text"
+							value={state.ollamaContainerName}
+							onChange={(e) => updateField("ollamaContainerName", e.target.value)}
+							placeholder={DEFAULT_OLLAMA_CONTAINER_NAME}
+							required
+						/>
+						<span className="setting-description">
+							Name of the Ollama Docker container the control plane shells into to
+							check sign-in status. Defaults to yeetomatic-ollama.
+						</span>
+					</div>
+
+					<OllamaSignInPanel
+						containerName={state.ollamaContainerName}
+						fetchStatus={fetchOnboardingOllamaSignInStatus}
+					/>
+				</>
+			)}
+
+			<div className="form-group">
+				<label htmlFor="pi_agent_model">LLM Model</label>
+				<input
+					id="pi_agent_model"
+					type="text"
+					value={state.piAgentModel}
+					onChange={(e) => updateField("piAgentModel", e.target.value)}
+					placeholder="e.g. kimi-k2.7-code:cloud"
+					required
+				/>
+				<span className="setting-description">
+					The model identifier worker containers use when invoking the LLM. This
+					matches the free-text field on Settings → AI / LLM.
+				</span>
+			</div>
 		</div>
 	);
 }
