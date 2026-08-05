@@ -35,6 +35,8 @@ export interface AdminRouteDefinition<TBody extends object = Record<string, unkn
 	pattern: RegExp;
 	/** Authorize the request before invoking the handler. `false` is a public route. */
 	auth?: boolean;
+	/** When true and `auth` is not `false`, also accept HTTP Basic Auth (RFC 7617) verified against the `users` table. */
+	allowBasicAuth?: boolean;
 	parseBody?: boolean;
 	required?: string[];
 	requiresDeps?: RequiredAdminRouteDep[];
@@ -85,7 +87,7 @@ export class AdminRouteRegistry {
 			}
 
 			if (definition.auth !== false) {
-				if (!checkAdminJson(request, response, deps)) {
+				if (!checkAdminJson(request, response, deps, definition.allowBasicAuth === true)) {
 					return true;
 				}
 			}
@@ -234,10 +236,14 @@ export function checkAdminJson(
 	request: IncomingMessage,
 	response: ServerResponse,
 	deps: AdminRouterDeps,
+	allowBasicAuth = false,
 ): boolean {
 	if (!deps.sessionAuth) {
 		sendJson(response, 503, { error: "Server is in onboarding mode. Complete setup first." });
 		return false;
+	}
+	if (allowBasicAuth) {
+		return deps.sessionAuth.requireAdminJsonAllowBasic(request, response);
 	}
 	return deps.sessionAuth.requireAdminJson(request, response);
 }
