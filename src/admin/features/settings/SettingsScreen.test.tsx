@@ -54,9 +54,9 @@ const MOCK_SETTINGS = [
 		category: "github-integration",
 	},
 	{
-		key: "admin_username",
+		key: "admin_github_username",
 		value: "admin",
-		description: "Admin UI username",
+		description: "GitHub user authorized for /yeetomatic stop and /yeetomatic issue-refinement",
 		type: "string",
 		default: undefined,
 		requiresRestart: true,
@@ -271,7 +271,7 @@ describe("SettingsScreen", () => {
 			expect(screen.getByText("github_token")).not.toBeNull();
 		});
 		expect(screen.getByText("github_username")).not.toBeNull();
-		expect(screen.queryByText("admin_username")).toBeNull();
+		expect(screen.queryByText("admin_github_username")).toBeNull();
 		expect(screen.queryByText("port")).toBeNull();
 	});
 
@@ -376,6 +376,7 @@ describe("SettingsScreen", () => {
 			"Git & Worktrees",
 			"Worker Behavior",
 			"AI / LLM",
+			"Users",
 			"Skills",
 			"Invitations",
 			"Rerun On-Boarding",
@@ -387,7 +388,7 @@ describe("SettingsScreen", () => {
 		for (const section of ["Server", "Authentication", "File System", "Logging"]) {
 			expect(screen.getByRole("heading", { name: section })).not.toBeNull();
 		}
-		expect(screen.getByText("admin_username")).not.toBeNull();
+		expect(screen.getByText("admin_github_username")).not.toBeNull();
 		expect(screen.getByText("sessions_dir")).not.toBeNull();
 		expect(screen.getByText("log_level")).not.toBeNull();
 		expect(screen.queryByText("configured_repositories")).toBeNull();

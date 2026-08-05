@@ -16,8 +16,6 @@ vi.mock("./config.js", () => ({
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
 		selfReportEnabled: true,
-		adminUsername: "admin",
-		adminPassword: "secret",
 		onboardingComplete: true,
 		adminGithubUsername: "admin",
 		cleanupRetentionDays: undefined,
@@ -64,6 +62,19 @@ const repositoryStoreMock = vi.hoisted(() => ({
 
 vi.mock("./repos/repository-store.js", () => ({
 	RepositoryStore: vi.fn(() => repositoryStoreMock),
+}));
+
+const userStoreMock = vi.hoisted(() => ({
+	hasAnySync: vi.fn(() => true),
+	createSync: vi.fn(),
+	firstSync: vi.fn(() => null),
+	listSync: vi.fn(() => []),
+	getByUsernameSync: vi.fn(() => null),
+	getByIdSync: vi.fn(() => null),
+}));
+
+vi.mock("./users/store.js", () => ({
+	UserStore: vi.fn(() => userStoreMock),
 }));
 
 
@@ -204,8 +215,6 @@ describe("main", () => {
 				set: expect.any(Function),
 				getAll: expect.any(Function),
 			}),
-			"admin",
-			"secret",
 			expect.any(Object),
 			expect.objectContaining({
 				createOrGetWorktree: expect.any(Function),
@@ -241,8 +250,6 @@ describe("main", () => {
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
-			adminUsername: "admin",
-			adminPassword: "secret",
 			onboardingComplete: true,
 			adminGithubUsername: "admin",
 			cleanupRetentionDays: undefined,
@@ -286,8 +293,6 @@ describe("main", () => {
 			"secret",
 			noOpHandlers,
 			expect.any(Object),
-			expect.anything(),
-			expect.anything(),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
@@ -344,8 +349,6 @@ describe("main", () => {
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
-			adminUsername: "admin",
-			adminPassword: "secret",
 			onboardingComplete: true,
 			adminGithubUsername: "admin",
 			cleanupRetentionDays: undefined,
@@ -380,8 +383,6 @@ describe("main", () => {
 			"secret",
 			expect.objectContaining({ handleGitHubEvent: expect.any(Function) }),
 			expect.any(Object),
-			expect.anything(),
-			expect.anything(),
 			expect.any(Object),
 			expect.any(Object),
 			expect.any(Object),
@@ -529,8 +530,6 @@ describe("main", () => {
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
-			adminUsername: "admin",
-			adminPassword: "secret",
 			onboardingComplete: true,
 			adminGithubUsername: "admin",
 			cleanupRetentionDays: 7,
@@ -606,7 +605,7 @@ describe("main", () => {
 		await main();
 
 		const onboardingCall = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0];
-		const options = onboardingCall?.[9] as { onOnboardingComplete: () => Promise<void> };
+		const options = onboardingCall?.[7] as { onOnboardingComplete: () => Promise<void> };
 		expect(options.onOnboardingComplete).toBeTypeOf("function");
 
 		// Completing onboarding re-reads config and must see a complete config now.
@@ -622,7 +621,7 @@ describe("main", () => {
 	it("does not start runtime when onboarding complete fires before config is complete", async () => {
 		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
 		await main();
-		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[9] as {
+		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[7] as {
 			onOnboardingComplete: () => Promise<void>;
 		};
 		const callsBefore = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length;
@@ -634,7 +633,7 @@ describe("main", () => {
 	it("does not start runtime twice if onboarding complete fires again", async () => {
 		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
 		await main();
-		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[9] as {
+		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[7] as {
 			onOnboardingComplete: () => Promise<void>;
 		};
 		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);

@@ -9,7 +9,7 @@ function request(url: string, method = "GET", body?: string): http.IncomingMessa
 		url,
 		method,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {
@@ -33,8 +33,7 @@ function response() {
 
 function makeDeps(overrides: Record<string, unknown> = {}) {
 	return {
-		adminUsername: "admin",
-		adminPassword: "secret",
+		sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 		getAdminStatus: {
 			execute: vi.fn(async () =>
 				ok({
@@ -76,8 +75,7 @@ describe("handleStatusRoutes", () => {
 			{ method: "GET", url: "/api/status", headers: {} } as never,
 			res,
 			{
-				adminUsername: "admin",
-				adminPassword: "secret",
+				sessionAuth: { requireAdminJson: (_req: any, res: any) => { res.statusCode = 401; res.end('{"error":"Unauthorized"}'); return false; }, requireAdminText: () => false, isAdminAuthorized: () => false, hasUsers: () => true } as never,
 			} as never,
 			"/api/status",
 		);

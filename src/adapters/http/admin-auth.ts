@@ -2,9 +2,16 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { sendJson, sendText } from "./response-helpers.js";
+import { verifyPassword, type User, type UserStore } from "../../users/store.js";
 
-const SESSION_COOKIE_NAME = "yeetomatic_admin_session";
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+export const SESSION_COOKIE_NAME = "yeetomatic_admin_session";
+export const SESSION_TTL_SECONDS = 12 * 60 * 60;
+
+export interface SessionPayload {
+	userId: string;
+	expiresAt: number;
+	signature: string;
+}
 
 function isSecureRequest(request: IncomingMessage): boolean {
 	if ((request.socket as { encrypted?: boolean } | undefined)?.encrypted) {
@@ -32,147 +39,158 @@ function parseCookies(request: IncomingMessage): Map<string, string> {
 	return cookies;
 }
 
-function sessionSignature(username: string, password: string, expiresAt: number): string {
-	return createHmac("sha256", password).update(`${username}:${expiresAt}`).digest("base64url");
+function sessionSignature(secret: string, userId: string, expiresAt: number): string {
+	return createHmac("sha256", secret).update(`${userId}:${expiresAt}`).digest("base64url");
 }
 
-function buildSessionCookieValue(username: string, password: string, expiresAt: number): string {
-	const payload = JSON.stringify({
-		username,
+function buildSessionCookieValue(secret: string, userId: string, expiresAt: number): string {
+	const payload: SessionPayload = {
+		userId,
 		expiresAt,
-		signature: sessionSignature(username, password, expiresAt),
-	});
-	return Buffer.from(payload, "utf8").toString("base64url");
+		signature: sessionSignature(secret, userId, expiresAt),
+	};
+	return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
 
-function verifySessionCookie(request: IncomingMessage, username: string, password: string): boolean {
-	const cookies = parseCookies(request);
-	const token = cookies.get(SESSION_COOKIE_NAME);
-	if (!token) {
-		return false;
-	}
-
-	let parsed: { username?: string; expiresAt?: unknown; signature?: string };
+function parseSessionToken(token: string): SessionPayload | null {
+	let parsed: Partial<SessionPayload>;
 	try {
-		parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as {
-			username?: string;
-			expiresAt?: unknown;
-			signature?: string;
-		};
+		parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as Partial<SessionPayload>;
 	} catch {
-		return false;
+		return null;
 	}
-
-	if (parsed.username !== username || typeof parsed.signature !== "string" || typeof parsed.expiresAt !== "number") {
-		return false;
+	if (
+		typeof parsed.userId !== "string" ||
+		typeof parsed.expiresAt !== "number" ||
+		typeof parsed.signature !== "string"
+	) {
+		return null;
 	}
-	if (!Number.isFinite(parsed.expiresAt) || parsed.expiresAt <= Math.floor(Date.now() / 1000)) {
-		return false;
-	}
-
-	const expected = sessionSignature(username, password, parsed.expiresAt);
-	const actual = parsed.signature;
-	if (actual.length !== expected.length) {
-		return false;
-	}
-
-	return timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
+	return parsed as SessionPayload;
 }
 
-function setSessionCookie(
-	request: IncomingMessage,
-	response: ServerResponse,
-	username: string,
-	password: string,
-): void {
-	const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-	const token = buildSessionCookieValue(username, password, expiresAt);
-	const secure = isSecureRequest(request) ? "; Secure" : "";
-	response.setHeader(
-		"Set-Cookie",
-		`${SESSION_COOKIE_NAME}=${token}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; SameSite=Lax${secure}`,
-	);
-}
+/**
+ * Admin session authentication backed by the `users` table.
+ *
+ * The session cookie (`yeetomatic_admin_session`) is a signed token whose
+ * payload carries `userId` and `expiresAt`, signed with an HMAC keyed by the
+ * user's current password hash. This lets the server distinguish multiple
+ * admin users and invalidates outstanding sessions when a password is reset
+ * — without ever storing or logging plaintext passwords. HTTP Basic Auth is
+ * not supported.
+ */
+export class AdminSessionAuth {
+	constructor(private readonly userStore: UserStore) {}
 
-function hasValidBasicAuth(request: IncomingMessage, username: string, password: string): boolean {
-	const authHeader = request.headers.authorization;
-	if (!authHeader || !authHeader.startsWith("Basic ")) {
+	get store(): UserStore {
+		return this.userStore;
+	}
+
+	/**
+	 * Verify submitted credentials against the `users` table. Returns the
+	 * matching user on success, or null for an unknown user or bad password.
+	 */
+	verifyCredentials(username: string, password: string): User | null {
+		const user = this.userStore.getByUsernameSync(username);
+		if (!user) {
+			return null;
+		}
+		if (!verifyPassword(password, user.passwordHash)) {
+			return null;
+		}
+		return user;
+	}
+
+	/** True when at least one admin user exists (boot is past onboarding). */
+	hasUsers(): boolean {
+		return this.userStore.hasAnySync();
+	}
+
+	/** Resolve the authenticated user for a request, or null when unauthenticated. */
+	verifyRequest(request: IncomingMessage): User | null {
+		const cookies = parseCookies(request);
+		const token = cookies.get(SESSION_COOKIE_NAME);
+		if (!token) {
+			return null;
+		}
+		const payload = parseSessionToken(token);
+		if (!payload) {
+			return null;
+		}
+		if (!Number.isFinite(payload.expiresAt) || payload.expiresAt <= Math.floor(Date.now() / 1000)) {
+			return null;
+		}
+		const user = this.userStore.getByIdSync(payload.userId);
+		if (!user) {
+			return null;
+		}
+		const expected = sessionSignature(user.passwordHash, payload.userId, payload.expiresAt);
+		const actual = payload.signature;
+		if (actual.length !== expected.length) {
+			return null;
+		}
+		if (!timingSafeEqual(Buffer.from(actual), Buffer.from(expected))) {
+			return null;
+		}
+		return user;
+	}
+
+	/** Issue a session cookie for `user` on the outbound response. */
+	setSessionCookie(request: IncomingMessage, response: ServerResponse, user: User): void {
+		const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+		const token = buildSessionCookieValue(user.passwordHash, user.id, expiresAt);
+		const secure = isSecureRequest(request) ? "; Secure" : "";
+		response.setHeader(
+			"Set-Cookie",
+			`${SESSION_COOKIE_NAME}=${token}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; SameSite=Lax${secure}`,
+		);
+	}
+
+	/** Clear the session cookie on the outbound response. */
+	clearSessionCookie(response: ServerResponse): void {
+		response.setHeader(
+			"Set-Cookie",
+			`${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`,
+		);
+	}
+
+	/** Issue a session cookie and return the user view, or null on bad creds. */
+	login(
+		request: IncomingMessage,
+		response: ServerResponse,
+		username: string,
+		password: string,
+	): User | null {
+		const user = this.verifyCredentials(username, password);
+		if (!user) {
+			return null;
+		}
+		this.setSessionCookie(request, response, user);
+		return user;
+	}
+
+	/** Authorize a JSON API request; sends a 401 JSON response when unauthenticated. */
+	requireAdminJson(request: IncomingMessage, response: ServerResponse): boolean {
+		const user = this.verifyRequest(request);
+		if (user) {
+			return true;
+		}
+		sendJson(response, 401, { error: "Unauthorized" });
 		return false;
 	}
 
-	const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
-	const colonIndex = decoded.indexOf(":");
-	const providedUser = colonIndex >= 0 ? decoded.slice(0, colonIndex) : decoded;
-	const providedPass = colonIndex >= 0 ? decoded.slice(colonIndex + 1) : "";
-	if (providedUser.length !== username.length || providedPass.length !== password.length) {
+	/** Authorize a text/HTML request; sends a 401 text response when unauthenticated. */
+	requireAdminText(request: IncomingMessage, response: ServerResponse): boolean {
+		const user = this.verifyRequest(request);
+		if (user) {
+			return true;
+		}
+		sendText(response, 401, "Unauthorized");
 		return false;
 	}
 
-	const userMatch = timingSafeEqual(Buffer.from(providedUser), Buffer.from(username));
-	const passMatch = timingSafeEqual(Buffer.from(providedPass), Buffer.from(password));
-	return userMatch && passMatch;
-}
-
-export function isAdminAuthorized(
-	request: IncomingMessage,
-	username: string,
-	password: string,
-): boolean {
-	return verifySessionCookie(request, username, password) || hasValidBasicAuth(request, username, password);
-}
-
-function checkAdminAuth(
-	request: IncomingMessage,
-	response: ServerResponse,
-	username: string,
-	password: string,
-): boolean {
-	if (verifySessionCookie(request, username, password)) {
-		return true;
+	/** Sync authorization check used by the WebSocket upgrade handler. */
+	isAdminAuthorized(request: IncomingMessage): boolean {
+		return this.verifyRequest(request) !== null;
 	}
-
-	if (!request.headers.authorization) {
-		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="Yeetomatic Admin"');
-		response.setHeader("content-type", "text/plain; charset=utf-8");
-		response.end("Unauthorized");
-		return false;
-	}
-
-	if (!hasValidBasicAuth(request, username, password)) {
-		response.statusCode = 401;
-		response.setHeader("WWW-Authenticate", 'Basic realm="Yeetomatic Admin"');
-		response.setHeader("content-type", "text/plain; charset=utf-8");
-		response.end("Invalid credentials");
-		return false;
-	}
-
-	setSessionCookie(request, response, username, password);
-	return true;
-}
-
-export function requireAdminText(
-	request: IncomingMessage,
-	response: ServerResponse,
-	username: string | undefined,
-	password: string | undefined,
-): boolean {
-	if (!username || !password) {
-		sendText(response, 404, "Not found");
-		return false;
-	}
-	return checkAdminAuth(request, response, username, password);
-}
-
-export function requireAdminJson(
-	request: IncomingMessage,
-	response: ServerResponse,
-	username: string | undefined,
-	password: string | undefined,
-): boolean {
-	if (!username || !password) {
-		sendJson(response, 404, { error: "Not found" });
-		return false;
-	}
-	return checkAdminAuth(request, response, username, password);
 }

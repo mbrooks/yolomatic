@@ -42,7 +42,7 @@ docker compose up --build -d
 
 Open [http://127.0.0.1:6767/yeetomatic/admin](http://127.0.0.1:6767/yeetomatic/admin) and complete the setup wizard. It will:
 
-1. Create admin credentials.
+1. Create the master admin account (full name, username, and password). Additional admin users can be added later from the dashboard.
 2. Verify your GitHub token.
 3. Generate a webhook secret.
 4. Select repositories and initialize their workspaces.

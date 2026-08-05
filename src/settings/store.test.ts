@@ -66,14 +66,12 @@ describe("SettingsStore", () => {
 	});
 
 	it("getAllViews blanks out sensitive field values", () => {
-		store.seedFromEnv({ WEBHOOK_SECRET: "secret123", GITHUB_TOKEN: "token456", ADMIN_PASSWORD: "pass789" });
+		store.seedFromEnv({ WEBHOOK_SECRET: "secret123", GITHUB_TOKEN: "token456" });
 		const views = store.getAllViews();
 		const secretView = views.find((v) => v.key === "webhook_secret");
 		const tokenView = views.find((v) => v.key === "github_token");
-		const passView = views.find((v) => v.key === "admin_password");
 		expect(secretView?.value).toBe("");
 		expect(tokenView?.value).toBe("");
-		expect(passView?.value).toBe("");
 	});
 
 	it("getAllViews returns actual values for non-sensitive fields", () => {

@@ -8,7 +8,7 @@ function request(url: string, method = "GET", body?: string): http.IncomingMessa
 		url,
 		method,
 		headers: {
-			authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
+			cookie: "yeetomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {
@@ -32,8 +32,7 @@ function response() {
 
 function makeDeps(overrides: Record<string, unknown> = {}) {
 	return {
-		adminUsername: "admin",
-		adminPassword: "secret",
+		sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 		settingsStore: {
 			getAllViews: vi.fn(() => ({})),
 			setTyped: vi.fn(),
@@ -65,7 +64,7 @@ describe("handleSettingsRoutes", () => {
 		const handled = await handleSettingsRoutes(
 			request("/api/settings"),
 			res,
-			{ adminUsername: "admin", adminPassword: "secret" } as never,
+			{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never } as never,
 			"/api/settings",
 		);
 
@@ -92,7 +91,7 @@ describe("handleSettingsRoutes", () => {
 		const res = response();
 		const deps = makeDeps();
 		const handled = await handleSettingsRoutes(
-			request("/api/settings", "PATCH", JSON.stringify({ admin_username: "x", admin_password: "" })),
+			request("/api/settings", "PATCH", JSON.stringify({ github_username: "x", github_token: "" })),
 			res,
 			deps,
 			"/api/settings",
@@ -101,9 +100,9 @@ describe("handleSettingsRoutes", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
 		const body = JSON.parse(res.body);
-		expect(body.updated).toContain("admin_username");
-		expect(body.updated).not.toContain("admin_password");
-		expect(body.requiresRestart).toContain("admin_username");
+		expect(body.updated).toContain("github_username");
+		expect(body.updated).not.toContain("github_token");
+		expect(body.requiresRestart).toContain("github_username");
 	});
 
 	it("lists pending GitHub invitations", async () => {
@@ -125,7 +124,7 @@ describe("handleSettingsRoutes", () => {
 		const handled = await handleSettingsRoutes(
 			request("/api/github/invitations"),
 			res,
-			{ adminUsername: "admin", adminPassword: "secret" } as never,
+			{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never } as never,
 			"/api/github/invitations",
 		);
 
@@ -153,7 +152,7 @@ describe("handleSettingsRoutes", () => {
 		const handled = await handleSettingsRoutes(
 			request("/api/github/invitations/42/accept", "POST"),
 			res,
-			{ adminUsername: "admin", adminPassword: "secret" } as any,
+			{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never } as any,
 			"/api/github/invitations/42/accept",
 		);
 

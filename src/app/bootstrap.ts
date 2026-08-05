@@ -32,6 +32,8 @@ import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-s
 import { systemClock } from "../ports/clock.js";
 import { createStartIssueSession, type StartIssueSession } from "./commands/start-issue-session.js";
 import type { SettingsStore } from "../settings/store.js";
+import { UserStore } from "../users/store.js";
+import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -56,6 +58,7 @@ export interface RuntimeDeps {
 	sessionStore: SessionStore;
 	taskController: TaskController;
 	repositoryStore: RepositoryStore;
+	userStore?: UserStore;
 }
 
 export interface RuntimeGraph {
@@ -79,6 +82,9 @@ export interface RuntimeGraph {
  */
 export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): RuntimeGraph {
 	const { settingsStore, sessionStore, taskController, repositoryStore } = deps;
+
+	const userStore = deps.userStore ?? new UserStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const sessionAuth = new AdminSessionAuth(userStore);
 
 	// Load managed repositories once at construction time. Per-repo overrides
 	// (github_event_mode, default_branch) require a restart to take effect, so
@@ -201,8 +207,6 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		config.webhookSecret,
 		activeHandlers,
 		sessionStore,
-		config.adminUsername,
-		config.adminPassword,
 		taskController,
 		workspaceManager,
 		staleDetector,
@@ -213,6 +217,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 			adminPath: config.adminPath,
 			adminDefaultPage: config.adminDefaultPage,
 			restartSession: (owner, repo, issueNumber) => handlers.resumeInterruptedSession(owner, repo, issueNumber),
+			userStore,
+			sessionAuth,
 		},
 		github,
 		settingsStore,

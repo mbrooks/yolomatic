@@ -40,8 +40,6 @@ export interface AppConfig {
 	workspacesDir: string;
 	soulPath: string;
 	selfReportEnabled: boolean;
-	adminUsername: string | undefined;
-	adminPassword: string | undefined;
 	onboardingComplete: boolean;
 	adminGithubUsername: string | undefined;
 	memoryDir: string;
@@ -91,10 +89,8 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workspacesDir: path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		soulPath: path.resolve(store.getString("soul_path", "./SOUL.md")),
 		selfReportEnabled: store.getBoolean("self_report_enabled", true),
-		adminUsername: store.get("admin_username"),
-		adminPassword: store.get("admin_password"),
 		onboardingComplete: store.getBoolean("onboarding_complete"),
-		adminGithubUsername: store.get("admin_github_username") ?? store.get("admin_username") ?? undefined,
+		adminGithubUsername: store.get("admin_github_username") ?? undefined,
 		cleanupRetentionDays: (() => {
 			if (!rawCleanup) return undefined;
 			const parsed = Number.parseInt(rawCleanup, 10);
@@ -136,8 +132,6 @@ export function isBootstrapComplete(config: AppConfig): boolean {
 		(config.githubEventMode === "polling" || config.webhookSecret !== "") &&
 		config.githubToken !== "" &&
 		config.githubUsername !== "" &&
-		!!config.adminUsername &&
-		!!config.adminPassword &&
 		config.onboardingComplete
 	);
 }
@@ -147,8 +141,6 @@ export function getBootstrapMissingFields(config: AppConfig): string[] {
 	if (config.githubEventMode !== "polling" && !config.webhookSecret) missing.push("webhook_secret");
 	if (!config.githubToken) missing.push("github_token");
 	if (!config.githubUsername) missing.push("github_username");
-	if (!config.adminUsername) missing.push("admin_username");
-	if (!config.adminPassword) missing.push("admin_password");
 	if (!config.onboardingComplete) missing.push("onboarding_complete");
 	return missing;
 }

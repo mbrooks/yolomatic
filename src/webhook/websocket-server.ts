@@ -2,7 +2,6 @@ import type { Server } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { SessionLogEntry } from "../logging/session-log-store.js";
-import { isAdminAuthorized } from "../adapters/http/admin-auth.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 import { adminWebSocketPath, DEFAULT_ADMIN_PATH } from "../config.js";
 import { sessionStorageKey, type SessionKind } from "../session/store.js";
@@ -18,8 +17,9 @@ export type ServerMessage =
 	| { type: "status"; data: unknown }
 	| { type: "error"; message: string };
 
-export interface CredentialProvider {
-	getCredentials(): { username?: string; password?: string };
+export interface WebSocketAuthProvider {
+	/** True when the upgrade request carries a valid admin session. */
+	isAuthorized(request: IncomingMessage): boolean;
 }
 
 export interface StatusProvider {
@@ -28,7 +28,7 @@ export interface StatusProvider {
 
 export function createAdminWebSocketServer(
 	httpServer: Server,
-	credentialProvider: CredentialProvider,
+	authProvider: WebSocketAuthProvider,
 	statusProvider?: StatusProvider,
 	taskControlService?: TaskControlService,
 	adminPath: string = DEFAULT_ADMIN_PATH,
@@ -53,8 +53,7 @@ export function createAdminWebSocketServer(
 		}
 
 		const req = request as IncomingMessage;
-		const { username, password } = credentialProvider.getCredentials();
-		if (username && password && !isAdminAuthorized(req, username, password)) {
+		if (!authProvider.isAuthorized(req)) {
 			socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
 			socket.destroy();
 			return;

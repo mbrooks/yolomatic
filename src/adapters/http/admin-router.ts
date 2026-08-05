@@ -8,6 +8,8 @@ import { handleSessionRoutes } from "./admin-routes/session-routes.js";
 import { handleSettingsRoutes } from "./admin-routes/settings-routes.js";
 import { handleSkillRoutes } from "./admin-routes/skill-routes.js";
 import { handleStatusRoutes } from "./admin-routes/status-routes.js";
+import { handleAuthRoutes } from "./admin-routes/auth-routes.js";
+import { handleUserRoutes } from "./admin-routes/user-routes.js";
 
 export type { AdminRouterDeps } from "./admin-router-shared.js";
 
@@ -20,6 +22,8 @@ export async function handleAdminRoute(
 	const pathname = requestUrl.pathname;
 
 	return (
+		(await handleAuthRoutes(request, response, deps, pathname)) ||
+		(await handleUserRoutes(request, response, deps, pathname)) ||
 		(await handleOnboardingRoutes(request, response, deps, pathname)) ||
 		(await handleStatusRoutes(request, response, deps, pathname)) ||
 		(await handleSessionRoutes(request, response, deps, requestUrl, pathname)) ||
