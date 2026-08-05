@@ -57,17 +57,18 @@ export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yeetomatic. Refin
 /**
  * Build the short automatic comment Yeetomatic posts on newly opened issues.
  *
- * Lists the available commands (assign-to-Yeetomatic, `/yeetomatic
- * issue-refinement`, `/yeetomatic stop`) and, when an admin issue URL is
- * provided, appends a one-line status-tracking link. The detailed refinement
- * explanation lives in README.md / design/issue-refinement.md and is not
- * duplicated here.
+ * Lists the available commands (assign-to-Yeetomatic, `/yeetomatic feedback`,
+ * `/yeetomatic issue-refinement`, `/yeetomatic stop`) and, when an admin issue
+ * URL is provided, appends a one-line status-tracking link. The detailed
+ * refinement explanation lives in README.md / design/issue-refinement.md and
+ * is not duplicated here.
  */
 export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: string): string {
 	const body = [
 		"Yeetomatic is available to work on this issue.",
 		"",
 		"- Assign the issue to `" + githubUsername + "` to start an implementation session and open a pull request.",
+		"- `/yeetomatic feedback` — once a session is active, steer it by posting a comment with this command (or by @-mentioning `" + githubUsername + "`). Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.",
 		"- `/yeetomatic issue-refinement` — have an authorized maintainer ask Yeetomatic to refine the issue body into a Proposed Task (no implementation or PR). Trailing text after the command is treated as a steering prompt that shapes the refinement pass.",
 		"- `/yeetomatic stop` — stop the active session (authorized maintainers only).",
 	].join("\n");
