@@ -194,6 +194,118 @@ describe("AdminSessionAuth", () => {
 		});
 	});
 
+	describe("verifyBasicAuth", () => {
+		it("returns the user for a valid Basic header", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("admin:secret").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))?.username).toBe("admin");
+		});
+
+		it("accepts a lowercase basic scheme", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "basic " + Buffer.from("admin:secret").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))?.username).toBe("admin");
+		});
+
+		it("looks up usernames case-insensitively", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("ADMIN:secret").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))?.username).toBe("admin");
+		});
+
+		it("rejects a bad password", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("admin:wrong").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))).toBeNull();
+		});
+
+		it("rejects an unknown user", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("ghost:secret").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))).toBeNull();
+		});
+
+		it("returns null when the Authorization header is absent", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			expect(auth.verifyBasicAuth(createRequest({}))).toBeNull();
+		});
+
+		it("returns null for a non-Basic scheme", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			expect(auth.verifyBasicAuth(createRequest({ authorization: "Bearer token" }))).toBeNull();
+		});
+
+		it("returns null for a malformed header (no credentials)", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			expect(auth.verifyBasicAuth(createRequest({ authorization: "Basic" }))).toBeNull();
+		});
+
+		it("returns null for credentials with no colon", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("nocolonpassword").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))).toBeNull();
+		});
+
+		it("allows a password containing a colon", async () => {
+			const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-admin-auth-"));
+			const store = new UserStore(path.join(dir, "users.sqlite"));
+			store.createSync({ fullName: "Admin", username: "admin", password: "pa:ss:word" });
+			const auth = new AdminSessionAuth(store);
+			const header = "Basic " + Buffer.from("admin:pa:ss:word").toString("base64");
+			expect(auth.verifyBasicAuth(createRequest({ authorization: header }))?.username).toBe("admin");
+		});
+
+		it("returns null for invalid base64", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			expect(auth.verifyBasicAuth(createRequest({ authorization: "Basic !!!not-base64!!!" }))).toBeNull();
+		});
+	});
+
+	describe("requireAdminJsonAllowBasic", () => {
+		it("authorizes a request with a valid session cookie", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const request = createRequest({});
+			const cookie = mintCookie(auth, "admin", "secret", request);
+			const authedRequest = createRequest({ cookie });
+			expect(auth.requireAdminJsonAllowBasic(authedRequest, createResponse())).toBe(true);
+		});
+
+		it("authorizes a request with valid Basic credentials and no cookie", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("admin:secret").toString("base64");
+			const request = createRequest({ authorization: header });
+			expect(auth.requireAdminJsonAllowBasic(request, createResponse())).toBe(true);
+		});
+
+		it("prefers the session cookie when both are present", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const loginRequest = createRequest({});
+			const cookie = mintCookie(auth, "admin", "secret", loginRequest);
+			const header = "Basic " + Buffer.from("admin:wrong").toString("base64");
+			const request = createRequest({ cookie, authorization: header });
+			expect(auth.requireAdminJsonAllowBasic(request, createResponse())).toBe(true);
+		});
+
+		it("rejects a request with neither cookie nor Basic credentials", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const request = createRequest({});
+			const response = createResponse();
+			expect(auth.requireAdminJsonAllowBasic(request, response)).toBe(false);
+			expect(response.statusCode).toBe(401);
+			expect(response.body).toContain("Unauthorized");
+			expect(response.getHeader("www-authenticate")).toBeUndefined();
+		});
+
+		it("rejects a request with invalid Basic credentials", async () => {
+			const auth = new AdminSessionAuth(await tmpUserStore());
+			const header = "Basic " + Buffer.from("admin:wrong").toString("base64");
+			const request = createRequest({ authorization: header });
+			const response = createResponse();
+			expect(auth.requireAdminJsonAllowBasic(request, response)).toBe(false);
+			expect(response.statusCode).toBe(401);
+		});
+	});
+
 	describe("isAdminAuthorized", () => {
 		it("returns true for a valid session cookie and false otherwise", async () => {
 			const auth = new AdminSessionAuth(await tmpUserStore());

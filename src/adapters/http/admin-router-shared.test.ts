@@ -6,6 +6,7 @@ import {
 	checkAdminJson,
 	checkAdminTextAllowOnboarding,
 	requireDeps,
+	getRequiredDeps,
 	resolveAdminPath,
 	resolveAdminDefaultPage,
 } from "./admin-router-shared.js";
@@ -56,6 +57,32 @@ describe("admin-router-shared", () => {
 		expect(result).toBe(true);
 	});
 
+	it("checkAdminJson delegates to requireAdminJsonAllowBasic when allowBasicAuth is true", () => {
+		const request = { headers: {} } as never;
+		const response = mockResponse();
+		const requireAdminJson = vi.fn(() => true);
+		const requireAdminJsonAllowBasic = vi.fn(() => true);
+		const result = checkAdminJson(request, response as never, {
+			sessionAuth: { requireAdminJson, requireAdminJsonAllowBasic } as never,
+		} as never, true);
+		expect(result).toBe(true);
+		expect(requireAdminJsonAllowBasic).toHaveBeenCalledTimes(1);
+		expect(requireAdminJson).not.toHaveBeenCalled();
+	});
+
+	it("checkAdminJson with allowBasicAuth false uses requireAdminJson", () => {
+		const request = { headers: {} } as never;
+		const response = mockResponse();
+		const requireAdminJson = vi.fn(() => true);
+		const requireAdminJsonAllowBasic = vi.fn(() => true);
+		const result = checkAdminJson(request, response as never, {
+			sessionAuth: { requireAdminJson, requireAdminJsonAllowBasic } as never,
+		} as never, false);
+		expect(result).toBe(true);
+		expect(requireAdminJson).toHaveBeenCalledTimes(1);
+		expect(requireAdminJsonAllowBasic).not.toHaveBeenCalled();
+	});
+
 	it("checkAdminTextAllowOnboarding always allows (login screen is served by the SPA)", () => {
 		const request = { headers: {} } as never;
 		const response = { statusCode: 0 } as never;
@@ -96,6 +123,29 @@ describe("admin-router-shared", () => {
 
 		expect(ok).toBe(false);
 		expect(JSON.parse(response.body).error).toBe("Ollama sign-in service not configured");
+	});
+
+	it("requireDeps returns true when every required dep is present", () => {
+		const response = mockResponse();
+		const ctx = {
+			request: { headers: {} },
+			response,
+			deps: { settingsStore: {} },
+			body: {},
+			params: [],
+		} as unknown as AdminRouteContext;
+
+		expect(requireDeps(ctx, ["settingsStore"])).toBe(true);
+		expect(response.statusCode).toBe(0);
+	});
+
+	it("getRequiredDeps returns the requested dependency views", () => {
+		const settingsStore = { id: "settings" } as never;
+		const userStore = { id: "users" } as never;
+		const deps = { settingsStore, userStore } as never;
+		const result = getRequiredDeps(deps, ["settingsStore", "userStore"]);
+		expect(result.settingsStore).toBe(settingsStore);
+		expect(result.userStore).toBe(userStore);
 	});
 
 	it("registry handles missing route deps before invoking the handler", async () => {

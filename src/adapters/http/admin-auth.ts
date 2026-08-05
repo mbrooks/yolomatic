@@ -43,6 +43,42 @@ function sessionSignature(secret: string, userId: string, expiresAt: number): st
 	return createHmac("sha256", secret).update(`${userId}:${expiresAt}`).digest("base64url");
 }
 
+/**
+ * Parse an RFC 7617 `Authorization: Basic <base64(user:pass)>` header.
+ * Returns the decoded username/password pair, or null when the header is
+ * absent, malformed, or not the Basic scheme. The scheme match is
+ * case-insensitive; the credentials are decoded as UTF-8 and split on the
+ * first colon so passwords may contain colons.
+ */
+function parseBasicAuthHeader(header: string | string[] | undefined): { username: string; password: string } | null {
+	if (Array.isArray(header) || header === undefined) {
+		return null;
+	}
+	const trimmed = header.trim();
+	const spaceIndex = trimmed.indexOf(" ");
+	if (spaceIndex === -1) {
+		return null;
+	}
+	if (trimmed.slice(0, spaceIndex).toLowerCase() !== "basic") {
+		return null;
+	}
+	const encoded = trimmed.slice(spaceIndex + 1).trim();
+	let decoded: string;
+	try {
+		decoded = Buffer.from(encoded, "base64").toString("utf8");
+	} catch {
+		return null;
+	}
+	const colonIndex = decoded.indexOf(":");
+	if (colonIndex === -1) {
+		return null;
+	}
+	return {
+		username: decoded.slice(0, colonIndex),
+		password: decoded.slice(colonIndex + 1),
+	};
+}
+
 function buildSessionCookieValue(secret: string, userId: string, expiresAt: number): string {
 	const payload: SessionPayload = {
 		userId,
@@ -76,8 +112,12 @@ function parseSessionToken(token: string): SessionPayload | null {
  * payload carries `userId` and `expiresAt`, signed with an HMAC keyed by the
  * user's current password hash. This lets the server distinguish multiple
  * admin users and invalidates outstanding sessions when a password is reset
- * — without ever storing or logging plaintext passwords. HTTP Basic Auth is
- * not supported.
+ * — without ever storing or logging plaintext passwords.
+ *
+ * HTTP Basic Auth (RFC 7617) is also supported, but only when a route opts
+ * into it via `requireAdminJsonAllowBasic` (used by the status API routes for
+ * deploy automation). It is verified against the same `users` table using
+ * `verifyCredentials`; there is no parallel credential store.
  */
 export class AdminSessionAuth {
 	constructor(private readonly userStore: UserStore) {}
@@ -104,6 +144,19 @@ export class AdminSessionAuth {
 	/** True when at least one admin user exists (boot is past onboarding). */
 	hasUsers(): boolean {
 		return this.userStore.hasAnySync();
+	}
+
+	/**
+	 * Parse and verify an HTTP Basic Auth `Authorization` header against the
+	 * `users` table. Returns the matching user on success, or null for a
+	 * missing/malformed header, unknown user, or bad password.
+	 */
+	verifyBasicAuth(request: IncomingMessage): User | null {
+		const credentials = parseBasicAuthHeader(request.headers.authorization);
+		if (!credentials) {
+			return null;
+		}
+		return this.verifyCredentials(credentials.username, credentials.password);
 	}
 
 	/** Resolve the authenticated user for a request, or null when unauthenticated. */
@@ -173,6 +226,23 @@ export class AdminSessionAuth {
 	requireAdminJson(request: IncomingMessage, response: ServerResponse): boolean {
 		const user = this.verifyRequest(request);
 		if (user) {
+			return true;
+		}
+		sendJson(response, 401, { error: "Unauthorized" });
+		return false;
+	}
+
+	/**
+	 * Authorize a JSON API request that also accepts HTTP Basic Auth. A valid
+	 * session cookie authorizes the request unchanged; otherwise valid Basic
+	 * credentials (RFC 7617) verified against the `users` table authorize it.
+	 * Sends a 401 JSON response when neither is present.
+	 */
+	requireAdminJsonAllowBasic(request: IncomingMessage, response: ServerResponse): boolean {
+		if (this.verifyRequest(request)) {
+			return true;
+		}
+		if (this.verifyBasicAuth(request)) {
 			return true;
 		}
 		sendJson(response, 401, { error: "Unauthorized" });
