@@ -514,6 +514,81 @@ describe("ExecuteSession", () => {
 		);
 	});
 
+	it("routes a corrected complete worker result through delivery", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({
+					status: "complete" as const,
+					summary: "Fixed the parser bug.",
+					rawResponse: "Done. Summary: fixed.\nStatus: complete",
+				})),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.workspaces.commitAndPush).toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.not.stringContaining("Yeetomatic is still working"),
+		);
+	});
+
+	it("does not deliver when the worker result is an exhausted status-correction failure", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({
+					status: "failed" as const,
+					summary:
+						"Worker protocol failure: the worker did not return a valid YEETOMATIC_STATUS marker after one correction prompt. No work was delivered.",
+					rawResponse: "Done.",
+				})),
+				executePRReview: vi.fn(),
+			},
+		});
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.workspaces.commitAndPush).not.toHaveBeenCalled();
+		expect(deps.github.createPullRequest).not.toHaveBeenCalled();
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-failed"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("protocol failure"),
+		);
+	});
+
 	it("marks seeded when session is not seeded and there is no comment", async () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, seeded: false });

@@ -15,14 +15,14 @@ import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionStorageKey, type SessionState } from "../session/store.js";
 import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-import { getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment } from "./prompts.js";
+import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
-export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment } from "./prompts.js";
-export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
+export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, detectStatusMarker, type ExecutionResult, type ExecutionStatus, type RefinementResult } from "./results.js";
+export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment } from "./prompts.js";
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
@@ -79,7 +79,16 @@ export class PiAgentExecutor implements ExecutionService {
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<RefinementResult> {
-		const result = await this.executeWithOverride(state, overridePrompt, abortSignal, onSessionCreated, onActivity);
+		const result = await this.run(
+			state,
+			undefined,
+			undefined,
+			abortSignal,
+			onSessionCreated,
+			overridePrompt,
+			onActivity,
+			{ refinement: true },
+		);
 		const parsed = parseRefinementResult(result.rawResponse);
 		if (!parsed) {
 			throw new Error("Worker did not return a parseable refinement result.");
@@ -95,6 +104,7 @@ export class PiAgentExecutor implements ExecutionService {
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		overridePrompt?: string,
 		onActivity?: () => void,
+		options?: { refinement?: boolean },
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
 		const notifyActivity = () => {
@@ -321,6 +331,11 @@ export class PiAgentExecutor implements ExecutionService {
 				status: "failed",
 			};
 		}
+
+		if (!options?.refinement && result.status !== "failed" && detectStatusMarker(rawResponse) === null) {
+			result = await this.correctStatusProtocol(session, key, rawResponse, logger, abortSignal);
+		}
+
 		recordSessionLog(key, {
 			level: "assistant",
 			message: rawResponse || "(no response)",
@@ -329,6 +344,75 @@ export class PiAgentExecutor implements ExecutionService {
 		notifyActivity();
 
 		return result;
+	}
+
+	private async correctStatusProtocol(
+		session: AgentSession,
+		key: string,
+		originalRaw: string,
+		logger: LlmLogger,
+		abortSignal?: AbortSignal,
+	): Promise<ExecutionResult> {
+		recordSessionLog(key, {
+			level: "warn",
+			message: "Status protocol violation: worker response omitted a valid YEETOMATIC_STATUS marker. Issuing one correction prompt.",
+			details: { type: "protocol_violation" },
+		});
+		const correctionPrompt = buildStatusCorrectionPrompt();
+		logger.logPrompt(correctionPrompt);
+		recordSessionLog(key, {
+			level: "info",
+			message: "Correction prompt sent to request a valid status marker.",
+			details: { type: "correction_prompt", length: correctionPrompt.length },
+		});
+
+		try {
+			await session.prompt(correctionPrompt);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			logger.logError(error instanceof Error ? error : new Error(message), "Status correction prompt failed");
+			recordSessionLog(key, {
+				level: "error",
+				message: `Status correction prompt failed: ${message}`,
+				details: { type: "correction_prompt_error", error: message },
+			});
+			return {
+				status: "failed",
+				summary: `Worker protocol failure: the worker response omitted a valid YEETOMATIC_STATUS marker and the correction prompt failed (${message}). No work was delivered.`,
+				rawResponse: originalRaw,
+			};
+		}
+
+		if (abortSignal?.aborted) {
+			return {
+				status: "cancelled",
+				summary: "Task cancelled by admin during status correction.",
+				rawResponse: "",
+			};
+		}
+
+		const correctedRaw = getLastAssistantText(session);
+		logger.logResponse(correctedRaw);
+		if (detectStatusMarker(correctedRaw) !== null) {
+			const corrected = parseExecutionResult(correctedRaw);
+			recordSessionLog(key, {
+				level: "info",
+				message: `Status correction succeeded with status ${corrected.status}.`,
+				details: { type: "correction_result", status: corrected.status },
+			});
+			return corrected;
+		}
+
+		recordSessionLog(key, {
+			level: "error",
+			message: "Status protocol violation persisted after one correction prompt; failing execution without delivery.",
+			details: { type: "protocol_violation_exhausted" },
+		});
+		return {
+			status: "failed",
+			summary: "Worker protocol failure: the worker did not return a valid YEETOMATIC_STATUS marker after one correction prompt. No work was delivered.",
+			rawResponse: correctedRaw || originalRaw,
+		};
 	}
 
 	private getModelConfig(): ConfiguredModelOverride | undefined {

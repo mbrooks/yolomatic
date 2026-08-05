@@ -86,6 +86,31 @@ describe("PiAgentExecutor", () => {
 		return { mockSession, unsubscribe };
 	}
 
+	function mockSequentialSession(responses: string[], onPromptCall?: (callIndex: number) => void) {
+		const unsubscribe = vi.fn();
+		const messages: Array<{ role: string; content: string }> = [];
+		let callIndex = 0;
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(async () => {
+				const current = callIndex;
+				callIndex += 1;
+				onPromptCall?.(current);
+				const content = responses[current];
+				if (content !== undefined) {
+					messages.push({ role: "assistant", content });
+				}
+			}),
+			steer: vi.fn(),
+			abort: vi.fn(),
+			get messages() {
+				return messages;
+			},
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+		return { mockSession, unsubscribe };
+	}
+
 	it("constructor stores soulPath", () => {
 		const executor = new PiAgentExecutor({ soulPath: "/tmp/SOUL.md" });
 		expect(executor).toBeInstanceOf(PiAgentExecutor);
@@ -587,5 +612,155 @@ describe("PiAgentExecutor", () => {
 
 		expect(result.status).toBe("failed");
 		expect(unsubscribe).toHaveBeenCalledOnce();
+	});
+
+	it("does not issue a correction prompt when the first response has a valid marker", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"YEETOMATIC_STATUS: complete\nDone.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(20));
+
+		expect(result.status).toBe("complete");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+	});
+
+	it("issues one correction prompt and returns complete when the first response lacks a marker", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"Done. Summary: fixed the bug.\nStatus: complete",
+			"YEETOMATIC_STATUS: complete\nFixed the parser bug.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(21));
+
+		expect(result.status).toBe("complete");
+		expect(result.summary).toBe("Fixed the parser bug.");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("rejected"));
+		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("YEETOMATIC_STATUS: complete"));
+	});
+
+	it("treats an unsupported marker as invalid and corrects once", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"YEETOMATIC_STATUS: done\nAll done.",
+			"YEETOMATIC_STATUS: complete\nDone.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(22));
+
+		expect(result.status).toBe("complete");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("returns working when the corrected response is a valid working marker", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"Still going.",
+			"YEETOMATIC_STATUS: working\nStill going.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(23));
+
+		expect(result.status).toBe("working");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("returns waiting-feedback when the corrected response is valid waiting-feedback", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"I have a question.",
+			"YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(24));
+
+		expect(result.status).toBe("waiting-feedback");
+		expect(result.summary).toBe("Need clarification.");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("fails after one correction when the corrected response still lacks a marker", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			"Done. Summary: fixed.",
+			"I am done now. No status line.",
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(25));
+
+		expect(result.status).toBe("failed");
+		expect(result.summary).toContain("protocol failure");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("fails when the correction prompt itself throws", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const { mockSession } = mockSequentialSession(
+			["Done."],
+			(callIndex) => {
+				if (callIndex === 1) {
+					throw new Error("correction channel failed");
+				}
+			},
+		);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(26));
+
+		expect(result.status).toBe("failed");
+		expect(result.summary).toContain("protocol failure");
+		expect(result.summary).toContain("correction channel failed");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("returns cancelled when abort fires during status correction", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const controller = new AbortController();
+		const { mockSession } = mockSequentialSession(
+			["Done.", "YEETOMATIC_STATUS: complete\nFixed."],
+			(callIndex) => {
+				if (callIndex === 1) controller.abort();
+			},
+		);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(27), undefined, controller.signal);
+
+		expect(result.status).toBe("cancelled");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not issue a status correction for refinement executions", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const refinementJson = JSON.stringify({
+			proposedTaskBody: "## Summary\nRefined.",
+			summary: "Clarified.",
+			investigation: "Read code.",
+		});
+		const { mockSession } = mockSequentialSession([refinementJson]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.executeRefinement(makeState(28), "refine prompt");
+
+		expect(result.proposedTaskBody).toContain("Refined.");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(1);
 	});
 });
