@@ -56,9 +56,24 @@ Tailor acceptance criteria to what the change would touch:
 
 Do not invent new verification commands. Prefer the commands `AGENTS.md` and `README.md` already name.
 
+## Optional title
+
+The base prompt lists `proposedTitle` as an optional field in the JSON result.
+Use it sparingly:
+
+- Omit `proposedTitle` (or leave it empty) when the original issue title is
+  already clear and descriptive.
+- Only propose a title when the original is unclear, misleading, or too vague to
+  identify the task.
+- Keep any proposed title concise and descriptive. Do not reframe the underlying
+  request or expand scope through the title.
+
+The control plane applies the proposed title only when it differs from the
+original and the issue title has not changed during the run.
+
 ## Constraints
 
-- Do not commit, push, create a pull request, or modify any GitHub state. The control plane owns issue body replacement and comment posting; do not attempt them.
+- Do not commit, push, create a pull request, or modify any GitHub state. The control plane owns issue body and title replacement and comment posting; do not attempt them.
 - Discard all experimental edits; leave the worktree as you found it.
 - Do not instruct the control plane to take actions. The skill informs the worker's judgment only.
 - Stay within the worker's boundaries: inspect files, run shell commands, make temporary edits, run tests, and use the network to validate conclusions.

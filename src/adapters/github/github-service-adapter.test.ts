@@ -235,6 +235,17 @@ describe("GitHubServiceAdapter", () => {
 			expect(result).toEqual({ state: "open" });
 		});
 
+		it("returns the issue title alongside state and body", async () => {
+			const octokit = createMockOctokit({
+				issues: {
+					get: vi.fn(async () => ({ data: { state: "open", title: "My Title", body: "b" } })),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getIssue("mbrooks", "yeetomatic", 1);
+			expect(result).toEqual({ state: "open", title: "My Title", body: "b" });
+		});
+
 		it("returns null on error", async () => {
 			const octokit = createMockOctokit({
 				issues: {
@@ -664,6 +675,15 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			await adapter.closeIssue("mbrooks", "yeetomatic", 1);
 			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, state: "closed" });
+		});
+	});
+
+	describe("updateIssueTitle", () => {
+		it("calls issues.update with title", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.updateIssueTitle("mbrooks", "yeetomatic", 1, "New Title");
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, title: "New Title" });
 		});
 	});
 

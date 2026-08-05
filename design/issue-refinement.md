@@ -147,9 +147,9 @@ After accepting the command, Yeetomatic:
 6. launches a fresh instance of the existing Docker worker for refinement;
 7. lets the worker investigate, make experimental edits, and run relevant tests;
 8. receives a Proposed Task and a concise record of the investigation;
-9. re-fetches the issue and verifies that its body has not changed;
-10. replaces the issue body through the GitHub API;
-11. posts a short completion comment identifying the requesting maintainer; and
+9. re-fetches the issue and verifies that its body and title have not changed;
+10. replaces the issue body, and the title when the worker proposed a changed one, through the GitHub API;
+11. posts a short completion comment identifying the requesting maintainer, noting when the title was also updated; and
 12. destroys the refinement container and temporary worktree without delivery.
 
 If the issue changes while refinement is running, Yeetomatic leaves the newer
@@ -157,8 +157,12 @@ body unchanged and asks the maintainer to run the command again.
 
 ### 3. Update the issue body
 
-The issue title remains unchanged. The Proposed Task becomes the issue body,
-typically using sections such as:
+Refinement may optionally update the issue title in addition to the body. When
+the worker returns a non-empty `proposedTitle` that differs from the original
+title, and the title has not changed during the run, Yeetomatic applies it
+alongside the body. When the worker omits or empties `proposedTitle`, the
+title is left unchanged. The Proposed Task becomes the issue body, typically
+using sections such as:
 
 ```markdown
 ## Summary
@@ -185,6 +189,9 @@ Issue refined at the request of @maintainer. The issue body now contains the
 Proposed Task. No implementation session was started.
 ```
 
+When the title was also updated, the completion comment notes that both the
+title and body now contain the Proposed Task.
+
 ## End-to-End Flow
 
 ```mermaid
@@ -206,7 +213,7 @@ sequenceDiagram
     Worker->>Worker: Inspect, experiment, and test
     Worker-->>CP: Return Proposed Task and investigation summary
     CP->>CP: Verify result and source fingerprint
-    CP->>GH: Replace original issue body
+    CP->>GH: Replace original issue body (and title when proposed)
     CP->>GH: Post completion comment
     CP->>CP: Remove temporary worktree
 ```
@@ -283,14 +290,19 @@ worktree and uses the refined issue body as its task description.
 The worker returns a refinement-specific result containing:
 
 - `proposedTaskBody`: the complete Markdown body to apply to the issue;
+- `proposedTitle`: an optional new issue title. Omit or leave empty to keep
+  the original title; supply a concise, descriptive title only when the
+  original is unclear or misleading;
 - `summary`: a concise explanation of what was clarified;
 - `investigation`: relevant files, commands, tests, and observations; and
 - the normal execution status and failure information.
 
 The control plane verifies that a successful result contains a non-empty body
-within GitHub's supported size limits. Repository owner, issue number,
-requester identity, and authorization remain properties of the accepted
-command; the worker result does not select the GitHub target.
+within GitHub's supported size limits, and that a proposed title, when present,
+is non-empty after trimming and within GitHub's 256-character title limit.
+Repository owner, issue number, requester identity, and authorization remain
+properties of the accepted command; the worker result does not select the
+GitHub target.
 
 ## Refinement State and Idempotency
 
@@ -312,7 +324,7 @@ The durable record includes:
 - requester identity;
 - original title and body;
 - original body fingerprint;
-- returned Proposed Task body and investigation summary;
+- returned Proposed Task body, proposed title, and investigation summary;
 - instruction source (`repository-skill` or `prompt-defaults`);
 - repository commit used for refinement;
 - the steering prompt (when the maintainer supplied trailing text);
@@ -358,7 +370,10 @@ the refinement command is sent.
   for the maintainer.
 - Missing or oversized Proposed Task: reject the result and leave the issue
   unchanged.
-- Source issue changed: mark the attempt stale and request a new command.
+- Empty or over-length proposed title: reject the result and leave the issue
+  unchanged (GitHub's title limit is 256 characters).
+- Source issue changed (body or title edited during refinement): mark the
+  attempt stale and request a new command.
 - GitHub update failed: retain both bodies in durable state and report the
   failure without retrying blindly.
 - Duplicate command delivery: return the recorded outcome without repeating the
@@ -401,8 +416,10 @@ The implementation is expected to add or extend these boundaries:
   defaults.
 - The worker can inspect the repository, make temporary edits, run the
   application and tests, and investigate its conclusions before responding.
-- A successful result automatically replaces only the original issue body; the
-  title remains unchanged.
+- A successful result automatically replaces the original issue body. When
+  the worker returns a non-empty `proposedTitle` that differs from the
+  original, the title is also updated; otherwise the title is unchanged. In
+  both cases the title must not have changed during the run.
 - The original body and refinement history remain durable.
 - An issue edit made during refinement prevents automatic replacement.
 - Replayed webhook deliveries cannot run refinement or mutate the issue twice.

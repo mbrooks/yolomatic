@@ -88,6 +88,32 @@ describe("migrations", () => {
 		db.close();
 	});
 
+	it("adds the proposed_title column to refinement_attempts via migration 11", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+		expect(columns.some((c) => c.name === "proposed_title")).toBe(true);
+
+		db.prepare(
+			"INSERT INTO refinement_attempts (id, owner, repo, issue_number, requester, original_title, original_body, original_body_fingerprint, instruction_source, state, proposed_title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		).run("r2", "o", "r", 1, "admin", "T", "B", "fp", "prompt-defaults", "applied", "Clearer Title", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z");
+		const row = db.prepare("SELECT proposed_title FROM refinement_attempts WHERE id = ?").get("r2") as { proposed_title: string };
+		expect(row.proposed_title).toBe("Clearer Title");
+		db.close();
+	});
+
+	it("is idempotent when adding the proposed_title column", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+		const proposedTitleColumns = columns.filter((c) => c.name === "proposed_title");
+		expect(proposedTitleColumns).toHaveLength(1);
+		db.close();
+	});
+
 	it("migrates legacy session rows and logs to kind-aware keys", () => {
 		const db = new DatabaseSync(dbPath);
 		for (const migration of MIGRATIONS.filter((entry) => entry.id < 9)) migration.up(db);
