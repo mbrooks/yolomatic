@@ -10,6 +10,7 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/status\/working$/u,
+		allowBasicAuth: true,
 		handler: async (ctx) => {
 			const result = await ctx.deps.getAdminStatus.execute();
 			if (!result.success) {
@@ -38,6 +39,7 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/maintenance$/u,
+		allowBasicAuth: true,
 		handler: async (ctx) => {
 			return { status: 200, body: { draining: ctx.deps.taskController.isDraining() } };
 		},
@@ -48,6 +50,7 @@ const registry = new AdminRouteRegistry()
 		method: "POST",
 		pattern: /^\/api\/maintenance$/u,
 		parseBody: true,
+		allowBasicAuth: true,
 		handler: async (ctx) => {
 			const body = ctx.body as { enabled?: boolean };
 			const enabled = body.enabled === true;
@@ -61,6 +64,7 @@ const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/status$/u,
+		allowBasicAuth: true,
 		handler: async (ctx) => {
 			const result = await ctx.deps.getAdminStatus.execute();
 			if (!result.success) {

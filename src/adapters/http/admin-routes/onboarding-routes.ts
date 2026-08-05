@@ -13,6 +13,7 @@ import {
 } from "../admin-router-shared.js";
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
+import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
 import type { User } from "../../../users/store.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
@@ -36,7 +37,13 @@ export const ONBOARDING_CONFIG_KEYS = [
 	"github_event_mode",
 	"github_poll_interval_ms",
 	"webhook_secret",
+	"pi_agent_provider",
+	"pi_agent_model",
+	"ollama_container_name",
 ] as const;
+
+/** LLM provider values accepted by the onboarding submission handler. */
+export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama"];
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
@@ -323,6 +330,24 @@ const registry = new AdminRouteRegistry()
 			return { status: 200, body: { initialized } };
 		},
 	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/onboarding\/ollama-signin$/u,
+		auth: false,
+		requiresDeps: ["settingsStore", "ollamaSignInService"],
+		handler: async (ctx) => {
+			const { settingsStore, ollamaSignInService } = getRequiredDeps(ctx.deps, [
+				"settingsStore",
+				"ollamaSignInService",
+			]);
+			const containerName = settingsStore.getString(
+				"ollama_container_name",
+				DEFAULT_OLLAMA_CONTAINER_NAME,
+			);
+			const result = await ollamaSignInService.checkSignInStatus({ containerName });
+			return { status: 200, body: result };
+		},
+	})
 	.route<Record<string, string>>({
 		method: "POST",
 		pattern: /^\/api\/onboarding$/u,
@@ -380,6 +405,13 @@ const registry = new AdminRouteRegistry()
 					return;
 				}
 			}
+			const providerRaw = body.pi_agent_provider?.trim();
+			if (providerRaw && !VALID_ONBOARDING_PROVIDERS.includes(providerRaw)) {
+				sendJson(ctx.response, 400, {
+					error: `pi_agent_provider must be one of: ${VALID_ONBOARDING_PROVIDERS.join(", ")}`,
+				});
+				return;
+			}
 			applyMasterAdmin(ctx.deps, adminFullName, adminUsername, adminPassword);
 			settingsStore.set("github_token", githubToken!);
 			settingsStore.set("github_username", body.github_username.trim());
@@ -389,6 +421,17 @@ const registry = new AdminRouteRegistry()
 			}
 			if (isPollingMode(eventMode)) {
 				settingsStore.set("github_poll_interval_ms", String(Number.parseInt(body.github_poll_interval_ms.trim(), 10)));
+			}
+			if (providerRaw) {
+				settingsStore.set("pi_agent_provider", providerRaw);
+			}
+			const modelValue = body.pi_agent_model?.trim();
+			if (modelValue) {
+				settingsStore.set("pi_agent_model", modelValue);
+			}
+			const containerValue = body.ollama_container_name?.trim();
+			if (containerValue) {
+				settingsStore.set("ollama_container_name", containerValue);
 			}
 			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({
