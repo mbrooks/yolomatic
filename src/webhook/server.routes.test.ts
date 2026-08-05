@@ -254,7 +254,7 @@ describe("GitHubIssueHandlers", () => {
 				title: "Test issue",
 				body: "Test body",
 			},
-			comment: { body: "What is the status?", user: { login: "mbrooks" } },
+			comment: { body: "@yeetomatic-bot What is the status?", user: { login: "mbrooks" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "mbrooks" },
 		});
@@ -357,7 +357,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Here is the missing detail", user: { login: "mbrooks" } },
+			comment: { body: "@yeetomatic-bot Here is the missing detail", user: { login: "mbrooks" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -386,7 +386,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Can you also add tests?", user: { login: "mbrooks" } },
+			comment: { body: "@yeetomatic-bot Can you also add tests?", user: { login: "mbrooks" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -510,7 +510,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Proceed", user: { login: "mbrooks" } },
+			comment: { body: "@yeetomatic-bot Proceed", user: { login: "mbrooks" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -954,11 +954,11 @@ describe("GitHubIssueHandlers", () => {
 			expect.objectContaining({ labels: ["yeetomatic"] }),
 		);
 
-		// Second comment now has a yeetomatic label; mention gate is no longer needed
+		// Second comment still requires an explicit trigger (mention or /yeetomatic feedback); the label alone is no longer sufficient
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 7, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Thanks!", user: { login: "user" } },
+			comment: { body: "@yeetomatic-bot Thanks!", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -1952,7 +1952,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 1, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Proceed", user: { login: "mbrooks" } },
+			comment: { body: "@yeetomatic-bot Proceed", user: { login: "mbrooks" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
@@ -1966,7 +1966,7 @@ describe("GitHubIssueHandlers", () => {
 			"yeetomatic",
 			1,
 			"waiting-feedback",
-			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["Proceed"] }),
+			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["@yeetomatic-bot Proceed"] }),
 			"implementation",
 		);
 	});

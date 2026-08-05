@@ -8,6 +8,7 @@ import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
 import { appendAdminLink } from "./comment-links.js";
+import type { PriorDiscussionComment } from "../../executor/index.js";
 import type { PRReviewPayload } from "./handle-pr-review.js";
 
 /**
@@ -77,7 +78,7 @@ interface CommentGuardPayload {
 
 export type GuardEventResult =
 	| { skip: true; reason: string }
-	| { skip: false; isMentioned?: boolean; isCreatedByYeetomatic?: boolean };
+	| { skip: false; isMentioned?: boolean; isFeedbackCommand?: boolean; isCreatedByYeetomatic?: boolean };
 
 /**
  * Applies the existing policy helpers ({@link shouldIgnoreIssueEvent} /
@@ -113,7 +114,7 @@ export function guardEvent(
 	if (check.ignore) {
 		return { skip: true, reason: check.reason };
 	}
-	return { skip: false, isMentioned: check.isMentioned, isCreatedByYeetomatic: check.isCreatedByYeetomatic };
+	return { skip: false, isMentioned: check.isMentioned, isFeedbackCommand: check.isFeedbackCommand, isCreatedByYeetomatic: check.isCreatedByYeetomatic };
 }
 
 export type PrepareIssueSessionResult =
@@ -408,7 +409,7 @@ export async function handleDrainingMode(
 }
 
 export async function startIssueExecution(
-	executor: { run: (session: SessionState, commentBody?: string) => Promise<void> },
+	executor: { run: (session: SessionState, commentBody?: string, priorComments?: PriorDiscussionComment[]) => Promise<void> },
 	github: GitHubService,
 	owner: string,
 	repo: string,
@@ -417,9 +418,10 @@ export async function startIssueExecution(
 	message: string,
 	commentBody?: string,
 	adminIssueUrl?: string,
+	priorComments?: PriorDiscussionComment[],
 ): Promise<void> {
 	await markIssueWorking(github, owner, repo, issueNumber, message, adminIssueUrl);
-	await executor.run(session, commentBody);
+	await executor.run(session, commentBody, priorComments);
 }
 
 export async function handleAdminStop(

@@ -194,9 +194,15 @@ Issue pickup is rejected when any of these conditions applies:
 Ordinary issue comments are accepted only when they are newly created,
 authored by a non-bot account other than Yeetomatic, and the issue is assigned
 to Yeetomatic. Payloads identified as belonging to a closed issue are rejected.
-The issue must also have a Yeetomatic-visible label or the comment must mention
-the configured account or `@yeetomatic`. A mention adds the `yeetomatic` label
-so later comments can pass the label gate.
+The issue must be assigned to Yeetomatic and the comment must explicitly
+trigger feedback by mentioning the configured account or `@yeetomatic`, or by
+containing the `/yeetomatic feedback` comment command. The Yeetomatic-visible
+label is no longer part of the comment gate (neither required nor sufficient).
+A mention still adds the `yeetomatic` routing-marker label, but that label no
+longer affects gate eligibility. When a qualifying trigger comment is accepted,
+Yeetomatic gathers the issue's prior non-trigger, non-Yeetomatic-authored
+comments and includes them as a "Prior discussion" context section in the
+feedback/steering prompt sent to the session.
 
 ## Proposed: Pre-Implementation Issue Refinement
 

@@ -113,7 +113,7 @@ Select `polling` if Yeetomatic cannot receive a public webhook. No public URL is
 2. Open an issue with a clear description and acceptance criteria.
 3. Assign the issue to the GitHub account connected to Yeetomatic, or choose **Start Session** from the issue in the admin dashboard.
 4. Follow progress in GitHub or inspect the live session log in the dashboard.
-5. Add an issue comment or update the issue description to steer active work. Yeetomatic keeps the same issue session and worktree.
+5. Add an issue comment that tags the configured Yeetomatic account (or contains the `/yeetomatic feedback` command) to steer active work, or update the issue description. Yeetomatic keeps the same issue session and worktree. Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.
 6. Review the pull request. Actionable review comments trigger another implementation pass and are pushed to the same branch.
 
 Yeetomatic uses workflow labels and GitHub comments to show its current state:
