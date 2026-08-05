@@ -20,6 +20,7 @@ Code for each repository is managed in `~/workspaces/{owner}-{repo}/`.
 Workspace naming uses lowercase `{owner}-{repo}` directories as documented in `WORKSPACES.md`.
 
 ## Changes made to this codebase in `/src`
+- Work test-first: write or update the unit tests that define the desired behavior before changing the implementation, then write code until the tests pass.
 - For changes to guardrail-relevant files under `src`, include or update unit tests that cover the changed behavior.
 - Before treating a coding task as complete, always run `npm run guardrail:test`.
 - Do not treat a coding task as complete until the guardrail command passes.
