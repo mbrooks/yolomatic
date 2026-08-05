@@ -22,10 +22,10 @@ export class GitHubEventDispatcher {
 
 		switch (event.type) {
 			case "issue":
-				await this.deps.handleIssueEvent.execute(event.payload);
+				await this.deps.handleIssueEvent.execute({ ...event.payload, source: event.source });
 				break;
 			case "issue_comment":
-				await this.deps.handleIssueComment.execute(event.payload);
+				await this.deps.handleIssueComment.execute({ ...event.payload, source: event.source });
 				break;
 			case "pull_request_review":
 			case "pull_request_review_comment":

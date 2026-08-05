@@ -63,6 +63,12 @@ export interface GitHubEventStateStore {
 	upsertPollingSubject?(subject: GitHubPollSubject): void;
 	listPollingSubjects?(): GitHubPollSubject[];
 	markPollingSubjectChecked?(subjectKey: string, checkedAt: string): void;
+	getRepoPollBaseline?(owner: string, repo: string): string | null;
+	setRepoPollBaseline?(owner: string, repo: string, baselineAt: string): void;
+}
+
+export function isPollingSource(source: GitHubEventSource): source is "polling" {
+	return source === "polling";
 }
 
 export type GitHubPollSubjectType = "issue" | "pull_request";

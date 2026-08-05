@@ -2,6 +2,7 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService, IssueComment } from "../../ports/github-service.js";
+import type { GitHubEventSource } from "../../github-events/model.js";
 import { commentTriggersFeedback, hasYeetomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import type { PriorDiscussionComment } from "../../executor/index.js";
 import { formatPriorDiscussion } from "../../executor/index.js";
@@ -19,6 +20,7 @@ import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
 import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface CommentEventPayload {
+	source?: GitHubEventSource;
 	action: string;
 	issue: {
 		number: number;

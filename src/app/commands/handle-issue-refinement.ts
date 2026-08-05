@@ -4,6 +4,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
+import type { GitHubEventStateStore } from "../../github-events/model.js";
 import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
@@ -16,6 +17,7 @@ import { statSync } from "node:fs";
 import { sessionStorageKey } from "../../session/store.js";
 
 export interface IssueRefinementEventPayload {
+	source?: "webhook" | "polling";
 	action: string;
 	issue: {
 		number: number;
@@ -34,11 +36,13 @@ export interface IssueRefinementEventPayload {
 }
 
 export interface IssueRefinementInstructionPayload {
+	source?: "webhook" | "polling";
 	action: string;
 	issue: {
 		number: number;
 		title: string;
 		body: string | null;
+		created_at?: string;
 		labels?: Array<{ name?: string }>;
 		assignee?: { login: string } | null;
 		assignees?: { login: string }[];
@@ -82,6 +86,7 @@ export class HandleIssueRefinement {
 			workspaces: WorkspaceService;
 			executor: DockerWorkerExecutor;
 			clock: Clock;
+			eventStore?: GitHubEventStateStore;
 			adminGithubUsername?: string;
 			githubUsername: string;
 			defaultBranch?: string;
@@ -98,6 +103,15 @@ export class HandleIssueRefinement {
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
 		return this.inFlight.has(issueSessionKey(owner, repo, issueNumber));
+	}
+
+	isAppliedBodyEdit(payload: { source?: "webhook" | "polling"; issue: { number: number; body?: string | null; pull_request?: { url: string } }; repository: { name: string; owner: { login: string } } }): boolean {
+		if (payload.source !== "polling") return false;
+		if (payload.issue.pull_request) return false;
+		const { owner, repo, issueNumber } = this.resolveContext(payload);
+		const attempt = this.deps.refinementStore.getLatestAttempt(owner, repo, issueNumber);
+		if (!attempt || attempt.state !== "applied") return false;
+		return attempt.proposedTaskBody === (payload.issue.body ?? "");
 	}
 
 	async postInstructions(payload: IssueRefinementInstructionPayload): Promise<void> {
@@ -469,6 +483,17 @@ export class HandleIssueRefinement {
 
 		if (this.deps.refinementEnabled === false) {
 			return false;
+		}
+
+		if (payload.source === "polling") {
+			const baseline = this.deps.eventStore?.getRepoPollBaseline?.(owner, repo);
+			if (!baseline) {
+				return false;
+			}
+			const createdAt = payload.issue.created_at ? Date.parse(payload.issue.created_at) : NaN;
+			if (Number.isNaN(createdAt) || createdAt <= Date.parse(baseline)) {
+				return false;
+			}
 		}
 
 		if (issue.user?.login === this.deps.githubUsername) {

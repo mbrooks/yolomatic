@@ -13,6 +13,8 @@ function makeStore(overrides: Partial<GitHubEventStateStore> = {}): GitHubEventS
 		upsertPollingSubject: vi.fn(),
 		listPollingSubjects: vi.fn(() => []),
 		markPollingSubjectChecked: vi.fn(),
+		getRepoPollBaseline: vi.fn(() => null),
+		setRepoPollBaseline: vi.fn(),
 		...overrides,
 	};
 }
@@ -52,6 +54,35 @@ describe("GitHubEventDispatcher", () => {
 			lastActivityAt: "2026-06-01T00:00:00.000Z",
 			lastCheckedAt: null,
 		}));
+	});
+
+	it("passes the event source into the handler payload", async () => {
+		const store = makeStore();
+		const handleIssueEvent = { execute: vi.fn(async () => {}) };
+		const dispatcher = new GitHubEventDispatcher({
+			handleIssueEvent: handleIssueEvent as never,
+			handleIssueComment: { execute: vi.fn() } as never,
+			handlePRReview: { execute: vi.fn() } as never,
+			eventStore: store,
+			githubUsername: "yeetomatic-bot",
+		});
+
+		await dispatcher.dispatch({
+			id: "event-poll",
+			type: "issue",
+			source: "polling",
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			occurredAt: "2026-06-01T00:00:00.000Z",
+			payload: {
+				action: "opened",
+				issue: { number: 1, title: "Issue", body: "", labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		});
+
+		expect(handleIssueEvent.execute).toHaveBeenCalledWith(expect.objectContaining({ source: "polling" }));
 	});
 
 	it("skips events already seen by the dedupe store", async () => {

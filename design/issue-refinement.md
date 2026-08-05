@@ -110,6 +110,11 @@ Yeetomatic does not post the instructions when:
 - issue refinement is disabled for the repository; or
 - an instruction comment has already been recorded for the issue.
 
+For repositories reached through polling, the initial poll establishes a per-repo
+baseline timestamp. Issues that existed before that baseline are never eligible
+for the static instruction comment, even if they appear in the first poll scan.
+Only issues opened after the repo's polling baseline can receive it.
+
 ### 2. Run the authenticated command
 
 An authorized maintainer comments:
@@ -218,17 +223,25 @@ sequenceDiagram
     CP->>CP: Remove temporary worktree
 ```
 
+The same sequence runs whether the events arrive via signed webhook or via
+polling; `GitHubEventDispatcher` normalizes both sources into the same
+`GitHubEvent` model before the refinement handlers process them.
+
 ## Authentication and Authorization
 
-The GitHub webhook signature authenticates that GitHub delivered the event; it
-does not by itself authorize the sender to refine an issue.
+The event source determines how delivery is authenticated. Webhook events are
+authenticated by GitHub's signed webhook payload, which proves GitHub delivered
+the event; that signature does not by itself authorize the sender to refine an
+issue. Polling events are read through the authenticated GitHub API and carry
+the same identity information in a normalized form.
 
 The configured `admin_github_username` and explicit repository
 collaborators may run `/yeetomatic issue-refinement`. The command must start
 the trimmed comment (case-insensitive); trailing text after the command is
 treated as a steering prompt and does not change who may run the command.
-Authorization uses the signed webhook's `sender.login`. Collaborator membership
-is determined via `repos.checkCollaborator` (the GitHub collaborator-membership
+Authorization uses the event sender identity: `sender.login` for webhook events
+and `comment.user.login` from the authenticated polling response for polled
+events. Collaborator membership is determined via `repos.checkCollaborator` (the GitHub collaborator-membership
 endpoint, which returns `204` for explicit collaborators and `404` otherwise),
 not via the effective permission level alone: public repositories grant an
 effective `read` permission to users who were never added as collaborators, so a
@@ -336,7 +349,12 @@ issue twice. A later authenticated command may refine the body again and
 creates a new attempt linked to the prior one.
 
 Yeetomatic-authored `issues.edited` events caused by applying the result are
-ignored by normal issue-edit steering and cannot start implementation.
+ignored by normal issue-edit steering and cannot start implementation. For
+webhook events, the `sender.login` guard recognizes edits authored by the
+configured Yeetomatic account. For polling events, where the issues list API does
+not expose the editor, a polled `issues.edited` event whose body matches the
+most recent `applied` refinement attempt's `proposedTaskBody` is treated as the
+same automatic edit and ignored.
 
 ## Interaction With Normal Issue Execution
 
@@ -397,19 +415,30 @@ The implementation is expected to add or extend these boundaries:
 - an `issue-refinement` worker prompt kind;
 - temporary refinement worktree creation and cleanup;
 - issue-level atomic task admission shared with implementation;
-- `GitHubService.updateIssueBody` for the automatic mutation; and
-- tests for authorization, worker execution, idempotency, stale-source
-  rejection, cleanup, and normal-workflow interaction.
+- `GitHubService.updateIssueBody` for the automatic mutation;
+- a per-repo polling baseline that gates the static instruction comment so
+  pre-existing issues picked up on the initial poll do not receive it; and
+- source-neutral recognition of Yeetomatic-authored `issues.edited` events,
+  using `sender.login` for webhooks and the durable applied-body fingerprint for
+  polling.
 
 ## Acceptance Criteria
 
 - A new eligible issue receives exactly one static instruction comment that
-  includes the worker access and issue-verification warning.
+  includes the worker access and issue-verification warning, whether the issue
+  is opened via webhook or discovered via polling.
 - Opening an issue does not launch a refinement worker.
-- The configured `admin_github_username` and explicit repository collaborators can start refinement.
+- The configured `admin_github_username` and explicit repository collaborators
+  can start refinement from either a webhook or a polled comment.
 - The `/yeetomatic issue-refinement` command (with or without a trailing
-  steering prompt) starts a fresh instance of the
-  existing Docker worker workflow.
+  steering prompt) starts a fresh instance of the existing Docker worker
+  workflow.
+- On polling-mode repositories, the first poll establishes a per-repo baseline
+  and the static instruction comment is not posted to issues that existed
+  before that baseline.
+- After a refinement result is applied, the resulting `issues.edited` event is
+  ignored under both webhooks (by `sender.login`) and polling (by matching the
+  applied Proposed Task body), so it does not steer or mutate a session.
 - The worker follows the target repository's `issue-refinement` skill when it
   exists.
 - A missing repository skill uses Yeetomatic's built-in issue-refinement prompt
@@ -422,7 +451,7 @@ The implementation is expected to add or extend these boundaries:
   both cases the title must not have changed during the run.
 - The original body and refinement history remain durable.
 - An issue edit made during refinement prevents automatic replacement.
-- Replayed webhook deliveries cannot run refinement or mutate the issue twice.
+- Replayed deliveries cannot run refinement or mutate the issue twice.
 - Refinement cannot overlap normal implementation.
 - Experimental changes are discarded, and refinement cannot commit, push, or
   open a pull request.

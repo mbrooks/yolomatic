@@ -84,6 +84,7 @@ export function normalizePolledIssue(owner: string, repo: string, issue: PollIss
 				number: issue.number,
 				title: issue.title,
 				body: issue.body,
+				created_at: issue.created_at,
 				labels: issue.labels,
 				assignee: issue.assignee,
 				assignees: issue.assignees,
@@ -259,6 +260,13 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 	for (const repo of repos) {
 		if (deps.shouldPollRepo && !deps.shouldPollRepo(repo.owner, repo.repo)) {
 			continue;
+		}
+		if (deps.eventStore.setRepoPollBaseline) {
+			const baseline = deps.eventStore.getRepoPollBaseline?.(repo.owner, repo.repo);
+			if (!baseline) {
+				deps.eventStore.setRepoPollBaseline(repo.owner, repo.repo, now.toISOString());
+				log(`[github-poll] initialized baseline for ${repo.owner}/${repo.repo}=${now.toISOString()}`);
+			}
 		}
 		log(`[github-poll] checking ${repo.owner}/${repo.repo} (lastEventReceivedAt=${lastReceivedAt}, since=${since})`);
 		try {
