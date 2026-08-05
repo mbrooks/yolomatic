@@ -218,7 +218,9 @@ against a temporary refinement worktree. The worker follows
 follows Yeetomatic's built-in issue-refinement defaults from the prompt. It may
 inspect the application, make experimental changes, and run tests before
 returning a Proposed Task. The control plane verifies that the source issue has
-not changed and automatically replaces its body. The title is unchanged.
+not changed and automatically replaces its body. When the worker proposes a
+changed title and the title has not changed during the run, refinement also
+updates the title; otherwise the title is left unchanged.
 
 Refinement uses the same issue-level task admission key as implementation but
 bypasses normal commit, push, and pull-request delivery. Its temporary changes

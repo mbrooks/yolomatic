@@ -326,6 +326,7 @@ export class HandleIssueRefinement {
 
 			this.deps.refinementStore.updateAttempt(attemptId, {
 				proposedTaskBody: result.proposedTaskBody,
+				proposedTitle: result.proposedTitle,
 				summary: result.summary,
 				investigation: result.investigation,
 			});
@@ -352,6 +353,14 @@ export class HandleIssueRefinement {
 				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yeetomatic issue-refinement` again."));
 				return;
 			}
+			if (currentIssue.title !== undefined && currentIssue.title !== title) {
+				const reason = "issue title changed during refinement";
+				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
+				await this.failSession(owner, repo, issueNumber, reason);
+				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue title changed during refinement");
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue title changed during refinement. Please run `/yeetomatic issue-refinement` again."));
+				return;
+			}
 
 			if (result.proposedTaskBody.length > 65535) {
 				const reason = "proposed task body exceeds GitHub size limit";
@@ -362,18 +371,35 @@ export class HandleIssueRefinement {
 				return;
 			}
 
+			const proposedTitle = result.proposedTitle?.trim() ?? "";
+			const applyTitle = proposedTitle.length > 0 && proposedTitle !== title;
+			if (applyTitle && proposedTitle.length > 256) {
+				const reason = "proposed title exceeds GitHub size limit";
+				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: reason });
+				await this.failSession(owner, repo, issueNumber, reason);
+				this.log(owner, repo, issueNumber, "warn", "Refinement failed: proposed title exceeds GitHub size limit");
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement produced a title that is too long for GitHub. Please run the command again with a narrower request."));
+				return;
+			}
+
 			await this.deps.github.updateIssueBody(owner, repo, issueNumber, result.proposedTaskBody);
+			if (applyTitle) {
+				await this.deps.github.updateIssueTitle(owner, repo, issueNumber, proposedTitle);
+			}
 			this.deps.refinementStore.updateAttempt(attemptId, { state: "applied" });
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete", {
 				summary: result.summary,
 				taskFinishedAt: this.deps.clock.now().toISOString(),
 			}, "refinement");
 			this.log(owner, repo, issueNumber, "info", "Applied refined issue body");
+			const completionBody = applyTitle
+				? `Issue refined at the request of @${payload.sender.login}. The issue title and body now contain the Proposed Task. No implementation session was started.`
+				: `Issue refined at the request of @${payload.sender.login}. The issue body now contains the Proposed Task. No implementation session was started.`;
 			await this.deps.github.postComment(
 				owner,
 				repo,
 				issueNumber,
-				this.withAdminLink(owner, repo, issueNumber, `Issue refined at the request of @${payload.sender.login}. The issue body now contains the Proposed Task. No implementation session was started.`),
+				this.withAdminLink(owner, repo, issueNumber, completionBody),
 			);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
