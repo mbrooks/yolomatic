@@ -4,7 +4,7 @@ import type { ExecutionService, LiveExecutionSession } from "../../ports/executi
 import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { Clock } from "../../ports/clock.js";
-import type { ExecutionResult } from "../../executor/index.js";
+import type { ExecutionResult, PriorDiscussionComment } from "../../executor/index.js";
 import { isExecutionEnvironmentBlocker } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
@@ -62,7 +62,7 @@ export class ExecuteSession {
 		});
 	}
 
-	async run(state: SessionState, comment?: string): Promise<void> {
+	async run(state: SessionState, comment?: string, priorComments?: PriorDiscussionComment[]): Promise<void> {
 		const { owner, repo, issueNumber } = state;
 		const key = issueSessionKey(owner, repo, issueNumber);
 		const abortController = new AbortController();
@@ -136,6 +136,7 @@ export class ExecuteSession {
 							resolveSession?.(session);
 						},
 						onActivity,
+						priorComments,
 					);
 				} finally {
 					const durationMs = Date.now() - taskStartedAt;

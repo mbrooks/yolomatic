@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HandleIssueComment } from "./handle-issue-comment.js";
+import { HandleIssueComment, selectPriorContextComments, composeSteerMessage } from "./handle-issue-comment.js";
 
 describe("HandleIssueComment", () => {
 	function createHandler() {
@@ -62,6 +62,7 @@ describe("HandleIssueComment", () => {
 		};
 		const workspaces = {
 			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yeetomatic/issue-42" })),
+			syncWorktree: vi.fn(async () => undefined),
 			removeWorktree: vi.fn(async () => {}),
 			commitAndPush: vi.fn(async () => true),
 			commitAndPushPath: vi.fn(async () => true),
@@ -106,6 +107,7 @@ describe("HandleIssueComment", () => {
 			updateIssueAssignees: vi.fn(),
 			closeIssue: vi.fn(),
 			updateIssueBody: vi.fn(),
+			listIssueComments: vi.fn(async () => []),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		};
@@ -113,6 +115,8 @@ describe("HandleIssueComment", () => {
 			execute: vi.fn(async () => undefined),
 		};
 
+		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." }));
+		const executorExecutePRReview = vi.fn();
 		const handlerDepsExecutor = {
 			sessions: sessions as never,
 			workspaces: workspaces as never,
@@ -122,7 +126,7 @@ describe("HandleIssueComment", () => {
 			defaultBranch: "main",
 			githubUsername: "yeetomatic-bot",
 			selfReportEnabled: false,
-			executor: { execute: vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." })), executePRReview: vi.fn() } as never,
+			executor: { execute: executorExecute, executePRReview: executorExecutePRReview } as never,
 		};
 		const handler = new HandleIssueComment({
 			sessions: sessions as never,
@@ -136,7 +140,7 @@ describe("HandleIssueComment", () => {
 			prReview: prReview as never,
 		});
 
-		return { handler, sessions, github, prReview, tasks, workspaces, executor: handlerDepsExecutor };
+		return { handler, sessions, github, prReview, tasks, workspaces, executor: handlerDepsExecutor, executorExecute };
 	}
 
 	it("routes a refinement command with trailing text as a steering prompt", async () => {
@@ -289,7 +293,7 @@ describe("HandleIssueComment", () => {
 				labels: [{ name: "yeetomatic" }],
 				assignee: { login: "yeetomatic-bot" },
 			},
-			comment: { id: 1, body: "Please update", user: { login: "user" } },
+			comment: { id: 1, body: "@yeetomatic-bot Please update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -310,7 +314,7 @@ describe("HandleIssueComment", () => {
 				labels: [{ name: "yeetomatic" }],
 				assignee: { login: "yeetomatic-bot" },
 			},
-			comment: { id: 1, body: "Please update", user: { login: "user" } },
+			comment: { id: 1, body: "@yeetomatic-bot Please update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -468,7 +472,7 @@ describe("HandleIssueComment", () => {
 		await handler.execute({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "please update", user: { login: "user" } },
+			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -486,7 +490,7 @@ describe("HandleIssueComment", () => {
 		await handler.execute({
 			action: "created",
 			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "please update", user: { login: "user" } },
+			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
 			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
@@ -527,4 +531,272 @@ describe("HandleIssueComment", () => {
 
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Stopping Yeetomatic...");
 	});
+
+describe("HandleIssueComment feedback gate behavior", () => {
+	it("ignores a plain comment on an assigned, labeled issue (label is no longer sufficient)", async () => {
+		const { handler, github, tasks, sessions } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [{ name: "yeetomatic-working" }],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 1, body: "just checking in, no trigger", user: { login: "user" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+		expect(tasks.steer).not.toHaveBeenCalled();
+		expect(sessions.get).not.toHaveBeenCalled();
+		expect(github.addLabels).not.toHaveBeenCalled();
+	});
+
+	it("accepts a /yeetomatic feedback command on an assigned issue and starts execution", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 1, body: "/yeetomatic feedback please rerun the tests", user: { login: "user" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			42,
+			"Feedback received. Resuming work.",
+		);
+	});
+
+	it("does not auto-add the yeetomatic label for a /yeetomatic feedback command without a mention", async () => {
+		const { handler, github } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 1, body: "/yeetomatic feedback rerun", user: { login: "user" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.addLabels).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic"]);
+	});
+
+	it("ignores a /yeetomatic feedback command when the issue is not assigned to Yeetomatic", async () => {
+		const { handler, github, tasks, sessions } = createHandler();
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [{ name: "yeetomatic" }],
+				assignee: { login: "someone-else" },
+				assignees: [{ login: "someone-else" }],
+			},
+			comment: { id: 1, body: "/yeetomatic feedback please help", user: { login: "user" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).not.toHaveBeenCalled();
+		expect(tasks.steer).not.toHaveBeenCalled();
+		expect(sessions.get).not.toHaveBeenCalled();
+	});
 });
+
+describe("HandleIssueComment prior-context inclusion", () => {
+	it("fetches prior comments and passes them through to the executor on a new execution", async () => {
+		const { handler, github, executorExecute } = createHandler();
+		github.listIssueComments.mockResolvedValue([
+			{ id: 10, body: "earlier discussion", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+			{ id: 20, body: "@yeetomatic-bot please retry", author: "user", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
+		] as never);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.listIssueComments).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(executorExecute).toHaveBeenCalledTimes(1);
+		const call = (executorExecute.mock.calls[0] as unknown[]);
+		// execute(state, comment, abortSignal, onSessionCreated, onActivity, priorComments)
+		const priorComments = call[5];
+		expect(priorComments).toEqual([{ author: "mbrooks", body: "earlier discussion" }]);
+	});
+
+	it("includes prior context in the steer message for an active execution", async () => {
+		const { handler, github, tasks } = createHandler();
+		tasks.isActive.mockReturnValue(true);
+		tasks.steer.mockResolvedValue(true);
+		github.listIssueComments.mockResolvedValue([
+			{ id: 10, body: "earlier discussion", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+		] as never);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(tasks.steer).toHaveBeenCalledTimes(1);
+		const steeredMessage = tasks.steer.mock.calls[0]![1] as string;
+		expect(steeredMessage).toContain("Prior discussion");
+		expect(steeredMessage).toContain("@mbrooks:");
+		expect(steeredMessage).toContain("earlier discussion");
+		expect(steeredMessage).toContain("please retry");
+	});
+
+	it("degrades gracefully when listIssueComments throws", async () => {
+		const { handler, github, executorExecute } = createHandler();
+		github.listIssueComments.mockRejectedValue(new Error("boom") as never);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			42,
+			"Feedback received. Resuming work.",
+		);
+		expect(executorExecute).toHaveBeenCalledTimes(1);
+		const priorComments = (executorExecute.mock.calls[0] as unknown[])[5];
+		expect(priorComments).toEqual([]);
+	});
+
+	it("degrades gracefully when listIssueComments returns an empty list", async () => {
+		const { handler, github, executorExecute } = createHandler();
+		github.listIssueComments.mockResolvedValue([] as never);
+
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				title: "Issue",
+				body: "Body",
+				labels: [],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executorExecute).toHaveBeenCalledTimes(1);
+		expect((executorExecute.mock.calls[0] as unknown[])[5]).toEqual([]);
+	});
+});
+
+});
+
+describe("HandleIssueComment prior-context gathering", () => {
+	it("selects prior non-trigger, non-Yeetomatic comments older than the trigger", () => {
+		const comments = [
+			{ id: 10, body: "older plain comment", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+			{ id: 20, body: "@yeetomatic-bot older trigger", author: "tarsmbrooks", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
+			{ id: 30, body: "yeetomatic's own comment", author: "yeetomatic-bot", created_at: "2026-08-03T00:00:00Z", updated_at: "2026-08-03T00:00:00Z", html_url: "u" },
+			{ id: 40, body: "/yeetomatic feedback older command trigger", author: "mbrooks", created_at: "2026-08-04T00:00:00Z", updated_at: "2026-08-04T00:00:00Z", html_url: "u" },
+		];
+		const selected = selectPriorContextComments(
+			comments,
+			{ id: 50, body: "@yeetomatic-bot please retry", created_at: "2026-08-05T00:00:00Z" },
+			"yeetomatic-bot",
+		);
+		expect(selected).toEqual([{ author: "mbrooks", body: "older plain comment" }]);
+	});
+
+	it("falls back to id ordering when timestamps tie", () => {
+		const comments = [
+			{ id: 10, body: "same ts, older id", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+			{ id: 20, body: "same ts, newer id (the trigger)", author: "user", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+		];
+		const selected = selectPriorContextComments(
+			comments,
+			{ id: 20, body: "trigger", created_at: "2026-08-01T00:00:00Z" },
+			"yeetomatic-bot",
+		);
+		expect(selected).toEqual([{ author: "mbrooks", body: "same ts, older id" }]);
+	});
+
+	it("excludes comments with no ordering relation to the trigger", () => {
+		const comments = [
+			{ id: 10, body: "orphan comment", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
+		];
+		const selected = selectPriorContextComments(
+			comments,
+			{ body: "trigger with no id or timestamp" },
+			"yeetomatic-bot",
+		);
+		expect(selected).toEqual([]);
+	});
+
+	it("composeSteerMessage prepends prior discussion to the trigger body", () => {
+		const message = composeSteerMessage("Please retry.", [
+			{ author: "mbrooks", body: "Background note" },
+		]);
+		expect(message).toContain("Prior discussion");
+		expect(message).toContain("@mbrooks:");
+		expect(message).toContain("Background note");
+		expect(message).toContain("Please retry.");
+		expect(message.indexOf("Prior discussion")).toBeLessThan(message.indexOf("Please retry."));
+	});
+
+	it("composeSteerMessage returns the trigger body unchanged when there is no prior context", () => {
+		expect(composeSteerMessage("Please retry.", [])).toBe("Please retry.");
+	});
+});
+
+

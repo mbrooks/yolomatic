@@ -15,14 +15,14 @@ import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionStorageKey, type SessionState } from "../session/store.js";
 import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
 export { resolveConfiguredModel } from "./model-selection.js";
 export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, detectStatusMarker, type ExecutionResult, type ExecutionStatus, type RefinementResult } from "./results.js";
-export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment } from "./prompts.js";
+export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
@@ -48,8 +48,9 @@ export class PiAgentExecutor implements ExecutionService {
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
+		priorComments?: PriorDiscussionComment[],
 	): Promise<ExecutionResult> {
-		return this.run(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity);
+		return this.run(state, comment, undefined, abortSignal, onSessionCreated, undefined, onActivity, undefined, priorComments);
 	}
 
 	executePRReview(
@@ -105,6 +106,7 @@ export class PiAgentExecutor implements ExecutionService {
 		overridePrompt?: string,
 		onActivity?: () => void,
 		options?: { refinement?: boolean },
+		priorComments?: PriorDiscussionComment[],
 	): Promise<ExecutionResult> {
 		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
 		const notifyActivity = () => {
@@ -118,7 +120,7 @@ export class PiAgentExecutor implements ExecutionService {
 		} else if (prReview) {
 			prompt = buildPRReviewPrompt(state, prReview.comments, prReview.reviewBody);
 		} else if (newComment) {
-			prompt = buildFeedbackPrompt(newComment);
+			prompt = buildFeedbackPrompt(newComment, priorComments ?? []);
 		} else {
 			prompt = buildIssuePrompt(state);
 		}

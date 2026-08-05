@@ -52,6 +52,20 @@ export interface PendingInvitation {
 
 export type CollaboratorPermission = "admin" | "maintain" | "write" | "triage" | "read";
 
+/**
+ * An issue-style comment on either an issue or a pull request, returned by
+ * {@link GitHubService.listIssueComments}. Mirrors the gateway's
+ * `GatewayIssueComment` shape (author login only; no GitHub account `type`).
+ */
+export interface IssueComment {
+	id: number;
+	body: string;
+	author: string;
+	created_at: string;
+	updated_at: string;
+	html_url: string;
+}
+
 export type RepoVisibility = "public" | "private" | "internal";
 
 export interface AccessibleRepo {
@@ -107,6 +121,7 @@ export interface GitHubService {
 	updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void>;
 	closeIssue(owner: string, repo: string, issueNumber: number): Promise<void>;
 	updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void>;
+	listIssueComments(owner: string, repo: string, issueNumber: number): Promise<IssueComment[]>;
 	updateIssueTitle(owner: string, repo: string, issueNumber: number, title: string): Promise<void>;
 	getAuthenticatedUser(): Promise<{ login: string } | null>;
 	listAccessibleRepositories(): Promise<AccessibleRepo[]>;
