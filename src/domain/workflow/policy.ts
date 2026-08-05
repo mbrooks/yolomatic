@@ -195,34 +195,24 @@ const ISSUE_REFINEMENT_COMMAND = "/yeetomatic issue-refinement";
 /**
  * Parse an issue-refinement command from a comment body.
  *
- * The command must appear at the start of the trimmed comment (case-insensitive).
+ * Matching reuses the shared {@link commentStartsWithCommand} helper so the
+ * start-of-body rule is identical to the other `/yeetomatic` commands: the
+ * command must start the trimmed comment (case-insensitive), and the character
+ * after the command token must be either absent or whitespace. This rejects
+ * embedded or quoted commands (e.g. `` `/yeetomatic issue-refinement` `` or
+ * `Please run /yeetomatic issue-refinement`) and Markdown-wrapped tokens.
+ *
  * When the command is the entire trimmed body, `steeringPrompt` is the empty
  * string. When the command is followed by whitespace then additional text, the
- * text after the separating whitespace (trimmed) is returned as the
- * `steeringPrompt`. Embedded or quoted commands (e.g. `` `/yeetomatic
- * issue-refinement` `` or `Please run /yeetomatic issue-refinement`) and
- * Markdown-wrapped command tokens are rejected because the command token does
- * not start the trimmed body.
+ * text after the command token (trimmed) is returned as the `steeringPrompt`.
  */
 export function parseIssueRefinementCommand(
 	body: string,
 ): { matched: true; steeringPrompt: string } | { matched: false } {
-	const trimmed = body.trim();
-	if (trimmed.length === 0) {
+	if (!commentStartsWithCommand(body, ISSUE_REFINEMENT_COMMAND)) {
 		return { matched: false };
 	}
-	const lower = trimmed.toLowerCase();
-	if (!lower.startsWith(ISSUE_REFINEMENT_COMMAND)) {
-		return { matched: false };
-	}
-	if (trimmed.length === ISSUE_REFINEMENT_COMMAND.length) {
-		return { matched: true, steeringPrompt: "" };
-	}
-	const nextChar = trimmed[ISSUE_REFINEMENT_COMMAND.length]!;
-	if (!/\s/.test(nextChar)) {
-		return { matched: false };
-	}
-	const steeringPrompt = trimmed.slice(ISSUE_REFINEMENT_COMMAND.length).trim();
+	const steeringPrompt = body.trim().slice(ISSUE_REFINEMENT_COMMAND.length).trim();
 	return { matched: true, steeringPrompt };
 }
 
