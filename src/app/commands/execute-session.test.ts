@@ -59,9 +59,17 @@ function makeDeps(overrides?: {
 	const github: GitHubService = {
 		getIssue: vi.fn(),
 		listPullRequests: vi.fn(async () => []),
-		getPullRequest: vi.fn(),
+		getPullRequest: vi.fn(async () => ({
+			head: { ref: "yeetomatic/issue-1", sha: "sha" },
+			state: "open",
+			merged: false,
+			mergeable: true,
+			mergeableState: "clean",
+			draft: true,
+		})),
 		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: overrides?.createPullRequest ? vi.fn(overrides.createPullRequest) : vi.fn(async () => null),
+		markPullRequestReadyForReview: vi.fn(async () => undefined),
 		createIssue: vi.fn(),
 		initializeEmptyRepo: vi.fn(async () => undefined),
 		postComment: vi.fn(async () => 1),

@@ -126,7 +126,35 @@ describe("GitHubServiceAdapter", () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.getPullRequest("mbrooks", "yeetomatic", 1);
-			expect(result).toEqual({ head: { ref: "main" }, state: "open", merged: false });
+			expect(result).toEqual({ head: { ref: "main" }, state: "open", merged: false, mergeable: null, mergeableState: "unknown", draft: false });
+		});
+
+		it("maps mergeable, mergeable_state, and draft from the Octokit response", async () => {
+			const octokit = createMockOctokit({
+				pulls: {
+					get: vi.fn(async () => ({
+						data: {
+							head: { ref: "yeetomatic/issue-1", sha: "abc" },
+							state: "open",
+							merged: false,
+							mergeable: true,
+							mergeable_state: "clean",
+							draft: true,
+						},
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.getPullRequest("mbrooks", "yeetomatic", 7);
+			expect(result).toEqual({
+				head: { ref: "yeetomatic/issue-1", sha: "abc" },
+				state: "open",
+				merged: false,
+				mergeable: true,
+				mergeableState: "clean",
+				draft: true,
+			});
+			expect(octokit.pulls.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 7 });
 		});
 
 		it("returns null on error", async () => {
@@ -147,6 +175,27 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main");
 			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/pulls/1" });
+		});
+
+		it("forwards the draft option to octokit.pulls.create", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main", true);
+			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", title: "Title", body: "Body", head: "feature", base: "main", draft: true });
+		});
+
+		it("omits draft when not specified", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main");
+			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", title: "Title", body: "Body", head: "feature", base: "main" });
+		});
+
+		it("marks a pull request ready for review via pulls.update with draft:false", async () => {
+			const octokit = createMockOctokit();
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await adapter.markPullRequestReadyForReview("mbrooks", "yeetomatic", 42);
+			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 42, draft: false });
 		});
 
 		it("returns null when no commits between branches", async () => {
