@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { Modal } from "../../components/Modal.js";
 import {
 	createUser,
 	deleteUser,
@@ -20,7 +21,9 @@ export function UsersScreen(): React.ReactElement {
 	const [users, setUsers] = useState<User[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [showAdd, setShowAdd] = useState(false);
 	const [draft, setDraft] = useState<NewUserDraft>(EMPTY_DRAFT);
+	const [addError, setAddError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 
 	const refresh = useCallback(async () => {
@@ -40,13 +43,25 @@ export function UsersScreen(): React.ReactElement {
 		void refresh();
 	}, [refresh]);
 
+	const openAddModal = useCallback(() => {
+		setDraft(EMPTY_DRAFT);
+		setAddError(null);
+		setShowAdd(true);
+	}, []);
+
+	const closeAddModal = useCallback(() => {
+		if (busy) return;
+		setShowAdd(false);
+		setAddError(null);
+	}, [busy]);
+
 	const handleCreate = useCallback(async () => {
 		if (!draft.fullName.trim() || !draft.username.trim() || !draft.password) {
-			setError("Full name, username, and password are required");
+			setAddError("Full name, username, and password are required");
 			return;
 		}
 		setBusy(true);
-		setError(null);
+		setAddError(null);
 		try {
 			await createUser({
 				full_name: draft.fullName.trim(),
@@ -54,9 +69,10 @@ export function UsersScreen(): React.ReactElement {
 				password: draft.password,
 			});
 			setDraft(EMPTY_DRAFT);
+			setShowAdd(false);
 			await refresh();
 		} catch (err) {
-			setError(err instanceof Error ? err.message : String(err));
+			setAddError(err instanceof Error ? err.message : String(err));
 		} finally {
 			setBusy(false);
 		}
@@ -123,51 +139,16 @@ export function UsersScreen(): React.ReactElement {
 			</p>
 			{error && <div className="error-banner">{error}</div>}
 
-			<section className="settings-section">
-				<h4 className="settings-section-title">Add user</h4>
-				<div className="onboarding-form">
-					<div className="form-group">
-						<label htmlFor="new-user-full-name">Full name</label>
-						<input
-							id="new-user-full-name"
-							type="text"
-							value={draft.fullName}
-							onChange={(e) => setDraft((d) => ({ ...d, fullName: e.target.value }))}
-							placeholder="Ada Lovelace"
-						/>
-					</div>
-					<div className="form-group">
-						<label htmlFor="new-user-username">Username</label>
-						<input
-							id="new-user-username"
-							type="text"
-							value={draft.username}
-							onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
-							placeholder="ada"
-						/>
-					</div>
-					<div className="form-group">
-						<label htmlFor="new-user-password">Password</label>
-						<input
-							id="new-user-password"
-							type="password"
-							value={draft.password}
-							onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
-							placeholder="password"
-						/>
-					</div>
-					<div className="settings-actions">
-						<button
-							className="action-btn restart"
-							type="button"
-							onClick={() => void handleCreate()}
-							disabled={busy}
-						>
-							{busy ? "Adding..." : "Add user"}
-						</button>
-					</div>
-				</div>
-			</section>
+			<div className="settings-actions">
+				<button
+					className="action-btn restart"
+					type="button"
+					onClick={openAddModal}
+					disabled={busy}
+				>
+					Add User
+				</button>
+			</div>
 
 			{loading ? (
 				<div className="empty">Loading users...</div>
@@ -223,6 +204,73 @@ export function UsersScreen(): React.ReactElement {
 					</tbody>
 				</table>
 			)}
+
+			<Modal open={showAdd} onClose={closeAddModal} title="Add User">
+				<form
+					className="onboarding-form"
+					onSubmit={(e) => {
+						e.preventDefault();
+						void handleCreate();
+					}}
+				>
+					<div className="form-group">
+						<label htmlFor="new-user-full-name">Full name</label>
+						<input
+							id="new-user-full-name"
+							type="text"
+							value={draft.fullName}
+							onChange={(e) => setDraft((d) => ({ ...d, fullName: e.target.value }))}
+							placeholder="Ada Lovelace"
+							disabled={busy}
+							autoFocus
+						/>
+					</div>
+					<div className="form-group">
+						<label htmlFor="new-user-username">Username</label>
+						<input
+							id="new-user-username"
+							type="text"
+							value={draft.username}
+							onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
+							placeholder="ada"
+							disabled={busy}
+						/>
+					</div>
+					<div className="form-group">
+						<label htmlFor="new-user-password">Password</label>
+						<input
+							id="new-user-password"
+							type="password"
+							value={draft.password}
+							onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
+							placeholder="password"
+							disabled={busy}
+						/>
+					</div>
+					{addError && (
+						<div className="error-banner" role="alert">
+							{addError}
+						</div>
+					)}
+					<div className="settings-actions">
+						<button
+							className="action-btn"
+							type="button"
+							onClick={closeAddModal}
+							disabled={busy}
+						>
+							Cancel
+						</button>
+						<button
+							className="action-btn restart"
+							type="submit"
+							disabled={busy}
+						>
+							{busy ? "Adding..." : "Add user"}
+						</button>
+					</div>
+				</form>
+			</Modal>
 		</div>
 	);
 }
