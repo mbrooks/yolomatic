@@ -25,6 +25,31 @@ function makeStore(last: string | null, subjects: GitHubPollSubject[] = []): Git
 		upsertPollingSubject: vi.fn(),
 		listPollingSubjects: vi.fn(() => subjects),
 		markPollingSubjectChecked: vi.fn(),
+		getRepoPollBaseline: vi.fn(() => null),
+		setRepoPollBaseline: vi.fn(),
+	};
+}
+
+function makeStatefulStore(last: string | null): GitHubEventStateStore {
+	let lastReceivedAt = last;
+	const baselines = new Map<string, string>();
+	return {
+		getLastEventReceivedAt: () => lastReceivedAt,
+		initializeLastEventReceivedAt: (value: string) => {
+			if (!lastReceivedAt) lastReceivedAt = value;
+		},
+		updateLastEventReceivedAt: (value: string) => {
+			lastReceivedAt = value;
+		},
+		hasSeen: () => false,
+		markSeen: () => {},
+		upsertPollingSubject: () => {},
+		listPollingSubjects: () => [],
+		markPollingSubjectChecked: () => {},
+		getRepoPollBaseline: (owner, repo) => baselines.get(`${owner}/${repo}`) ?? null,
+		setRepoPollBaseline: (owner, repo, value) => {
+			baselines.set(`${owner}/${repo}`, value);
+		},
 	};
 }
 
@@ -612,6 +637,139 @@ describe("tickGitHubPolling", () => {
 		} finally {
 			writeSpy.mockRestore();
 		}
+	});
+
+	it("initializes a per-repo polling baseline the first time a repo is checked", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		const github = makeGithub({
+			listAccessibleRepositories: vi.fn(async () => [
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+			]),
+			listIssuesUpdatedSince: vi.fn(async () => []),
+		});
+		const now = new Date("2026-06-01T12:05:00.000Z");
+
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yeetomatic-bot",
+			intervalMs: 60000,
+			now: () => now,
+			dispatch: vi.fn(),
+		});
+
+		expect(store.setRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yeetomatic", now.toISOString());
+		expect(store.getRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+	});
+
+	it("does not reinitialize the per-repo baseline once it exists", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		store.getRepoPollBaseline = vi.fn(() => "2026-06-01T12:00:00.000Z");
+		const github = makeGithub({
+			listAccessibleRepositories: vi.fn(async () => [
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+			]),
+			listIssuesUpdatedSince: vi.fn(async () => []),
+		});
+
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yeetomatic-bot",
+			intervalMs: 60000,
+			dispatch: vi.fn(),
+		});
+
+		expect(store.setRepoPollBaseline).not.toHaveBeenCalled();
+	});
+
+	it("gates the static instruction comment with a per-repo polling baseline", async () => {
+		const store = makeStatefulStore("2026-06-01T12:00:00.000Z");
+		const preExisting = {
+			number: 1,
+			title: "Old issue",
+			body: "Body",
+			state: "open",
+			created_at: "2026-05-01T12:00:00.000Z",
+			updated_at: "2026-06-01T12:00:30.000Z",
+			labels: [],
+			assignee: null,
+			assignees: [],
+			user: { login: "human" },
+		};
+		const github = makeGithub({
+			listAccessibleRepositories: vi.fn(async () => [
+				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+			]),
+			listIssuesUpdatedSince: vi.fn(async () => [preExisting]),
+		});
+		const firstTickNow = new Date("2026-06-01T12:05:00.000Z");
+		const firstDispatch = vi.fn(async (_event: unknown) => {});
+
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yeetomatic-bot",
+			intervalMs: 60000,
+			now: () => firstTickNow,
+			dispatch: firstDispatch,
+		});
+
+		// Pre-existing issue is normalized as edited, so it cannot trigger the
+		// new-issue static instruction comment.
+		expect(firstDispatch).toHaveBeenCalledWith(expect.objectContaining({
+			type: "issue",
+			payload: expect.objectContaining({ action: "edited" }),
+		}));
+		expect(firstDispatch).not.toHaveBeenCalledWith(expect.objectContaining({
+			type: "issue",
+			payload: expect.objectContaining({ action: "opened" }),
+		}));
+		expect(store.getRepoPollBaseline?.("mbrooks", "yeetomatic")).toBe(firstTickNow.toISOString());
+
+		// Second tick sees a newly opened issue. Because the repo baseline is
+		// now set, the issue is eligible for the static instruction comment.
+		const newIssue = {
+			...preExisting,
+			number: 2,
+			title: "New issue",
+			created_at: "2026-06-01T12:10:00.000Z",
+			updated_at: "2026-06-01T12:10:00.000Z",
+		};
+		github.listIssuesUpdatedSince = vi.fn(async () => [newIssue]);
+		const secondDispatch = vi.fn(async (_event: unknown) => {});
+		const secondTickNow = new Date("2026-06-01T12:15:00.000Z");
+
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yeetomatic-bot",
+			intervalMs: 60000,
+			now: () => secondTickNow,
+			dispatch: secondDispatch,
+		});
+
+		expect(secondDispatch).toHaveBeenCalledWith(expect.objectContaining({
+			type: "issue",
+			payload: expect.objectContaining({ action: "opened" }),
+		}));
+	});
+
+	it("includes created_at in normalized polled issue payloads", () => {
+		const issue = {
+			number: 1,
+			title: "Issue",
+			body: "Body",
+			state: "open",
+			created_at: "2026-06-01T12:00:30.000Z",
+			updated_at: "2026-06-01T12:00:30.000Z",
+			labels: [],
+			assignee: null,
+			assignees: [],
+			user: { login: "human" },
+		};
+		const event = normalizePolledIssue("mbrooks", "yeetomatic", issue, "2026-06-01T12:00:00.000Z");
+		expect((event.payload as { issue: { created_at: string } }).issue.created_at).toBe("2026-06-01T12:00:30.000Z");
 	});
 
 	describe("startGitHubPolling startup logging", () => {

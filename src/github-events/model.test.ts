@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GitHubEvent } from "./model.js";
+import { isPollingSource } from "./model.js";
 
 describe("GitHubEvent model", () => {
 	it("accepts normalized issue events", () => {
@@ -19,6 +20,11 @@ describe("GitHubEvent model", () => {
 			},
 		};
 		expect(event.type).toBe("issue");
+	});
+
+	it("identifies polling source", () => {
+		expect(isPollingSource("polling")).toBe(true);
+		expect(isPollingSource("webhook")).toBe(false);
 	});
 });
 

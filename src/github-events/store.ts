@@ -16,6 +16,8 @@ export class GitHubEventStore implements GitHubEventStateStore {
 	private readonly upsertSubjectStmt: StatementSync;
 	private readonly listSubjectsStmt: StatementSync;
 	private readonly markSubjectCheckedStmt: StatementSync;
+	private readonly getRepoBaselineStmt: StatementSync;
+	private readonly setRepoBaselineStmt: StatementSync;
 
 	constructor(dbPath: string) {
 		mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -53,6 +55,16 @@ export class GitHubEventStore implements GitHubEventStateStore {
 		);
 		this.markSubjectCheckedStmt = this.db.prepare(
 			`UPDATE github_poll_subjects SET last_checked_at = ?, updated_at = ? WHERE subject_key = ?`,
+		);
+		this.getRepoBaselineStmt = this.db.prepare(
+			"SELECT baseline_at FROM github_poll_repo_baselines WHERE owner = ? AND repo = ?",
+		);
+		this.setRepoBaselineStmt = this.db.prepare(
+			`INSERT INTO github_poll_repo_baselines (owner, repo, baseline_at, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(owner, repo) DO UPDATE SET
+			 baseline_at = excluded.baseline_at,
+			 updated_at = excluded.updated_at`,
 		);
 	}
 
@@ -109,5 +121,15 @@ export class GitHubEventStore implements GitHubEventStateStore {
 
 	markPollingSubjectChecked(subjectKey: string, checkedAt: string): void {
 		this.markSubjectCheckedStmt.run(checkedAt, new Date().toISOString(), subjectKey);
+	}
+
+	getRepoPollBaseline(owner: string, repo: string): string | null {
+		const row = this.getRepoBaselineStmt.get(owner, repo) as { baseline_at?: string } | undefined;
+		return row?.baseline_at ?? null;
+	}
+
+	setRepoPollBaseline(owner: string, repo: string, baselineAt: string): void {
+		const now = new Date().toISOString();
+		this.setRepoBaselineStmt.run(owner, repo, baselineAt, now, now);
 	}
 }

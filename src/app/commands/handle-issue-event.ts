@@ -3,6 +3,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
+import type { GitHubEventSource } from "../../github-events/model.js";
 import { hasYeetomaticVisibleLabel, isAssignedToYeetomatic } from "../../domain/workflow/policy.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 import {
@@ -17,11 +18,13 @@ import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
 import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface IssueEventPayload {
+	source?: GitHubEventSource;
 	action: string;
 	issue: {
 		number: number;
 		title: string;
 		body: string | null;
+		created_at?: string;
 		labels?: Array<{ name?: string }>;
 		assignee?: { login: string } | null;
 		assignees?: { login: string }[];
@@ -84,6 +87,11 @@ export class HandleIssueEvent {
 
 		if (payload.sender.login === this.deps.githubUsername) {
 			process.stdout.write(`[webhook] issues action ignored: event from ${this.deps.githubUsername}\n`);
+			return;
+		}
+
+		if (payload.action === "edited" && payload.source === "polling" && this.deps.refinement?.isAppliedBodyEdit(payload)) {
+			process.stdout.write(`[github-event] issues.edited ignored: matches applied refinement body for ${key}\n`);
 			return;
 		}
 
