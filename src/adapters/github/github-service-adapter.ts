@@ -50,7 +50,14 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 	async getPullRequest(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null> {
 		try {
 			const { data } = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
-			return { head: data.head, state: data.state, merged: data.merged ?? false };
+			return {
+				head: data.head,
+				state: data.state,
+				merged: data.merged ?? false,
+				mergeable: data.mergeable ?? null,
+				mergeableState: data.mergeable_state ?? "unknown",
+				draft: data.draft ?? false,
+			};
 		} catch {
 			return null;
 		}
@@ -83,9 +90,18 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		body: string,
 		head: string,
 		base: string,
+		draft?: boolean,
 	): Promise<CreatedPR | null> {
 		try {
-			const pr = await this.octokit.pulls.create({ owner, repo, title, body, head, base });
+			const pr = await this.octokit.pulls.create({
+				owner,
+				repo,
+				title,
+				body,
+				head,
+				base,
+				...(draft !== undefined ? { draft } : {}),
+			});
 			return { number: pr.data.number, html_url: pr.data.html_url };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -94,6 +110,10 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 			}
 			throw error;
 		}
+	}
+
+	async markPullRequestReadyForReview(owner: string, repo: string, prNumber: number): Promise<void> {
+		await this.octokit.pulls.update({ owner, repo, pull_number: prNumber, draft: false });
 	}
 
 	async listPullRequests(
