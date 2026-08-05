@@ -155,6 +155,7 @@ vi.mock("ws", () => ({
 }));
 
 const executeWithOverride = vi.fn();
+const executeRefinement = vi.fn();
 const mockSession = {
 	steer: vi.fn(async () => undefined),
 };
@@ -162,10 +163,12 @@ const mockSession = {
 vi.mock("../executor/index.js", () => ({
 	PiAgentExecutor: vi.fn(() => ({
 		executeWithOverride,
+		executeRefinement,
 	})),
 }));
 
 import { PiAgentExecutor } from "../executor/index.js";
+import { sessionStorageKey } from "../session/store.js";
 import { runWorkerRuntime } from "./runtime.js";
 import { callGitHubGateway } from "./github-gateway-client.js";
 
@@ -595,7 +598,7 @@ describe("runWorkerRuntime", () => {
 		const markerPath = path.join(workspacePath, "init-marker.txt");
 		await writeFile(
 			path.join(workspacePath, "yeetstrap.sh"),
-				`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
+			`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
 		);
 		const sessionKey = "github-mbrooks-yeetomatic-issue-801-implementation";
 		let executorConstructed = false;
@@ -689,7 +692,7 @@ describe("runWorkerRuntime", () => {
 		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-badinit-"));
 		await writeFile(
 			path.join(workspacePath, "yeetstrap.sh"),
-				"#!/usr/bin/env bash\nset -euo pipefail\necho 'nope' >&2\nexit 7\n",
+			"#!/usr/bin/env bash\nset -euo pipefail\necho 'nope' >&2\nexit 7\n",
 		);
 		const sessionKey = "github-mbrooks-yeetomatic-issue-803-implementation";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
@@ -737,5 +740,90 @@ describe("runWorkerRuntime", () => {
 		} finally {
 			await rm(workspacePath, { recursive: true, force: true });
 		}
+	});
+
+	it("forwards refinement LLM logs under the refinement session key", async () => {
+		const sessionKey = "github-mbrooks-yeetomatic-issue-200-refinement";
+		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
+		let capturedState: { kind?: string; owner: string; repo: string; issueNumber: number } | undefined;
+
+		executeRefinement.mockImplementation(async (state, _prompt, _signal, onSessionCreated) => {
+			capturedState = state;
+			onSessionCreated?.(mockSession);
+			// Mirror the executor's key derivation so the test reproduces the bug:
+			// the executor records under sessionStorageKey(...state.kind ?? "implementation").
+			const key = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
+			emitSessionLogEvent(key, {
+				timestamp: new Date().toISOString(),
+				level: "assistant",
+				message: "thinking…",
+				details: { type: "thinking" },
+			});
+			emitSessionLogEvent(key, {
+				timestamp: new Date().toISOString(),
+				level: "assistant",
+				message: "response",
+				details: { type: "response" },
+			});
+			emitSessionLogEvent(key, {
+				timestamp: new Date().toISOString(),
+				level: "assistant",
+				message: "tool call",
+				details: { type: "tool_execution_start" },
+			});
+			return {
+				proposedTaskBody: "body",
+				summary: "done",
+				investigation: "investigation",
+			};
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				seenMessages.push(message);
+				if (message.type === "hello") {
+					await sendWorkerWebSocketMessage(
+						server as never,
+						createWorkerMessage("launch_config", sessionKey, "launch-refinement", {
+							session: {
+								owner: "mbrooks",
+								repo: "yeetomatic",
+								issueNumber: 200,
+								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-200",
+								title: "Refine me",
+								body: "Body",
+								kind: "refinement",
+							},
+							prompt: { kind: "issue-refinement", text: "custom prompt" },
+						}),
+					);
+					return;
+				}
+			});
+		});
+
+		await runWorkerRuntime({
+			wsUrl: "ws://worker.test/session-200",
+			sessionKey,
+			soulPath: "/tmp/SOUL.md",
+		});
+
+		// The state forwarded to the executor must carry the refinement kind so the
+		// executor records LLM events under the refinement key (matching the
+		// runtime's sessionLogKey). Without `kind`, capturedState would default to
+		// the implementation key and no event_batch would be forwarded.
+		expect(capturedState?.kind).toBe("refinement");
+
+		const eventBatches = seenMessages.filter((message) => message.type === "event_batch");
+		expect(eventBatches.length).toBeGreaterThan(0);
+		const forwardedEntries = eventBatches.flatMap(
+			(message) => (message as WorkerProtocolMessage<"event_batch">).payload.events,
+		);
+		expect(forwardedEntries.some((event) => event.type === "session_log")).toBe(true);
+		const logEntries = forwardedEntries.filter((event) => event.type === "session_log");
+		expect(logEntries.some((event) => event.entry.details?.type === "thinking")).toBe(true);
+		expect(logEntries.some((event) => event.entry.details?.type === "response")).toBe(true);
+		expect(logEntries.some((event) => event.entry.details?.type === "tool_execution_start")).toBe(true);
 	});
 });
