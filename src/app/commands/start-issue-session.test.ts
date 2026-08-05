@@ -102,6 +102,7 @@ function makeCommand(
 		getPullRequest: vi.fn(async () => null),
 		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: vi.fn(async () => null),
+		markPullRequestReadyForReview: vi.fn(async () => undefined),
 		listPullRequests: vi.fn(async () => []),
 		getIssue: vi.fn(async () => null),
 		createIssue: vi.fn(async () => ({ number: 1, html_url: "" })),

@@ -2,6 +2,12 @@ export interface PullRequestInfo {
 	head: { ref: string; sha?: string };
 	state: string;
 	merged: boolean;
+	/** GitHub mergeability computed by a background job (`true | false | null`). `null` means still computing — poll. */
+	mergeable?: boolean | null;
+	/** Raw `mergeable_state` from `octokit.pulls.get` (`clean | dirty | blocked | unstable | has_hooks | unknown | draft`). */
+	mergeableState?: string;
+	/** Whether the PR is a draft. */
+	draft?: boolean;
 }
 
 export interface ReviewComment {
@@ -100,7 +106,9 @@ export interface GitHubService {
 		body: string,
 		head: string,
 		base: string,
+		draft?: boolean,
 	): Promise<CreatedPR | null>;
+	markPullRequestReadyForReview(owner: string, repo: string, prNumber: number): Promise<void>;
 	listPullRequests(
 		owner: string,
 		repo: string,
