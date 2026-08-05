@@ -23,6 +23,7 @@ implemented by Yeetomatic, plus explicitly labeled proposed extensions:
 - [protocol-websocket-transport.md](protocol-websocket-transport.md): transport, session isolation, reconnect, and shutdown rules
 - [protocol-session-messages.md](protocol-session-messages.md): bidirectional message types for launch, events, heartbeat, steering, and completion
 - [schema.md](schema.md): SQLite tables, columns, indexes, and persistence conventions used by the control plane
+- [worker-env-init.md](worker-env-init.md): proposed design for deterministically running a repository-provided `.pi/init.sh` in the worker container before the agent starts
 
 ## Goals
 
