@@ -200,6 +200,16 @@ describe("HandleIssueRefinement", () => {
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain("custom-yeet-bot");
 	});
 
+	it("includes the /yeetomatic feedback command in the new-issue comment", async () => {
+		await handler.postInstructions(createInstructionPayload() as never);
+		const posted = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3];
+		expect(posted).toContain("/yeetomatic feedback");
+		expect(posted).toContain("steer");
+		// Ordering: feedback is documented between assign and issue-refinement.
+		expect(posted.indexOf("/yeetomatic feedback")).toBeLessThan(posted.indexOf("/yeetomatic issue-refinement"));
+		expect(posted.indexOf("Assign the issue")).toBeLessThan(posted.indexOf("/yeetomatic feedback"));
+	});
+
 	it("does not post the automatic comment when issueNewCommentEnabled is false", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
