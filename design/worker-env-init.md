@@ -96,13 +96,17 @@ workspace path, using these precedence rules:
 
 1. `YEETOMATIC_WORKER_INIT_SCRIPT` if set and non-empty (resolved relative to
    the workspace path when not absolute).
-2. Otherwise `.pi/init.sh` relative to the workspace path.
+2. Otherwise `yeetstrap.sh` relative to the workspace path.
 
-The `.pi/` directory is already the established convention for
-repository-owned Yeetomatic artifacts: skills live under `.pi/skills/` and
-trusted extensions under `.pi/extensions/`. Placing the init script at
-`.pi/init.sh` keeps all Yeetomatic-facing repository configuration under one
-directory and avoids littering the repository root.
+The repository root is the established convention for project-level entry
+points: it is where a maintainer already expects to find tooling scripts such
+as `build.sh`, `test.sh`, or `Makefile`-driven wrappers. Placing the init
+script at the repository root as `yeetstrap.sh` makes it discoverable alongside
+those existing scripts and does not require a Yeetomatic-specific directory to
+exist. The `.pi/` directory remains reserved for Yeetomatic-owned artifacts
+(skills under `.pi/skills/`, trusted extensions under `.pi/extensions/`); the
+init script is repository-owned tooling and belongs at the root, not under
+`.pi/`.
 
 The script must:
 
@@ -141,7 +145,7 @@ and before `PiAgentExecutor` is constructed:
 
    The `cd` is explicit and redundant with step 2 but makes the script's
    working directory deterministic even if the script itself `cd`s away and
-   back. `exec bash` (not `./init.sh`) ignores the executable bit and the
+   back. `exec bash` (not `./yeetstrap.sh`) ignores the executable bit and the
    script's own shebang choice, so the script runs under the worker image's
    `bash` regardless of how it was committed.
 
@@ -218,15 +222,15 @@ idempotent or that the environment is rebuilt from scratch each time.
 
 The shared workspace mount is the cache. Concrete example for a Node project:
 
-1. First worker launch: `.pi/init.sh` runs `npm ci`. `node_modules` is
+1. First worker launch: `yeetstrap.sh` runs `npm ci`. `node_modules` is
    materialized inside the workspace. The container exits.
-2. Second worker launch (same repo, same workspace volume): `.pi/init.sh`
+2. Second worker launch (same repo, same workspace volume): `yeetstrap.sh`
    runs `npm ci` again. `npm` sees `node_modules` already present and
    matching the lockfile, does a fast verification, and exits near-instantly.
    The agent starts with a warm environment.
 
 A repository that wants a truly clean rebuild each time can make its
-`.pi/init.sh` remove `node_modules` first. That is a repository policy
+`yeetstrap.sh` remove `node_modules` first. That is a repository policy
 decision, not a Yeetomatic decision.
 
 Yeetomatic does not checksum the environment before or after the init script.
@@ -243,7 +247,7 @@ None of these variables are required; all have safe defaults.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `YEETOMATIC_WORKER_INIT_SCRIPT` | `.pi/init.sh` | Path to the init script, resolved relative to the workspace path when not absolute. Set to an absolute path to point outside the workspace (rare). |
+| `YEETOMATIC_WORKER_INIT_SCRIPT` | `yeetstrap.sh` | Path to the init script, resolved relative to the workspace path when not absolute. Set to an absolute path to point outside the workspace (rare). |
 | `YEETOMATIC_WORKER_INIT_SKIP` | `0` | When set to `1` (or `true`), the worker skips the init phase entirely even if a script is present. Used by maintainers to debug a broken environment. |
 | `YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS` | `1800` | Wall-clock seconds before the init script is killed. |
 
@@ -343,7 +347,7 @@ dependency materialization, not a hook to install system packages.
   overall runtime budget because it runs inside the same worker process, but
   the init-specific timeout fires first for a stuck script.
 - **Refinement workers**: refinement launches use the same worker runtime
-  and therefore the same init step. A repository's `.pi/init.sh` runs before
+  and therefore the same init step. A repository's `yeetstrap.sh` runs before
   the refinement agent just as it runs before the implementation agent. This
   is intentional: refinement needs a buildable environment to test claims.
 - **PR review workers**: same as refinement. The init script runs.
@@ -362,7 +366,7 @@ Two properties are worth restating:
 - The init script runs as the non-root worker user, with no GitHub
   credentials, no Docker socket, and no control-plane state access. It can
   only mutate the mounted workspace and reach the network.
-- The init script is discovered by convention (`.pi/init.sh`) and is
+- The init script is discovered by convention (`yeetstrap.sh`) and is
   overridable or skippable by the control plane. A maintainer who does not
   trust a repository's init script sets `YEETOMATIC_WORKER_INIT_SKIP=1` for
   that launch.
@@ -391,7 +395,7 @@ This is the escape hatch for:
 
 ## Example Init Scripts
 
-Minimal Node project (`.pi/init.sh`):
+Minimal Node project (`yeetstrap.sh`):
 
 ```bash
 #!/usr/bin/env bash
@@ -463,9 +467,9 @@ Unit tests in `src/worker/env-init.test.ts` cover:
 Integration coverage in `src/worker/runtime.test.ts` extends the existing
 runtime tests to assert that:
 
-- a workspace with `.pi/init.sh` runs the script before the executor is
+- a workspace with `yeetstrap.sh` runs the script before the executor is
   constructed,
-- a workspace without `.pi/init.sh` skips straight to the executor, and
+- a workspace without `yeetstrap.sh` skips straight to the executor, and
 - a failing init script causes the runtime to emit an `error` message and
   rethrow without constructing the executor.
 
