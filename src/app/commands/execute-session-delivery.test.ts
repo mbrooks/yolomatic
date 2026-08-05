@@ -10,7 +10,9 @@ import { ExecuteSessionReporter } from "./execute-session-reporter.js";
 function makeDeps(overrides?: {
 	commitAndPush?: () => Promise<boolean>;
 	createPullRequest?: (owner: string, repo: string, title: string, body: string) => Promise<{ number: number; html_url: string } | null>;
+	getPullRequest?: () => Promise<import("../../ports/github-service.js").PullRequestInfo | null>;
 	getGitDiff?: () => Promise<string>;
+	execute?: () => Promise<ExecutionResult>;
 }) {
 	const sessions: SessionRepository = {
 		get: vi.fn(async () => state),
@@ -46,12 +48,31 @@ function makeDeps(overrides?: {
 		getGitDiff: overrides?.getGitDiff ? vi.fn(overrides.getGitDiff) : vi.fn(async () => "diff --git a/src/main.ts"),
 	};
 
+	const executor = {
+		execute: overrides?.execute ? vi.fn(overrides.execute) : vi.fn(async (): Promise<ExecutionResult> => ({
+			status: "complete",
+			summary: "Rebased and resolved conflicts.",
+			rawResponse: "YEETOMATIC_STATUS: complete\nRebased and resolved conflicts.",
+		})),
+		executePRReview: vi.fn(),
+	} as unknown as import("../../ports/execution-service.js").ExecutionService;
+
 	const github: GitHubService = {
 		getIssue: vi.fn(),
 		listPullRequests: vi.fn(async () => []),
-		getPullRequest: vi.fn(),
+		getPullRequest: overrides?.getPullRequest
+			? vi.fn(overrides.getPullRequest)
+			: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: true,
+				mergeableState: "clean",
+				draft: true,
+			})),
 		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: overrides?.createPullRequest ? vi.fn(overrides.createPullRequest) : vi.fn(async () => null),
+		markPullRequestReadyForReview: vi.fn(async () => undefined),
 		createIssue: vi.fn(),
 		initializeEmptyRepo: vi.fn(async () => undefined),
 		postComment: vi.fn(async () => 1),
@@ -84,7 +105,7 @@ function makeDeps(overrides?: {
 		postFailureComment: vi.fn(),
 	} as unknown as ExecuteSessionReporter;
 
-	return { sessions, workspaces, github, reporter };
+	return { sessions, workspaces, github, reporter, executor };
 }
 
 const state: SessionState = {
@@ -113,6 +134,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -146,6 +168,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -159,6 +182,7 @@ describe("ExecuteSessionDelivery", () => {
 			expect.stringContaining("Fixes #1"),
 			"yeetomatic/issue-1",
 			"main",
+			true,
 		);
 		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, 42, "https://github.com/mbrooks/yeetomatic/pull/42");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
@@ -183,6 +207,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -208,6 +233,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -238,6 +264,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -259,6 +286,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -281,6 +309,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -300,6 +329,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -326,6 +356,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -349,6 +380,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -374,6 +406,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -401,6 +434,7 @@ describe("ExecuteSessionDelivery", () => {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: "main",
 			reporter: deps.reporter,
 		});
@@ -408,5 +442,282 @@ describe("ExecuteSessionDelivery", () => {
 		await delivery.deliverCompletion(state, result);
 
 		expect(deps.github.createPullRequest).toHaveBeenCalled();
+	});
+
+	it("marks a clean draft PR ready and posts 'Ready for review' without worker iteration", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: true,
+				mergeableState: "clean",
+				draft: true,
+			})),
+		});
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.github.markPullRequestReadyForReview).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-pr-created"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("polls a null mergeable response before deciding the PR is clean", async () => {
+		const calls: (boolean | null)[] = [null, null, true];
+		let i = 0;
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: calls[Math.min(i++, calls.length - 1)],
+				mergeableState: "clean",
+				draft: true,
+			})),
+		});
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+			mergeabilityPollMaxAttempts: 10,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.github.getPullRequest).toHaveBeenCalledTimes(3);
+		expect(deps.github.markPullRequestReadyForReview).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
+	});
+
+	it("launches a rework iteration, re-pushes, and re-checks when mergeable is false", async () => {
+		const calls: (boolean | null)[] = [false, true];
+		let i = 0;
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: calls[Math.min(i++, calls.length - 1)],
+				mergeableState: calls[Math.min(i - 1, calls.length - 1)] === false ? "dirty" : "clean",
+				draft: true,
+			})),
+			execute: vi.fn(async (): Promise<ExecutionResult> => ({
+				status: "complete",
+				summary: "Rebased onto main.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nRebased onto main.",
+			})),
+		});
+		(deps.workspaces.commitAndPushPath as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+			maxConflictAttempts: 2,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.executor.execute).toHaveBeenCalledWith(state, expect.stringContaining("git rebase origin/main"));
+		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalled();
+		expect(deps.github.markPullRequestReadyForReview).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
+	});
+
+	it("fails delivery and leaves the PR a draft after two conflicting attempts", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: false,
+				mergeableState: "dirty",
+				draft: true,
+			})),
+			execute: vi.fn(async (): Promise<ExecutionResult> => ({
+				status: "complete",
+				summary: "Tried to rebase.",
+				rawResponse: "YEETOMATIC_STATUS: complete\nTried to rebase.",
+			})),
+		});
+		(deps.workspaces.getGitStatus as ReturnType<typeof vi.fn>).mockResolvedValue("UU src/conflicted.ts");
+		(deps.workspaces.commitAndPushPath as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const realReporter = new ExecuteSessionReporter({
+			github: deps.github,
+			workspaces: deps.workspaces,
+			sessions: deps.sessions,
+			selfReportEnabled: false,
+		});
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: realReporter,
+			mergeabilityPollDelayMs: 0,
+			maxConflictAttempts: 2,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.executor.execute).toHaveBeenCalledTimes(2);
+		expect(deps.github.markPullRequestReadyForReview).not.toHaveBeenCalled();
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			42,
+			expect.stringContaining("maintainer must resolve"),
+		);
+		expect(deps.github.postComment).not.toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
+	});
+
+	it("fails delivery when mergeable stays null past the polling window", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: null,
+				mergeableState: "unknown",
+				draft: true,
+			})),
+		});
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+			mergeabilityPollMaxAttempts: 3,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.github.markPullRequestReadyForReview).not.toHaveBeenCalled();
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			42,
+			expect.stringContaining("could not compute mergeability"),
+		);
+		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			state,
+			expect.any(Error),
+		);
+		expect(deps.github.postComment).not.toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
+		expect(deps.executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("fails delivery when the worker rework attempt does not produce a pushable branch", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yeetomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-1", sha: "sha" },
+				state: "open",
+				merged: false,
+				mergeable: false,
+				mergeableState: "dirty",
+				draft: true,
+			})),
+			execute: vi.fn(async (): Promise<ExecutionResult> => ({
+				status: "failed",
+				summary: "Could not rebase.",
+				rawResponse: "YEETOMATIC_STATUS: failed\nCould not rebase.",
+			})),
+		});
+		(deps.workspaces.getGitStatus as ReturnType<typeof vi.fn>).mockResolvedValue("");
+		(deps.workspaces.commitAndPushPath as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+			maxConflictAttempts: 2,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.executor.execute).toHaveBeenCalledTimes(1);
+		expect(deps.workspaces.commitAndPushPath).not.toHaveBeenCalled();
+		expect(deps.github.markPullRequestReadyForReview).not.toHaveBeenCalled();
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			42,
+			expect.stringContaining("did not produce a pushable branch"),
+		);
+		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			state,
+			expect.any(Error),
+		);
+		expect(deps.github.postComment).not.toHaveBeenCalledWith(
+			"mbrooks",
+			"yeetomatic",
+			1,
+			expect.stringContaining("Ready for review."),
+		);
 	});
 });

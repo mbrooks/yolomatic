@@ -66,6 +66,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 						head: { ref: "yeetomatic/issue-56" },
 						state: "open",
 						merged: false,
+						mergeable: true,
+						mergeable_state: "clean",
+						draft: false,
 					},
 				})),
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/99", number: 99 } })),
@@ -519,6 +522,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				head: { ref: "yeetomatic/issue-57" },
 				state: "open",
 				merged: false,
+				mergeable: true,
+				mergeable_state: "clean",
+				draft: false,
 			},
 		});
 		sessionManager.getSession.mockResolvedValue({

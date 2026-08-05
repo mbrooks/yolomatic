@@ -305,7 +305,7 @@ The worker result controls both durable session state and GitHub presentation:
 | `waiting-feedback` | `waiting-feedback` | Add `yeetomatic-feedback-required`; post the clarification request. |
 | `cancelled` | `cancelled` | Add `yeetomatic-cancelled`; post cancellation. |
 | `failed` | `failed` | Add `yeetomatic-failed`; post failure details. |
-| `complete` with changes | `complete` | Commit and push, create or reuse a PR, add `yeetomatic-pr-created`, and post the PR link. |
+| `complete` with changes | `complete` | Commit and push, open a draft PR, gate on GitHub mergeability (rework conflicts up to twice), then flip ready, add `yeetomatic-pr-created`, and post the PR link. |
 | `complete` without changes | `complete` | Post the summary and state that no code changes were necessary. |
 
 Before normal issue transitions, Yeetomatic removes
@@ -322,15 +322,26 @@ For a completed issue execution, the control plane:
    commit message.
 3. Pushes `yeetomatic/issue-{number}` when the new commit or an already-local
    commit is ahead of the base.
-4. Creates a PR titled `Yeetomatic: {issue title}` against the effective
-   default branch.
+4. Creates a **draft** PR titled `Yeetomatic: {issue title}` against the
+   effective default branch.
 5. Builds a PR body containing `Fixes #{issue}`, the worker summary, bounded
    issue context, and a bounded diff when one is available.
 6. Persists the PR number and URL in the session.
+7. Runs a mergeability gate against `octokit.pulls.get`: polls `mergeable`
+   while GitHub reports `null`, and if the PR conflicts (`mergeable: false`
+   or `mergeable_state: "dirty"`) launches up to two worker iterations that
+   `git rebase origin/main`, resolve conflict markers, and re-push the branch
+   before re-checking. When the PR is clean it is flipped ready
+   (`draft: false`), `yeetomatic-pr-created` is applied, and "Ready for
+   review." is posted. If two attempts still conflict (or a worker attempt
+   fails), an error comment is posted to the PR timeline, the session is
+   failed via `yeetomatic-delivery-failed` + `yeetomatic-working`, the
+   worktree is preserved, and the PR stays a draft.
 
 If GitHub reports that a PR already exists, Yeetomatic finds the open PR with
-the same head and base and associates it with the session. `No commits
-between` is treated as a no-change completion.
+the same head and base and associates it with the session, then runs the same
+mergeability gate; a pre-existing clean non-draft PR skips the draft
+transition. `No commits between` is treated as a no-change completion.
 
 Delivery failures are distinct from worker failures. Yeetomatic preserves the
 worktree, captures Git status/diff diagnostics, marks the session failed, and
@@ -486,7 +497,11 @@ trust model.
 - `pull_request` events are observed for polling state but do not directly
   change a session.
 - Per-repository event-mode and default-branch overrides are restart-bound.
-- Yeetomatic does not resolve merge conflicts, merge PRs, or close issues.
+- Yeetomatic does not merge PRs or close issues. The PR-creation delivery path
+  now opens each PR as a draft and resolves merge conflicts against the base
+  branch by launching up to two worker-driven `git rebase origin/main`
+  iterations before flipping the PR ready for review; PR review iterations and
+  the pre-execution update-branch preflight still do not rework conflicts.
 
 ## Implementation Map
 

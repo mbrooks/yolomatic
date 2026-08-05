@@ -52,6 +52,7 @@ export class ExecuteSession {
 			sessions: deps.sessions,
 			workspaces: deps.workspaces,
 			github: deps.github,
+			executor: deps.executor,
 			defaultBranch: deps.defaultBranch,
 			resolveDefaultBranch: deps.resolveDefaultBranch,
 			reporter: this.reporter,
