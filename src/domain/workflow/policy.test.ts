@@ -448,12 +448,22 @@ describe("isStopCommand", () => {
 		expect(isStopCommand("/yeetomatic stop")).toBe(true);
 	});
 
+	it("strips leading and trailing whitespace before matching", () => {
+		expect(isStopCommand("   /yeetomatic stop   ")).toBe(true);
+		expect(isStopCommand("\n/yeetomatic stop\n")).toBe(true);
+	});
+
 	it("is case-insensitive", () => {
 		expect(isStopCommand("/Yeetomatic STOP")).toBe(true);
 	});
 
 	it("ignores extra text", () => {
 		expect(isStopCommand("/yeetomatic stop now")).toBe(false);
+	});
+
+	it("rejects embedded commands that do not start the trimmed body", () => {
+		expect(isStopCommand("please /yeetomatic stop")).toBe(false);
+		expect(isStopCommand("`/yeetomatic stop`")).toBe(false);
 	});
 });
 
@@ -542,8 +552,24 @@ describe("isFeedbackCommand", () => {
 		expect(isFeedbackCommand("/YEETOMATIC Feedback")).toBe(true);
 	});
 
-	it("matches as a substring anywhere in the body", () => {
-		expect(isFeedbackCommand("Please /yeetomatic feedback now")).toBe(true);
+	it("strips leading and trailing whitespace before matching", () => {
+		expect(isFeedbackCommand("   /yeetomatic feedback   ")).toBe(true);
+		expect(isFeedbackCommand("\n/yeetomatic feedback\n")).toBe(true);
+	});
+
+	it("accepts trailing text after the command as the feedback payload", () => {
+		expect(isFeedbackCommand("/yeetomatic feedback please retry")).toBe(true);
+		expect(isFeedbackCommand("/yeetomatic feedback\nplease retry now")).toBe(true);
+	});
+
+	it("rejects embedded commands that do not start the trimmed body", () => {
+		expect(isFeedbackCommand("Please /yeetomatic feedback now")).toBe(false);
+		expect(isFeedbackCommand("run /yeetomatic feedback")).toBe(false);
+	});
+
+	it("rejects backtick-wrapped command tokens", () => {
+		expect(isFeedbackCommand("`/yeetomatic feedback`")).toBe(false);
+		expect(isFeedbackCommand("` /yeetomatic feedback`")).toBe(false);
 	});
 
 	it("rejects bodies without the command", () => {
@@ -555,6 +581,12 @@ describe("isFeedbackCommand", () => {
 
 	it("does not match /yeetomaticfeedback without the separating space", () => {
 		expect(isFeedbackCommand("/yeetomaticfeedback")).toBe(false);
+		expect(isFeedbackCommand("/yeetomatic feedbacknow")).toBe(false);
+	});
+
+	it("rejects empty or whitespace-only bodies", () => {
+		expect(isFeedbackCommand("")).toBe(false);
+		expect(isFeedbackCommand("   ")).toBe(false);
 	});
 });
 
@@ -569,6 +601,14 @@ describe("commentTriggersFeedback", () => {
 
 	it("returns true for the /yeetomatic feedback command", () => {
 		expect(commentTriggersFeedback("/yeetomatic feedback", "yeetomatic-bot")).toBe(true);
+	});
+
+	it("returns true for the feedback command with trailing text", () => {
+		expect(commentTriggersFeedback("/yeetomatic feedback please retry", "yeetomatic-bot")).toBe(true);
+	});
+
+	it("returns false for an embedded feedback command", () => {
+		expect(commentTriggersFeedback("Please run /yeetomatic feedback", "yeetomatic-bot")).toBe(false);
 	});
 
 	it("returns false for a plain comment with no trigger", () => {
