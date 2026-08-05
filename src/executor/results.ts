@@ -35,6 +35,12 @@ export interface RefinementResult {
 	proposedTaskBody: string;
 	summary: string;
 	investigation: string;
+	/**
+	 * Optional replacement issue title. Omitted when the worker does not
+	 * propose a title change (or leaves it empty); a non-empty string signals
+	 * that the control plane should update the issue title alongside the body.
+	 */
+	proposedTitle?: string;
 }
 
 function parseRefinementJson(candidate: string): RefinementResult | null {
@@ -51,11 +57,17 @@ function parseRefinementJson(candidate: string): RefinementResult | null {
 			typeof parsed.summary === "string" &&
 			typeof parsed.investigation === "string"
 		) {
-			return {
+			const result: RefinementResult = {
 				proposedTaskBody: parsed.proposedTaskBody,
 				summary: parsed.summary,
 				investigation: parsed.investigation,
 			};
+			const proposedTitle =
+				typeof parsed.proposedTitle === "string" ? parsed.proposedTitle.trim() : "";
+			if (proposedTitle.length > 0) {
+				result.proposedTitle = proposedTitle;
+			}
+			return result;
 		}
 	} catch {
 		return null;

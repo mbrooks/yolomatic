@@ -80,6 +80,7 @@ function makeDeps(overrides?: {
 		updateIssueAssignees: vi.fn(async () => undefined),
 		closeIssue: vi.fn(async () => undefined),
 		updateIssueBody: vi.fn(async () => undefined),
+		updateIssueTitle: vi.fn(async () => undefined),
 		getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),

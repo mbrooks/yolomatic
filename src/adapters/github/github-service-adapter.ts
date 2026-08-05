@@ -111,10 +111,10 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		return data.map((pr) => ({ number: pr.number, html_url: pr.html_url }));
 	}
 
-	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; body?: string } | null> {
+	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; title?: string; body?: string } | null> {
 		try {
 			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });
-			return { state: data.state, body: data.body ?? undefined };
+			return { state: data.state, title: data.title ?? undefined, body: data.body ?? undefined };
 		} catch {
 			return null;
 		}
@@ -279,6 +279,10 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 
 	async updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
 		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, body });
+	}
+
+	async updateIssueTitle(owner: string, repo: string, issueNumber: number, title: string): Promise<void> {
+		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, title });
 	}
 
 	async getAuthenticatedUser(): Promise<{ login: string } | null> {

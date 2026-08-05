@@ -182,6 +182,22 @@ describe("buildIssueRefinementPrompt", () => {
 		expect(prompt).toContain("Do NOT commit");
 	});
 
+	it("lists proposedTitle as an optional field in the JSON contract", () => {
+		const state = {
+			issueNumber: 7,
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			workspacePath: "/tmp/ws",
+			title: "Refine me",
+			body: "Original body",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state);
+		expect(prompt).toContain('"proposedTitle"');
+		expect(prompt).toContain("omit or empty to keep the original");
+		expect(prompt).toContain("proposedTaskBody");
+		expect(prompt).toContain("investigation");
+	});
+
 	it("includes repository skill content when provided", () => {
 		const state = {
 			issueNumber: 8,

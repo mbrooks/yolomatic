@@ -148,6 +148,7 @@ export function buildIssueRefinementPrompt(state: SessionState, skillContent?: s
 		'- "proposedTaskBody": the complete Markdown body to replace the issue body',
 		'- "summary": a concise explanation of what you clarified',
 		'- "investigation": relevant files, commands, tests, and observations',
+		'- "proposedTitle": optional new issue title (omit or empty to keep the original). Keep it concise and descriptive; only propose a title when the original is unclear or misleading.',
 		"",
 		"The proposed task body should be self-contained and use sections such as Summary, Requirements, Acceptance criteria, and Out of scope when appropriate.",
 		"",
