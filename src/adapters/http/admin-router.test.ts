@@ -1,8 +1,13 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { unlinkSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import http from "node:http";
 import { handleAdminRoute } from "./admin-router.js";
 import { SettingsStore } from "../../settings/store.js";
+import { AdminSessionAuth } from "./admin-auth.js";
+import { UserStore } from "../../users/store.js";
 
 const TEST_DB = "/tmp/yeetomatic-admin-router-test.sqlite";
 
@@ -19,6 +24,13 @@ function hasValidCookie(req: http.IncomingMessage): boolean {
 }
 const sessionAuth = {
 	requireAdminJson: (req: http.IncomingMessage, res: http.ServerResponse) => {
+		if (hasValidCookie(req)) return true;
+		res.statusCode = 401;
+		res.setHeader("content-type", "application/json");
+		res.end('{"error":"Unauthorized"}');
+		return false;
+	},
+	requireAdminJsonAllowBasic: (req: http.IncomingMessage, res: http.ServerResponse) => {
 		if (hasValidCookie(req)) return true;
 		res.statusCode = 401;
 		res.setHeader("content-type", "application/json");
@@ -2069,5 +2081,101 @@ describe.sequential("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(400);
 		const body = JSON.parse(String(res.body));
 		expect(body.error).toBe("Invalid invitation ID");
+	});
+});
+
+describe.sequential("handleAdminRoute — Basic Auth route scoping", () => {
+	let userStore: UserStore;
+	let realDeps: Parameters<typeof handleAdminRoute>[2];
+
+	beforeEach(async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-admin-router-basic-"));
+		userStore = new UserStore(path.join(dir, "users.sqlite"));
+		userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
+		realDeps = {
+			sessionAuth: new AdminSessionAuth(userStore),
+			adminAssetsDir: "/tmp/admin-assets",
+			userStore,
+			getAdminStatus: {
+				execute: vi.fn(async () => ({
+					success: true as const,
+					data: {
+						agent: "online" as const,
+						uptime: "1m",
+						draining: false,
+						repos: [],
+						sessions: [],
+					},
+				})),
+			} as never,
+			getSession: {} as never,
+			getSessionLog: {
+				execute: vi.fn(async () => ({ success: true as const, data: { entries: [] } })),
+			} as never,
+			runSessionCommand: {
+				execute: vi.fn(async () => ({ success: true as const, data: { acknowledged: true } })),
+			} as never,
+			taskController: {
+				isDraining: vi.fn(() => false),
+				setDraining: vi.fn(),
+				cancel: vi.fn(),
+				isActive: vi.fn(() => false),
+				register: vi.fn(),
+				unregister: vi.fn(),
+			} as never,
+		} as never;
+	});
+
+	it("GET /api/users with valid Basic credentials but no cookie returns 401 (Basic not enabled)", async () => {
+		const req = mockRequest({
+			url: "/api/users",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, realDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(401);
+	});
+
+	it("GET /api/users with a valid session cookie still succeeds", async () => {
+		const loginReq = mockRequest({
+			url: "/api/users",
+			method: "GET",
+			headers: { socket: { encrypted: false } } as never,
+		});
+		const loginRes = mockResponse();
+		const auth = realDeps.sessionAuth as unknown as AdminSessionAuth;
+		auth.login(loginReq as never, loginRes as never, "admin", "secret");
+		const setCookie = String((loginRes.setHeader as unknown as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === "Set-Cookie")?.[1]);
+		const cookie = setCookie.split(";")[0];
+		const req = mockRequest({
+			url: "/api/users",
+			method: "GET",
+			headers: { cookie },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, realDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(Array.isArray(body.users)).toBe(true);
+	});
+
+	it("GET /api/status/working with valid Basic credentials returns 200 (Basic enabled)", async () => {
+		const req = mockRequest({
+			url: "/api/status/working",
+			method: "GET",
+			headers: { authorization: makeBasicAuth("admin", "secret") },
+		});
+		const res = mockResponse();
+
+		const handled = await handleAdminRoute(req, res, realDeps);
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(String(res.body));
+		expect(body.working).toBe(false);
 	});
 });
