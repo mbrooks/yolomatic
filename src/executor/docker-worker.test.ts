@@ -399,6 +399,54 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("forwards YEETOMATIC_WORKER_INIT_* env vars when present", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yeetomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		process.env.YEETOMATIC_WORKER_INIT_SCRIPT = "scripts/bootstrap.sh";
+		process.env.YEETOMATIC_WORKER_INIT_SKIP = "0";
+		process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS = "600";
+
+		try {
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("YEETOMATIC_WORKER_INIT_SCRIPT=scripts/bootstrap.sh");
+			expect(args).toContain("YEETOMATIC_WORKER_INIT_SKIP=0");
+			expect(args).toContain("YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS=600");
+		} finally {
+			delete process.env.YEETOMATIC_WORKER_INIT_SCRIPT;
+			delete process.env.YEETOMATIC_WORKER_INIT_SKIP;
+			delete process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS;
+		}
+	});
+
+	it("omits YEETOMATIC_WORKER_INIT_* env vars when absent", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yeetomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		delete process.env.YEETOMATIC_WORKER_INIT_SCRIPT;
+		delete process.env.YEETOMATIC_WORKER_INIT_SKIP;
+		delete process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS;
+
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args.some((arg: string) => arg.startsWith("YEETOMATIC_WORKER_INIT_"))).toBe(false);
+	});
+
 	it("propagates worker errors", async () => {
 		const harness = await createHarness(420);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
