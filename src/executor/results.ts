@@ -1,7 +1,34 @@
+export type ExecutionStatus = "working" | "waiting-feedback" | "complete";
+
 export interface ExecutionResult {
 	status: "working" | "waiting-feedback" | "complete" | "cancelled" | "failed";
 	summary: string;
 	rawResponse: string;
+}
+
+const STATUS_MARKER_PATTERN = /^YEETOMATIC_STATUS:\s*(working|waiting-feedback|complete)$/u;
+
+/**
+ * Strictly detect an explicit `YEETOMATIC_STATUS` marker in the response.
+ *
+ * Returns the recognized status when an exact marker is present, or `null`
+ * when the response has no marker or an unsupported marker (for example
+ * `YEETOMATIC_STATUS: done`). A missing or unsupported marker must not be
+ * silently interpreted as `working`; callers use a `null` result to drive the
+ * one-shot status-correction protocol.
+ */
+export function detectStatusMarker(rawResponse: string): ExecutionStatus | null {
+	const trimmed = rawResponse.trim();
+	if (!trimmed) return null;
+	const lines = trimmed.split(/\r?\n/u);
+	for (let i = lines.length - 1; i >= 0; i -= 1) {
+		const line = lines[i]?.trim() || "";
+		const match = STATUS_MARKER_PATTERN.exec(line);
+		if (match) {
+			return match[1] as ExecutionStatus;
+		}
+	}
+	return null;
 }
 
 export interface RefinementResult {
@@ -140,16 +167,15 @@ export function parseExecutionResult(rawResponse: string): ExecutionResult {
 	const trimmed = rawResponse.trim();
 	const lines = trimmed.split(/\r?\n/u);
 
+	const status = detectStatusMarker(trimmed);
 	let statusLineIndex = -1;
-	let status: ExecutionResult["status"] | undefined;
-
-	for (let i = lines.length - 1; i >= 0; i -= 1) {
-		const line = lines[i]?.trim() || "";
-		const match = /^YEETOMATIC_STATUS:\s*(working|waiting-feedback|complete)$/u.exec(line);
-		if (match) {
-			statusLineIndex = i;
-			status = match[1] as ExecutionResult["status"];
-			break;
+	if (status) {
+		for (let i = lines.length - 1; i >= 0; i -= 1) {
+			const line = lines[i]?.trim() || "";
+			if (STATUS_MARKER_PATTERN.exec(line)) {
+				statusLineIndex = i;
+				break;
+			}
 		}
 	}
 
