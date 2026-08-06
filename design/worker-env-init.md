@@ -346,11 +346,16 @@ dependency materialization, not a hook to install system packages.
   shorter than `maxRuntimeSeconds`. Init time counts against the session's
   overall runtime budget because it runs inside the same worker process, but
   the init-specific timeout fires first for a stuck script.
-- **Refinement workers**: refinement launches use the same worker runtime
-  and therefore the same init step. A repository's `yeetstrap.sh` runs before
-  the refinement agent just as it runs before the implementation agent. This
-  is intentional: refinement needs a buildable environment to test claims.
-- **PR review workers**: same as refinement. The init script runs.
+- **Refinement workers**: refinement launches skip the init step entirely.
+  The refinement worker runs in a temporary worktree that is discarded after
+  the refinement attempt, so spending model-budget time on a repository init
+  script there is wasteful and can fail the refinement attempt for reasons
+  unrelated to the refinement task. The skip is a hard skip keyed on the
+  refinement prompt kind (`launch_config.payload.prompt.kind ===
+  "issue-refinement"`) in the worker runtime, independent of
+  `YEETOMATIC_WORKER_INIT_SKIP`. A repository's `yeetstrap.sh` therefore runs
+  before the implementation agent but not before the refinement agent.
+- **PR review workers**: same as the implementation worker. The init script runs.
 
 ## Security Considerations
 
@@ -491,9 +496,12 @@ threshold for statements, branches, functions, and lines, per the project's
   show init progress separately from agent progress.
 - Should the worker skip the init script on refinement-only launches where
   the refinement worktree is a fresh temporary checkout that will be
-  discarded? Current proposal: no, run it anyway; refinement needs a
-  buildable environment to test claims, and the cost is paid once per
-  refinement attempt.
+  discarded? Current proposal: yes, skip it. Refinement runs in a temporary
+  worktree that is discarded afterward, so the init script's environment
+  preparation is wasted there and can fail the refinement attempt for
+  reasons unrelated to the refinement task. The skip is a hard skip keyed on
+  the refinement prompt kind in the worker runtime, independent of
+  `YEETOMATIC_WORKER_INIT_SKIP`.
 - Should `YEETOMATIC_WORKER_INIT_SCRIPT` support a `disabled` sentinel
   value in addition to `YEETOMATIC_WORKER_INIT_SKIP`? Current proposal: no,
   two mechanisms for the same thing is confusing; `SKIP` is the single
