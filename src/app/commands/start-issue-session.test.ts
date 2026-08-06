@@ -79,6 +79,12 @@ function makeCommand(
 		tasks: TaskControlService;
 		github: GitHubService;
 		executor: ExecutionService;
+		adminLink: {
+			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+		};
 	}>,
 ) {
 	const repo = makeMockRepo(state);
@@ -151,6 +157,7 @@ function makeCommand(
 		"main",
 		"yeetomatic-bot",
 		true,
+		overrides?.adminLink ?? {},
 	);
 	return { command, repo, workspaces, github, tasks, executor };
 }
@@ -278,5 +285,77 @@ describe("StartIssueSession", () => {
 
 		expect(result.success).toBe(true);
 		expect(executor.execute).toHaveBeenCalled();
+	});
+
+	it("appends an admin session link to the pickup comment when enabled", async () => {
+		const { command, github } = makeCommand(null, {
+			adminLink: {
+				adminBaseUrl: "http://host:6767/yeetomatic/admin",
+				issueAdminLinkInCommentsEnabled: true,
+			},
+		});
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+
+		expect(result.success).toBe(true);
+		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/implementation";
+		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall).toBeDefined();
+		expect(pickupCall[3]).toContain(`Track status: ${expectedUrl}`);
+		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yeetomatic/issues/1");
+	});
+
+	it("omits the admin session link from the pickup comment when admin_base_url is empty", async () => {
+		const { command, github } = makeCommand(null, {
+			adminLink: {
+				adminBaseUrl: "",
+				issueAdminLinkInCommentsEnabled: true,
+			},
+		});
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+
+		expect(result.success).toBe(true);
+		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall).toBeDefined();
+		expect(pickupCall[3]).toBe("Picked up by Yeetomatic. Working on it...");
+		expect(pickupCall[3]).not.toContain("Track status:");
+	});
+
+	it("omits the admin session link from the pickup comment when the toggle is disabled", async () => {
+		const { command, github } = makeCommand(null, {
+			adminLink: {
+				adminBaseUrl: "http://host:6767/yeetomatic/admin",
+				issueAdminLinkInCommentsEnabled: false,
+			},
+		});
+		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+
+		expect(result.success).toBe(true);
+		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall).toBeDefined();
+		expect(pickupCall[3]).not.toContain("Track status:");
+	});
+
+	it("reads admin link settings live from the resolver at pickup time", async () => {
+		let baseUrl = "http://host:6767/old/admin";
+		let enabled = true;
+		const { command, github } = makeCommand(null, {
+			adminLink: {
+				resolveAdminBaseUrl: () => baseUrl,
+				resolveIssueAdminLinkInCommentsEnabled: () => enabled,
+			},
+		});
+		await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		let pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall[3]).toContain(
+			"Track status: http://host:6767/old/admin#/repos/mbrooks/yeetomatic/1/implementation",
+		);
 	});
 });

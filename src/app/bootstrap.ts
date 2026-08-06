@@ -190,6 +190,10 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		resolveDefaultBranch,
 		githubUsername: config.githubUsername,
 		selfReportEnabled: config.selfReportEnabled,
+		issueAdminLinkInCommentsEnabled: config.issueAdminLinkInCommentsEnabled,
+		adminBaseUrl: config.adminBaseUrl,
+		resolveAdminBaseUrl,
+		resolveIssueAdminLinkInCommentsEnabled,
 	});
 
 	const repoModes = managedRepositories.map((repo) =>

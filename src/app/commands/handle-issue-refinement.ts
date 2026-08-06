@@ -9,7 +9,7 @@ import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
-import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
+import { appendAdminLink, resolveAdminIssueUrl, resolveAdminSessionUrl } from "./comment-links.js";
 import { isAdmin, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -289,7 +289,7 @@ export class HandleIssueRefinement {
 			sessionStarted = true;
 
 			process.stdout.write(`[refinement] starting for ${owner}/${repo}#${issueNumber}\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT));
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminSessionLink(owner, repo, issueNumber, ISSUE_REFINEMENT_STARTING_COMMENT));
 			this.log(owner, repo, issueNumber, "info", "Refinement started");
 
 			const issue = await this.deps.github.getIssue(owner, repo, issueNumber);
@@ -464,6 +464,17 @@ export class HandleIssueRefinement {
 		const issueAdminLinkInCommentsEnabled =
 			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
 		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private adminSessionUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminSessionUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber, "refinement");
+	}
+
+	private withAdminSessionLink(owner: string, repo: string, issueNumber: number, body: string): string {
+		return appendAdminLink(body, this.adminSessionUrl(owner, repo, issueNumber));
 	}
 
 	private withAdminLink(owner: string, repo: string, issueNumber: number, body: string): string {
