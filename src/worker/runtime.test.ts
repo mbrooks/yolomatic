@@ -826,4 +826,72 @@ describe("runWorkerRuntime", () => {
 		expect(logEntries.some((event) => event.entry.details?.type === "response")).toBe(true);
 		expect(logEntries.some((event) => event.entry.details?.type === "tool_execution_start")).toBe(true);
 	});
+
+	it("skips the init step on issue-refinement launches even when yeetstrap.sh is present", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-refinement-skip-"));
+		const markerPath = path.join(workspacePath, "init-marker.txt");
+		await writeFile(
+			path.join(workspacePath, "yeetstrap.sh"),
+			`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
+		);
+		const sessionKey = "github-mbrooks-yeetomatic-issue-201-refinement";
+		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
+
+		executeRefinement.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
+			onSessionCreated?.(mockSession);
+			return {
+				proposedTaskBody: "body",
+				summary: "done",
+				investigation: "investigation",
+			};
+		});
+
+		wsTestHarness.setConnectionHandler(({ server }) => {
+			server.on("message", async (raw: Buffer) => {
+				const message = decodeWorkerWebSocketMessage(raw);
+				seenMessages.push(message);
+				if (message.type !== "hello") return;
+				await sendWorkerWebSocketMessage(
+					server as never,
+					createWorkerMessage("launch_config", sessionKey, "launch-refinement-skip", {
+						session: {
+							owner: "mbrooks",
+							repo: "yeetomatic",
+							issueNumber: 201,
+							workspacePath,
+							title: "Refine without init",
+							body: "Body",
+							kind: "refinement",
+						},
+						prompt: { kind: "issue-refinement", text: "custom prompt" },
+					}),
+				);
+			});
+		});
+
+		try {
+			await runWorkerRuntime({
+				wsUrl: "ws://worker.test/session-201",
+				sessionKey,
+				soulPath: "/tmp/SOUL.md",
+			});
+
+			expect(executeRefinement).toHaveBeenCalled();
+			// The init script must not have run: no marker file is written.
+			await expect(readFile(markerPath, "utf8")).rejects.toThrow();
+			// No env_init session_log events should be forwarded to the control plane.
+			const eventBatches = seenMessages.filter((message) => message.type === "event_batch");
+			const forwardedEntries = eventBatches.flatMap(
+				(message) => (message as WorkerProtocolMessage<"event_batch">).payload.events,
+			);
+			const envInitEvents = forwardedEntries.filter(
+				(event) =>
+					event.type === "session_log" &&
+					event.entry.details?.type === "env_init",
+			);
+			expect(envInitEvents).toHaveLength(0);
+		} finally {
+			await rm(workspacePath, { recursive: true, force: true });
+		}
+	});
 });

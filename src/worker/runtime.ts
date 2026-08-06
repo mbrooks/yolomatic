@@ -104,13 +104,21 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 			);
 		});
 
-		await runEnvironmentInit({
-			workspacePath: state.workspacePath,
-			log: (entry) => {
-				recordSessionLog(sessionLogKey, entry);
-			},
-			signal: abortController.signal,
-		});
+		// Refinement launches use a temporary worktree that is discarded after the
+		// refinement attempt, so spending model-budget time on a repository init
+		// script there is wasteful and can fail the attempt for reasons unrelated
+		// to refinement. The skip is a hard skip keyed on the refinement prompt
+		// kind, independent of YEETOMATIC_WORKER_INIT_SKIP; every other launch
+		// kind runs the init step exactly as before.
+		if (launchConfig.payload.prompt.kind !== "issue-refinement") {
+			await runEnvironmentInit({
+				workspacePath: state.workspacePath,
+				log: (entry) => {
+					recordSessionLog(sessionLogKey, entry);
+				},
+				signal: abortController.signal,
+			});
+		}
 
 		tempDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-"));
 
