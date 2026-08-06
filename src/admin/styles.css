@@ -1201,6 +1201,41 @@ a:hover {
 	flex-shrink: 0;
 }
 
+/* Settings: responsive layout for mobile and narrow browser widths.
+   Reuses the existing max-width: 768px / 480px breakpoints used elsewhere
+   in the admin shell. Keeps the eleven Settings tab buttons wrapping
+   instead of overflowing horizontally, and keeps setting-row inputs and
+   selects inside the available width. */
+@media (max-width: 768px) {
+	.repo-tabs {
+		flex-wrap: wrap;
+	}
+
+	.setting-row input,
+	.setting-row select {
+		max-width: 100%;
+		width: 100%;
+	}
+}
+
+@media (max-width: 480px) {
+	.repo-tabs {
+		gap: 0.4rem;
+	}
+
+	.repo-tab {
+		padding: 0.3rem 0.5rem;
+	}
+
+	.settings-list {
+		padding: 0.75rem;
+	}
+
+	.setting-row {
+		padding: 0.6rem 0;
+	}
+}
+
 .error-banner {
 	background: rgba(248, 81, 73, 0.15);
 	border: 1px solid var(--red);
