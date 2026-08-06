@@ -332,7 +332,8 @@ For a completed issue execution, the control plane:
    or `mergeable_state: "dirty"`) launches up to two worker iterations that
    `git rebase origin/main`, resolve conflict markers, and re-push the branch
    before re-checking. When the PR is clean it is flipped ready
-   (`draft: false`), `yeetomatic-pr-created` is applied, and "Ready for
+   (via the "Mark a pull request as ready for review" endpoint),
+   `yeetomatic-pr-created` is applied, and "Ready for
    review." is posted. If two attempts still conflict (or a worker attempt
    fails), an error comment is posted to the PR timeline, the session is
    failed via `yeetomatic-delivery-failed` + `yeetomatic-working`, the
