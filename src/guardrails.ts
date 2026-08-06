@@ -6,7 +6,56 @@ import { resolve } from "node:path";
 export const MINIMUM_COVERAGE = 80;
 export const COVERAGE_SUMMARY_FILE = resolve(process.cwd(), "coverage/coverage-summary.json");
 
-const SOURCE_FILE_PATTERN = /^src\/.*\.ts$/;
+const SOURCE_PATH_PATTERN = /^src\//u;
+const SOURCE_FILE_PATTERN = /\.tsx?$/u;
+const TEST_FILE_PATTERN = /\.test\.ts$/u;
+
+/**
+ * Coverage-relevance exclusions per `AGENTS.md`.
+ *
+ * The guardrail enforces 80% statements/branches/functions/lines only on
+ * business logic, utilities, and state transitions. The categories below are
+ * excluded from both coverage measurement and enforcement. Each rule is a
+ * deterministic path pattern so the excluded set stays reviewable.
+ */
+
+// Type-export modules: files that only export types/interfaces. Matches any
+// file named `types.ts` anywhere under `src/`.
+const TYPE_EXPORT_PATTERN = /(^|\/)types\.ts$/u;
+
+// Styling files: admin UI components (`.tsx`) and CSS/style modules. `.tsx`
+// is also outside the `.ts` coverage include; the explicit check keeps the
+// exclusion intentional rather than incidental to the extension.
+const STYLING_PATTERN = /(^|\/)((styles|style|.*\.styles|.*\.style)\.ts|.*\.tsx)$/u;
+
+// Configuration files: modules that wire settings into runtime config.
+// Matches `config.ts` and any `*.config.ts` under `src/`.
+const CONFIG_PATTERN = /(^|\/)(config|.*\.config)\.ts$/u;
+
+// Third-party setup / wiring: modules that only instantiate/configure an
+// external SDK. Add new SDK-wiring module basenames here so the exclusion
+// set stays deterministic and reviewable.
+const THIRD_PARTY_SETUP_PATTERN = /(^|\/)octokit\.ts$/u;
+
+export function isTestFile(file: string): boolean {
+	return TEST_FILE_PATTERN.test(file);
+}
+
+export function isTypeExportFile(file: string): boolean {
+	return TYPE_EXPORT_PATTERN.test(file);
+}
+
+export function isStylingFile(file: string): boolean {
+	return STYLING_PATTERN.test(file);
+}
+
+export function isConfigurationFile(file: string): boolean {
+	return CONFIG_PATTERN.test(file);
+}
+
+export function isThirdPartySetupFile(file: string): boolean {
+	return THIRD_PARTY_SETUP_PATTERN.test(file);
+}
 
 export interface CoverageEntry {
 	statements: { pct: number };
@@ -32,11 +81,14 @@ export function parseChangedFiles(value: string): string[] {
 }
 
 export function isGuardrailSourceFile(file: string): boolean {
-	return (
-		SOURCE_FILE_PATTERN.test(file) &&
-		!file.endsWith(".test.ts") &&
-		!file.endsWith("/types.ts")
-	);
+	if (!SOURCE_PATH_PATTERN.test(file)) return false;
+	if (!SOURCE_FILE_PATTERN.test(file)) return false;
+	if (isTestFile(file)) return false;
+	if (isTypeExportFile(file)) return false;
+	if (isStylingFile(file)) return false;
+	if (isConfigurationFile(file)) return false;
+	if (isThirdPartySetupFile(file)) return false;
+	return true;
 }
 
 export function getChangedSourceFiles(files: string[]): string[] {

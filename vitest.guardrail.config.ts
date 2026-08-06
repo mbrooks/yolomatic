@@ -14,7 +14,16 @@ export default defineConfig({
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],
 			include: ["src/**/*.ts"],
-			exclude: ["src/**/*.test.ts"],
+			exclude: [
+				"src/**/*.test.ts",
+				"src/**/types.ts",
+				"src/config.ts",
+				"src/**/config.ts",
+				"src/**/*.config.ts",
+				"src/adapters/github/octokit.ts",
+				"src/**/*.styles.ts",
+				"src/**/*.style.ts",
+			],
 			thresholds: {
 				lines: 0,
 				functions: 0,
