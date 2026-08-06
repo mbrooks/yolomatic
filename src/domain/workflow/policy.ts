@@ -86,25 +86,51 @@ export function shouldIgnoreIssueEvent(
 
 /**
  * The `/yeetomatic feedback` comment command, used as an explicit trigger for
- * the feedback flow. Detected as a case-insensitive substring of the comment
- * body, mirroring the `@yeetomatic` mention detection.
+ * the feedback flow.
  */
 export const FEEDBACK_COMMAND = "/yeetomatic feedback";
 
 /**
- * Whether a comment body contains the `/yeetomatic feedback` command marker.
- * Case-insensitive substring match, symmetric with the `@yeetomatic` mention
- * check. This is a trigger marker, not a dispatch command routed to a handler.
+ * Tests whether a comment body begins with the given `/yeetomatic` command
+ * token. The command must start the trimmed comment (case-insensitive), and
+ * the character immediately after the command token must be either absent
+ * (the command is the entire trimmed body) or whitespace. This rejects
+ * embedded or quoted commands (e.g. `Please run /yeetomatic feedback` or
+ * `` `/yeetomatic feedback` ``) so commands do not trigger when contained in
+ * surrounding text. Leading and trailing whitespace around the comment is
+ * stripped before matching.
+ */
+function commentStartsWithCommand(body: string, command: string): boolean {
+	const trimmed = body.trim();
+	if (trimmed.length === 0) {
+		return false;
+	}
+	const lower = trimmed.toLowerCase();
+	if (!lower.startsWith(command)) {
+		return false;
+	}
+	if (trimmed.length === command.length) {
+		return true;
+	}
+	return /\s/.test(trimmed[command.length]!);
+}
+
+/**
+ * Whether a comment body is the `/yeetomatic feedback` command. The command
+ * must start the trimmed comment (case-insensitive) and must not be embedded
+ * or quoted within surrounding text. Trailing text after the command is
+ * allowed and is treated as the feedback payload. This is a trigger marker,
+ * not a dispatch command routed to a handler.
  */
 export function isFeedbackCommand(body: string): boolean {
-	return body.toLowerCase().includes(FEEDBACK_COMMAND);
+	return commentStartsWithCommand(body, FEEDBACK_COMMAND);
 }
 
 /**
  * Whether a comment body explicitly triggers feedback by mentioning the
  * configured Yeetomatic account (`@{githubUsername}` or `@yeetomatic`) or by
- * containing the `/yeetomatic feedback` command. The Yeetomatic-visible label
- * is intentionally not part of this check.
+ * starting the trimmed comment with the `/yeetomatic feedback` command. The
+ * Yeetomatic-visible label is intentionally not part of this check.
  */
 export function commentTriggersFeedback(body: string, githubUsername: string): boolean {
 	const isMentioned =
@@ -169,34 +195,24 @@ const ISSUE_REFINEMENT_COMMAND = "/yeetomatic issue-refinement";
 /**
  * Parse an issue-refinement command from a comment body.
  *
- * The command must appear at the start of the trimmed comment (case-insensitive).
+ * Matching reuses the shared {@link commentStartsWithCommand} helper so the
+ * start-of-body rule is identical to the other `/yeetomatic` commands: the
+ * command must start the trimmed comment (case-insensitive), and the character
+ * after the command token must be either absent or whitespace. This rejects
+ * embedded or quoted commands (e.g. `` `/yeetomatic issue-refinement` `` or
+ * `Please run /yeetomatic issue-refinement`) and Markdown-wrapped tokens.
+ *
  * When the command is the entire trimmed body, `steeringPrompt` is the empty
  * string. When the command is followed by whitespace then additional text, the
- * text after the separating whitespace (trimmed) is returned as the
- * `steeringPrompt`. Embedded or quoted commands (e.g. `` `/yeetomatic
- * issue-refinement` `` or `Please run /yeetomatic issue-refinement`) and
- * Markdown-wrapped command tokens are rejected because the command token does
- * not start the trimmed body.
+ * text after the command token (trimmed) is returned as the `steeringPrompt`.
  */
 export function parseIssueRefinementCommand(
 	body: string,
 ): { matched: true; steeringPrompt: string } | { matched: false } {
-	const trimmed = body.trim();
-	if (trimmed.length === 0) {
+	if (!commentStartsWithCommand(body, ISSUE_REFINEMENT_COMMAND)) {
 		return { matched: false };
 	}
-	const lower = trimmed.toLowerCase();
-	if (!lower.startsWith(ISSUE_REFINEMENT_COMMAND)) {
-		return { matched: false };
-	}
-	if (trimmed.length === ISSUE_REFINEMENT_COMMAND.length) {
-		return { matched: true, steeringPrompt: "" };
-	}
-	const nextChar = trimmed[ISSUE_REFINEMENT_COMMAND.length]!;
-	if (!/\s/.test(nextChar)) {
-		return { matched: false };
-	}
-	const steeringPrompt = trimmed.slice(ISSUE_REFINEMENT_COMMAND.length).trim();
+	const steeringPrompt = body.trim().slice(ISSUE_REFINEMENT_COMMAND.length).trim();
 	return { matched: true, steeringPrompt };
 }
 
@@ -204,8 +220,16 @@ export function isIssueRefinementCommand(commentBody: string): boolean {
 	return parseIssueRefinementCommand(commentBody).matched;
 }
 
+const STOP_COMMAND = "/yeetomatic stop";
+
+/**
+ * Whether a comment body is the `/yeetomatic stop` command. The command must
+ * start the trimmed comment (case-insensitive) and must not be embedded or
+ * quoted within surrounding text. No trailing text is accepted: stop takes no
+ * arguments.
+ */
 export function isStopCommand(commentBody: string): boolean {
-	return commentBody.trim().toLowerCase() === "/yeetomatic stop";
+	return commentBody.trim().toLowerCase() === STOP_COMMAND;
 }
 
 export function canPause(status: SessionStatus): { ok: true } | { ok: false; reason: string } {
