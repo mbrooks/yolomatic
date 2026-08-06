@@ -334,6 +334,19 @@ export class PiAgentExecutor implements ExecutionService {
 			};
 		}
 
+		// Honor an abort that fired during (or just before) the run before issuing
+		// the status-correction prompt. The correction prompt runs another full
+		// agent turn; issuing it after a Stop would re-engage the worker and
+		// undercut the cancel. Return a cancelled result so the reporter leaves
+		// the session in `cancelled`.
+		if (abortSignal?.aborted) {
+			return {
+				status: "cancelled",
+				summary: "Task cancelled by admin.",
+				rawResponse: rawResponse,
+			};
+		}
+
 		if (!options?.refinement && result.status !== "failed" && detectStatusMarker(rawResponse) === null) {
 			result = await this.correctStatusProtocol(session, key, rawResponse, logger, abortSignal);
 		}
