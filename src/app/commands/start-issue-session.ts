@@ -6,6 +6,7 @@ import type { ExecutionService } from "../../ports/execution-service.js";
 import type { Clock } from "../../ports/clock.js";
 import { ExecuteSession } from "./execute-session.js";
 import { ensureSessionExists, issueSessionKey, startIssueExecution } from "./workflow-helpers.js";
+import { resolveAdminSessionUrl } from "./comment-links.js";
 import { fail, ok, type AppResult } from "../result.js";
 
 export interface StartIssueSessionResult {
@@ -25,6 +26,10 @@ export interface StartIssueSessionDeps {
 	resolveDefaultBranch?: (owner: string, repo: string) => string;
 	githubUsername: string;
 	selfReportEnabled: boolean;
+	issueAdminLinkInCommentsEnabled?: boolean;
+	adminBaseUrl?: string;
+	resolveAdminBaseUrl?: () => string | undefined;
+	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 }
 
 export class StartIssueSession {
@@ -38,6 +43,12 @@ export class StartIssueSession {
 		private readonly defaultBranchOrResolver: string | ((owner: string, repo: string) => string),
 		private readonly githubUsername: string,
 		private readonly selfReportEnabled: boolean,
+		private readonly adminLink: {
+			adminBaseUrl?: string;
+			resolveAdminBaseUrl?: () => string | undefined;
+			issueAdminLinkInCommentsEnabled?: boolean;
+			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+		} = {},
 	) {}
 
 	async execute(
@@ -113,6 +124,8 @@ export class StartIssueSession {
 				issueNumber,
 				session,
 				"Picked up by Yeetomatic. Working on it...",
+				undefined,
+				this.adminSessionUrl(owner, repo, issueNumber),
 			);
 
 			return ok<StartIssueSessionResult>({
@@ -124,6 +137,20 @@ export class StartIssueSession {
 			const message = error instanceof Error ? error.message : String(error);
 			return fail("internal", message);
 		}
+	}
+
+	private adminSessionUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		const adminBaseUrl = this.adminLink.resolveAdminBaseUrl?.() ?? this.adminLink.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.adminLink.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.adminLink.issueAdminLinkInCommentsEnabled;
+		return resolveAdminSessionUrl(
+			adminBaseUrl,
+			issueAdminLinkInCommentsEnabled,
+			owner,
+			repo,
+			issueNumber,
+			"implementation",
+		);
 	}
 }
 
@@ -138,5 +165,11 @@ export function createStartIssueSession(deps: StartIssueSessionDeps): StartIssue
 		deps.resolveDefaultBranch ?? deps.defaultBranch,
 		deps.githubUsername,
 		deps.selfReportEnabled,
+		{
+			adminBaseUrl: deps.adminBaseUrl,
+			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
+			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
+		},
 	);
 }

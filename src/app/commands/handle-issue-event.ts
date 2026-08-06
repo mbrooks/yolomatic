@@ -15,7 +15,7 @@ import {
 	prepareIssueSession,
 } from "./workflow-helpers.js";
 import type { HandleIssueRefinement } from "./handle-issue-refinement.js";
-import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
+import { appendAdminLink, resolveAdminIssueUrl, resolveAdminSessionUrl } from "./comment-links.js";
 
 export interface IssueEventPayload {
 	source?: GitHubEventSource;
@@ -74,6 +74,13 @@ export class HandleIssueEvent {
 		const issueAdminLinkInCommentsEnabled =
 			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
 		return resolveAdminIssueUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber);
+	}
+
+	private adminSessionUrl(owner: string, repo: string, issueNumber: number): string | undefined {
+		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
+		const issueAdminLinkInCommentsEnabled =
+			this.deps.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.deps.issueAdminLinkInCommentsEnabled;
+		return resolveAdminSessionUrl(adminBaseUrl, issueAdminLinkInCommentsEnabled, owner, repo, issueNumber, "implementation");
 	}
 
 	private withLink(owner: string, repo: string, issueNumber: number, body: string): string {
@@ -201,7 +208,8 @@ export class HandleIssueEvent {
 				issue.number,
 				prepared.session,
 				"Picked up by Yeetomatic. Working on it...",
-				this.adminIssueUrl(owner, repo, issue.number),
+				undefined,
+				this.adminSessionUrl(owner, repo, issue.number),
 			);
 		} finally {
 			this.inFlight.delete(key);
