@@ -78,6 +78,74 @@ describe("GetRefinementLog", () => {
 		}
 	});
 
+	it("returns worker-detail entries in addition to orchestration entries for a refinement run", async () => {
+		store.createAttempt({
+			owner: "mbrooks",
+			repo: "yeetomatic",
+			issueNumber: 3,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "applied",
+		});
+		const key = sessionStorageKey("mbrooks", "yeetomatic", 3, "refinement");
+		// Orchestration entries recorded by handle-issue-refinement.ts.
+		recordSessionLog(key, { level: "info", message: "Refinement started" });
+		recordSessionLog(key, { level: "info", message: "Created refinement attempt" });
+		// Worker-detail entries recorded by PiAgentExecutor.run under the same key.
+		recordSessionLog(key, {
+			level: "info",
+			message: "Prompt sent",
+			details: { type: "prompt", length: 42 },
+		});
+		recordSessionLog(key, {
+			level: "info",
+			message: "Using model: ollama/qwen",
+			details: { type: "model", provider: "ollama", modelId: "qwen", configured: null },
+		});
+		recordSessionLog(key, {
+			level: "assistant",
+			message: "investigating the issue",
+			details: { type: "thinking" },
+		});
+		recordSessionLog(key, {
+			level: "tool",
+			message: "read /some/file",
+			details: { type: "tool_execution_start", toolName: "read", args: {} },
+		});
+		recordSessionLog(key, {
+			level: "info",
+			message: "read done",
+			details: { type: "tool_execution_end", toolName: "read", result: "ok", isError: false },
+		});
+		recordSessionLog(key, {
+			level: "assistant",
+			message: "YEETOMATIC_STATUS: working\nrefined body",
+			details: { type: "response", status: "working" },
+		});
+
+		const result = await query.execute("mbrooks", "yeetomatic", 3);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.available).toBe(true);
+			const detailTypes = result.data.logs
+				.map((entry) => entry.details?.type)
+				.filter((type): type is string => typeof type === "string");
+			// Worker-detail entries are present alongside the orchestration messages.
+			expect(detailTypes).toContain("prompt");
+			expect(detailTypes).toContain("model");
+			expect(detailTypes).toContain("thinking");
+			expect(detailTypes).toContain("tool_execution_start");
+			expect(detailTypes).toContain("tool_execution_end");
+			expect(detailTypes).toContain("response");
+			// Orchestration entries (no details.type) are still present.
+			expect(result.data.logs.some((entry) => entry.message === "Refinement started")).toBe(true);
+			expect(result.data.logs.some((entry) => entry.message === "Created refinement attempt")).toBe(true);
+		}
+	});
+
 	it("filters logs by since timestamp", async () => {
 		store.createAttempt({
 			owner: "mbrooks",

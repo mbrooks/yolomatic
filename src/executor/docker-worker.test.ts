@@ -924,6 +924,137 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("records forwarded session_log events under the refinement session key for a refinement run", async () => {
+		const harness = await createHarness(455);
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "remote" && args[1] === "get-url") {
+				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				return;
+			}
+			callback(null, currentWorkerTransport, "");
+		});
+
+		const refinementKey = "github-mbrooks-yeetomatic-issue-455-refinement";
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					expect((message as WorkerProtocolMessage<"launch_config">).payload.session.kind).toBe("refinement");
+					await connection.send(
+						createWorkerMessage("ack", refinementKey, "ack-log", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("event_batch", refinementKey, "events-refine", {
+							events: [
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "info",
+										message: "Prompt sent",
+										details: { type: "prompt", length: 42 },
+									},
+								},
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "assistant",
+										message: "thinking…",
+										details: { type: "thinking" },
+									},
+								},
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "tool",
+										message: "read tool call",
+										details: { type: "tool_execution_start", toolName: "read", args: {} },
+									},
+								},
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "info",
+										message: "read done",
+										details: { type: "tool_execution_end", toolName: "read", result: "ok", isError: false },
+									},
+								},
+								{
+									type: "session_log",
+									entry: {
+										timestamp: new Date().toISOString(),
+										level: "assistant",
+										message: "response",
+										details: { type: "response", status: "complete" },
+									},
+								},
+							],
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", refinementKey, "complete-log", {
+							result: {
+								proposedTaskBody: "## Summary\nRefined.",
+								summary: "Better description.",
+								investigation: "Read the code.",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			const result = await harness.executor.executeRefinement(makeSessionState(455, harness.workspacePath), undefined);
+			expect(result.proposedTaskBody).toBe("## Summary\nRefined.");
+
+			// The orchestration launch entry is recorded under the refinement key.
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ message: expect.stringContaining("Launching worker container") }),
+			);
+			// Forwarded worker-detail session_log entries are re-recorded under the
+			// refinement key (not the implementation key) so they appear in the
+			// refinement admin log with the same richness as a task log.
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ message: "Prompt sent", details: expect.objectContaining({ type: "prompt" }) }),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ details: expect.objectContaining({ type: "thinking" }) }),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ details: expect.objectContaining({ type: "tool_execution_start" }) }),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ details: expect.objectContaining({ type: "tool_execution_end" }) }),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				refinementKey,
+				expect.objectContaining({ details: expect.objectContaining({ type: "response" }) }),
+			);
+			// No worker-detail entry should be re-recorded under the implementation key.
+			const implementationKey = "github-mbrooks-yeetomatic-issue-455-implementation";
+			expect(recordSessionLogMock).not.toHaveBeenCalledWith(
+				implementationKey,
+				expect.objectContaining({ details: expect.objectContaining({ type: "thinking" }) }),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("rejects an invalid refinement result", async () => {
 		const harness = await createHarness(451);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
