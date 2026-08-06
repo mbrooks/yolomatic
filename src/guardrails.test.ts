@@ -51,13 +51,39 @@ describe("isGuardrailSourceFile", () => {
 		expect(isGuardrailSourceFile("src/adapters/http/admin-router.ts")).toBe(true);
 	});
 
+	it("returns true for business-logic / utility / state-transition files", () => {
+		expect(isGuardrailSourceFile("src/session/manager.ts")).toBe(true);
+		expect(isGuardrailSourceFile("src/guardrails.ts")).toBe(true);
+		expect(isGuardrailSourceFile("src/domain/session/model.ts")).toBe(true);
+	});
+
 	it("returns false for test files", () => {
 		expect(isGuardrailSourceFile("src/foo.test.ts")).toBe(false);
 	});
 
-	it("returns false for types files", () => {
+	it("returns false for type-export files", () => {
 		expect(isGuardrailSourceFile("src/types.ts")).toBe(false);
 		expect(isGuardrailSourceFile("src/foo/types.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/skills/types.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/admin/app/types.ts")).toBe(false);
+	});
+
+	it("returns false for styling files (.tsx components and style modules)", () => {
+		expect(isGuardrailSourceFile("src/admin/components/Modal.tsx")).toBe(false);
+		expect(isGuardrailSourceFile("src/admin/styles.css")).toBe(false);
+		expect(isGuardrailSourceFile("src/admin/theme/styles.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/admin/lib/button.styles.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/admin/lib/button.style.ts")).toBe(false);
+	});
+
+	it("returns false for configuration files", () => {
+		expect(isGuardrailSourceFile("src/config.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/workspace/config.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/foo/bar.config.ts")).toBe(false);
+	});
+
+	it("returns false for third-party setup / wiring files", () => {
+		expect(isGuardrailSourceFile("src/adapters/github/octokit.ts")).toBe(false);
 	});
 });
 
@@ -78,6 +104,19 @@ describe("getChangedSourceFiles", () => {
 			"src/admin/api/issues.ts",
 			"src/adapters/http/admin-router.ts",
 		]);
+	});
+
+	it("filters out styling, type-export, configuration, and third-party-setup files", () => {
+		const result = getChangedSourceFiles([
+			"src/session/manager.ts",
+			"src/admin/components/Modal.tsx",
+			"src/skills/types.ts",
+			"src/config.ts",
+			"src/workspace/config.ts",
+			"src/adapters/github/octokit.ts",
+			"src/foo/bar.config.ts",
+		]);
+		expect(result).toEqual(["src/session/manager.ts"]);
 	});
 });
 
@@ -183,6 +222,21 @@ describe("runGuardrail", () => {
 		const result = await runGuardrail(["README.md"]);
 		expect(result.ok).toBe(true);
 		expect(result.checkedFiles).toEqual([]);
+	});
+
+	it("returns ok with no checked files when only excluded categories change", async () => {
+		const result = await runGuardrail([
+			"src/config.ts",
+			"src/workspace/config.ts",
+			"src/adapters/github/octokit.ts",
+			"src/skills/types.ts",
+			"src/admin/components/Modal.tsx",
+		]);
+		expect(result.ok).toBe(true);
+		expect(result.checkedFiles).toEqual([]);
+		expect(result.failures).toEqual([]);
+		expect(result.failures.some((f) => f.includes("Missing test file"))).toBe(false);
+		expect(result.failures.some((f) => f.includes("Coverage too low"))).toBe(false);
 	});
 
 	it("returns failure when test is missing", async () => {
