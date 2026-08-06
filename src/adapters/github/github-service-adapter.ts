@@ -113,7 +113,13 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 	}
 
 	async markPullRequestReadyForReview(owner: string, repo: string, prNumber: number): Promise<void> {
-		await this.octokit.pulls.update({ owner, repo, pull_number: prNumber, draft: false });
+		// GitHub's "Update a pull request" endpoint does not accept a `draft` field,
+		// so `pulls.update({ draft: false })` is a no-op. Use the dedicated
+		// "Mark a pull request as ready for review" endpoint instead.
+		await this.octokit.request(
+			"POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review",
+			{ owner, repo, pull_number: prNumber },
+		);
 	}
 
 	async listPullRequests(
