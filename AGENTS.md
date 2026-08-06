@@ -28,7 +28,7 @@ Additional requirements:
 * Add or update unit tests for guardrail-relevant changes.
 * Mock only external boundaries, such as network requests and third-party SDKs. If testing requires extensive internal mocking, pause and propose a modular refactor.
 * Use meaningful assertions that verify outputs or side effects.
-* Target 80% path and branch coverage for business logic, utilities, and state transitions.
+* Target 80% coverage for statements, branches, functions, and lines for business logic, utilities, and state transitions.
 * Exclude styling, type exports, configuration, and third-party setup from coverage expectations.
 * Run `npm run guardrail:test` before declaring the task complete.
 * If the guardrail fails, continue working until it passes or clearly explain the blocker.
