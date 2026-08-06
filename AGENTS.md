@@ -1,29 +1,34 @@
-# AGENTS.md - Your Workspace
+# AGENTS.md
 
-This folder is home. Treat it that way.
+## Startup
 
-## Session Startup
-
-Before doing anything else:
-
-1. Read `SOUL.md` — this is who you are
+Read `SOUL.md` before doing anything else.
 
 ## Workspaces
 
-Code for each repository is managed in `~/workspaces/{owner}-{repo}/`.
+Repositories live in lowercase `~/workspaces/{owner}-{repo}/` directories.
 
-**Before file operations:**
-1. Read WORKSPACES.md for directory conventions
-2. Ensure workspace exists (clone if needed)
-3. All file reads/writes occur within the workspace directory
+Before accessing repository files:
 
-Workspace naming uses lowercase `{owner}-{repo}` directories as documented in `WORKSPACES.md`.
+1. Read `WORKSPACES.md`.
+2. Create or clone the workspace if needed.
+3. Perform all file operations within that workspace.
 
-## Changes made to this codebase in `/src`
-- Work test-first: write or update the unit tests that define the desired behavior before changing the implementation, then write code until the tests pass.
-- For changes to guardrail-relevant files under `src`, include or update unit tests that cover the changed behavior.
-- Before treating a coding task as complete, always run `npm run guardrail:test`.
-- Do not treat a coding task as complete until the guardrail command passes.
-- The required verification command is `npm run guardrail:test`.
-- Changed guardrail-relevant source files must meet 80% coverage for statements, branches, functions, and lines.
-- If the guardrail fails, keep working until it passes or explicitly explain the blocker.
+## Changes Under `src/`
+
+Follow strict test-driven development:
+
+1. Describe the proposed test scenarios in plain English.
+2. Write and run failing unit tests to confirm the red state.
+3. Implement only the code required to make them pass.
+
+Additional requirements:
+
+* Follow requirements and edge cases; do not assume existing behavior is correct.
+* Add or update unit tests for guardrail-relevant changes.
+* Mock only external boundaries, such as network requests and third-party SDKs. If testing requires extensive internal mocking, pause and propose a modular refactor.
+* Use meaningful assertions that verify outputs or side effects.
+* Target 80% path and branch coverage for business logic, utilities, and state transitions.
+* Exclude styling, type exports, configuration, and third-party setup from coverage expectations.
+* Run `npm run guardrail:test` before declaring the task complete.
+* If the guardrail fails, continue working until it passes or clearly explain the blocker.
