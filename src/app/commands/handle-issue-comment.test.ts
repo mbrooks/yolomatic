@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { HandleIssueComment, selectPriorContextComments, composeSteerMessage } from "./handle-issue-comment.js";
+import { TaskController } from "../../task-controller.js";
 
 describe("HandleIssueComment", () => {
 	function createHandler() {
@@ -796,6 +797,147 @@ describe("HandleIssueComment prior-context gathering", () => {
 
 	it("composeSteerMessage returns the trigger body unchanged when there is no prior context", () => {
 		expect(composeSteerMessage("Please retry.", [])).toBe("Please retry.");
+	});
+});
+
+describe("HandleIssueComment cancel race", () => {
+	it("steers a comment that arrives after Stop while the previous run winds down", async () => {
+		// Drive the handler with a real TaskController so the post-cancel
+		// wind-down window (cancel frees the key vs. the run's finally) is
+		// exercised end-to-end rather than via a stub.
+		const controller = new TaskController();
+		const steered: string[] = [];
+		const registration = controller.register("mbrooks/yeetomatic#42", () => {}, async (msg) => {
+			steered.push(msg);
+		});
+		expect(registration).not.toBeNull();
+
+		const sessions = {
+			get: vi.fn(async () => ({
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 42,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws/issue-42",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+				labels: [],
+			})),
+			getAll: vi.fn(),
+			save: vi.fn(),
+			delete: vi.fn(),
+			archive: vi.fn(),
+			createSession: vi.fn(),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			associatePR: vi.fn(),
+			incrementIterationCount: vi.fn(),
+			findSessionByPR: vi.fn(async () => null),
+			cancelSession: vi.fn(),
+			pauseSession: vi.fn(),
+			unpauseSession: vi.fn(),
+			restartSession: vi.fn(),
+			markComplete: vi.fn(),
+			markFailed: vi.fn(),
+			markStale: vi.fn(),
+		};
+		const workspaces = {
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yeetomatic/issue-42" })),
+			syncWorktree: vi.fn(async () => undefined),
+			removeWorktree: vi.fn(async () => {}),
+			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
+			hasChanges: vi.fn(async () => false),
+			getWorktreePath: vi.fn(() => "/tmp/ws/issue-42"),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
+		};
+		const github = {
+			postComment: vi.fn(async () => 1),
+			postPRComment: vi.fn(async () => 1),
+			addLabels: vi.fn(async () => {}),
+			removeLabel: vi.fn(async () => {}),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yeetomatic/issue-42" },
+				state: "open",
+				merged: false,
+			})),
+			createPullRequest: vi.fn(),
+			listPullRequests: vi.fn(),
+			getIssue: vi.fn(),
+			createIssue: vi.fn(),
+			initializeEmptyRepo: vi.fn(),
+			fileSelfReport: vi.fn(),
+			listReviewComments: vi.fn(async () => []),
+			listLabels: vi.fn(),
+			getIssueTemplates: vi.fn(),
+			listRecentCommits: vi.fn(),
+			listRelatedIssues: vi.fn(),
+			listOpenIssues: vi.fn(),
+			listPendingInvitations: vi.fn(),
+			acceptInvitation: vi.fn(),
+			updateIssueAssignees: vi.fn(),
+			closeIssue: vi.fn(),
+			updateIssueBody: vi.fn(),
+			listIssueComments: vi.fn(async () => []),
+			getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
+			listAccessibleRepositories: vi.fn(async () => []),
+		};
+		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." }));
+		const handlerDepsExecutor = {
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			github: github as never,
+			tasks: controller as never,
+			clock: { now: () => new Date() } as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			selfReportEnabled: false,
+			executor: { execute: executorExecute, executePRReview: vi.fn() } as never,
+		};
+		const handler = new HandleIssueComment({
+			sessions: sessions as never,
+			workspaces: workspaces as never,
+			tasks: controller as never,
+			github: github as never,
+			defaultBranch: "main",
+			githubUsername: "yeetomatic-bot",
+			adminGithubUsername: "admin",
+			executor: handlerDepsExecutor,
+		});
+
+		// Admin Stop fires the abort but must NOT free the key.
+		expect(controller.cancel("mbrooks/yeetomatic#42")).toBe(true);
+		expect(controller.isActive("mbrooks/yeetomatic#42")).toBe(true);
+
+		// A feedback comment arrives in the wind-down window.
+		await handler.execute({
+			action: "created",
+			issue: {
+				number: 42,
+				labels: [{ name: "yeetomatic" }],
+				assignee: { login: "yeetomatic-bot" },
+				assignees: [{ login: "yeetomatic-bot" }],
+			},
+			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
+			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		// The comment is steered into the winding-down run, not started as a new
+		// worker execution.
+		expect(executorExecute).not.toHaveBeenCalled();
+		expect(steered).toHaveLength(1);
+		expect(steered[0]).toContain("please update");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Steering comment received.");
+
+		// Once the run's finally block unregisters, the key is released and a
+		// later event can claim it again.
+		controller.unregister("mbrooks/yeetomatic#42", registration!);
+		expect(controller.isActive("mbrooks/yeetomatic#42")).toBe(false);
 	});
 });
 

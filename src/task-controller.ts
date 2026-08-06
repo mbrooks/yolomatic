@@ -27,7 +27,12 @@ export class TaskController implements TaskControlService {
 		const task = this.active.get(key);
 		if (task) {
 			task.abort();
-			this.active.delete(key);
+			// Intentionally do NOT delete the key here. The in-flight
+			// ExecuteSession.run owns this key until its `finally` block calls
+			// unregister. Releasing the key before the run winds down opens a
+			// window in which a concurrent event (redelivered webhook, feedback
+			// or mention comment) observes isActive(key) === false and starts a
+			// new worker, undoing the Stop.
 			return true;
 		}
 		return false;
