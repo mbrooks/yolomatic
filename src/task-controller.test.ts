@@ -3,16 +3,20 @@ import { describe, expect, it } from "vitest";
 import { TaskController } from "./task-controller.js";
 
 describe("TaskController", () => {
-	it("registers and cancels an active task", () => {
+	it("registers and cancels an active task, keeping the key claimed until unregister", () => {
 		const controller = new TaskController();
 		let aborted = false;
-		controller.register("key1", () => {
+		const registration = controller.register("key1", () => {
 			aborted = true;
 		});
 
 		expect(controller.isActive("key1")).toBe(true);
 		expect(controller.cancel("key1")).toBe(true);
 		expect(aborted).toBe(true);
+		// The key stays claimed during wind-down so concurrent events steer/queue
+		// instead of starting a new worker as a side effect of the cancel.
+		expect(controller.isActive("key1")).toBe(true);
+		controller.unregister("key1", registration!);
 		expect(controller.isActive("key1")).toBe(false);
 	});
 
@@ -45,19 +49,25 @@ describe("TaskController", () => {
 		expect(controller.isActive("key1")).toBe(true);
 	});
 
-	it("does not let an old registration unregister a replacement", () => {
+	it("keeps a cancelled task claimed so a replacement cannot register during wind-down", () => {
 		const controller = new TaskController();
 		const first = controller.register("key1", () => {});
 		expect(first).not.toBeNull();
 		expect(controller.cancel("key1")).toBe(true);
 
+		// A new registration is refused while the winding-down task is still claimed.
 		const replacement = controller.register("key1", () => {});
-		expect(replacement).not.toBeNull();
-		controller.unregister("key1", first!);
-
+		expect(replacement).toBeNull();
 		expect(controller.isActive("key1")).toBe(true);
-		controller.unregister("key1", replacement!);
+
+		// The key frees once the winding-down run's finally block unregisters.
+		controller.unregister("key1", first!);
 		expect(controller.isActive("key1")).toBe(false);
+
+		// After wind-down, a new registration can claim the key again.
+		const replacement2 = controller.register("key1", () => {});
+		expect(replacement2).not.toBeNull();
+		controller.unregister("key1", replacement2!);
 	});
 
 	it("tracks multiple tasks independently", () => {

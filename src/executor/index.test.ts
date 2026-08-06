@@ -747,6 +747,28 @@ describe("PiAgentExecutor", () => {
 		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
 	});
 
+	it("does not issue a status-correction prompt when abort is set before the correction branch", async () => {
+		const soulPath = await makeSoulPath();
+		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		const controller = new AbortController();
+		const { mockSession } = mockSequentialSession(
+			["Done. No status marker here."],
+			() => {
+				// Abort fires once the first prompt returns, before the correction
+				// branch is reached. The run must honor the abort and return a
+				// cancelled result without issuing a correction prompt.
+				controller.abort();
+			},
+		);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(29), undefined, controller.signal);
+
+		expect(result.status).toBe("cancelled");
+		expect(result.summary).toBe("Task cancelled by admin.");
+		expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+	});
+
 	it("does not issue a status correction for refinement executions", async () => {
 		const soulPath = await makeSoulPath();
 		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
