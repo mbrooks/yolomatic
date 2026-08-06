@@ -288,11 +288,45 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
+		const expectedIssueUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
+		const expectedSessionUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/refinement";
 		const startingCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith(ISSUE_REFINEMENT_STARTING_COMMENT))!;
-		expect(startingCall[3]).toContain(`Track status: ${expectedUrl}`);
+		expect(startingCall[3]).toContain(`Track status: ${expectedSessionUrl}`);
+		expect(startingCall[3]).not.toContain(expectedIssueUrl);
 		const refinedCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith("Issue refined at the request of"))!;
-		expect(refinedCall[3]).toContain(`Track status: ${expectedUrl}`);
+		expect(refinedCall[3]).toContain(`Track status: ${expectedIssueUrl}`);
+		expect(refinedCall[3]).not.toContain(expectedSessionUrl);
+	});
+
+	it("omits the Track status footer from the refinement pickup comment when the toggle is disabled", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yeetomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueAdminLinkInCommentsEnabled: false,
+			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		const startingCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith(ISSUE_REFINEMENT_STARTING_COMMENT))!;
+		expect(startingCall[3]).toBe(ISSUE_REFINEMENT_STARTING_COMMENT);
+		expect(startingCall[3]).not.toContain("Track status:");
 	});
 
 	it("does not post instructions twice for the same issue", async () => {

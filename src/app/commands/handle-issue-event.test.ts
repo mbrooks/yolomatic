@@ -132,6 +132,10 @@ function createDeps(overrides?: {
 				})),
 			} as any,
 		},
+		adminBaseUrl: undefined as string | undefined,
+		issueAdminLinkInCommentsEnabled: undefined as boolean | undefined,
+		resolveAdminBaseUrl: undefined as (() => string | undefined) | undefined,
+		resolveIssueAdminLinkInCommentsEnabled: undefined as (() => boolean | undefined) | undefined,
 	};
 }
 
@@ -460,6 +464,72 @@ describe("HandleIssueEvent", () => {
 			1,
 			"Picked up by Yeetomatic. Working on it...",
 		);
+	});
+
+	it("appends an admin session link to the pickup comment when enabled", async () => {
+		const deps = createDeps();
+		let getCallCount = 0;
+		deps.sessions.get = vi.fn(async () => {
+			getCallCount++;
+			if (getCallCount <= 2) return null;
+			return {
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 1,
+				status: "working",
+				seeded: true,
+				title: "Test issue",
+				body: "Issue body",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				labels: [],
+			};
+		});
+		deps.adminBaseUrl = "http://host:6767/yeetomatic/admin";
+		deps.issueAdminLinkInCommentsEnabled = true;
+		const handler = new HandleIssueEvent(deps as any);
+		const payload = createPayload();
+
+		await handler.execute(payload);
+
+		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/implementation";
+		const pickupCall = (deps.github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall).toBeDefined();
+		expect(pickupCall[3]).toContain(`Track status: ${expectedUrl}`);
+		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yeetomatic/issues/1");
+	});
+
+	it("omits the admin session link from the pickup comment when the toggle is disabled", async () => {
+		const deps = createDeps();
+		let getCallCount = 0;
+		deps.sessions.get = vi.fn(async () => {
+			getCallCount++;
+			if (getCallCount <= 2) return null;
+			return {
+				owner: "mbrooks",
+				repo: "yeetomatic",
+				issueNumber: 1,
+				status: "working",
+				seeded: true,
+				title: "Test issue",
+				body: "Issue body",
+				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				labels: [],
+			};
+		});
+		deps.adminBaseUrl = "http://host:6767/yeetomatic/admin";
+		deps.issueAdminLinkInCommentsEnabled = false;
+		const handler = new HandleIssueEvent(deps as any);
+		const payload = createPayload();
+
+		await handler.execute(payload);
+
+		const pickupCall = (deps.github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
+			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+		)!;
+		expect(pickupCall[3]).toBe("Picked up by Yeetomatic. Working on it...");
+		expect(pickupCall[3]).not.toContain("Track status:");
 	});
 
 	it("initializes empty repo and retries when createOrGetWorktree throws EmptyRepositoryError", async () => {
