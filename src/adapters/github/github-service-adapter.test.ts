@@ -191,11 +191,16 @@ describe("GitHubServiceAdapter", () => {
 			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", title: "Title", body: "Body", head: "feature", base: "main" });
 		});
 
-		it("marks a pull request ready for review via pulls.update with draft:false", async () => {
-			const octokit = createMockOctokit();
+		it("marks a pull request ready for review via the ready-for-review endpoint", async () => {
+			const request = vi.fn(async () => ({ data: {} }));
+			const octokit = createMockOctokit({ request });
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			await adapter.markPullRequestReadyForReview("mbrooks", "yeetomatic", 42);
-			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 42, draft: false });
+			expect(request).toHaveBeenCalledWith(
+				"POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review",
+				{ owner: "mbrooks", repo: "yeetomatic", pull_number: 42 },
+			);
+			expect(octokit.pulls.update).not.toHaveBeenCalled();
 		});
 
 		it("returns null when no commits between branches", async () => {
