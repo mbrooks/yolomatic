@@ -14,6 +14,16 @@ header {
 	gap: 0.75rem;
 }
 
+.header-user {
+	color: var(--muted);
+	font-size: 0.875rem;
+	margin-right: 0.5rem;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 h1 {
 	font-size: 1.25rem;
 }
@@ -939,6 +949,31 @@ a:hover {
 
 	.repo-list {
 		grid-template-columns: 1fr;
+	}
+
+	.header-actions {
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+
+	.activity-list-header {
+		display: none;
+	}
+
+	.activity-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.25rem 0.75rem;
+	}
+
+	.activity-repo {
+		flex: 1 1 100%;
+		font-weight: 600;
+	}
+
+	.activity-time {
+		margin-left: auto;
 	}
 }
 
