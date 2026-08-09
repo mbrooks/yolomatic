@@ -11,17 +11,15 @@ This skill governs how to investigate an issue in `mbrooks/yolomatic` and produc
 
 Read local guidance and relevant source before drawing conclusions. Prefer evidence (file references, commands, test output) over assumptions.
 
-Read in this order, stopping when the issue is understood:
+Read `AGENTS.md` and `SOUL.md` first. Then read only the material needed for the issue:
 
-- `AGENTS.md` and `SOUL.md` — house style, guardrail rules, and boundaries.
-- `README.md` — feature behavior and user-facing contracts.
-- `design/issue-refinement.md` — the authoritative workflow, trust model, and result contract for this refinement flow.
-- `design/architecture.md` and `design/github-workflow.md` — how events flow into sessions, worktrees, and pull requests.
-- The `src/` modules referenced by the issue, plus adjacent tests and the relevant `design/*.md` documents.
+- Use `README.md` for user-facing behavior and supported workflows.
+- Read the `design/*.md` documents that directly constrain the requested change. Do not read the issue-refinement or GitHub workflow designs unless the issue concerns those systems.
+- Inspect the `src/` modules referenced by the issue, their adjacent tests, and the nearest callers or consumers needed to understand the behavior.
 
-Use `rg`, `ls`, and file reads to locate relevant code. Run `npm run guardrail:test` only to validate hypotheses about test behavior; do not treat a passing run as a reason to expand scope.
+Stop once the requested behavior, important constraints, and credible verification are understood. Use `rg`, `ls`, and file reads to locate relevant code. Run tests only to validate a concrete hypothesis; do not run the full guardrail merely to make the investigation look comprehensive.
 
-Record concrete findings in `investigation`: file paths, commands, and observations. Cite the specific lines or modules that support each conclusion.
+Record the detailed evidence in `investigation`: file paths, commands, tests, and observations. Promote a finding into `proposedTaskBody` only when it helps a maintainer understand the requested outcome or helps an implementation agent avoid a material mistake.
 
 ## Fidelity rules
 
@@ -29,32 +27,68 @@ Preserve the original issue's intent and scope.
 
 - Do not invent requirements the requester did not state.
 - Do not escalate scope, rename the underlying request, or fold in adjacent work the issue does not ask for.
+- Do not turn a possible implementation into a requirement unless the repository or requester already constrains the solution.
 - Do not silently change the request. If the issue's wording is loose, keep the Proposed Task aligned with the most natural reading.
-- When the issue is ambiguous, note the ambiguity in `investigation` and pick the most conservative interpretation in the Proposed Task. State the interpretation explicitly so a maintainer can correct it.
+- When the issue is ambiguous, note the ambiguity in `investigation` and pick the most conservative interpretation in the Proposed Task. If the ambiguity materially affects product behavior, scope, or architecture, surface it briefly as an open question instead of speculating through detailed requirements.
 - Preserve any constraints, acceptance hints, or out-of-scope notes the original issue already contains.
 
 ## Proposed Task structure
 
-Write `proposedTaskBody` as self-contained Markdown. A reader should understand the task from the body alone, without the original issue text.
+Write `proposedTaskBody` as self-contained Markdown for two audiences: a concise human-facing task at the top and optional implementation guidance for agents at the bottom.
 
-Use these sections, omitting any that add nothing:
+### Human-facing task
 
-- **Summary** — one or two short paragraphs stating what to do and why.
-- **Background** — include only when repository context (modules, design docs, prior decisions) is needed to understand the task.
-- **Requirements** — concrete, scoped bullet points.
-- **Acceptance criteria** — verifiable bullets. Each criterion should be checkable by a command, a file inspection, or a clear observable behavior.
-- **Out of scope** — name the adjacent work explicitly excluded, including anything the issue might have implied but should not be pulled in.
+The top of the issue is the authoritative task contract. Target 250–500 words; exceed that only when the request genuinely needs more context. A maintainer should be able to review this portion without expanding the agent notes.
 
-Reference files with paths (e.g. `src/app/commands/handle-issue-refinement.ts`). Reference design docs by path when they constrain the work.
+Use only the sections that improve understanding:
+
+- **Summary** — one or two short paragraphs stating the requested outcome and why it matters.
+- **Desired behavior** or **Requirements** — scoped, observable behavior rather than a file-by-file implementation plan.
+- **Acceptance criteria** — a short list of verifiable outcomes.
+- **Out of scope** or **Open questions** — only when needed to prevent scope drift or request a material human decision.
+
+Include background only when it is essential to understand the task. State each requirement once. Do not include an investigation transcript, dependency inventory, exhaustive file list, or speculative architecture in the human-facing portion.
+
+### Agent implementation notes
+
+When repository findings would materially help implementation, put them after the human-facing task in a collapsed block at the bottom:
+
+```markdown
+---
+
+<details>
+<summary>Implementation notes for agents</summary>
+
+The human-facing requirements above are authoritative. These notes are non-binding guidance. Verify them against the current repository before implementation.
+
+### Repository findings
+
+- Relevant current behavior and constraints.
+
+### Likely implementation areas
+
+- `src/example.ts`
+
+### Test scenarios
+
+1. Observable scenario to cover.
+
+</details>
+```
+
+Use only the subsections that add value. Put task-specific source paths, dependency details, likely test locations, and technical cautions here. Keep decisions requiring human approval visible in the human-facing portion rather than burying them in the collapsed block.
+
+The agent notes may be more detailed than the human-facing task, but they must remain relevant and non-repetitive. Do not copy repository-wide policies from `AGENTS.md`, restate the requirements, or use hidden HTML comments.
 
 ## Repo-specific verification guidance
 
-Tailor acceptance criteria to what the change would touch:
+Keep verification proportional to the task:
 
-- For changes that would modify files under `src/`: reference `npm run guardrail:test` as the required verification command, and state the 80% coverage requirement for changed guardrail-relevant source files (statements, branches, functions, and lines). Call out which existing or new tests cover the changed behavior.
-- For changes confined to docs, skills, or `design/`: do not require test coverage. Require instead that the suite remains green (`npm run guardrail:test` still passes) and that the prose is internally consistent with the cited source files.
+- For changes under `src/`, include one human-facing criterion that `npm run guardrail:test` passes. `AGENTS.md` already governs TDD and coverage; do not repeat its policy in the issue.
+- Put task-specific test scenarios or likely test locations in the agent notes when they clarify behavior. Do not prescribe an exhaustive test-file checklist.
+- For changes confined to docs, skills, or `design/`, require internal consistency and a green `npm run guardrail:test`; do not add coverage requirements.
 
-Do not invent new verification commands. Prefer the commands `AGENTS.md` and `README.md` already name.
+Do not invent new verification commands. Prefer commands already named by `AGENTS.md` and `README.md`.
 
 ## Optional title
 
