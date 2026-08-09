@@ -202,7 +202,7 @@ function AppHeader({
 			<h1>Yolomatic Admin</h1>
 			<div className="header-actions">
 				{authUser ? (
-					<span style={{ color: "var(--muted)", fontSize: "0.875rem", marginRight: "0.5rem" }}>
+					<span className="header-user">
 						Signed in as {authUser.username}
 					</span>
 				) : null}

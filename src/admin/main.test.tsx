@@ -201,6 +201,18 @@ describe("App", () => {
 		expect(screen.queryAllByText("Active Sessions").length).toBeGreaterThan(0);
 	});
 
+	it("renders the signed-in user label in a header-user element", async () => {
+		render(<App />);
+
+		await waitFor(() => {
+			expect(screen.queryByText("Active Work")).not.toBeNull();
+		});
+
+		const userLabel = document.querySelector(".header-user");
+		expect(userLabel).not.toBeNull();
+		expect(userLabel!.textContent).toBe("Signed in as admin");
+	});
+
 	it("navigates to working view via quick link", async () => {
 		render(<App />);
 
