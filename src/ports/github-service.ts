@@ -1,5 +1,6 @@
 export interface PullRequestInfo {
 	head: { ref: string; sha?: string };
+	base?: { ref: string; sha?: string };
 	state: string;
 	merged: boolean;
 	/** GitHub mergeability computed by a background job (`true | false | null`). `null` means still computing — poll. */

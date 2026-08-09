@@ -64,6 +64,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				get: vi.fn(async () => ({
 					data: {
 						head: { ref: "yolomatic/issue-56" },
+						base: { ref: "main" },
 						state: "open",
 						merged: false,
 						mergeable: true,
@@ -520,6 +521,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		octokit.pulls.get.mockResolvedValue({
 			data: {
 				head: { ref: "yolomatic/issue-57" },
+				base: { ref: "main" },
 				state: "open",
 				merged: false,
 				mergeable: true,

@@ -3556,8 +3556,9 @@ describe("createWebhookServer", () => {
 		const updatedState = setCall[0][0];
 		expect(updatedState.status).toBe("pending");
 		expect(updatedState.summary).toBeUndefined();
-		expect(updatedState.prNumber).toBeUndefined();
-		expect(updatedState.prUrl).toBeUndefined();
+		// Restart preserves a durable PR association for recovery.
+		expect(updatedState.prNumber).toBe(7);
+		expect(updatedState.prUrl).toBe("https://github.com/mbrooks/yolomatic/pull/7");
 		expect(updatedState.seeded).toBe(false);
 		expect(updatedState.iterationCount).toBeUndefined();
 		expect(updatedState.restartCount).toBe(1);

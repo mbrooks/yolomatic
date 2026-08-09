@@ -314,8 +314,10 @@ describe("SessionManager", () => {
 		const restarted = await manager.restartSession("mbrooks", "yolomatic", 13);
 		expect(restarted.status).toBe("pending");
 		expect(restarted.summary).toBeUndefined();
-		expect(restarted.prNumber).toBeUndefined();
-		expect(restarted.prUrl).toBeUndefined();
+		// A restart must preserve a durable PR association so a restarted session
+		// can reconcile the existing PR instead of losing it on a delivery hiccup.
+		expect(restarted.prNumber).toBe(7);
+		expect(restarted.prUrl).toBe("https://github.com/mbrooks/yolomatic/pull/7");
 		expect(restarted.seeded).toBe(false);
 		expect(restarted.iterationCount).toBeUndefined();
 		expect(restarted.restartCount).toBe(1);
@@ -323,6 +325,18 @@ describe("SessionManager", () => {
 		expect(restarted.title).toBe("Title");
 		expect(restarted.body).toBe("Body");
 		expect(restarted.labels).toEqual(["bug"]);
+	});
+
+	it("restarts a failed session without a PR association and leaves it absent", async () => {
+		const sessionsDir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-sessions-"));
+		const store = new SessionStore(path.join(sessionsDir, "sessions.sqlite"), sessionsDir);
+		const manager = new SessionManager(sessionsDir, store);
+
+		await manager.createSession("mbrooks", "yolomatic", 130, "Title", "Body", "/tmp/ws");
+		await manager.updateStatus("mbrooks", "yolomatic", 130, "failed", { summary: "Boom" });
+		const restarted = await manager.restartSession("mbrooks", "yolomatic", 130);
+		expect(restarted.prNumber).toBeUndefined();
+		expect(restarted.prUrl).toBeUndefined();
 	});
 
 	it("restarts a cancelled session", async () => {
