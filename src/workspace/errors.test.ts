@@ -3,10 +3,10 @@ import { EmptyRepositoryError, WorktreeBranchDivergedError } from "./errors.js";
 
 describe("EmptyRepositoryError", () => {
 	it("has the correct name and message", () => {
-		const error = new EmptyRepositoryError("/tmp/workspaces/mbrooks-yeetomatic");
+		const error = new EmptyRepositoryError("/tmp/workspaces/mbrooks-yolomatic");
 		expect(error.name).toBe("EmptyRepositoryError");
 		expect(error.message).toContain("Cannot resolve base branch");
-		expect(error.message).toContain("/tmp/workspaces/mbrooks-yeetomatic");
+		expect(error.message).toContain("/tmp/workspaces/mbrooks-yolomatic");
 		expect(error.message).toContain("appears to be empty");
 	});
 
@@ -18,10 +18,10 @@ describe("EmptyRepositoryError", () => {
 
 describe("WorktreeBranchDivergedError", () => {
 	it("has the correct name, branch, and remoteRef", () => {
-		const error = new WorktreeBranchDivergedError("yeetomatic/issue-472", "origin/yeetomatic/issue-472");
+		const error = new WorktreeBranchDivergedError("yolomatic/issue-472", "origin/yolomatic/issue-472");
 		expect(error.name).toBe("WorktreeBranchDivergedError");
-		expect(error.branch).toBe("yeetomatic/issue-472");
-		expect(error.remoteRef).toBe("origin/yeetomatic/issue-472");
+		expect(error.branch).toBe("yolomatic/issue-472");
+		expect(error.remoteRef).toBe("origin/yolomatic/issue-472");
 		expect(error.message).toContain("diverged");
 		expect(error.message).toContain("update-branch");
 	});

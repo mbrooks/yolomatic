@@ -74,11 +74,11 @@ describe("checkOllamaSignInStatus", () => {
 
 	it("returns signed-in when the command prints the already-signed-in line", async () => {
 		const exec = fakeExec(true, "You are already signed in as user 'bob'\n");
-		const result = await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec });
+		const result = await checkOllamaSignInStatus({ containerName: "yolomatic-ollama", execFile: exec });
 		expect(result.signedIn).toBe(true);
 		expect(result.user).toBe("bob");
 		expect(result.error).toBeUndefined();
-		expect(exec).toHaveBeenCalledWith("docker", ["exec", "yeetomatic-ollama", "ollama", "signin"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
+		expect(exec).toHaveBeenCalledWith("docker", ["exec", "yolomatic-ollama", "ollama", "signin"], expect.objectContaining({ timeout: DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS }));
 	});
 
 	it("returns the connect URL when the account is not signed in", async () => {
@@ -144,10 +144,10 @@ describe("checkOllamaSignInStatus", () => {
 	it("reports a missing container from stderr", async () => {
 		const exec = failingExec(Object.assign(new Error("exit 1"), {
 			stdout: "",
-			stderr: "Error: No such container: yeetomatic-ollama",
+			stderr: "Error: No such container: yolomatic-ollama",
 			code: 1,
 		}));
-		const result = await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec });
+		const result = await checkOllamaSignInStatus({ containerName: "yolomatic-ollama", execFile: exec });
 		expect(result.signedIn).toBe(false);
 		expect(result.error).toContain("No such container");
 		expect(result.message).toContain("was not found");
@@ -171,9 +171,9 @@ describe("checkOllamaSignInStatus", () => {
 		it("logs the issued command and the successful result", async () => {
 			const exec = fakeExec(true, "You are already signed in as user 'bob'\n");
 			const debug = vi.fn();
-			await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec, debug });
+			await checkOllamaSignInStatus({ containerName: "yolomatic-ollama", execFile: exec, debug });
 			expect(debug).toHaveBeenCalledWith(
-				expect.stringContaining("issuing: docker exec yeetomatic-ollama ollama signin"),
+				expect.stringContaining("issuing: docker exec yolomatic-ollama ollama signin"),
 			);
 			expect(debug).toHaveBeenCalledWith(
 				expect.stringContaining("result: exit 0"),
@@ -185,15 +185,15 @@ describe("checkOllamaSignInStatus", () => {
 		it("logs the issued command and the failure details", async () => {
 			const exec = failingExec(Object.assign(new Error("Command failed"), {
 				stdout: "",
-				stderr: "Error: No such container: yeetomatic-ollama",
+				stderr: "Error: No such container: yolomatic-ollama",
 				code: 1,
 				signal: undefined,
 				killed: false,
 			}));
 			const debug = vi.fn();
-			await checkOllamaSignInStatus({ containerName: "yeetomatic-ollama", execFile: exec, debug });
+			await checkOllamaSignInStatus({ containerName: "yolomatic-ollama", execFile: exec, debug });
 			expect(debug).toHaveBeenCalledWith(
-				expect.stringContaining("issuing: docker exec yeetomatic-ollama ollama signin"),
+				expect.stringContaining("issuing: docker exec yolomatic-ollama ollama signin"),
 			);
 			const resultLine = debug.mock.calls.find((c) => String(c[0]).startsWith("result:"))?.[0] as string;
 			expect(resultLine).toContain("code=1");

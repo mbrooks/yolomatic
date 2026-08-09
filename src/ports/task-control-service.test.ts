@@ -15,7 +15,7 @@ describe("TaskControlService", () => {
 			setDraining: () => undefined,
 		};
 
-		expect(service.register("mbrooks/yeetomatic#1", () => undefined)).toBe(registration);
-		expect(service.isActive("mbrooks/yeetomatic#1")).toBe(true);
+		expect(service.register("mbrooks/yolomatic#1", () => undefined)).toBe(registration);
+		expect(service.isActive("mbrooks/yolomatic#1")).toBe(true);
 	});
 });

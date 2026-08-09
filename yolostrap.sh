@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# yeetstrap.sh - worker environment initialization for the yeetomatic project.
+# yolostrap.sh - worker environment initialization for the yolomatic project.
 #
-# Yeetomatic runs this script inside the disposable worker container before
+# Yolomatic runs this script inside the disposable worker container before
 # the agent starts, so the workspace is in a known state before the first
 # model turn. See design/worker-env-init.md for the full contract.
 #

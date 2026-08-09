@@ -1,11 +1,11 @@
 services:
-  yeetomatic:
-    image: yeetomatic-control-plane:latest
+  yolomatic:
+    image: yolomatic-control-plane:latest
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    container_name: yeetomatic
+    container_name: yolomatic
     restart: unless-stopped
     ports:
       - "127.0.0.1:6767:6767"
@@ -13,33 +13,33 @@ services:
       - .env
     environment:
       OLLAMA_HOST: http://127.0.0.1:11434
-      YEETOMATIC_WORKER_CONTROL_BASE_URL: http://127.0.0.1:6767
-      YEETOMATIC_WORKER_DOCKER_NETWORK_MODE: container:yeetomatic
-      YEETOMATIC_WORKER_RUNTIME_DIR: /app/runtime
-      YEETOMATIC_WORKER_RUNTIME_MOUNT_SOURCE: yeetomatic_runtime
-      YEETOMATIC_WORKER_WORKSPACE_MOUNT_SOURCE: yeetomatic_workspaces
-      YEETOMATIC_WORKER_OLLAMA_HOST: http://127.0.0.1:11434
+      YOLO_WORKER_CONTROL_BASE_URL: http://127.0.0.1:6767
+      YOLO_WORKER_DOCKER_NETWORK_MODE: container:yolomatic
+      YOLO_WORKER_RUNTIME_DIR: /app/runtime
+      YOLO_WORKER_RUNTIME_MOUNT_SOURCE: yolomatic_runtime
+      YOLO_WORKER_WORKSPACE_MOUNT_SOURCE: yolomatic_workspaces
+      YOLO_WORKER_OLLAMA_HOST: http://127.0.0.1:11434
     group_add:
       - "${DOCKER_GID:-999}"
     volumes:
-      - yeetomatic_sessions:/app/sessions
-      - yeetomatic_workspaces:/app/workspaces
-      - yeetomatic_pi:/home/yeetomatic/.pi/agent
-      - yeetomatic_memory:/app/memory
-      - yeetomatic_runtime:/app/runtime
+      - yolomatic_sessions:/app/sessions
+      - yolomatic_workspaces:/app/workspaces
+      - yolomatic_pi:/home/yolomatic/.pi/agent
+      - yolomatic_memory:/app/memory
+      - yolomatic_runtime:/app/runtime
       - /var/run/docker.sock:/var/run/docker.sock
 
   ollama:
     image: alpine/ollama:0.20.5
-    container_name: yeetomatic-ollama
-    network_mode: "service:yeetomatic"
+    container_name: yolomatic-ollama
+    network_mode: "service:yolomatic"
     restart: unless-stopped
     volumes:
       - ${HOME}/.ollama:/root/.ollama
 
 volumes:
-  yeetomatic_sessions:
-  yeetomatic_workspaces:
-  yeetomatic_pi:
-  yeetomatic_memory:
-  yeetomatic_runtime:
+  yolomatic_sessions:
+  yolomatic_workspaces:
+  yolomatic_pi:
+  yolomatic_memory:
+  yolomatic_runtime:

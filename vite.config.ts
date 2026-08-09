@@ -8,7 +8,7 @@ import { defineConfig } from "vite";
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
 function resolveAdminBase(): string {
-	const raw = (process.env.YEETOMATIC_ADMIN_BASE_URL ?? "/yeetomatic/admin/").trim() || "/yeetomatic/admin/";
+	const raw = (process.env.YOLO_ADMIN_BASE_URL ?? "/yolomatic/admin/").trim() || "/yolomatic/admin/";
 	return raw.endsWith("/") ? raw : `${raw}/`;
 }
 

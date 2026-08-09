@@ -4,7 +4,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { GitHubEventSource } from "../../github-events/model.js";
-import { hasYeetomaticVisibleLabel, isAssignedToYeetomatic } from "../../domain/workflow/policy.js";
+import { hasYolomaticVisibleLabel, isAssignedToYolomatic } from "../../domain/workflow/policy.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
 import {
 	issueSessionKey,
@@ -107,24 +107,24 @@ export class HandleIssueEvent {
 		}
 
 		if (payload.action === "unassigned") {
-			if (isAssignedToYeetomatic(issue, this.deps.githubUsername)) {
-				process.stdout.write(`[webhook] issues.unassigned ignored: Yeetomatic still assigned to ${key}\n`);
+			if (isAssignedToYolomatic(issue, this.deps.githubUsername)) {
+				process.stdout.write(`[webhook] issues.unassigned ignored: Yolomatic still assigned to ${key}\n`);
 				return;
 			}
-			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (Yeetomatic unassigned)\n`);
+			process.stdout.write(`[webhook] issues.unassigned repo=${owner}/${repo} issue=#${issue.number} (Yolomatic unassigned)\n`);
 			const state = await this.deps.sessions.get(owner, repo, issue.number, "implementation");
 			if (state && (state.status === "working" || state.status === "waiting-feedback")) {
 				await this.deps.sessions.updateStatus(owner, repo, issue.number, "pending");
 				await removeWorkflowLabels(this.deps.github, owner, repo, issue.number);
-				await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Yeetomatic unassigned. Pausing work."));
+				await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Yolomatic unassigned. Pausing work."));
 			}
 			return;
 		}
 
 		if (payload.action === "edited") {
-			const hasYeetomaticLabel = hasYeetomaticVisibleLabel(issue.labels) || issue.user?.login === this.deps.githubUsername;
-			if (!isAssignedToYeetomatic(issue, this.deps.githubUsername) && !hasYeetomaticLabel) {
-				process.stdout.write(`[webhook] issues.edited ignored: not a Yeetomatic issue\n`);
+			const hasYolomaticLabel = hasYolomaticVisibleLabel(issue.labels) || issue.user?.login === this.deps.githubUsername;
+			if (!isAssignedToYolomatic(issue, this.deps.githubUsername) && !hasYolomaticLabel) {
+				process.stdout.write(`[webhook] issues.edited ignored: not a Yolomatic issue\n`);
 				return;
 			}
 			const state = await this.deps.sessions.get(owner, repo, issue.number, "implementation");
@@ -136,7 +136,7 @@ export class HandleIssueEvent {
 				const steered = await this.deps.tasks.steer(key, issue.body ?? "");
 				if (steered) {
 					process.stdout.write(`[webhook] steered description update on active execution ${key}\n`);
-					await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Issue description updated. Steering to Yeetomatic."));
+					await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Issue description updated. Steering to Yolomatic."));
 				} else {
 					await this.deps.github.postComment(owner, repo, issue.number, this.withLink(owner, repo, issue.number, "Issue description updated but could not be steered."));
 				}
@@ -207,7 +207,7 @@ export class HandleIssueEvent {
 				repo,
 				issue.number,
 				prepared.session,
-				"Picked up by Yeetomatic. Working on it...",
+				"Picked up by Yolomatic. Working on it...",
 				undefined,
 				this.adminSessionUrl(owner, repo, issue.number),
 			);

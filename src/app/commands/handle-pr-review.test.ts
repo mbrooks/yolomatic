@@ -7,17 +7,17 @@ describe("HandlePRReview", () => {
 	function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 		return {
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete",
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			...overrides,
 		};
 	}
@@ -34,7 +34,7 @@ describe("HandlePRReview", () => {
 				makeSession({ status, ...updates }),
 			),
 			markSeeded: vi.fn(),
-			associatePR: vi.fn(async () => makeSession({ prNumber: 99, prUrl: "https://github.com/mbrooks/yeetomatic/pull/99" })),
+			associatePR: vi.fn(async () => makeSession({ prNumber: 99, prUrl: "https://github.com/mbrooks/yolomatic/pull/99" })),
 			incrementIterationCount: vi.fn(async () => makeSession({ status: "working", iterationCount: 1 })),
 			findSessionByPR: vi.fn(async () => null),
 			cancelSession: vi.fn(async () => makeSession({ status: "cancelled" })),
@@ -47,8 +47,8 @@ describe("HandlePRReview", () => {
 		};
 		const workspaces = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-				branch: "yeetomatic/issue-56",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+				branch: "yolomatic/issue-56",
 			})),
 			removeWorktree: vi.fn(),
 			commitAndPush: vi.fn(async () => true),
@@ -63,7 +63,7 @@ describe("HandlePRReview", () => {
 			executePRReview: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Fixed the typo.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nFixed the typo.",
+				rawResponse: "YOLO_STATUS: complete\nFixed the typo.",
 			})),
 		};
 		const github = {
@@ -96,7 +96,7 @@ describe("HandlePRReview", () => {
 			executor: executor as never,
 			github: github as never,
 			tasks: tasks as never,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			selfReportEnabled: false,
 		});
 
@@ -107,10 +107,10 @@ describe("HandlePRReview", () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
-			comment: { id: 1, body: "Fix this", user: { login: "yeetomatic-bot" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
+			comment: { id: 1, body: "Fix this", user: { login: "yolomatic-bot" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
@@ -123,20 +123,20 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
-		expect(tasks.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#56", "Fix this");
+		expect(tasks.steer).toHaveBeenCalledWith("mbrooks/yolomatic#56", "Fix this");
 		expect(executor.executePRReview).not.toHaveBeenCalled();
 		expect(tasks.unregister).not.toHaveBeenCalled();
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			"Review feedback was steered to the active Yeetomatic task.",
+			"Review feedback was steered to the active Yolomatic task.",
 		);
 	});
 
@@ -148,8 +148,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
@@ -157,57 +157,57 @@ describe("HandlePRReview", () => {
 		expect(executor.executePRReview).not.toHaveBeenCalled();
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			"Yeetomatic is busy. Review feedback could not be steered.",
+			"Yolomatic is busy. Review feedback could not be steered.",
 		);
 	});
 
-	it("ignores non-Yeetomatic branches", async () => {
+	it("ignores non-Yolomatic branches", async () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
 			pull_request: { number: 99, head: { ref: "feature/other" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 	});
 
 	it("processes non-issue branch PR feedback using the stored PR mapping", async () => {
 		const { handler, sessions, workspaces, executor, github, tasks } = createHandler();
 		const session = makeSession({
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/custom-branch-123",
-			branch: "yeetomatic/custom-branch-123",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/custom-branch-123",
+			branch: "yolomatic/custom-branch-123",
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		});
 		sessions.findSessionByPR.mockResolvedValue(session as never);
 		sessions.get.mockResolvedValue(session as never);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/custom-branch-123" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/custom-branch-123" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please update the generated file", user: { login: "user" }, path: "src/foo.ts", line: 42 },
 		});
 
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 		expect(executor.executePRReview).toHaveBeenCalledTimes(1);
 		expect(workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/custom-branch-123",
-			"yeetomatic/custom-branch-123",
-			"Yeetomatic: Fix the typo",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/custom-branch-123",
+			"yolomatic/custom-branch-123",
+			"Yolomatic: Fix the typo",
 		);
-		expect(tasks.register).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Function), expect.any(Function));
-		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Symbol));
+		expect(tasks.register).toHaveBeenCalledWith("mbrooks/yolomatic#56", expect.any(Function), expect.any(Function));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yolomatic#56", expect.any(Symbol));
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("iteration complete"),
 		);
@@ -217,22 +217,22 @@ describe("HandlePRReview", () => {
 		const { handler, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "closed", merged: true },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "closed", merged: true },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 		expect(sessions.get).not.toHaveBeenCalled();
 	});
 
-	it("silently ignores a Yeetomatic-named PR when no session exists for the mapped issue", async () => {
+	it("silently ignores a Yolomatic-named PR when no session exists for the mapped issue", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(null);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
@@ -242,19 +242,19 @@ describe("HandlePRReview", () => {
 		expect(github.postPRComment).not.toHaveBeenCalled();
 	});
 
-	it("silently ignores a Yeetomatic-named PR associated with a different PR", async () => {
+	it("silently ignores a Yolomatic-named PR associated with a different PR", async () => {
 		const { handler, sessions, executor, github } = createHandler();
 		sessions.get.mockResolvedValue(
 			makeSession({
 				prNumber: 100,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/100",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/100",
 			}),
 		);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
@@ -269,19 +269,19 @@ describe("HandlePRReview", () => {
 		sessions.get.mockResolvedValue(
 			makeSession({
 				prNumber: 99,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			}),
 		);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
 		});
 
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "working");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "working");
 		expect(executor.executePRReview).toHaveBeenCalledTimes(1);
 		expect(executor.executePRReview).toHaveBeenCalledWith(
 			expect.objectContaining({ issueNumber: 56 }),
@@ -294,16 +294,16 @@ describe("HandlePRReview", () => {
 			expect.any(Function),
 		);
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-			"yeetomatic/issue-56",
-			"Yeetomatic: Fix the typo",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+			"yolomatic/issue-56",
+			"Yolomatic: Fix the typo",
 		);
-		expect(sessions.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
-		expect(tasks.register).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Function), expect.any(Function));
-		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Symbol));
+		expect(sessions.incrementIterationCount).toHaveBeenCalledWith("mbrooks", "yolomatic", 56);
+		expect(tasks.register).toHaveBeenCalledWith("mbrooks/yolomatic#56", expect.any(Function), expect.any(Function));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yolomatic#56", expect.any(Symbol));
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("iteration complete"),
 		);
@@ -314,23 +314,23 @@ describe("HandlePRReview", () => {
 		const expectedRemoteHead = "a".repeat(40);
 		sessions.get.mockResolvedValue(makeSession());
 		github.getPullRequest.mockResolvedValue({
-			head: { ref: "yeetomatic/issue-56", sha: expectedRemoteHead },
+			head: { ref: "yolomatic/issue-56", sha: expectedRemoteHead },
 			state: "open",
 			merged: false,
 		});
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Rebase this branch onto main", user: { login: "user" } },
 		});
 
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-			"yeetomatic/issue-56",
-			"Yeetomatic: Fix the typo",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+			"yolomatic/issue-56",
+			"Yolomatic: Fix the typo",
 			undefined,
 			expectedRemoteHead,
 		);
@@ -341,7 +341,7 @@ describe("HandlePRReview", () => {
 		const expectedRemoteHead = "b".repeat(40);
 		sessions.get.mockResolvedValue(makeSession());
 		github.getPullRequest.mockResolvedValue({
-			head: { ref: "yeetomatic/issue-56", sha: expectedRemoteHead },
+			head: { ref: "yolomatic/issue-56", sha: expectedRemoteHead },
 			state: "open",
 			merged: false,
 		});
@@ -352,28 +352,28 @@ describe("HandlePRReview", () => {
 		await expect(
 			handler.execute({
 				action: "created",
-				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 				comment: { id: 1, body: "Resolve the branch conflicts", user: { login: "user" } },
 			}),
 		).resolves.toBeUndefined();
 
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
-		expect(sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "complete");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "failed");
+		expect(sessions.updateStatus).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "complete");
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			expect.stringContaining("Yeetomatic delivery failed."),
+			expect.stringContaining("Yolomatic delivery failed."),
 		);
 		expect(github.addLabels).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			56,
-			["yeetomatic-working", "yeetomatic-delivery-failed"],
+			["yolomatic-working", "yolomatic-delivery-failed"],
 		);
-		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#56", expect.any(Symbol));
+		expect(tasks.unregister).toHaveBeenCalledWith("mbrooks/yolomatic#56", expect.any(Symbol));
 	});
 
 	it("falls back to the issue branch when the session has no stored branch", async () => {
@@ -382,22 +382,22 @@ describe("HandlePRReview", () => {
 			makeSession({
 				branch: undefined,
 				prNumber: 99,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			}),
 		);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
 		});
 
 		expect(workspaces.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-			"yeetomatic/issue-56",
-			"Yeetomatic: Fix the typo",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+			"yolomatic/issue-56",
+			"Yolomatic: Fix the typo",
 		);
 	});
 
@@ -407,21 +407,21 @@ describe("HandlePRReview", () => {
 		sessions.get.mockResolvedValue(
 			makeSession({
 				prNumber: 99,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			}),
 		);
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please fix the typo on line 42", user: { login: "user" }, path: "src/foo.ts", line: 42 },
 		});
 
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("No changes were needed."),
 		);
@@ -433,22 +433,22 @@ describe("HandlePRReview", () => {
 		(executor.executePRReview as ReturnType<typeof vi.fn>).mockResolvedValue({
 			status: "cancelled",
 			summary: "Stopped by request.",
-			rawResponse: "YEETOMATIC_STATUS: cancelled\nStopped by request.",
+			rawResponse: "YOLO_STATUS: cancelled\nStopped by request.",
 		});
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Please stop", user: { login: "user" } },
 		});
 
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "cancelled");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "cancelled");
 		expect(workspaces.commitAndPushPath).not.toHaveBeenCalled();
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("Task cancelled by admin."),
 		);
@@ -460,8 +460,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "LGTM", user: { login: "user" } },
 		});
@@ -469,7 +469,7 @@ describe("HandlePRReview", () => {
 		expect(executor.executePRReview).not.toHaveBeenCalled();
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("No code changes required"),
 		);
@@ -481,8 +481,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "LGTM", user: { login: "user" } },
 		});
@@ -498,8 +498,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "Please add more tests.", state: "changes_requested", user: { login: "user" } },
 		});
@@ -523,8 +523,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "Please add more tests.", state: "changes_requested", user: { login: "user" } },
 		});
@@ -532,7 +532,7 @@ describe("HandlePRReview", () => {
 		expect(executor.executePRReview).not.toHaveBeenCalled();
 		expect(sessions.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			56,
 			"complete",
 			expect.objectContaining({
@@ -543,7 +543,7 @@ describe("HandlePRReview", () => {
 		);
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			"Deploy in progress. Review feedback will be processed after restart.",
 		);
@@ -554,8 +554,8 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "dismissed",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: null, state: "dismissed", user: { login: "user" } },
 		});
@@ -571,8 +571,8 @@ describe("HandlePRReview", () => {
 		await expect(
 			handler.execute({
 				action: "created",
-				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 				comment: { id: 1, body: "Fix this", user: { login: "user" } },
 			}),
@@ -580,11 +580,11 @@ describe("HandlePRReview", () => {
 
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("**Build failed**"),
 		);
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "failed");
 	});
 
 	it("posts 'Build failed' comment when executor returns failed status for rate-limit error", async () => {
@@ -598,19 +598,19 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("**Build failed**"),
 		);
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "failed");
 	});
 
 	it("posts generic failure comment when executor returns failed status for non-rate-limit error", async () => {
@@ -624,19 +624,19 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			expect.stringContaining("Yeetomatic failed."),
+			expect.stringContaining("Yolomatic failed."),
 		);
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "failed");
 	});
 
 	it("marks execution-environment blocker review responses as failed", async () => {
@@ -651,16 +651,16 @@ describe("HandlePRReview", () => {
 
 		await handler.execute({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
-		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "failed");
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "failed");
 		expect(github.postPRComment).not.toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("still working on the review feedback"),
 		);
@@ -674,8 +674,8 @@ describe("HandlePRReview", () => {
 		await expect(
 			handler.execute({
 				action: "created",
-				pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 				comment: { id: 1, body: "Fix this", user: { login: "user" } },
 			}),
@@ -683,9 +683,9 @@ describe("HandlePRReview", () => {
 
 		expect(github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			expect.stringContaining("Yeetomatic failed"),
+			expect.stringContaining("Yolomatic failed"),
 		);
 	});
 });

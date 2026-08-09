@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { generateCommitMessage } from "./commit-message.js";
 
 describe("generateCommitMessage", () => {
-	it("uses Yeetomatic: prefix when no labels match", () => {
+	it("uses Yolomatic: prefix when no labels match", () => {
 		const msg = generateCommitMessage(undefined, 42, "Add widget support");
-		expect(msg).toBe("Yeetomatic: Add widget support");
+		expect(msg).toBe("Yolomatic: Add widget support");
 	});
 
 	it("infers feat: from enhancement label", () => {
@@ -39,7 +39,7 @@ describe("generateCommitMessage", () => {
 		const long = "A".repeat(100);
 		const msg = generateCommitMessage(undefined, 1, long);
 		expect(msg.length).toBeLessThanOrEqual(72);
-		expect(msg.startsWith("Yeetomatic: ")).toBe(true);
+		expect(msg.startsWith("Yolomatic: ")).toBe(true);
 	});
 
 	it("uses first line as subject and rest as body", () => {

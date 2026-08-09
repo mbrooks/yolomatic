@@ -8,7 +8,7 @@ import { UserStore } from "../users/store.js";
 import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
 // Shared admin account + signed session cookie for the protected upgrade tests.
-const userDbPath = `/tmp/yeetomatic-ws-integration-users-${process.pid}.sqlite`;
+const userDbPath = `/tmp/yolomatic-ws-integration-users-${process.pid}.sqlite`;
 const userStore = new UserStore(userDbPath);
 userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
 const sessionAuth = new AdminSessionAuth(userStore);
@@ -86,7 +86,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: () => true,
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`);
 		await new Promise<void>((resolve, reject) => {
 			client.once("open", resolve);
 			client.once("error", reject);
@@ -100,7 +100,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`);
 		await expect(
 			new Promise<void>((resolve, reject) => {
 				client.once("open", resolve);
@@ -115,7 +115,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -133,7 +133,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -151,7 +151,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -168,7 +168,7 @@ describe("createAdminWebSocketServer", () => {
 			});
 		});
 
-		client.send(JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" }));
+		client.send(JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation" }));
 
 		// Wait a tick for subscription to be processed
 		await new Promise((r) => setTimeout(r, 50));
@@ -178,11 +178,11 @@ describe("createAdminWebSocketServer", () => {
 			level: "info",
 			message: "hello",
 		};
-		wsServer.broadcastLog("github-mbrooks-yeetomatic-issue-1-implementation", entry);
+		wsServer.broadcastLog("github-mbrooks-yolomatic-issue-1-implementation", entry);
 
 		const msg = (await messagePromise) as { type: string; sessionKey: string; entry: SessionLogEntry };
 		expect(msg.type).toBe("log-entry");
-		expect(msg.sessionKey).toBe("github-mbrooks-yeetomatic-issue-1-implementation");
+		expect(msg.sessionKey).toBe("github-mbrooks-yolomatic-issue-1-implementation");
 		expect(msg.entry.message).toBe("hello");
 
 		client.close();
@@ -194,7 +194,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -212,7 +212,7 @@ describe("createAdminWebSocketServer", () => {
 		const received = vi.fn();
 		client.on("message", received);
 
-		wsServer.broadcastLog("mbrooks/yeetomatic#1", {
+		wsServer.broadcastLog("mbrooks/yolomatic#1", {
 			timestamp: "2025-01-01T00:00:00.000Z",
 			level: "info",
 			message: "hello",
@@ -233,7 +233,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		}, statusProvider);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -269,7 +269,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		}, statusProvider);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -296,7 +296,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -323,7 +323,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -357,7 +357,7 @@ describe("createAdminWebSocketServer", () => {
 			isAuthorized: (req) => sessionAuth.isAdminAuthorized(req),
 		});
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},

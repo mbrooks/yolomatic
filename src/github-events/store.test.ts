@@ -3,7 +3,7 @@ import { unlinkSync } from "node:fs";
 
 import { GitHubEventStore } from "./store.js";
 
-const TEST_DB = "/tmp/yeetomatic-github-event-store-test.sqlite";
+const TEST_DB = "/tmp/yolomatic-github-event-store-test.sqlite";
 
 describe("GitHubEventStore", () => {
 	beforeEach(() => {
@@ -39,12 +39,12 @@ describe("GitHubEventStore", () => {
 			type: "pull_request",
 			source: "polling",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			occurredAt: "2026-06-01T00:00:00.000Z",
 			payload: {
 				action: "opened",
 				pull_request: { number: 1, head: { ref: "branch" }, state: "open", merged: false },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			},
 		});
@@ -54,9 +54,9 @@ describe("GitHubEventStore", () => {
 	it("persists polling subject backoff state", () => {
 		const store = new GitHubEventStore(TEST_DB);
 		store.upsertPollingSubject({
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T00:00:00.000Z",
@@ -65,9 +65,9 @@ describe("GitHubEventStore", () => {
 		});
 
 		expect(store.listPollingSubjects()).toEqual([{
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T00:00:00.000Z",
@@ -75,13 +75,13 @@ describe("GitHubEventStore", () => {
 			createdAt: "2026-06-01T00:00:00.000Z",
 		}]);
 
-		store.markPollingSubjectChecked("mbrooks/yeetomatic:issue:1", "2026-06-01T00:05:00.000Z");
+		store.markPollingSubjectChecked("mbrooks/yolomatic:issue:1", "2026-06-01T00:05:00.000Z");
 		expect(store.listPollingSubjects()[0]?.lastCheckedAt).toBe("2026-06-01T00:05:00.000Z");
 
 		store.upsertPollingSubject({
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T01:00:00.000Z",
@@ -94,13 +94,13 @@ describe("GitHubEventStore", () => {
 
 	it("persists per-repo polling baselines", () => {
 		const store = new GitHubEventStore(TEST_DB);
-		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBeNull();
+		expect(store.getRepoPollBaseline("mbrooks", "yolomatic")).toBeNull();
 
-		store.setRepoPollBaseline("mbrooks", "yeetomatic", "2026-06-01T12:00:00.000Z");
-		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBe("2026-06-01T12:00:00.000Z");
+		store.setRepoPollBaseline("mbrooks", "yolomatic", "2026-06-01T12:00:00.000Z");
+		expect(store.getRepoPollBaseline("mbrooks", "yolomatic")).toBe("2026-06-01T12:00:00.000Z");
 
-		store.setRepoPollBaseline("mbrooks", "yeetomatic", "2026-06-02T12:00:00.000Z");
-		expect(store.getRepoPollBaseline("mbrooks", "yeetomatic")).toBe("2026-06-02T12:00:00.000Z");
+		store.setRepoPollBaseline("mbrooks", "yolomatic", "2026-06-02T12:00:00.000Z");
+		expect(store.getRepoPollBaseline("mbrooks", "yolomatic")).toBe("2026-06-02T12:00:00.000Z");
 
 		expect(store.getRepoPollBaseline("other", "repo")).toBeNull();
 	});

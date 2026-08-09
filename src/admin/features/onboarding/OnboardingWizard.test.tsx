@@ -36,11 +36,11 @@ vi.mock("../../api/onboarding.js", async (importOriginal) => {
 		generateWebhookSecret: vi.fn(async () => ({ secret: "a".repeat(192) })),
 		listAccessibleRepositories: vi.fn(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
 		})),
-		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/yeetomatic"] })),
+		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/yolomatic"] })),
 		submitOnboarding: vi.fn(async () => ({ success: true, activated: true, requiresRestart: [] })),
 	};
 });
@@ -94,7 +94,7 @@ describe("OnboardingWizard", () => {
 		// override it via mockResolvedValue/mockImplementation.
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
 			configured: [],
@@ -313,7 +313,7 @@ describe("OnboardingWizard", () => {
 			expect(body.github_event_mode).toBe("webhook");
 			expect(body.pi_agent_provider).toBe("ollama");
 			expect(body.pi_agent_model).toBe("test-model");
-			expect(body.ollama_container_name).toBe("yeetomatic-ollama");
+			expect(body.ollama_container_name).toBe("yolomatic-ollama");
 		});
 
 		it("fetches repositories and initializes workspaces using the stored token when it is protected", async () => {
@@ -341,7 +341,7 @@ describe("OnboardingWizard", () => {
 			// button is available. The backend resolves the stored token from the
 			// empty submitted value.
 			expect(screen.queryByText("Using the configured GitHub token.")).not.toBeNull();
-			await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
+			await waitFor(() => expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull());
 
 			fireEvent.click(screen.getByText("Initialize & Finish"));
 			await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
@@ -350,7 +350,7 @@ describe("OnboardingWizard", () => {
 			expect(onboarding.initializeWorkspaces).toHaveBeenCalledWith({
 				token: "",
 				username: "configured-user",
-				repos: [{ owner: "mbrooks", repo: "yeetomatic" }, { owner: "octocat", repo: "hello" }],
+				repos: [{ owner: "mbrooks", repo: "yolomatic" }, { owner: "octocat", repo: "hello" }],
 			});
 			expect(onboarding.submitOnboarding).toHaveBeenCalledTimes(1);
 		});
@@ -386,7 +386,7 @@ describe("OnboardingWizard", () => {
 			expect(state.githubEventMode).toBe("");
 			expect(state.piAgentProvider).toBe("ollama");
 			expect(state.piAgentModel).toBe("");
-			expect(state.ollamaContainerName).toBe("yeetomatic-ollama");
+			expect(state.ollamaContainerName).toBe("yolomatic-ollama");
 		});
 
 		it("pre-populates the AI / LLM fields from configuration", () => {
@@ -410,7 +410,7 @@ describe("OnboardingWizard", () => {
 
 		it("preserves in-progress localStorage state over config for edited fields", () => {
 			localStorage.setItem(
-				"yeetomatic-onboarding-wizard",
+				"yolomatic-onboarding-wizard",
 				JSON.stringify({
 					step: 2,
 					adminUsername: "in-progress-admin",
@@ -450,7 +450,7 @@ describe("OnboardingWizard", () => {
 
 		it("unprotects sensitive fields when localStorage has a replacement value", () => {
 			localStorage.setItem(
-				"yeetomatic-onboarding-wizard",
+				"yolomatic-onboarding-wizard",
 				JSON.stringify({
 					step: 1,
 					adminUsername: "admin",
@@ -487,7 +487,7 @@ describe("OnboardingWizard", () => {
 	it("renders step 1 by default", async () => {
 		render(<OnboardingWizard />);
 		await waitForReady();
-		expect(screen.queryByText("Welcome to Yeetomatic")).not.toBeNull();
+		expect(screen.queryByText("Welcome to Yolomatic")).not.toBeNull();
 		expect(screen.queryByText("Step 1 of 5")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Username")).not.toBeNull();
 		expect(screen.queryByLabelText("Admin Password")).not.toBeNull();
@@ -723,13 +723,13 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		await advanceThroughAiLlmStep();
-		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
 
-		expect(screen.queryByText("Your settings have been saved and Yeetomatic is loading them now.")).not.toBeNull();
-		expect(screen.queryByText(/Restart Yeetomatic/u)).toBeNull();
+		expect(screen.queryByText("Your settings have been saved and Yolomatic is loading them now.")).not.toBeNull();
+		expect(screen.queryByText(/Restart Yolomatic/u)).toBeNull();
 		expect(onComplete).toHaveBeenCalledTimes(1);
 		expect(initializeWorkspaces).toHaveBeenCalled();
 		expect(submitOnboarding).toHaveBeenCalled();
@@ -739,7 +739,7 @@ describe("OnboardingWizard", () => {
 		expect(body.github_poll_interval_ms).toBeUndefined();
 		expect(body.pi_agent_provider).toBe("ollama");
 		expect(body.pi_agent_model).toBe("test-model");
-		expect(body.ollama_container_name).toBe("yeetomatic-ollama");
+		expect(body.ollama_container_name).toBe("yolomatic-ollama");
 	});
 
 	it("submits a polling interval and omits a webhook secret for polling mode", async () => {
@@ -758,7 +758,7 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		await advanceThroughAiLlmStep();
-		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull());
 
 		fireEvent.click(screen.getByText("Initialize & Finish"));
 		await waitFor(() => expect(screen.queryByText("Setup Complete")).not.toBeNull());
@@ -775,12 +775,12 @@ describe("OnboardingWizard", () => {
 		render(<OnboardingWizard />);
 		await waitForReady();
 		fireEvent.change(screen.getByLabelText("Admin Username"), { target: { value: "admin" } });
-		await waitFor(() => expect(localStorage.getItem("yeetomatic-onboarding-wizard")).toContain("admin"));
+		await waitFor(() => expect(localStorage.getItem("yolomatic-onboarding-wizard")).toContain("admin"));
 	});
 
 	it("restores state from localStorage", async () => {
 		localStorage.setItem(
-			"yeetomatic-onboarding-wizard",
+			"yolomatic-onboarding-wizard",
 			JSON.stringify({
 				step: 2,
 				adminUsername: "stored-admin",
@@ -869,7 +869,7 @@ describe("OnboardingWizard", () => {
 
 	it("deselects and selects all repositories in the workspace-init step", async () => {
 		localStorage.setItem(
-			"yeetomatic-onboarding-wizard",
+			"yolomatic-onboarding-wizard",
 			JSON.stringify({
 				step: 5,
 				adminUsername: "admin",
@@ -884,7 +884,7 @@ describe("OnboardingWizard", () => {
 				webhookSecret: "webhook-secret",
 				webhookSecretProtected: false,
 				repositories: [
-					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", selected: true },
+					{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", selected: true },
 					{ owner: "octocat", repo: "hello", fullName: "octocat/hello", selected: true },
 				],
 				error: null,
@@ -895,7 +895,7 @@ describe("OnboardingWizard", () => {
 		await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
 
 		const repositoryCheckboxes = [
-			screen.getByLabelText("mbrooks/yeetomatic") as HTMLInputElement,
+			screen.getByLabelText("mbrooks/yolomatic") as HTMLInputElement,
 			screen.getByLabelText("octocat/hello") as HTMLInputElement,
 		];
 		expect(repositoryCheckboxes.every((checkbox) => checkbox.checked)).toBe(true);
@@ -918,7 +918,7 @@ describe("OnboardingWizard", () => {
 		await advanceThroughAiLlmStep();
 		// The list is populated automatically; the legacy Fetch button is gone.
 		expect(screen.queryByRole("button", { name: /fetch repositories/i })).toBeNull();
-		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull());
 		expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeNull();
 	});
 
@@ -926,10 +926,10 @@ describe("OnboardingWizard", () => {
 		const onboarding = await import("../../api/onboarding.js");
 		(onboarding.listAccessibleRepositories as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
 			repositories: [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic" },
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
-			configured: [{ owner: "mbrooks", repo: "yeetomatic" }],
+			configured: [{ owner: "mbrooks", repo: "yolomatic" }],
 		}));
 		render(<OnboardingWizard />);
 		await advanceThroughGitHubIntegration();
@@ -939,13 +939,13 @@ describe("OnboardingWizard", () => {
 		fireEvent.click(screen.getByText("Next"));
 
 		await advanceThroughAiLlmStep();
-		await waitFor(() => expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull());
+		await waitFor(() => expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull());
 
 		// Rerunning the wizard with configured repos only pre-selects the
 		// configured repo; other accessible repos are left unchecked.
-		const yeetomaticCheckbox = screen.getByLabelText("mbrooks/yeetomatic") as HTMLInputElement;
+		const yolomaticCheckbox = screen.getByLabelText("mbrooks/yolomatic") as HTMLInputElement;
 		const helloCheckbox = screen.getByLabelText("octocat/hello") as HTMLInputElement;
-		expect(yeetomaticCheckbox.checked).toBe(true);
+		expect(yolomaticCheckbox.checked).toBe(true);
 		expect(helloCheckbox.checked).toBe(false);
 		// ...and the configured one shows an "enabled" badge.
 		expect(screen.getAllByText("enabled")).not.toBeNull();
@@ -958,7 +958,7 @@ describe("OnboardingWizard", () => {
 			fetchCount++;
 			return {
 				repositories: [
-					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic" },
+					{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic" },
 				],
 				configured: [],
 			};
@@ -991,7 +991,7 @@ describe("OnboardingWizard", () => {
 			const providerSelect = screen.getByLabelText("LLM Provider") as HTMLSelectElement;
 			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama"]);
 			expect(providerSelect.value).toBe("ollama");
-			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("yeetomatic-ollama");
+			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("yolomatic-ollama");
 			expect(screen.queryByText("Ollama sign-in status")).not.toBeNull();
 			expect(screen.queryByRole("button", { name: /Re-check status/u })).not.toBeNull();
 			expect(screen.queryByLabelText("LLM Model")).not.toBeNull();

@@ -8,7 +8,7 @@ function request(url: string, method = "GET"): http.IncomingMessage {
 		url,
 		method,
 		headers: {
-			cookie: "yeetomatic_admin_session=valid",
+			cookie: "yolomatic_admin_session=valid",
 		},
 	} as http.IncomingMessage;
 }
@@ -35,7 +35,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 	return {
 		sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never,
 		settingsStore: {
-			getString: vi.fn((_key: string, fallback?: string) => fallback ?? "yeetomatic-ollama"),
+			getString: vi.fn((_key: string, fallback?: string) => fallback ?? "yolomatic-ollama"),
 		},
 		ollamaSignInService: makeService({
 			signedIn: true,
@@ -67,8 +67,8 @@ describe("handleOllamaRoutes", () => {
 		const body = JSON.parse(res.body);
 		expect(body.signedIn).toBe(true);
 		expect(body.user).toBe("alice");
-		expect(deps.settingsStore.getString).toHaveBeenCalledWith("ollama_container_name", "yeetomatic-ollama");
-		expect(deps.ollamaSignInService.checkSignInStatus).toHaveBeenCalledWith({ containerName: "yeetomatic-ollama" });
+		expect(deps.settingsStore.getString).toHaveBeenCalledWith("ollama_container_name", "yolomatic-ollama");
+		expect(deps.ollamaSignInService.checkSignInStatus).toHaveBeenCalledWith({ containerName: "yolomatic-ollama" });
 	});
 
 	it("uses the configured container name from settings", async () => {

@@ -7,14 +7,14 @@ describe("buildIssuePrompt", () => {
 		const state = {
 			issueNumber: 42,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
 		} as never;
 		const prompt = buildIssuePrompt(state);
 		expect(prompt).toContain("#42");
-		expect(prompt).toContain("mbrooks/yeetomatic");
+		expect(prompt).toContain("mbrooks/yolomatic");
 		expect(prompt).toContain("/tmp/ws");
 		expect(prompt).toContain("Fix bug");
 		expect(prompt).toContain("Description here");
@@ -51,9 +51,10 @@ describe("buildFeedbackPrompt", () => {
 describe("buildStatusCorrectionPrompt", () => {
 	it("contains all three allowed markers", () => {
 		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("YEETOMATIC_STATUS: working");
-		expect(prompt).toContain("YEETOMATIC_STATUS: waiting-feedback");
-		expect(prompt).toContain("YEETOMATIC_STATUS: complete");
+		expect(prompt).toContain("YOLO_STATUS: working");
+		expect(prompt).toContain("YOLO_STATUS: waiting-feedback");
+		expect(prompt).toContain("YOLO_STATUS: complete");
+		expect(prompt).not.toContain(["YEETO", "MATIC_STATUS"].join(""));
 	});
 
 	it("explains that the previous response was rejected for lacking a marker", () => {
@@ -89,7 +90,7 @@ describe("buildPRReviewPrompt", () => {
 		const state = {
 			issueNumber: 56,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
@@ -97,8 +98,8 @@ describe("buildPRReviewPrompt", () => {
 		const prompt = buildPRReviewPrompt(state, [{ body: "Fix typo", user: "reviewer", path: "src/foo.ts", line: 42 }]);
 		expect(prompt).toContain("PR review feedback received");
 		expect(prompt).toContain("issue #56");
-		expect(prompt).toContain("mbrooks/yeetomatic");
-		expect(prompt).toContain("yeetomatic/issue-56");
+		expect(prompt).toContain("mbrooks/yolomatic");
+		expect(prompt).toContain("yolomatic/issue-56");
 		expect(prompt).toContain("Fix typo");
 		expect(prompt).toContain("src/foo.ts:42");
 	});
@@ -150,7 +151,7 @@ describe("buildPRReviewPrompt", () => {
 		const state = {
 			issueNumber: 56,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "Fix bug",
 			body: "Description here",
@@ -169,7 +170,7 @@ describe("buildIssueRefinementPrompt", () => {
 		const state = {
 			issueNumber: 7,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "Refine me",
 			body: "Original body",
@@ -186,7 +187,7 @@ describe("buildIssueRefinementPrompt", () => {
 		const state = {
 			issueNumber: 7,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "Refine me",
 			body: "Original body",
@@ -202,7 +203,7 @@ describe("buildIssueRefinementPrompt", () => {
 		const state = {
 			issueNumber: 8,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "T",
 			body: "B",
@@ -216,7 +217,7 @@ describe("buildIssueRefinementPrompt", () => {
 		const state = {
 			issueNumber: 9,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "T",
 			body: "B",
@@ -229,7 +230,7 @@ describe("buildIssueRefinementPrompt", () => {
 		const state = {
 			issueNumber: 10,
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			workspacePath: "/tmp/ws",
 			title: "T",
 			body: "B",

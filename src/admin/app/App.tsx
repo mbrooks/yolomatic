@@ -199,7 +199,7 @@ function AppHeader({
 }): React.ReactElement {
 	return (
 		<header>
-			<h1>Yeetomatic Admin</h1>
+			<h1>Yolomatic Admin</h1>
 			<div className="header-actions">
 				{authUser ? (
 					<span style={{ color: "var(--muted)", fontSize: "0.875rem", marginRight: "0.5rem" }}>

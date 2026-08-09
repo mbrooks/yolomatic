@@ -124,8 +124,8 @@ export function SettingsScreen({
 		(edited.ollama_container_name !== undefined
 			? String(edited.ollama_container_name)
 			: ollamaContainerSetting?.value) ??
-		(ollamaContainerSetting?.default !== undefined ? String(ollamaContainerSetting.default) : "yeetomatic-ollama") ??
-		"yeetomatic-ollama",
+		(ollamaContainerSetting?.default !== undefined ? String(ollamaContainerSetting.default) : "yolomatic-ollama") ??
+		"yolomatic-ollama",
 	);
 
 	if (loading) {

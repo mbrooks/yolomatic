@@ -108,7 +108,7 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 		// refinement attempt, so spending model-budget time on a repository init
 		// script there is wasteful and can fail the attempt for reasons unrelated
 		// to refinement. The skip is a hard skip keyed on the refinement prompt
-		// kind, independent of YEETOMATIC_WORKER_INIT_SKIP; every other launch
+		// kind, independent of YOLO_WORKER_INIT_SKIP; every other launch
 		// kind runs the init step exactly as before.
 		if (launchConfig.payload.prompt.kind !== "issue-refinement") {
 			await runEnvironmentInit({
@@ -120,7 +120,7 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 			});
 		}
 
-		tempDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-"));
+		tempDir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worker-"));
 
 		setGitHubGatewayTransport({
 			async call(request) {

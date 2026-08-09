@@ -15,7 +15,7 @@ describe("loadSoulContent", () => {
 	});
 
 	it("loads and caches SOUL.md content", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-soul-loader-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-soul-loader-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 		vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -31,6 +31,6 @@ describe("loadSoulContent", () => {
 		vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 		const { loadSoulContent } = await importLoader();
 
-		await expect(loadSoulContent("/tmp/missing-yeetomatic-soul.md")).resolves.toBe("");
+		await expect(loadSoulContent("/tmp/missing-yolomatic-soul.md")).resolves.toBe("");
 	});
 });

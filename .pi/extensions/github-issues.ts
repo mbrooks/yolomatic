@@ -2,7 +2,7 @@
  * GitHub Issues Extension for pi-coding-agent (worker/gateway mode)
  *
  * Provides scoped GitHub issue and pull-request management tools for the
- * Yeetomatic disposable worker. The worker never receives `GITHUB_TOKEN`;
+ * Yolomatic disposable worker. The worker never receives `GITHUB_TOKEN`;
  * every tool call is routed over the worker session WebSocket to the
  * control-plane {@link WorkerGitHubGateway}, which performs the GitHub call on
  * the worker's behalf and enforces session scope (current issue + its PRs).

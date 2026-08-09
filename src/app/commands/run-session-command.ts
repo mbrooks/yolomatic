@@ -111,7 +111,7 @@ export class RunSessionCommand {
 					return ok<CancelResult>({
 						cancelled: true,
 						wasActive,
-						message: "Cancellation signal sent. Yeetomatic will stop after completing the current step.",
+						message: "Cancellation signal sent. Yolomatic will stop after completing the current step.",
 					});
 				}
 				if (session.status === "working") {
@@ -122,7 +122,7 @@ export class RunSessionCommand {
 					cancelled: false,
 					wasActive,
 					status: session.status,
-					message: session.status === "cancelled" ? "Session marked as cancelled." : "Yeetomatic was not active on this session.",
+					message: session.status === "cancelled" ? "Session marked as cancelled." : "Yolomatic was not active on this session.",
 				});
 			}
 
@@ -149,7 +149,7 @@ export class RunSessionCommand {
 						restarted: true,
 						dispatched: false,
 						status: queued.status,
-						message: "Session reset and queued. Yeetomatic will restart it after the deploy completes.",
+						message: "Session reset and queued. Yolomatic will restart it after the deploy completes.",
 					});
 				}
 
@@ -167,7 +167,7 @@ export class RunSessionCommand {
 					restarted: true,
 					dispatched: true,
 					status: restarted.status,
-					message: "Session reset and restart dispatched. Yeetomatic is starting execution.",
+					message: "Session reset and restart dispatched. Yolomatic is starting execution.",
 				});
 			}
 

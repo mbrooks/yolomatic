@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { UserStore, hashPassword, verifyPassword } from "./store.js";
 
 async function tmpStore(): Promise<UserStore> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-user-store-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-user-store-"));
 	const store = new UserStore(path.join(dir, "users.sqlite"));
 	return store;
 }

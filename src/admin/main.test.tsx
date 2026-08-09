@@ -96,20 +96,20 @@ describe("App", () => {
 				uptime: "1m",
 				draining: false,
 				repos: [
-					{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 3, activeCount: 2, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "yolomatic", sessionCount: 3, activeCount: 2, lastActivity: new Date().toISOString() },
 					{ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [
 					{
 						owner: "mbrooks",
-						repo: "yeetomatic",
+						repo: "yolomatic",
 						issueNumber: 1,
 						status: "working",
 						title: null,
 						body: null,
 						summary: null,
 						workspacePath: "/ws/1",
-						branch: "yeetomatic/issue-1",
+						branch: "yolomatic/issue-1",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 3600000).toISOString(),
 						prUrl: null,
@@ -121,14 +121,14 @@ describe("App", () => {
 					},
 					{
 						owner: "mbrooks",
-						repo: "yeetomatic",
+						repo: "yolomatic",
 						issueNumber: 2,
 						status: "pending",
 						title: null,
 						body: null,
 						summary: null,
 						workspacePath: "/ws/2",
-						branch: "yeetomatic/issue-2",
+						branch: "yolomatic/issue-2",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 7200000).toISOString(),
 						prUrl: null,
@@ -140,14 +140,14 @@ describe("App", () => {
 					},
 					{
 						owner: "mbrooks",
-						repo: "yeetomatic",
+						repo: "yolomatic",
 						issueNumber: 3,
 						status: "complete",
 						title: null,
 						body: null,
 						summary: null,
 						workspacePath: "/ws/3",
-						branch: "yeetomatic/issue-3",
+						branch: "yolomatic/issue-3",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
@@ -166,7 +166,7 @@ describe("App", () => {
 						body: null,
 						summary: null,
 						workspacePath: "/ws/4",
-						branch: "yeetomatic/issue-4",
+						branch: "yolomatic/issue-4",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 1800000).toISOString(),
 						prUrl: null,
@@ -234,14 +234,14 @@ describe("App", () => {
 				sessions: [
 					{
 						owner: "mbrooks",
-						repo: "yeetomatic",
+						repo: "yolomatic",
 						issueNumber: 1,
 						status: "complete",
 						title: null,
 						body: null,
 						summary: null,
 						workspacePath: "/ws/1",
-						branch: "yeetomatic/issue-1",
+						branch: "yolomatic/issue-1",
 						lastActivity: new Date().toISOString(),
 						createdAt: new Date(Date.now() - 86400000).toISOString(),
 						prUrl: null,
@@ -278,7 +278,7 @@ describe("App", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Repositories/ }));
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/yeetomatic")).not.toBeNull();
+			expect(screen.queryByText("mbrooks/yolomatic")).not.toBeNull();
 		});
 	});
 
@@ -311,7 +311,7 @@ describe("App", () => {
 		fireEvent.click(sessionRow!);
 
 		await waitFor(() => {
-			expect(screen.queryByText("mbrooks/yeetomatic#1")).not.toBeNull();
+			expect(screen.queryByText("mbrooks/yolomatic#1")).not.toBeNull();
 		});
 	});
 
@@ -323,7 +323,7 @@ describe("App", () => {
 				uptime: "1m",
 				draining: true,
 				repos: [
-					{ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
+					{ owner: "mbrooks", repo: "yolomatic", sessionCount: 1, activeCount: 0, lastActivity: new Date().toISOString() },
 				],
 				sessions: [],
 			});
@@ -332,7 +332,7 @@ describe("App", () => {
 		render(<App />);
 
 		await waitFor(() => {
-			expect(screen.queryByText("Yeetomatic is marked for restart. Maintenance mode active.")).not.toBeNull();
+			expect(screen.queryByText("Yolomatic is marked for restart. Maintenance mode active.")).not.toBeNull();
 		});
 	});
 
@@ -343,7 +343,7 @@ describe("App", () => {
 			expect(screen.queryByText("Active Work")).not.toBeNull();
 		});
 
-		expect(screen.queryByText("Yeetomatic is marked for restart. Maintenance mode active.")).toBeNull();
+		expect(screen.queryByText("Yolomatic is marked for restart. Maintenance mode active.")).toBeNull();
 	});
 });
 
@@ -372,14 +372,14 @@ function mockLogResponse(overrides: Record<string, unknown> = {}) {
 function makeSession(status: "working" | "pending" | "waiting-feedback" | "complete" | "failed" | "cancelled") {
 	return {
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		issueNumber: 1,
 		status,
 		title: null,
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "yeetomatic/issue-1",
+		branch: "yolomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,

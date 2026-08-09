@@ -130,8 +130,8 @@ export function navigate(route: Route): void {
 
 export function getDefaultAdminPage(): string {
 	const configured =
-		typeof window !== "undefined" && typeof (window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__?: unknown }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__ === "string"
-			? (window as unknown as { __YEETOMATIC_ADMIN_DEFAULT_PAGE__: string }).__YEETOMATIC_ADMIN_DEFAULT_PAGE__
+		typeof window !== "undefined" && typeof (window as unknown as { __YOLO_ADMIN_DEFAULT_PAGE__?: unknown }).__YOLO_ADMIN_DEFAULT_PAGE__ === "string"
+			? (window as unknown as { __YOLO_ADMIN_DEFAULT_PAGE__: string }).__YOLO_ADMIN_DEFAULT_PAGE__
 			: "#/dashboard";
 	return configured || "#/dashboard";
 }

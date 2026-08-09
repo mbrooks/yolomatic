@@ -1,11 +1,11 @@
 ---
 name: issue-refinement
-description: Repository-specific guidance for Yeetomatic's issue-refinement worker. Used when a maintainer runs `/yeetomatic issue-refinement` on an issue in mbrooks/yeetomatic; instructs the worker how to investigate the issue and produce a Proposed Task body that matches this repository's conventions.
+description: Repository-specific guidance for Yolomatic's issue-refinement worker. Used when a maintainer runs `/yolomatic issue-refinement` on an issue in mbrooks/yolomatic; instructs the worker how to investigate the issue and produce a Proposed Task body that matches this repository's conventions.
 ---
 
 # Issue Refinement
 
-This skill governs how to investigate an issue in `mbrooks/yeetomatic` and produce a Proposed Task body. It supplements the base refinement prompt with repository-specific judgment. Do not restate the JSON output fields, allowed actions, or generic workflow already provided in the base prompt.
+This skill governs how to investigate an issue in `mbrooks/yolomatic` and produce a Proposed Task body. It supplements the base refinement prompt with repository-specific judgment. Do not restate the JSON output fields, allowed actions, or generic workflow already provided in the base prompt.
 
 ## Investigation approach
 

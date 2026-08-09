@@ -8,7 +8,7 @@ function request(url: string, method = "GET", body?: string): http.IncomingMessa
 		url,
 		method,
 		headers: {
-			cookie: "yeetomatic_admin_session=valid",
+			cookie: "yolomatic_admin_session=valid",
 		},
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {

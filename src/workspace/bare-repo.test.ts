@@ -20,8 +20,8 @@ function createConfig(workspacesDir: string): WorkspaceConfig {
 
 describe("BareRepoManager", () => {
 	it("clones a bare repo when no cached repo exists", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-clone-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-clone-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "clone") {
 				return { stdout: "", stderr: "" };
@@ -31,17 +31,17 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yolomatic")).resolves.toBe(bareRepoPath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yolomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("reclones when an existing path is not a valid git repository", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-invalid-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-invalid-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -55,17 +55,17 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yolomatic")).resolves.toBe(bareRepoPath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yolomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("reclones an existing bare repo when refresh hits a lock-permission error", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-refresh-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-refresh-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -74,8 +74,8 @@ describe("BareRepoManager", () => {
 			if (args.includes("fetch")) {
 				throw new Error(
 					"Command failed: git fetch origin +refs/heads/*:refs/remotes/origin/* --prune\n" +
-						"error: cannot lock ref 'refs/remotes/origin/yeetomatic/issue-427': Permission denied\n" +
-						"error: could not remove reference refs/remotes/origin/yeetomatic/issue-427",
+						"error: cannot lock ref 'refs/remotes/origin/yolomatic/issue-427': Permission denied\n" +
+						"error: could not remove reference refs/remotes/origin/yolomatic/issue-427",
 				);
 			}
 			if (args[0] === "clone") {
@@ -86,7 +86,7 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).resolves.toBe(bareRepoPath);
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yolomatic")).resolves.toBe(bareRepoPath);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -95,14 +95,14 @@ describe("BareRepoManager", () => {
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["clone", "--bare", "https://github.com/mbrooks/yeetomatic.git", bareRepoPath],
+			["clone", "--bare", "https://github.com/mbrooks/yolomatic.git", bareRepoPath],
 			expect.objectContaining({ env: expect.any(Object) }),
 		);
 	});
 
 	it("rethrows non-recoverable refresh failures for an existing bare repo", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-refresh-fail-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-refresh-fail-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -116,7 +116,7 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await expect(bareRepos.ensureBareRepo("mbrooks", "yeetomatic")).rejects.toThrow("repository 'origin' not found");
+		await expect(bareRepos.ensureBareRepo("mbrooks", "yolomatic")).rejects.toThrow("repository 'origin' not found");
 		expect(runCommand).not.toHaveBeenCalledWith(
 			"git",
 			expect.arrayContaining(["clone"]),
@@ -125,8 +125,8 @@ describe("BareRepoManager", () => {
 	});
 
 	it("replaces legacy credential-bearing remotes before fetching", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-sanitize-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-sanitize-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -137,11 +137,11 @@ describe("BareRepoManager", () => {
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 		const bareRepos = new BareRepoManager(createConfig(root), git);
 
-		await bareRepos.ensureBareRepo("mbrooks", "yeetomatic");
+		await bareRepos.ensureBareRepo("mbrooks", "yolomatic");
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["remote", "set-url", "origin", "https://github.com/mbrooks/yeetomatic.git"],
+			["remote", "set-url", "origin", "https://github.com/mbrooks/yolomatic.git"],
 			{ cwd: bareRepoPath },
 		);
 		const remoteUpdateIndex = (runCommand as ReturnType<typeof vi.fn>).mock.calls.findIndex(
@@ -152,7 +152,7 @@ describe("BareRepoManager", () => {
 	});
 
 	it("ignores remote set-head errors while updating the default branch", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-set-head-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-set-head-"));
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "fetch") {
 				return { stdout: "", stderr: "" };
@@ -169,7 +169,7 @@ describe("BareRepoManager", () => {
 	});
 
 	it("resolves a single remote branch when origin HEAD is unavailable", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-repo-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-repo-"));
 		const git = new GitCommandRunner(
 			createConfig(root),
 			vi.fn(async (_command, args) => {
@@ -192,7 +192,7 @@ describe("BareRepoManager", () => {
 	});
 
 	it("throws EmptyRepositoryError when no refs are available", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-empty-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-empty-"));
 		const git = new GitCommandRunner(
 			createConfig(root),
 			vi.fn(async (_command, args) => {
@@ -212,7 +212,7 @@ describe("BareRepoManager", () => {
 
 	describe("updateLocalBranchToOrigin", () => {
 		it("creates the local ref when it does not exist and reports updated=true", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-create-ref-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-create-ref-"));
 			const calls: Array<[string, string[]]> = [];
 			const runCommand: CommandRunner = vi.fn(async (_command, args, options) => {
 				calls.push(["git", args]);
@@ -255,7 +255,7 @@ describe("BareRepoManager", () => {
 		});
 
 		it("fast-forwards an existing local ref and reports updated=true", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-ff-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-ff-"));
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 				if (args[0] === "rev-parse" && args.includes("--verify")) {
 					return { stdout: "before5678\n", stderr: "" };
@@ -284,7 +284,7 @@ describe("BareRepoManager", () => {
 		});
 
 		it("reports updated=false and skips the branch update when already up to date", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-noop-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-noop-"));
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 				if (args[0] === "rev-parse") {
 					return { stdout: "same1234\n", stderr: "" };
@@ -309,7 +309,7 @@ describe("BareRepoManager", () => {
 		});
 
 		it("throws when origin branch does not exist and performs no ref mutation", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-missing-origin-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-missing-origin-"));
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 				if (args[0] === "rev-parse" && args.includes("--verify")) {
 					const ref = args[args.length - 1];
@@ -333,7 +333,7 @@ describe("BareRepoManager", () => {
 		});
 
 		it("surfaces fetch failures as errors", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-fetch-fail-"));
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-fetch-fail-"));
 			const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 				if (args[0] === "fetch") {
 					throw new Error("fatal: could not read from remote");

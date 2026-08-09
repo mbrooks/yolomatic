@@ -1,6 +1,6 @@
 # Auto-Update via Cron
 
-Yeetomatic can auto-update itself from `origin/main` using the included script `scripts/update-yeetomatic-if-needed.sh`.
+Yolomatic can auto-update itself from `origin/main` using the included script `scripts/update-yolomatic-if-needed.sh`.
 
 ## What it does
 
@@ -14,7 +14,7 @@ Yeetomatic can auto-update itself from `origin/main` using the included script `
 
 1. Make sure the script is executable:
    ```bash
-   chmod +x scripts/update-yeetomatic-if-needed.sh
+   chmod +x scripts/update-yolomatic-if-needed.sh
    ```
 
 2. Open your crontab:
@@ -24,25 +24,25 @@ Yeetomatic can auto-update itself from `origin/main` using the included script `
 
 3. Add an entry to run every 15 minutes (adjust path to your clone):
    ```cron
-   */15 * * * * cd /opt/yeetomatic && ./scripts/update-yeetomatic-if-needed.sh >> /var/log/yeetomatic-update.log 2>&1
+   */15 * * * * cd /opt/yolomatic && ./scripts/update-yolomatic-if-needed.sh >> /var/log/yolomatic-update.log 2>&1
    ```
 
    Or with `SHELL` and `PATH` set for Docker and Node:
    ```cron
    SHELL=/bin/bash
    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-   */15 * * * * cd /opt/yeetomatic && ./scripts/update-yeetomatic-if-needed.sh >> /var/log/yeetomatic-update.log 2>&1
+   */15 * * * * cd /opt/yolomatic && ./scripts/update-yolomatic-if-needed.sh >> /var/log/yolomatic-update.log 2>&1
    ```
 
 ## Post-restart checks
 
-- Yeetomatic exposes port `6767`. After the script runs `docker compose up -d --build`, verify the container is healthy:
+- Yolomatic exposes port `6767`. After the script runs `docker compose up -d --build`, verify the container is healthy:
   ```bash
-  docker ps --filter name=yeetomatic
+  docker ps --filter name=yolomatic
   curl -f http://localhost:6767/webhook -X POST -H "X-GitHub-Event: ping" -d '{"zen":"Ping!"}'
   ```
 
 ## Notes
 
-- **Data survives restarts.** Volumes `yeetomatic_sessions`, `yeetomatic_workspaces`, and `yeetomatic_pi` are mounted externally, so active sessions and workspace checkouts persist across container restarts.
-- **In-flight webhooks may be interrupted.** GitHub retries most webhook deliveries automatically, but any currently running Yeetomatic session inside the container will be cut short during the restart.
+- **Data survives restarts.** Volumes `yolomatic_sessions`, `yolomatic_workspaces`, and `yolomatic_pi` are mounted externally, so active sessions and workspace checkouts persist across container restarts.
+- **In-flight webhooks may be interrupted.** GitHub retries most webhook deliveries automatically, but any currently running Yolomatic session inside the container will be cut short during the restart.

@@ -55,23 +55,23 @@ describe("DockerWorkerExecutor", () => {
 			expect(args).toContain("run");
 			expect(args).toContain("--mount");
 			expect(args).not.toContain("GITHUB_TOKEN");
-			expect(options.env.YEETOMATIC_SESSION_KEY).toBe("github-mbrooks-yeetomatic-issue-418-implementation");
-			expect(options.env.YEETOMATIC_SESSION_WS_URL).toContain("sessionKey=github-mbrooks-yeetomatic-issue-418-implementation");
+			expect(options.env.YOLO_SESSION_KEY).toBe("github-mbrooks-yolomatic-issue-418-implementation");
+			expect(options.env.YOLO_SESSION_WS_URL).toContain("sessionKey=github-mbrooks-yolomatic-issue-418-implementation");
 
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					const launch = message as WorkerProtocolMessage<"launch_config">;
 					expect(launch.payload.session.workspacePath).toBe(harness.workspacePath);
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-418-implementation", "ack-1", {
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-418-implementation", "ack-1", {
 							ackMessageId: launch.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("event_batch", "github-mbrooks-yeetomatic-issue-418-implementation", "events-1", {
+						createWorkerMessage("event_batch", "github-mbrooks-yolomatic-issue-418-implementation", "events-1", {
 							events: [
 								{
 									type: "session_log",
@@ -86,11 +86,11 @@ describe("DockerWorkerExecutor", () => {
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-418-implementation", "complete-1", {
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-418-implementation", "complete-1", {
 							result: {
 								status: "complete",
 								summary: "done",
-								rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+								rawResponse: "YOLO_STATUS: complete\ndone",
 							},
 						}),
 					);
@@ -103,7 +103,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			const result = await harness.executor.execute({
 				issueNumber: 418,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Implement dockerized worker runtime",
 				body: "Body",
@@ -116,11 +116,11 @@ describe("DockerWorkerExecutor", () => {
 
 			expect(result.status).toBe("complete");
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"github-mbrooks-yeetomatic-issue-418-implementation",
-				expect.objectContaining({ message: "Launching worker container yeetomatic-session-mbrooks-yeetomatic-418" }),
+				"github-mbrooks-yolomatic-issue-418-implementation",
+				expect.objectContaining({ message: "Launching worker container yolomatic-session-mbrooks-yolomatic-418" }),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"github-mbrooks-yeetomatic-issue-418-implementation",
+				"github-mbrooks-yolomatic-issue-418-implementation",
 				expect.objectContaining({ message: "Prompt sent" }),
 			);
 		} finally {
@@ -136,20 +136,20 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-419-implementation", "ack-build", {
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-419-implementation", "ack-build", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-419-implementation", "complete-build", {
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-419-implementation", "complete-build", {
 							result: {
 								status: "complete",
 								summary: "done",
-								rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+								rawResponse: "YOLO_STATUS: complete\ndone",
 							},
 						}),
 					);
@@ -161,7 +161,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			await harness.executor.execute({
 				issueNumber: 419,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Build image when missing",
 				body: "Body",
@@ -180,9 +180,9 @@ describe("DockerWorkerExecutor", () => {
 					"--target",
 					"worker",
 					"--label",
-					"io.yeetomatic.worker.transport=websocket-v1",
+					"io.yolomatic.worker.transport=websocket-v1",
 					"-t",
-					"yeetomatic-worker:latest",
+					"yolomatic-worker:latest",
 					"/repo",
 				],
 				expect.any(Object),
@@ -201,20 +201,20 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-424-implementation", "ack-rebuild", {
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-424-implementation", "ack-rebuild", {
 							ackMessageId: message.messageId,
 						}),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-424-implementation", "complete-rebuild", {
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-424-implementation", "complete-rebuild", {
 							result: {
 								status: "complete",
 								summary: "done",
-								rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+								rawResponse: "YOLO_STATUS: complete\ndone",
 							},
 						}),
 					);
@@ -226,7 +226,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			await harness.executor.execute({
 				issueNumber: 424,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Rebuild stale worker image",
 				body: "Body",
@@ -245,9 +245,9 @@ describe("DockerWorkerExecutor", () => {
 					"--target",
 					"worker",
 					"--label",
-					"io.yeetomatic.worker.transport=websocket-v1",
+					"io.yolomatic.worker.transport=websocket-v1",
 					"-t",
-					"yeetomatic-worker:latest",
+					"yolomatic-worker:latest",
 					harness.projectRoot,
 				],
 				expect.any(Object),
@@ -264,7 +264,7 @@ describe("DockerWorkerExecutor", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "named-volume",
 			workerControlBaseUrl: "https://control.example.test/base",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
@@ -275,8 +275,8 @@ describe("DockerWorkerExecutor", () => {
 		expect((executor as any).buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
 		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
 		expect((executor as any).appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
-		expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yeetomatic-issue-1-implementation", "token-1")).toBe(
-			"wss://control.example.test/yeetomatic-worker/ws?sessionKey=github-mbrooks-yeetomatic-issue-1-implementation&token=token-1",
+		expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
+			"wss://control.example.test/yolomatic-worker/ws?sessionKey=github-mbrooks-yolomatic-issue-1-implementation&token=token-1",
 		);
 		expect(() => (executor as any).resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
 	});
@@ -286,7 +286,7 @@ describe("DockerWorkerExecutor", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "named-volume",
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
@@ -310,10 +310,10 @@ describe("DockerWorkerExecutor", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://127.0.0.1:6767",
-			workerDockerNetworkMode: "container:yeetomatic",
+			workerDockerNetworkMode: "container:yolomatic",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
@@ -322,13 +322,13 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
-			expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yeetomatic-issue-1-implementation", "token-1")).toBe(
-				"ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=github-mbrooks-yeetomatic-issue-1-implementation&token=token-1",
+			expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
+				"ws://127.0.0.1:6767/yolomatic-worker/ws?sessionKey=github-mbrooks-yolomatic-issue-1-implementation&token=token-1",
 			);
 
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
 			expect(args).toContain("--network");
-			expect(args).toContain("container:yeetomatic");
+			expect(args).toContain("container:yolomatic");
 			expect(args).not.toContain("--add-host");
 		} finally {
 			delete process.env.OLLAMA_HOST;
@@ -340,10 +340,10 @@ describe("DockerWorkerExecutor", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/app/workspaces",
-			workerImage: "yeetomatic-worker:latest",
-			workerWorkspaceMountSource: "yeetomatic_workspaces",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "yolomatic_workspaces",
 			workerControlBaseUrl: "http://127.0.0.1:6767",
-			workerDockerNetworkMode: "container:yeetomatic",
+			workerDockerNetworkMode: "container:yolomatic",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
@@ -354,7 +354,7 @@ describe("DockerWorkerExecutor", () => {
 			callback(
 				null,
 				JSON.stringify([
-					{ Destination: "/app/workspaces", Type: "volume", Name: "yeetomatic_yeetomatic_workspaces" },
+					{ Destination: "/app/workspaces", Type: "volume", Name: "yolomatic_yolomatic_workspaces" },
 				]),
 				"",
 			),
@@ -362,7 +362,7 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("type=volume,src=yeetomatic_yeetomatic_workspaces,dst=/app/workspaces");
+			expect(args).toContain("type=volume,src=yolomatic_yolomatic_workspaces,dst=/app/workspaces");
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
 				["inspect", "--format", "{{json .Mounts}}", "container-123"],
@@ -379,7 +379,7 @@ describe("DockerWorkerExecutor", () => {
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
@@ -399,52 +399,52 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
-	it("forwards YEETOMATIC_WORKER_INIT_* env vars when present", async () => {
+	it("forwards YOLO_WORKER_INIT_* env vars when present", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
 
-		process.env.YEETOMATIC_WORKER_INIT_SCRIPT = "scripts/bootstrap.sh";
-		process.env.YEETOMATIC_WORKER_INIT_SKIP = "0";
-		process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS = "600";
+		process.env.YOLO_WORKER_INIT_SCRIPT = "scripts/bootstrap.sh";
+		process.env.YOLO_WORKER_INIT_SKIP = "0";
+		process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS = "600";
 
 		try {
 			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("YEETOMATIC_WORKER_INIT_SCRIPT=scripts/bootstrap.sh");
-			expect(args).toContain("YEETOMATIC_WORKER_INIT_SKIP=0");
-			expect(args).toContain("YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS=600");
+			expect(args).toContain("YOLO_WORKER_INIT_SCRIPT=scripts/bootstrap.sh");
+			expect(args).toContain("YOLO_WORKER_INIT_SKIP=0");
+			expect(args).toContain("YOLO_WORKER_INIT_TIMEOUT_SECONDS=600");
 		} finally {
-			delete process.env.YEETOMATIC_WORKER_INIT_SCRIPT;
-			delete process.env.YEETOMATIC_WORKER_INIT_SKIP;
-			delete process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS;
+			delete process.env.YOLO_WORKER_INIT_SCRIPT;
+			delete process.env.YOLO_WORKER_INIT_SKIP;
+			delete process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS;
 		}
 	});
 
-	it("omits YEETOMATIC_WORKER_INIT_* env vars when absent", async () => {
+	it("omits YOLO_WORKER_INIT_* env vars when absent", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
 			workspacesDir: "/workspace-root",
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			soulPath: "/app/SOUL.md",
 		});
 
-		delete process.env.YEETOMATIC_WORKER_INIT_SCRIPT;
-		delete process.env.YEETOMATIC_WORKER_INIT_SKIP;
-		delete process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS;
+		delete process.env.YOLO_WORKER_INIT_SCRIPT;
+		delete process.env.YOLO_WORKER_INIT_SKIP;
+		delete process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS;
 
 		const args = await (executor as any).buildDockerRunArgs("worker-1");
-		expect(args.some((arg: string) => arg.startsWith("YEETOMATIC_WORKER_INIT_"))).toBe(false);
+		expect(args.some((arg: string) => arg.startsWith("YOLO_WORKER_INIT_"))).toBe(false);
 	});
 
 	it("propagates worker errors", async () => {
@@ -458,11 +458,11 @@ describe("DockerWorkerExecutor", () => {
 
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("error", "github-mbrooks-yeetomatic-issue-420-implementation", "error-1", {
+						createWorkerMessage("error", "github-mbrooks-yolomatic-issue-420-implementation", "error-1", {
 							message: "worker blew up",
 						}),
 					);
@@ -478,7 +478,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 420,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Feedback task",
 					body: "Body",
@@ -505,11 +505,11 @@ describe("DockerWorkerExecutor", () => {
 
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type === "launch_config") {
 						await connection.send(
-							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-421-implementation", "ack-launch", {
+							createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-421-implementation", "ack-launch", {
 								ackMessageId: message.messageId,
 							}),
 						);
@@ -518,12 +518,12 @@ describe("DockerWorkerExecutor", () => {
 					if (message.type === "control") {
 						sawStop = message.payload.action === "stop";
 						await connection.send(
-							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-421-implementation", "ack-stop", {
+							createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-421-implementation", "ack-stop", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-421-implementation", "complete-stop", {
+							createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-421-implementation", "complete-stop", {
 								result: {
 									status: "cancelled",
 									summary: "stopped",
@@ -543,7 +543,7 @@ describe("DockerWorkerExecutor", () => {
 		try {
 			const run = harness.executor.execute({
 				issueNumber: 421,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Abort task",
 				body: "Body",
@@ -568,9 +568,9 @@ describe("DockerWorkerExecutor", () => {
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
-			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
+			void connectWorkerSession(harness.workerRpcServer, options.env.YOLO_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send(
-					createWorkerMessage("hello", "github-mbrooks-yeetomatic-issue-999-implementation", "hello-wrong-session", {
+					createWorkerMessage("hello", "github-mbrooks-yolomatic-issue-999-implementation", "hello-wrong-session", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -583,7 +583,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 422,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Wrong session key",
 					body: "Body",
@@ -605,9 +605,9 @@ describe("DockerWorkerExecutor", () => {
 
 		spawnMock.mockImplementation((_cmd, _args, options) => {
 			const child = makeChildProcess();
-			void connectWorkerSession(harness.workerRpcServer, options.env.YEETOMATIC_SESSION_WS_URL as string).then(async (connection) => {
+			void connectWorkerSession(harness.workerRpcServer, options.env.YOLO_SESSION_WS_URL as string).then(async (connection) => {
 				await connection.send({
-					...createWorkerMessage("hello", "github-mbrooks-yeetomatic-issue-423-implementation", "hello-bad-version", {
+					...createWorkerMessage("hello", "github-mbrooks-yolomatic-issue-423-implementation", "hello-bad-version", {
 						workerVersion: "test",
 						pid: 321,
 					}),
@@ -621,7 +621,7 @@ describe("DockerWorkerExecutor", () => {
 			await expect(
 				harness.executor.execute({
 					issueNumber: 423,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Bad protocol version",
 					body: "Body",
@@ -653,20 +653,20 @@ describe("DockerWorkerExecutor", () => {
 				const child = makeChildProcess();
 				void connectMockWorker(
 					harness.workerRpcServer,
-					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					options.env.YOLO_SESSION_WS_URL as string,
 					async (connection, message) => {
 						if (message.type !== "launch_config") return;
 						await connection.send(
-							createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-425-implementation", "ack-retry", {
+							createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-425-implementation", "ack-retry", {
 								ackMessageId: message.messageId,
 							}),
 						);
 						await connection.send(
-							createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-425-implementation", "complete-retry", {
+							createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-425-implementation", "complete-retry", {
 								result: {
 									status: "complete",
 									summary: "recovered",
-									rawResponse: "YEETOMATIC_STATUS: complete\nrecovered",
+									rawResponse: "YOLO_STATUS: complete\nrecovered",
 								},
 							}),
 						);
@@ -682,20 +682,20 @@ describe("DockerWorkerExecutor", () => {
 			expect(spawnMock).toHaveBeenCalledTimes(2);
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
-				["inspect", "--format", "{{.State.Status}}", "yeetomatic-session-mbrooks-yeetomatic-425"],
+				["inspect", "--format", "{{.State.Status}}", "yolomatic-session-mbrooks-yolomatic-425"],
 				expect.any(Object),
 				expect.any(Function),
 			);
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
-				["rm", "yeetomatic-session-mbrooks-yeetomatic-425"],
+				["rm", "yolomatic-session-mbrooks-yolomatic-425"],
 				expect.any(Object),
 				expect.any(Function),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"github-mbrooks-yeetomatic-issue-425-implementation",
+				"github-mbrooks-yolomatic-issue-425-implementation",
 				expect.objectContaining({
-					message: "Removed stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-425; retrying launch",
+					message: "Removed stopped conflicting worker container yolomatic-session-mbrooks-yolomatic-425; retrying launch",
 				}),
 			);
 		} finally {
@@ -716,12 +716,12 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(426, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-yeetomatic-426" is already in use',
+				'The container name "/yolomatic-session-mbrooks-yolomatic-426" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(execFileMock).not.toHaveBeenCalledWith(
 				"docker",
-				["rm", "yeetomatic-session-mbrooks-yeetomatic-426"],
+				["rm", "yolomatic-session-mbrooks-yolomatic-426"],
 				expect.any(Object),
 				expect.any(Function),
 			);
@@ -743,13 +743,13 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(428, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-yeetomatic-428" is already in use',
+				'The container name "/yolomatic-session-mbrooks-yolomatic-428" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"github-mbrooks-yeetomatic-issue-428-implementation",
+				"github-mbrooks-yolomatic-issue-428-implementation",
 				expect.objectContaining({
-					message: "Could not inspect conflicting worker container yeetomatic-session-mbrooks-yeetomatic-428",
+					message: "Could not inspect conflicting worker container yolomatic-session-mbrooks-yolomatic-428",
 				}),
 			);
 		} finally {
@@ -774,13 +774,13 @@ describe("DockerWorkerExecutor", () => {
 
 		try {
 			await expect(harness.executor.execute(makeSessionState(429, harness.workspacePath))).rejects.toThrow(
-				'The container name "/yeetomatic-session-mbrooks-yeetomatic-429" is already in use',
+				'The container name "/yolomatic-session-mbrooks-yolomatic-429" is already in use',
 			);
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
-				"github-mbrooks-yeetomatic-issue-429-implementation",
+				"github-mbrooks-yolomatic-issue-429-implementation",
 				expect.objectContaining({
-					message: "Could not remove stopped conflicting worker container yeetomatic-session-mbrooks-yeetomatic-429",
+					message: "Could not remove stopped conflicting worker container yolomatic-session-mbrooks-yolomatic-429",
 				}),
 			);
 		} finally {
@@ -816,7 +816,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(430);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://x-access-token:ghp_secret@github.com/mbrooks/yeetomatic.git\n", "");
+				callback(null, "https://x-access-token:ghp_secret@github.com/mbrooks/yolomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -840,7 +840,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(431);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -851,15 +851,15 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-431-implementation", "ack-safe", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-431-implementation", "ack-safe", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-431-implementation", "complete-safe", {
-							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-431-implementation", "complete-safe", {
+							result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 						}),
 					);
 				},
@@ -880,7 +880,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(450);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -890,15 +890,15 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					expect((message as WorkerProtocolMessage<"launch_config">).payload.prompt.kind).toBe("issue-refinement");
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-450-refinement", "ack-refine", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-450-refinement", "ack-refine", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-450-refinement", "complete-refine", {
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-450-refinement", "complete-refine", {
 							result: {
 								proposedTaskBody: "## Summary\nRefined.",
 								summary: "Better description.",
@@ -928,7 +928,7 @@ describe("DockerWorkerExecutor", () => {
 		const harness = await createHarness(451);
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -938,14 +938,14 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-451-refinement", "ack-bad", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-451-refinement", "ack-bad", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-451-refinement", "complete-bad", {
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-451-refinement", "complete-bad", {
 							result: { proposedTaskBody: "", summary: "", investigation: "" } as any,
 						}),
 					);
@@ -974,7 +974,7 @@ describe("DockerWorkerExecutor", () => {
 				return;
 			}
 			if (args[0] === "remote" && args[1] === "get-url") {
-				callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+				callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 				return;
 			}
 			callback(null, currentWorkerTransport, "");
@@ -984,15 +984,15 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-452-implementation", "ack-fallback", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-452-implementation", "ack-fallback", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-452-implementation", "complete-fallback", {
-							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-452-implementation", "complete-fallback", {
+							result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 						}),
 					);
 				},
@@ -1023,15 +1023,15 @@ describe("DockerWorkerExecutor", () => {
 			const child = makeChildProcess();
 			void connectMockWorker(
 				harness.workerRpcServer,
-				options.env.YEETOMATIC_SESSION_WS_URL as string,
+				options.env.YOLO_SESSION_WS_URL as string,
 				async (connection, message) => {
 					if (message.type !== "launch_config") return;
 					await connection.send(
-						createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-453-implementation", "ack-noremote", { ackMessageId: message.messageId }),
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-453-implementation", "ack-noremote", { ackMessageId: message.messageId }),
 					);
 					await connection.send(
-						createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-453-implementation", "complete-noremote", {
-							result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-453-implementation", "complete-noremote", {
+							result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 						}),
 					);
 				},
@@ -1054,13 +1054,13 @@ describe("DockerWorkerExecutor", () => {
 		it("routes a worker tool_request through the gateway and logs success", async () => {
 			const harness = await createHarness(460);
 			const github: GitHubGatewayService = {
-				getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
+				getAuthenticatedUser: vi.fn(async () => ({ login: "yolomatic-bot" })),
 			} as unknown as GitHubGatewayService;
 			const gateway = new WorkerGitHubGateway(github, makeFakeWorkspace());
 			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
 			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 				if (args[0] === "remote" && args[1] === "get-url") {
-					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 					return;
 				}
 				callback(null, gatewayTransport, "");
@@ -1070,14 +1070,14 @@ describe("DockerWorkerExecutor", () => {
 				const child = makeChildProcess();
 				void connectMockWorker(
 					harness.workerRpcServer,
-					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					options.env.YOLO_SESSION_WS_URL as string,
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-460-implementation", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-460-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-460-implementation", "tool-1", {
+								createWorkerMessage("tool_request", "github-mbrooks-yolomatic-issue-460-implementation", "tool-1", {
 									tool: "get_authenticated_user",
 									params: {},
 								}),
@@ -1087,8 +1087,8 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							expect((message.payload as { ok: boolean }).ok).toBe(true);
 							await connection.send(
-								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-460-implementation", "complete-1", {
-									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-460-implementation", "complete-1", {
+									result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 								}),
 							);
 						}
@@ -1102,7 +1102,7 @@ describe("DockerWorkerExecutor", () => {
 				expect(result.status).toBe("complete");
 				expect(github.getAuthenticatedUser).toHaveBeenCalled();
 				expect(recordSessionLogMock).toHaveBeenCalledWith(
-					"github-mbrooks-yeetomatic-issue-460-implementation",
+					"github-mbrooks-yolomatic-issue-460-implementation",
 					expect.objectContaining({ message: "gateway get_authenticated_user done" }),
 				);
 			} finally {
@@ -1123,7 +1123,7 @@ describe("DockerWorkerExecutor", () => {
 			(harness.executor as unknown as { options: { githubGateway: WorkerGitHubGateway } }).options.githubGateway = gateway;
 			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 				if (args[0] === "remote" && args[1] === "get-url") {
-					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 					return;
 				}
 				callback(null, gatewayTransport, "");
@@ -1134,14 +1134,14 @@ describe("DockerWorkerExecutor", () => {
 				const child = makeChildProcess();
 				void connectMockWorker(
 					harness.workerRpcServer,
-					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					options.env.YOLO_SESSION_WS_URL as string,
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-461-implementation", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-461-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-461-implementation", "tool-2", {
+								createWorkerMessage("tool_request", "github-mbrooks-yolomatic-issue-461-implementation", "tool-2", {
 									tool: "set_pr_comment",
 									params: { body: "hi", pr_number: 999 },
 								}),
@@ -1151,8 +1151,8 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							responsePayload = message.payload as unknown as GatewayToolResponse;
 							await connection.send(
-								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-461-implementation", "complete-2", {
-									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-461-implementation", "complete-2", {
+									result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 								}),
 							);
 						}
@@ -1169,7 +1169,7 @@ describe("DockerWorkerExecutor", () => {
 				expect(github.postPRComment).not.toHaveBeenCalled();
 				expect(github.listPullRequestsForHead).toHaveBeenCalled();
 				expect(recordSessionLogMock).toHaveBeenCalledWith(
-					"github-mbrooks-yeetomatic-issue-461-implementation",
+					"github-mbrooks-yolomatic-issue-461-implementation",
 					expect.objectContaining({ message: "gateway set_pr_comment scope-rejected" }),
 				);
 			} finally {
@@ -1181,7 +1181,7 @@ describe("DockerWorkerExecutor", () => {
 			const harness = await createHarness(462);
 			execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 				if (args[0] === "remote" && args[1] === "get-url") {
-					callback(null, "https://github.com/mbrooks/yeetomatic.git\n", "");
+					callback(null, "https://github.com/mbrooks/yolomatic.git\n", "");
 					return;
 				}
 				callback(null, gatewayTransport, "");
@@ -1192,14 +1192,14 @@ describe("DockerWorkerExecutor", () => {
 				const child = makeChildProcess();
 				void connectMockWorker(
 					harness.workerRpcServer,
-					options.env.YEETOMATIC_SESSION_WS_URL as string,
+					options.env.YOLO_SESSION_WS_URL as string,
 					async (connection, message) => {
 						if (message.type === "launch_config") {
 							await connection.send(
-								createWorkerMessage("ack", "github-mbrooks-yeetomatic-issue-462-implementation", "ack-launch", { ackMessageId: message.messageId }),
+								createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-462-implementation", "ack-launch", { ackMessageId: message.messageId }),
 							);
 							await connection.send(
-								createWorkerMessage("tool_request", "github-mbrooks-yeetomatic-issue-462-implementation", "tool-3", {
+								createWorkerMessage("tool_request", "github-mbrooks-yolomatic-issue-462-implementation", "tool-3", {
 									tool: "fetch_issue",
 									params: {},
 								}),
@@ -1209,8 +1209,8 @@ describe("DockerWorkerExecutor", () => {
 						if (message.type === "tool_response") {
 							responsePayload = message.payload as unknown as GatewayToolResponse;
 							await connection.send(
-								createWorkerMessage("complete", "github-mbrooks-yeetomatic-issue-462-implementation", "complete-3", {
-									result: { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" },
+								createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-462-implementation", "complete-3", {
+									result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
 								}),
 							);
 						}
@@ -1238,8 +1238,8 @@ async function createHarness(issueNumber: number): Promise<{
 	workerRpcServer: FakeWorkerRpcServer;
 	close: () => Promise<void>;
 }> {
-	const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), `yeetomatic-docker-worker-${issueNumber}-`));
-	const workspacePath = path.join(workspacesRoot, "mbrooks-yeetomatic", ".worktrees", `issue-${issueNumber}`);
+	const workspacesRoot = await mkdtemp(path.join(os.tmpdir(), `yolomatic-docker-worker-${issueNumber}-`));
+	const workspacePath = path.join(workspacesRoot, "mbrooks-yolomatic", ".worktrees", `issue-${issueNumber}`);
 	await mkdir(workspacePath, { recursive: true });
 
 	const workerRpcServer = createFakeWorkerRpcServer();
@@ -1247,7 +1247,7 @@ async function createHarness(issueNumber: number): Promise<{
 	const executor = new DockerWorkerExecutor({
 		projectRoot,
 		workspacesDir: workspacesRoot,
-		workerImage: "yeetomatic-worker:latest",
+		workerImage: "yolomatic-worker:latest",
 		workerWorkspaceMountSource: workspacesRoot,
 		workerControlBaseUrl: "http://control-plane.test",
 		workerDockerNetworkMode: undefined,
@@ -1280,7 +1280,7 @@ function makeConflictingChildProcess(issueNumber: number): EventEmitter & { stdo
 		child.stderr.emit(
 			"data",
 			Buffer.from(
-				`docker: Error response from daemon: Conflict. The container name "/yeetomatic-session-mbrooks-yeetomatic-${issueNumber}" is already in use by container "existing".`,
+				`docker: Error response from daemon: Conflict. The container name "/yolomatic-session-mbrooks-yolomatic-${issueNumber}" is already in use by container "existing".`,
 			),
 		);
 		child.emit("exit", 125, null);
@@ -1291,7 +1291,7 @@ function makeConflictingChildProcess(issueNumber: number): EventEmitter & { stdo
 function makeSessionState(issueNumber: number, workspacePath: string) {
 	return {
 		issueNumber,
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		owner: "mbrooks",
 		title: "Recover a conflicting worker container",
 		body: "Body",

@@ -6,7 +6,7 @@ Last verified: 2026-08-01 against `github/main` at `26171605efdd`
 
 ## Purpose
 
-This protocol defines the bidirectional messages used between a worker and Yeetomatic for one issue session.
+This protocol defines the bidirectional messages used between a worker and Yolomatic for one issue session.
 
 ## Common Envelope
 
@@ -16,7 +16,7 @@ All messages include:
 {
   "type": "hello",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-1",
   "payload": {}
 }
@@ -57,7 +57,7 @@ therefore left at `1`.
 
 ### Direction
 
-Worker -> Yeetomatic
+Worker -> Yolomatic
 
 ### Purpose
 
@@ -69,7 +69,7 @@ The worker starts the session handshake and identifies which session it is claim
 {
   "type": "hello",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-1",
   "payload": {
     "workerVersion": "1.0.0",
@@ -82,11 +82,11 @@ The worker starts the session handshake and identifies which session it is claim
 
 ### Direction
 
-Yeetomatic -> worker
+Yolomatic -> worker
 
 ### Purpose
 
-Yeetomatic sends the authoritative launch payload after validating the session identity for that WebSocket connection.
+Yolomatic sends the authoritative launch payload after validating the session identity for that WebSocket connection.
 
 ### Example
 
@@ -94,20 +94,20 @@ Yeetomatic sends the authoritative launch payload after validating the session i
 {
   "type": "launch_config",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-2",
   "payload": {
     "session": {
       "owner": "mbrooks",
-      "repo": "yeetomatic",
+      "repo": "yolomatic",
       "issueNumber": 395,
-      "workspacePath": "/app/workspaces/mbrooks-yeetomatic/.worktrees/issue-395",
+      "workspacePath": "/app/workspaces/mbrooks-yolomatic/.worktrees/issue-395",
       "title": "Implement worker-based agent sessions",
       "body": "Design and build a new isolated worker runtime."
     },
     "prompt": {
       "kind": "issue",
-      "text": "You are working on GitHub issue #395 in mbrooks/yeetomatic.\n..."
+      "text": "You are working on GitHub issue #395 in mbrooks/yolomatic.\n..."
     },
     "limits": {
       "maxRuntimeSeconds": 7200
@@ -135,7 +135,7 @@ Acknowledges receipt and acceptance of a message.
 {
   "type": "ack",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-3",
   "payload": {
     "ackMessageId": "msg-2"
@@ -147,11 +147,11 @@ Acknowledges receipt and acceptance of a message.
 
 ### Direction
 
-Worker -> Yeetomatic
+Worker -> Yolomatic
 
 ### Purpose
 
-The worker sends structured execution events to Yeetomatic. The current runtime
+The worker sends structured execution events to Yolomatic. The current runtime
 emits one `session_log` event per `event_batch`; the array permits future
 coalescing.
 
@@ -161,7 +161,7 @@ coalescing.
 {
   "type": "event_batch",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-4",
   "payload": {
     "events": [
@@ -186,7 +186,7 @@ The implemented V1 event type is `session_log`, containing the existing `Session
 
 ### Direction
 
-Worker -> Yeetomatic
+Worker -> Yolomatic
 
 ### Purpose
 
@@ -201,7 +201,7 @@ does not enforce a heartbeat timeout.
 {
   "type": "heartbeat",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-5",
   "payload": {
     "state": "running",
@@ -215,11 +215,11 @@ does not enforce a heartbeat timeout.
 
 ### Direction
 
-Yeetomatic -> worker
+Yolomatic -> worker
 
 ### Purpose
 
-Yeetomatic sends live control or steering instructions to the worker.
+Yolomatic sends live control or steering instructions to the worker.
 
 ### Allowed Actions
 
@@ -245,7 +245,7 @@ Tells the worker to inject a text message into the live agent session.
 {
   "type": "control",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-6",
   "payload": {
     "action": "steer",
@@ -258,7 +258,7 @@ Tells the worker to inject a text message into the live agent session.
 
 For `steer`:
 
-1. Yeetomatic sends the message.
+1. Yolomatic sends the message.
 2. The worker responds with `ack` before applying the action.
 3. The worker passes the text into the live agent session through the agent's existing steering mechanism.
 4. The worker continues normal event streaming.
@@ -271,11 +271,11 @@ worker sends `error`. The host treats that error as an execution failure.
 
 ### Direction
 
-Worker -> Yeetomatic
+Worker -> Yolomatic
 
 ### Purpose
 
-The worker sends one terminal execution result to Yeetomatic.
+The worker sends one terminal execution result to Yolomatic.
 
 ### Example
 
@@ -283,13 +283,13 @@ The worker sends one terminal execution result to Yeetomatic.
 {
   "type": "complete",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-7",
   "payload": {
     "result": {
       "status": "complete",
       "summary": "Implement worker session launch and result handling.",
-      "rawResponse": "YEETOMATIC_STATUS: complete\nImplement worker session launch and result handling."
+      "rawResponse": "YOLO_STATUS: complete\nImplement worker session launch and result handling."
     }
   }
 }
@@ -305,12 +305,12 @@ The payload wraps the existing `ExecutionResult`. Allowed `payload.result.status
 - `failed`
 - `cancelled`
 
-These match the existing `ExecutionResult` shape used by Yeetomatic.
+These match the existing `ExecutionResult` shape used by Yolomatic.
 
 ### Completion Rules
 
 - The worker sends one completion result and then closes its connection during cleanup.
-- Yeetomatic treats that result as the execution result returned to the existing reporting and delivery flow.
+- Yolomatic treats that result as the execution result returned to the existing reporting and delivery flow.
 - The worker must not push or create the PR itself.
 
 ## `error`
@@ -329,7 +329,7 @@ Reports a protocol-level or session-level error.
 {
   "type": "error",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "msg-8",
   "payload": {
     "message": "Agent session could not accept a steering message."
@@ -341,7 +341,7 @@ Reports a protocol-level or session-level error.
 
 ### Direction
 
-Worker -> Yeetomatic
+Worker -> Yolomatic
 
 ### Purpose
 
@@ -357,7 +357,7 @@ control plane's `GitHubService` instance.
 {
   "type": "tool_request",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "tool-1",
   "payload": {
     "tool": "fetch_issue",
@@ -383,7 +383,7 @@ parameters):
   session repo, never accepts `owner`/`repo`/`branch`)
 
 PR tools (scoped to the session's linked PR or an open PR on the session
-branch `yeetomatic/issue-{n}`; accept an optional in-scope `pr_number`):
+branch `yolomatic/issue-{n}`; accept an optional in-scope `pr_number`):
 
 - `fetch_pr` (`pr_number?`, `include_comments?`)
 - `set_pr_comment` (`body`, `pr_number?`)
@@ -407,7 +407,7 @@ not exposed to the worker because they cannot be scoped to the current issue.
 
 ### Direction
 
-Yeetomatic -> worker
+Yolomatic -> worker
 
 ### Purpose
 
@@ -423,7 +423,7 @@ in that case.
 {
   "type": "tool_response",
   "protocolVersion": 1,
-  "sessionKey": "mbrooks/yeetomatic#395",
+  "sessionKey": "mbrooks/yolomatic#395",
   "messageId": "resp-1",
   "payload": {
     "requestMessageId": "tool-1",
@@ -435,21 +435,21 @@ in that case.
 
 ## Host Mapping
 
-Yeetomatic translates worker messages like this:
+Yolomatic translates worker messages like this:
 
 - `event_batch` -> `recordSessionLog` and activity updates for each `session_log` entry
 - `heartbeat` -> activity updates; there is no protocol-level heartbeat watchdog
 - `complete` -> `ExecutionResult` handoff into the existing reporting and delivery flow
 - `tool_request` -> `ack`, scope-validated `WorkerGitHubGateway` dispatch, and a `tool_response` carrying the result or a scope/error failure
 
-The `event_batch` stream carries the data Yeetomatic persists centrally, including:
+The `event_batch` stream carries the data Yolomatic persists centrally, including:
 
 - assistant responses
 - reasoning summaries
 - tool execution events
 - steering-related status updates
 
-Yeetomatic exposes live steering and stop actions through outbound `control` messages.
+Yolomatic exposes live steering and stop actions through outbound `control` messages.
 
 ## Missing Completion Handling
 

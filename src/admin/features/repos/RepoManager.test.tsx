@@ -16,8 +16,8 @@ const mockedAddRepo = vi.mocked(addRepo);
 function makeRepo(overrides: Partial<ManagedRepo> = {}): ManagedRepo {
 	return {
 		owner: "mbrooks",
-		repo: "yeetomatic",
-		fullName: "mbrooks/yeetomatic",
+		repo: "yolomatic",
+		fullName: "mbrooks/yolomatic",
 		visibility: "private",
 		selected: true,
 		configured: true,
@@ -55,7 +55,7 @@ describe("RepoManager", () => {
 			/>,
 		);
 		expect(screen.getByText("Choose repos")).not.toBeNull();
-		expect(screen.getByText("mbrooks/yeetomatic")).not.toBeNull();
+		expect(screen.getByText("mbrooks/yolomatic")).not.toBeNull();
 		// Configured + selected shows "enabled" badge.
 		expect(screen.getAllByText("enabled")).not.toBeNull();
 		// Newly selected (not configured) shows "new" badge.
@@ -67,7 +67,7 @@ describe("RepoManager", () => {
 		const onToggleRepo = vi.fn();
 		const repos = [makeRepo({ selected: false })];
 		render(<RepoManager repos={repos} onToggleRepo={onToggleRepo} onSetAllSelected={vi.fn()} />);
-		fireEvent.click(screen.getByRole("checkbox", { name: "mbrooks/yeetomatic" }));
+		fireEvent.click(screen.getByRole("checkbox", { name: "mbrooks/yolomatic" }));
 		expect(onToggleRepo).toHaveBeenCalledWith(0);
 	});
 

@@ -16,8 +16,8 @@ describe("repo-settings api", () => {
 			json: async () => ({ settings: [] }),
 		});
 
-		await expect(fetchRepoSettings("mbrooks", "yeetomatic")).resolves.toEqual({ settings: [] });
-		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic/settings");
+		await expect(fetchRepoSettings("mbrooks", "yolomatic")).resolves.toEqual({ settings: [] });
+		expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yolomatic/settings");
 	});
 
 	it("updates repo settings", async () => {
@@ -26,12 +26,12 @@ describe("repo-settings api", () => {
 			json: async () => ({ updated: ["github_event_mode"], requiresRestart: ["github_event_mode"] }),
 		});
 
-		await expect(updateRepoSettings("mbrooks", "yeetomatic", { github_event_mode: "polling" })).resolves.toEqual({
+		await expect(updateRepoSettings("mbrooks", "yolomatic", { github_event_mode: "polling" })).resolves.toEqual({
 			updated: ["github_event_mode"],
 			requiresRestart: ["github_event_mode"],
 		});
 		expect(fetchSpy).toHaveBeenCalledWith(
-			"/api/repos/mbrooks/yeetomatic/settings",
+			"/api/repos/mbrooks/yolomatic/settings",
 			expect.objectContaining({
 				method: "PATCH",
 				body: JSON.stringify({ github_event_mode: "polling" }),
@@ -46,6 +46,6 @@ describe("repo-settings api", () => {
 			json: async () => ({ error: "bad settings" }),
 		});
 
-		await expect(updateRepoSettings("mbrooks", "yeetomatic", { github_event_mode: "bad" })).rejects.toThrow("bad settings");
+		await expect(updateRepoSettings("mbrooks", "yolomatic", { github_event_mode: "bad" })).rejects.toThrow("bad settings");
 	});
 });

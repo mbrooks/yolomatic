@@ -5,7 +5,7 @@ import path from "node:path";
 /**
  * Worker environment initialization.
  *
- * Runs a repository-provided init script (default: `yeetstrap.sh` at the
+ * Runs a repository-provided init script (default: `yolostrap.sh` at the
  * workspace root) deterministically, before the agent starts, so the
  * environment is in a known state before the first model turn. See
  * `design/worker-env-init.md` for the full contract.
@@ -25,13 +25,13 @@ export interface EnvironmentInitOptions {
 	/** Absolute path to the workspace the script runs against. */
 	workspacePath: string;
 	/**
-	 * Override the init script path. Defaults to `YEETOMATIC_WORKER_INIT_SCRIPT`
-	 * or `yeetstrap.sh`. Relative paths resolve against the workspace path.
+	 * Override the init script path. Defaults to `YOLO_WORKER_INIT_SCRIPT`
+	 * or `yolostrap.sh`. Relative paths resolve against the workspace path.
 	 */
 	scriptPath?: string;
-	/** Skip the init phase entirely. Defaults from `YEETOMATIC_WORKER_INIT_SKIP`. */
+	/** Skip the init phase entirely. Defaults from `YOLO_WORKER_INIT_SKIP`. */
 	skip?: boolean;
-	/** Wall-clock timeout in seconds. Defaults from `YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS` or 1800. */
+	/** Wall-clock timeout in seconds. Defaults from `YOLO_WORKER_INIT_TIMEOUT_SECONDS` or 1800. */
 	timeoutSeconds?: number;
 	/** Streamed log emitter for stdout/stderr. */
 	log: EnvInitLogFn;
@@ -79,7 +79,7 @@ export class EnvInitError extends Error {
 }
 
 const DEFAULT_TIMEOUT_SECONDS = 1800;
-const DEFAULT_SCRIPT_NAME = "yeetstrap.sh";
+const DEFAULT_SCRIPT_NAME = "yolostrap.sh";
 const STDERR_TAIL_BYTES = 4096;
 
 function parseSkip(value: string | undefined): boolean {
@@ -100,11 +100,11 @@ export function resolveInitScriptPath(workspacePath: string, scriptPathRaw: stri
 
 export async function runEnvironmentInit(options: EnvironmentInitOptions): Promise<EnvironmentInitResult> {
 	const env = options.env ?? process.env;
-	const skip = options.skip ?? parseSkip(env.YEETOMATIC_WORKER_INIT_SKIP);
+	const skip = options.skip ?? parseSkip(env.YOLO_WORKER_INIT_SKIP);
 	const timeoutSeconds =
-		options.timeoutSeconds ?? parseTimeout(env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS);
+		options.timeoutSeconds ?? parseTimeout(env.YOLO_WORKER_INIT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS);
 	const scriptPathRaw =
-		options.scriptPath ?? (env.YEETOMATIC_WORKER_INIT_SCRIPT?.trim() || DEFAULT_SCRIPT_NAME);
+		options.scriptPath ?? (env.YOLO_WORKER_INIT_SCRIPT?.trim() || DEFAULT_SCRIPT_NAME);
 	const scriptPath = resolveInitScriptPath(options.workspacePath, scriptPathRaw);
 
 	if (skip) {
@@ -162,7 +162,7 @@ function spawnInitScript(options: SpawnInitOptions): Promise<void> {
 		const childEnv: NodeJS.ProcessEnv = { ...options.env };
 		// The WebSocket reservation URL is a single-use token the script has no
 		// use for; strip it before handing the environment to repository code.
-		delete childEnv.YEETOMATIC_SESSION_WS_URL;
+		delete childEnv.YOLO_SESSION_WS_URL;
 
 		let child: ChildProcess;
 		try {

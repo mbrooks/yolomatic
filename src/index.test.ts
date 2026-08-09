@@ -12,7 +12,7 @@ vi.mock("./config.js", () => ({
 		memoryDir: "/tmp/memory",
 		defaultBranch: "main",
 		githubToken: "token",
-		githubUsername: "yeetomatic-bot",
+		githubUsername: "yolomatic-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
 		selfReportEnabled: true,
@@ -24,12 +24,12 @@ vi.mock("./config.js", () => ({
 		evictionStrategy: "lru",
 		githubEventMode: "webhook",
 		githubPollIntervalMs: 60000,
-		workerImage: "yeetomatic-worker:latest",
+		workerImage: "yolomatic-worker:latest",
 		workerWorkspaceMountSource: "/tmp/workspaces",
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
 		workerOllamaHost: undefined,
-		adminPath: "/yeetomatic/admin",
+		adminPath: "/yolomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		issueNewCommentEnabled: true,
 		issueAdminLinkInCommentsEnabled: true,
@@ -246,7 +246,7 @@ describe("main", () => {
 			memoryDir: "/tmp/memory",
 			defaultBranch: "main",
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
@@ -265,12 +265,12 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "polling",
 			githubPollIntervalMs: 30000,
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/tmp/workspaces",
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
-		adminPath: "/yeetomatic/admin",
+		adminPath: "/yolomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		issueNewCommentEnabled: true,
 		issueAdminLinkInCommentsEnabled: true,
@@ -281,7 +281,7 @@ describe("main", () => {
 
 		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({
 			intervalMs: 30000,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			dispatch: expect.any(Function),
 		}));
 		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls[0][0] as { dispatch: (event: unknown) => Promise<void> };
@@ -310,9 +310,9 @@ describe("main", () => {
 
 	it("starts polling when a configured repository overrides webhook mode to polling", async () => {
 		const managedRepo = {
-			id: "mbrooks/yeetomatic",
+			id: "mbrooks/yolomatic",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			fullName: null,
 			visibility: null,
 			githubEventMode: "polling" as const,
@@ -322,7 +322,7 @@ describe("main", () => {
 		};
 		repositoryStoreMock.listSync.mockReturnValue([managedRepo]);
 		repositoryStoreMock.getSync.mockImplementation((owner, repo) =>
-			owner === "mbrooks" && repo === "yeetomatic" ? managedRepo : null,
+			owner === "mbrooks" && repo === "yolomatic" ? managedRepo : null,
 		);
 
 		await main();
@@ -331,7 +331,7 @@ describe("main", () => {
 			shouldPollRepo: expect.any(Function),
 		}));
 		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as { shouldPollRepo: (owner: string, repo: string) => boolean };
-		expect(pollingDeps.shouldPollRepo("mbrooks", "yeetomatic")).toBe(true);
+		expect(pollingDeps.shouldPollRepo("mbrooks", "yolomatic")).toBe(true);
 		expect(pollingDeps.shouldPollRepo("mbrooks", "case")).toBe(false);
 	});
 
@@ -345,7 +345,7 @@ describe("main", () => {
 			memoryDir: "/tmp/memory",
 			defaultBranch: "main",
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
@@ -364,12 +364,12 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "both",
 			githubPollIntervalMs: 45000,
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/tmp/workspaces",
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
-		adminPath: "/yeetomatic/admin",
+		adminPath: "/yolomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		issueNewCommentEnabled: true,
 		issueAdminLinkInCommentsEnabled: true,
@@ -402,7 +402,7 @@ describe("main", () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				status: "working",
 				workspacePath: "/tmp/ws",
@@ -421,14 +421,14 @@ describe("main", () => {
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 	});
 
 	it("resumes checkpointed sessions with resumeOnBoot on startup", async () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 43,
 				status: "pending",
 				workspacePath: "/tmp/ws",
@@ -448,7 +448,7 @@ describe("main", () => {
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 43);
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 43);
 	});
 
 	it("runs stale session detection on startup", async () => {
@@ -459,7 +459,7 @@ describe("main", () => {
 					ageMs: 99999999,
 					session: {
 						owner: "mbrooks",
-						repo: "yeetomatic",
+						repo: "yolomatic",
 						issueNumber: 99,
 						status: "working",
 						staleDetectedAt: null,
@@ -476,7 +476,7 @@ describe("main", () => {
 			markFailed: mockMarkFailed,
 		} as never));
 		await main();
-		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "interrupted_or_abandoned");
+		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "interrupted_or_abandoned");
 	});
 
 	it("handles stale detection errors gracefully", async () => {
@@ -491,7 +491,7 @@ describe("main", () => {
 		const mockGetAll = vi.fn(async () => [
 			{
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "working",
 				workspacePath: "/tmp/ws",
@@ -526,7 +526,7 @@ describe("main", () => {
 			memoryDir: "/tmp/memory",
 			defaultBranch: "main",
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			workspacesDir: "/tmp/workspaces",
 			soulPath: "/tmp/SOUL.md",
 			selfReportEnabled: true,
@@ -545,12 +545,12 @@ describe("main", () => {
 			logResponses: true,
 			githubEventMode: "webhook",
 			githubPollIntervalMs: 60000,
-			workerImage: "yeetomatic-worker:latest",
+			workerImage: "yolomatic-worker:latest",
 			workerWorkspaceMountSource: "/tmp/workspaces",
 			workerControlBaseUrl: "http://host.docker.internal:6767",
 			workerDockerNetworkMode: undefined,
 			workerOllamaHost: undefined,
-		adminPath: "/yeetomatic/admin",
+		adminPath: "/yolomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		issueNewCommentEnabled: true,
 		issueAdminLinkInCommentsEnabled: true,
@@ -652,6 +652,6 @@ describe("noOpHandlers", () => {
 	});
 
 	it("isInFlight returns false", () => {
-		expect(noOpHandlers.isInFlight("mbrooks", "yeetomatic", 1)).toBe(false);
+		expect(noOpHandlers.isInFlight("mbrooks", "yolomatic", 1)).toBe(false);
 	});
 });

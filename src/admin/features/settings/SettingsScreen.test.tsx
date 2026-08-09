@@ -33,7 +33,7 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "github_username",
-		value: "yeetomatic-bot",
+		value: "yolomatic-bot",
 		description: "GitHub username",
 		type: "string",
 		default: undefined,
@@ -56,7 +56,7 @@ const MOCK_SETTINGS = [
 	{
 		key: "admin_github_username",
 		value: "admin",
-		description: "GitHub user authorized for /yeetomatic stop and /yeetomatic issue-refinement",
+		description: "GitHub user authorized for /yolomatic stop and /yolomatic issue-refinement",
 		type: "string",
 		default: undefined,
 		requiresRestart: true,
@@ -99,7 +99,7 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "configured_repositories",
-		value: "[\"mbrooks/yeetomatic\"]",
+		value: "[\"mbrooks/yolomatic\"]",
 		description: "JSON list of repositories configured during onboarding",
 		type: "string",
 		default: "[]",
@@ -187,10 +187,10 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "ollama_container_name",
-		value: "yeetomatic-ollama",
+		value: "yolomatic-ollama",
 		description: "Name of the Ollama Docker container.",
 		type: "string",
-		default: "yeetomatic-ollama",
+		default: "yolomatic-ollama",
 		requiresRestart: false,
 		sensitive: false,
 		updatedAt: "2026-07-23T00:00:00.000Z",
@@ -198,7 +198,7 @@ const MOCK_SETTINGS = [
 	},
 	{
 		key: "admin_base_url",
-		value: "http://host:6767/yeetomatic/admin",
+		value: "http://host:6767/yolomatic/admin",
 		description: "Absolute public base URL of the admin UI.",
 		type: "string",
 		default: "",
@@ -439,9 +439,9 @@ describe("SettingsScreen", () => {
 			if (url === "/api/repos/accessible") {
 				return Promise.resolve(jsonResponse({
 					repositories: [
-						{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+						{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 					],
-					configured: [{ owner: "mbrooks", repo: "yeetomatic" }],
+					configured: [{ owner: "mbrooks", repo: "yolomatic" }],
 				}));
 			}
 			if (url === "/api/settings") {
@@ -452,7 +452,7 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="repositories" />);
 
 		await waitFor(() => {
-			expect(screen.getByText("mbrooks/yeetomatic")).not.toBeNull();
+			expect(screen.getByText("mbrooks/yolomatic")).not.toBeNull();
 		});
 
 		expect(screen.getByRole("button", { name: "Repositories" }).className).toContain("active");
@@ -524,10 +524,10 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
 		await waitFor(() => {
-			expect(screen.getByDisplayValue("yeetomatic-bot")).not.toBeNull();
+			expect(screen.getByDisplayValue("yolomatic-bot")).not.toBeNull();
 		});
 
-		const input = screen.getByDisplayValue("yeetomatic-bot") as HTMLInputElement;
+		const input = screen.getByDisplayValue("yolomatic-bot") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "new-bot" } });
 
 		expect(input.parentElement?.classList.contains("dirty")).toBe(true);
@@ -539,10 +539,10 @@ describe("SettingsScreen", () => {
 		render(<SettingsScreen onBack={vi.fn()} tab="github-integration" />);
 
 		await waitFor(() => {
-			expect(screen.getByDisplayValue("yeetomatic-bot")).not.toBeNull();
+			expect(screen.getByDisplayValue("yolomatic-bot")).not.toBeNull();
 		});
 
-		fireEvent.change(screen.getByDisplayValue("yeetomatic-bot"), { target: { value: "new-bot" } });
+		fireEvent.change(screen.getByDisplayValue("yolomatic-bot"), { target: { value: "new-bot" } });
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
 		await waitFor(() => {
@@ -627,7 +627,7 @@ describe("SettingsScreen", () => {
 		expect(link.tagName).toBe("A");
 		expect(link.getAttribute("target")).toBe("_blank");
 		expect(screen.getByText("Not signed in.")).not.toBeNull();
-		expect(screen.getByText(/docker exec -it yeetomatic-ollama ollama login/)).not.toBeNull();
+		expect(screen.getByText(/docker exec -it yolomatic-ollama ollama login/)).not.toBeNull();
 	});
 
 	it("renders an error with a retry control when the Ollama container cannot be reached", async () => {
@@ -639,8 +639,8 @@ describe("SettingsScreen", () => {
 			if (url === "/api/ollama/signin") {
 				return Promise.resolve(jsonResponse({
 					signedIn: false,
-					error: "No such container: yeetomatic-ollama",
-					message: "Ollama container \"yeetomatic-ollama\" was not found.",
+					error: "No such container: yolomatic-ollama",
+					message: "Ollama container \"yolomatic-ollama\" was not found.",
 				}));
 			}
 			return Promise.reject(new Error(`Unexpected fetch: ${url}`));

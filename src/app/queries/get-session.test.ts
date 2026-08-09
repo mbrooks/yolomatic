@@ -7,7 +7,7 @@ describe("GetSession", () => {
 	it("returns the session when found", async () => {
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			title: "Test",
 			body: "Body",
@@ -21,7 +21,7 @@ describe("GetSession", () => {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
 		const query = new GetSession(repo);
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data).toEqual(state);
@@ -33,7 +33,7 @@ describe("GetSession", () => {
 			get: vi.fn(async () => null),
 		} as unknown as SessionRepository;
 		const query = new GetSession(repo);
-		const result = await query.execute("mbrooks", "yeetomatic", 999);
+		const result = await query.execute("mbrooks", "yolomatic", 999);
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("not_found");
