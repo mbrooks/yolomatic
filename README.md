@@ -13,9 +13,11 @@ Assign an issue to Yolomatic, and it creates an isolated Git worktree, launches 
 
 ## Why use Yolomatic?
 
+Yolomatic is a good fit when you want to delegate coding tasks without introducing a complex orchestration platform.
+
 Yolomatic is intentionally not a full-blown orchestration platform. Instead, it uses GitHub issues as a lightweight, flexible work queue.
 
-For larger projects, use Claude Code or Codex to break the work into smaller, focused issues. Yolomatic can then implement each issue and deliver the resulting pull request.
+Yolomatic works best with focused, issue-sized tasks. For larger projects, use Claude Code or Codex to break the work into smaller issues, then let Yolomatic implement each one.
 
 ## Features
 
