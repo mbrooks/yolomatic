@@ -199,17 +199,14 @@ export class ExecuteSessionDelivery {
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			if (message.includes("A pull request already exists")) {
-				const existing = await this.deps.github.listPullRequests(owner, repo, {
-					head: `${owner}:${head}`,
-					base,
-					state: "open",
-				});
-				if (existing.length > 0) {
-					const pr = existing[0];
-					await this.deps.sessions.associatePR(owner, repo, issueNumber, pr.number, pr.html_url);
-					return { url: pr.html_url, number: pr.number, outcome: "pr-existed" };
-				}
+			// The PR may already exist ("A pull request already exists") or may have
+			// been created on GitHub's side before an ambiguous follow-up error
+			// (network blip, ready-for-review 404, etc.). Reconcile against the
+			// deterministic head/base before failing or duplicating.
+			const existing = await this.findExistingPR(owner, repo, head, base);
+			if (existing) {
+				await this.deps.sessions.associatePR(owner, repo, issueNumber, existing.number, existing.html_url);
+				return { url: existing.html_url, number: existing.number, outcome: "pr-existed" };
 			}
 			if (message.includes("No commits between")) {
 				return { outcome: "no-changes" };
@@ -217,6 +214,39 @@ export class ExecuteSessionDelivery {
 			throw error;
 		}
 		return { outcome: "no-changes" };
+	}
+
+	/**
+	 * Search for exactly one open, unmerged PR with the exact issue head and
+	 * configured base. Returns the validated PR, or `null` when zero or more
+	 * than one match (ambiguous). Never guesses; callers must fail on null.
+	 */
+	private async findExistingPR(
+		owner: string,
+		repo: string,
+		head: string,
+		base: string,
+	): Promise<{ number: number; html_url: string } | null> {
+		const candidates = await this.deps.github.listPullRequests(owner, repo, {
+			head: `${owner}:${head}`,
+			base,
+			state: "open",
+		});
+		const valid: Array<{ number: number; html_url: string }> = [];
+		for (const candidate of candidates) {
+			const pr = await this.deps.github.getPullRequest(owner, repo, candidate.number);
+			if (!pr) continue;
+			if (
+				pr.head.ref === head &&
+				pr.base?.ref === base &&
+				pr.state === "open" &&
+				!pr.merged
+			) {
+				valid.push({ number: candidate.number, html_url: candidate.html_url });
+			}
+		}
+		if (valid.length === 1) return valid[0];
+		return null;
 	}
 
 	private buildPRBody(

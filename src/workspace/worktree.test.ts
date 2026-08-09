@@ -71,6 +71,7 @@ describe("WorktreeManager", () => {
 		const bareRepos = {
 			ensureBareRepo: vi.fn(async () => bareRepoPath),
 			branchExists: vi.fn(async () => false),
+			remoteBranchExists: vi.fn(async () => false),
 			updateDefaultBranch: vi.fn(async () => {}),
 			resolveBaseRef: vi.fn(async () => "origin/HEAD"),
 			getBareRepoPath: vi.fn(() => bareRepoPath),
@@ -305,6 +306,71 @@ describe("WorktreeManager", () => {
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "add", "--force", worktreePath, "yolomatic/issue-42"], {
 			cwd: bareRepoPath,
 		});
+	});
+
+	it("recreates the worktree from the remote issue branch when origin has it", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worktree-remote-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = makeBareRepos(bareRepoPath, {
+			branchExists: vi.fn(async () => true),
+			remoteBranchExists: vi.fn(async () => true),
+		});
+		const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+		await worktrees.createOrGetWorktree("mbrooks", "yolomatic", 42);
+
+		// The local issue branch must be reset to the remote issue ref (not the
+		// base ref) so a recreated worktree preserves the pushed implementation.
+		expect(runCommand).toHaveBeenCalledWith("git", ["branch", "-f", "yolomatic/issue-42", "origin/yolomatic/issue-42"], {
+			cwd: bareRepoPath,
+		});
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "add", "--force", worktreePath, "yolomatic/issue-42"], {
+			cwd: bareRepoPath,
+		});
+		// Must NOT reset the issue branch to the base ref when a remote ref exists.
+		const resetToBase = (runCommand as ReturnType<typeof vi.fn>).mock.calls.filter(
+			([, args]) =>
+				args[0] === "branch" && args[1] === "-f" && args[2] === "yolomatic/issue-42" && args[3] === "origin/HEAD",
+		);
+		expect(resetToBase).toHaveLength(0);
+	});
+
+	it("creates the worktree from the configured base when no local or remote issue branch exists", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worktree-no-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
+		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
+
+		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
+			if (args[0] === "worktree" && args[1] === "list") {
+				return { stdout: "", stderr: "" };
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const git = new GitCommandRunner(createConfig(root), runCommand);
+		const bareRepos = makeBareRepos(bareRepoPath, {
+			branchExists: vi.fn(async () => false),
+			remoteBranchExists: vi.fn(async () => false),
+		});
+		const worktrees = new WorktreeManager(createConfig(root), git, bareRepos);
+
+		await worktrees.createOrGetWorktree("mbrooks", "yolomatic", 42);
+
+		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "add", worktreePath, "-b", "yolomatic/issue-42", "origin/HEAD"], {
+			cwd: bareRepoPath,
+		});
+		const branchF = (runCommand as ReturnType<typeof vi.fn>).mock.calls.filter(
+			([, args]) => args[0] === "branch" && args[1] === "-f",
+		);
+		expect(branchF).toHaveLength(0);
 	});
 
 	it("wraps worktree add failures with recovery guidance", async () => {

@@ -54,9 +54,17 @@ export class WorktreeManager {
 		const existsBranch = await this.bareRepos.branchExists(bareRepoPath, branchName);
 		await this.bareRepos.updateDefaultBranch(bareRepoPath);
 		const baseRef = await this.bareRepos.resolveBaseRef(bareRepoPath);
+		const remoteExists = await this.bareRepos.remoteBranchExists(bareRepoPath, branchName);
 
 		try {
-			if (existsBranch) {
+			if (remoteExists) {
+				// A remote issue branch already holds the pushed implementation; recreate
+				// the local ref from it rather than resetting the branch to the base.
+				await this.git.run("git", ["branch", "-f", branchName, `origin/${branchName}`], { cwd: bareRepoPath });
+				await this.git.run("git", ["worktree", "add", "--force", worktreePath, branchName], {
+					cwd: bareRepoPath,
+				});
+			} else if (existsBranch) {
 				await this.git.run("git", ["branch", "-f", branchName, baseRef], { cwd: bareRepoPath });
 				await this.git.run("git", ["worktree", "add", "--force", worktreePath, branchName], {
 					cwd: bareRepoPath,

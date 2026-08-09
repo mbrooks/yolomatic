@@ -61,6 +61,7 @@ function makeDeps(overrides?: {
 		listPullRequests: vi.fn(async () => []),
 		getPullRequest: vi.fn(async () => ({
 			head: { ref: "yolomatic/issue-1", sha: "sha" },
+			base: { ref: "main" },
 			state: "open",
 			merged: false,
 			mergeable: true,
@@ -936,7 +937,13 @@ describe("ExecuteSession", () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
 		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
-			head: { ref: "yolomatic/issue-1" },
+			head: { ref: "yolomatic/issue-1", sha: "sha" },
+			base: { ref: "main" },
+			state: "open",
+			merged: false,
+			mergeable: true,
+			mergeableState: "clean",
+			draft: true,
 		});
 		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
 		let syncCalls = 0;
@@ -994,7 +1001,13 @@ describe("ExecuteSession", () => {
 		const deps = makeDeps();
 		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
 		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
-			head: { ref: "yolomatic/issue-1" },
+			head: { ref: "yolomatic/issue-1", sha: "sha" },
+			base: { ref: "main" },
+			state: "open",
+			merged: false,
+			mergeable: true,
+			mergeableState: "clean",
+			draft: true,
 		});
 		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
 		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
@@ -1021,6 +1034,93 @@ describe("ExecuteSession", () => {
 		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 		expect(deps.executor.execute).not.toHaveBeenCalled();
 		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed", expect.objectContaining({ summary: expect.stringContaining("merge conflict") }));
+	});
+
+	it("discovers a missing PR association on divergence, updates the branch, and launches the worker", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: undefined });
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockResolvedValue({
+			head: { ref: "yolomatic/issue-1", sha: "sha" },
+			base: { ref: "main" },
+			state: "open",
+			merged: false,
+			mergeable: true,
+			mergeableState: "clean",
+			draft: true,
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ number: 605, html_url: "https://github.com/mbrooks/yolomatic/pull/605" },
+		]);
+		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
+		let syncCalls = 0;
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			syncCalls += 1;
+			if (syncCalls === 1) throw new WorktreeBranchDivergedError("yolomatic/issue-1", "origin/yolomatic/issue-1");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		expect(deps.github.listPullRequests).toHaveBeenCalledWith("mbrooks", "yolomatic", {
+			head: "mbrooks:yolomatic/issue-1",
+			base: "main",
+			state: "open",
+		});
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, 605, "https://github.com/mbrooks/yolomatic/pull/605");
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "yolomatic", 605);
+		expect(deps.workspaces.syncWorktree).toHaveBeenCalledTimes(2);
+		expect(deps.executor.execute).toHaveBeenCalled();
+	});
+
+	it("clears a stale preserved PR on divergence and discovers a valid replacement PR", async () => {
+		const deps = makeDeps();
+		(deps.sessions.get as ReturnType<typeof vi.fn>).mockResolvedValue({ ...state, prNumber: 42 });
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>).mockImplementation(async (_o, _r, n) => {
+			if (n === 42) {
+				return { head: { ref: "yolomatic/issue-1", sha: "sha" }, base: { ref: "develop" }, state: "open", merged: false, draft: true };
+			}
+			return { head: { ref: "yolomatic/issue-1", sha: "sha" }, base: { ref: "main" }, state: "open", merged: false, draft: true };
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ number: 605, html_url: "https://github.com/mbrooks/yolomatic/pull/605" },
+		]);
+		const { WorktreeBranchDivergedError } = await import("../../workspace/errors.js");
+		let syncCalls = 0;
+		(deps.workspaces.syncWorktree as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			syncCalls += 1;
+			if (syncCalls === 1) throw new WorktreeBranchDivergedError("yolomatic/issue-1", "origin/yolomatic/issue-1");
+		}) as never;
+
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await execute.run(state);
+
+		// Stale preserved PR #42 (wrong base) must be cleared before discovery.
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "working", { prNumber: undefined, prUrl: undefined });
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, 605, "https://github.com/mbrooks/yolomatic/pull/605");
+		expect(deps.github.updatePullRequestBranch).toHaveBeenCalledWith("mbrooks", "yolomatic", 605);
+		expect(deps.executor.execute).toHaveBeenCalled();
 	});
 
 	it("records task execution start and finish timestamps", async () => {

@@ -52,6 +52,7 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 			const { data } = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
 			return {
 				head: data.head,
+				base: { ref: data.base?.ref ?? "" },
 				state: data.state,
 				merged: data.merged ?? false,
 				mergeable: data.mergeable ?? null,
@@ -113,13 +114,31 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 	}
 
 	async markPullRequestReadyForReview(owner: string, repo: string, prNumber: number): Promise<void> {
-		// GitHub's "Update a pull request" endpoint does not accept a `draft` field,
-		// so `pulls.update({ draft: false })` is a no-op. Use the dedicated
-		// "Mark a pull request as ready for review" endpoint instead.
-		await this.octokit.request(
-			"POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review",
-			{ owner, repo, pull_number: prNumber },
-		);
+		// GitHub exposes "ready for review" only as the GraphQL
+		// `markPullRequestReadyForReview` mutation. The REST
+		// `POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review`
+		// route does not exist and returns 404, which previously left draft PRs
+		// stuck after creation. Resolve the PR's global node id, then flip it.
+		const nodeQuery = `query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) { id }
+  }
+}`;
+		const nodeResult = await this.octokit.graphql<{ repository?: { pullRequest?: { id?: string } } }>(nodeQuery, {
+			owner,
+			repo,
+			number: prNumber,
+		});
+		const pullRequestId = nodeResult?.repository?.pullRequest?.id;
+		if (!pullRequestId) {
+			throw new Error(`Could not resolve GitHub node id for pull request #${prNumber} in ${owner}/${repo}.`);
+		}
+		const mutation = `mutation MarkPullRequestReadyForReview($input: MarkPullRequestReadyForReviewInput!) {
+  markPullRequestReadyForReview(input: $input) {
+    pullRequest { id isDraft }
+  }
+}`;
+		await this.octokit.graphql(mutation, { input: { pullRequestId } });
 	}
 
 	async listPullRequests(

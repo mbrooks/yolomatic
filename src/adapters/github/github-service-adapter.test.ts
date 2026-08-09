@@ -6,11 +6,20 @@ function createMockOctokit(overrides?: Partial<{
 	pulls: Record<string, ReturnType<typeof vi.fn>>;
 	repos: Record<string, ReturnType<typeof vi.fn>>;
 	request: ReturnType<typeof vi.fn>;
+	graphql: ReturnType<typeof vi.fn>;
 	search: Record<string, ReturnType<typeof vi.fn>>;
 	users: Record<string, ReturnType<typeof vi.fn>>;
 }>) {
 	return {
 		request: overrides?.request ?? vi.fn(async () => ({ data: { items: [] } })),
+		graphql:
+			overrides?.graphql ??
+			vi.fn(async (query: string) => {
+				if (query.includes("markPullRequestReadyForReview")) {
+					return { markPullRequestReadyForReview: { pullRequest: { id: "PR_nodeid", isDraft: false } } };
+				}
+				return { repository: { pullRequest: { id: "PR_nodeid" } } };
+			}),
 		issues: {
 			createComment: vi.fn(async () => ({ data: {} })),
 			addLabels: vi.fn(async () => ({ data: {} })),
@@ -126,7 +135,7 @@ describe("GitHubServiceAdapter", () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.getPullRequest("mbrooks", "yolomatic", 1);
-			expect(result).toEqual({ head: { ref: "main" }, state: "open", merged: false, mergeable: null, mergeableState: "unknown", draft: false });
+			expect(result).toEqual({ head: { ref: "main" }, base: { ref: "" }, state: "open", merged: false, mergeable: null, mergeableState: "unknown", draft: false });
 		});
 
 		it("maps mergeable, mergeable_state, and draft from the Octokit response", async () => {
@@ -140,6 +149,7 @@ describe("GitHubServiceAdapter", () => {
 							mergeable: true,
 							mergeable_state: "clean",
 							draft: true,
+							base: { ref: "main" },
 						},
 					})),
 				},
@@ -148,6 +158,7 @@ describe("GitHubServiceAdapter", () => {
 			const result = await adapter.getPullRequest("mbrooks", "yolomatic", 7);
 			expect(result).toEqual({
 				head: { ref: "yolomatic/issue-1", sha: "abc" },
+				base: { ref: "main" },
 				state: "open",
 				merged: false,
 				mergeable: true,
@@ -191,16 +202,30 @@ describe("GitHubServiceAdapter", () => {
 			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", title: "Title", body: "Body", head: "feature", base: "main" });
 		});
 
-		it("marks a pull request ready for review via the ready-for-review endpoint", async () => {
-			const request = vi.fn(async () => ({ data: {} }));
-			const octokit = createMockOctokit({ request });
+		it("marks a pull request ready for review via the GraphQL mutation", async () => {
+			const graphql = vi.fn(async (query, variables) => {
+				if (query.includes("markPullRequestReadyForReview")) {
+					expect(variables).toEqual({ input: { pullRequestId: "PR_nodeid" } });
+					return { markPullRequestReadyForReview: { pullRequest: { id: "PR_nodeid", isDraft: false } } };
+				}
+				expect(variables).toEqual({ owner: "mbrooks", repo: "yolomatic", number: 42 });
+				return { repository: { pullRequest: { id: "PR_nodeid" } } };
+			});
+			const octokit = createMockOctokit({ graphql });
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			await adapter.markPullRequestReadyForReview("mbrooks", "yolomatic", 42);
-			expect(request).toHaveBeenCalledWith(
-				"POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review",
-				{ owner: "mbrooks", repo: "yolomatic", pull_number: 42 },
-			);
+			expect(graphql).toHaveBeenCalledTimes(2);
+			expect(octokit.request).not.toHaveBeenCalled();
 			expect(octokit.pulls.update).not.toHaveBeenCalled();
+		});
+
+		it("throws when the GraphQL node id cannot be resolved", async () => {
+			const graphql = vi.fn(async () => ({ repository: { pullRequest: null } }));
+			const octokit = createMockOctokit({ graphql });
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			await expect(adapter.markPullRequestReadyForReview("mbrooks", "yolomatic", 42)).rejects.toThrow(
+				"Could not resolve GitHub node id",
+			);
 		});
 
 		it("returns null when no commits between branches", async () => {
