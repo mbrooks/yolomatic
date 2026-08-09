@@ -94,4 +94,51 @@ describe("resolveConfiguredModel", () => {
 
 		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
+
+	it("resolves an openai model given PI_AGENT_PROVIDER=openai", () => {
+		const registry = createRegistry([
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
+			{ provider: "openai", id: "gpt-5.2" },
+			{ provider: "openai", id: "gpt-5.2-codex" },
+		]);
+
+		const model = resolveConfiguredModel(
+			registry,
+			undefined,
+			{ PI_AGENT_PROVIDER: "openai", PI_AGENT_MODEL: "gpt-5.2-codex" },
+		);
+
+		expect(model).toEqual({ provider: "openai", id: "gpt-5.2-codex" });
+	});
+
+	it("resolves an openai-codex model given PI_AGENT_PROVIDER=openai-codex", () => {
+		const registry = createRegistry([
+			{ provider: "openai", id: "gpt-5.2" },
+			{ provider: "openai-codex", id: "gpt-5.2" },
+			{ provider: "openai-codex", id: "gpt-5.3-codex" },
+		]);
+
+		const model = resolveConfiguredModel(
+			registry,
+			{ provider: "openai-codex", model: "gpt-5.3-codex" },
+			{},
+		);
+
+		expect(model).toEqual({ provider: "openai-codex", id: "gpt-5.3-codex" });
+	});
+
+	it("disambiguates a shared model id using the explicit openai-codex provider", () => {
+		const registry = createRegistry([
+			{ provider: "openai", id: "gpt-5.2" },
+			{ provider: "openai-codex", id: "gpt-5.2" },
+		]);
+
+		const model = resolveConfiguredModel(
+			registry,
+			{ provider: "openai-codex", model: "gpt-5.2" },
+			{},
+		);
+
+		expect(model).toEqual({ provider: "openai-codex", id: "gpt-5.2" });
+	});
 });

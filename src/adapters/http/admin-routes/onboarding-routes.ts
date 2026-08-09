@@ -40,14 +40,16 @@ export const ONBOARDING_CONFIG_KEYS = [
 	"pi_agent_provider",
 	"pi_agent_model",
 	"ollama_container_name",
+	"openai_api_key",
 ] as const;
 
 /** LLM provider values accepted by the onboarding submission handler. */
-export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama"];
+export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama", "openai", "openai-codex"];
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
 	"webhook_secret",
+	"openai_api_key",
 ]);
 
 export interface OnboardingConfigField {
@@ -348,6 +350,38 @@ const registry = new AdminRouteRegistry()
 			return { status: 200, body: result };
 		},
 	})
+	.route({
+		method: "GET",
+		pattern: /^\/api\/onboarding\/openai-codex-status$/u,
+		auth: false,
+		requiresDeps: ["openaiCodexAuthService"],
+		handler: async (ctx) => {
+			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
+			return { status: 200, body: openaiCodexAuthService.getSignInStatus() };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/openai-codex-login$/u,
+		auth: false,
+		requiresDeps: ["openaiCodexAuthService"],
+		handler: async (ctx) => {
+			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
+			const result = await openaiCodexAuthService.beginLogin();
+			return { status: 200, body: { authUrl: result.authUrl } };
+		},
+	})
+	.route({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/openai-codex-logout$/u,
+		auth: false,
+		requiresDeps: ["openaiCodexAuthService"],
+		handler: async (ctx) => {
+			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
+			openaiCodexAuthService.logout();
+			return { status: 200, body: { success: true } };
+		},
+	})
 	.route<Record<string, string>>({
 		method: "POST",
 		pattern: /^\/api\/onboarding$/u,
@@ -432,6 +466,10 @@ const registry = new AdminRouteRegistry()
 			const containerValue = body.ollama_container_name?.trim();
 			if (containerValue) {
 				settingsStore.set("ollama_container_name", containerValue);
+			}
+			const openaiApiKey = resolveSecret("openai_api_key");
+			if (openaiApiKey) {
+				settingsStore.set("openai_api_key", openaiApiKey);
 			}
 			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({

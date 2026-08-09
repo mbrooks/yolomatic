@@ -149,6 +149,31 @@ describe("settings/model", () => {
       expect(provider?.default).toBe("ollama");
       expect(provider?.envVar).toBe("PI_AGENT_PROVIDER");
       expect(provider?.category).toBe("ai-llm");
+      expect(provider?.description).not.toContain("The only supported provider");
+    });
+
+    it("defines the sensitive openai_api_key setting in the ai-llm category", () => {
+      const apiKey = getSettingDefinition("openai_api_key");
+      expect(apiKey).toBeDefined();
+      expect(apiKey?.envVar).toBe("OPENAI_API_KEY");
+      expect(apiKey?.category).toBe("ai-llm");
+      expect(apiKey?.sensitive).toBe(true);
+      expect(apiKey?.requiresRestart).toBe(true);
+      expect(apiKey?.type).toBe("string");
+    });
+
+    it("defines the worker pi auth volume and dir settings with defaults", () => {
+      const mount = getSettingDefinition("worker_pi_auth_mount_source");
+      expect(mount).toBeDefined();
+      expect(mount?.default).toBe("yolomatic_pi");
+      expect(mount?.envVar).toBe("YOLO_WORKER_PI_AUTH_MOUNT_SOURCE");
+      expect(mount?.category).toBe("agent-behavior");
+
+      const dir = getSettingDefinition("worker_pi_auth_dir");
+      expect(dir).toBeDefined();
+      expect(dir?.default).toBe("/home/yolomatic/.pi/agent");
+      expect(dir?.envVar).toBe("YOLO_WORKER_PI_AUTH_DIR");
+      expect(dir?.category).toBe("agent-behavior");
     });
 
     it("exposes a configurable ollama_container_name setting defaulting to yolomatic-ollama", () => {

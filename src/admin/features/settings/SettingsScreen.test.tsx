@@ -579,13 +579,13 @@ describe("SettingsScreen", () => {
 		expect(baseBlock![0]).toContain("background: var(--surface)");
 	});
 
-	it("renders pi_agent_provider as a dropdown whose only option is ollama", async () => {
+	it("renders pi_agent_provider as a dropdown offering ollama, openai, and openai-codex", async () => {
 		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "ok" });
 		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
 
 		const provider = await screen.findByRole("combobox", { name: /pi_agent_provider/ }) as HTMLSelectElement;
 		expect(provider.tagName).toBe("SELECT");
-		expect(Array.from(provider.options, (option) => option.value)).toEqual(["ollama"]);
+		expect(Array.from(provider.options, (option) => option.value)).toEqual(["ollama", "openai", "openai-codex"]);
 	});
 
 	it("does not render the Ollama status panel when the provider is not ollama", async () => {
@@ -603,6 +603,25 @@ describe("SettingsScreen", () => {
 		});
 		expect(screen.queryByText("Ollama sign-in status")).toBeNull();
 		expect(globalThis.fetch).not.toHaveBeenCalledWith("/api/ollama/signin", expect.anything());
+	});
+
+	it("renders the ChatGPT Codex status panel when the provider is openai-codex", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: aiLlmSettingsWithProvider("openai-codex") }));
+			}
+			if (url === "/api/openai-codex/status") {
+				return Promise.resolve(jsonResponse({ signedIn: false, message: "Not signed in with ChatGPT." }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await screen.findByText("ChatGPT (Codex) sign-in status");
+		expect(screen.queryByText("Ollama sign-in status")).toBeNull();
+		await screen.findByRole("button", { name: /Sign in with ChatGPT/u });
+		expect(globalThis.fetch).toHaveBeenCalledWith("/api/openai-codex/status");
 	});
 
 	it("renders the Ollama status panel for a signed-in account", async () => {

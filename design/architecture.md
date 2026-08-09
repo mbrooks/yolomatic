@@ -98,6 +98,10 @@ The worker gets:
 - a fresh writable container filesystem per execution
 - only the explicitly forwarded model/session environment variables
 - a session-specific WebSocket URL for the control-plane connection
+- (OpenAI Codex only) a **read-only** mount of the shared `yolomatic_pi`
+  auth volume plus `PI_CODING_AGENT_DIR`, so workers can read and refresh the
+  ChatGPT OAuth credentials in `auth.json` (see “OpenAI Codex OAuth credential
+  delivery” below)
 
 The worker does not get:
 
@@ -109,11 +113,46 @@ The worker does not get:
 - control-plane runtime and memory volumes
 - a mounted LLM session directory
 - direct access to Yolomatic source checkout unless it is under the workspace mount
+- write access to the shared pi auth volume (mounted read-only)
 
 Important caveat:
 
 - if any repository inside `WORKSPACES_DIR` contains its own `.env` or other secret-bearing files, the worker can read them because the full workspace tree is mounted read-write
 - this design therefore assumes secrets are kept out of workspace checkouts
+
+#### OpenAI Codex OAuth credential delivery
+
+Yolomatic supports two OpenAI auth modes for the `openai-codex` provider:
+
+- **OpenAI API** (`pi_agent_provider=openai`): the operator supplies an
+  `OPENAI_API_KEY`. The control plane syncs it to `process.env.OPENAI_API_KEY`
+  and `DockerWorkerExecutor.buildDockerRunArgs` forwards it into worker
+  containers as `-e OPENAI_API_KEY=...`, the same way `OLLAMA_HOST` is forwarded.
+- **ChatGPT Plus/Pro (Codex OAuth)** (`pi_agent_provider=openai-codex`): the
+  ChatGPT OAuth flow is Node `http`-callback based and cannot run in the browser,
+  so the control plane runs it server-side via the
+  `OpenAICodexAuthService` (`src/openai/codex-auth.ts`), which drives pi's built-in
+  `openaiCodexOAuthProvider` through `AuthStorage.login`. The admin UI (onboarding
+  wizard and Settings → AI / LLM) only asks the control plane to begin the flow
+  and opens the returned authorization URL.
+
+The resulting OAuth credentials are persisted to `auth.json` on the
+`yolomatic_pi` Docker volume (mounted into the control plane at
+`/home/yolomatic/.pi/agent`, the default pi agent dir). Disposable worker
+containers are launched with:
+
+- `--mount type=volume,src=yolomatic_pi,dst=/home/yolomatic/.pi/agent,ro`
+  (read-only; a bind mount is used when the source is an absolute path)
+- `-e PI_CODING_AGENT_DIR=/home/yolomatic/.pi/agent`
+
+so pi's `AuthStorage.create()` (called with no path inside the worker) reads
+`${PI_CODING_AGENT_DIR}/auth.json` and can refresh expired tokens itself. This
+satisfies the existing worker boundary: workers get only the auth file (no
+GitHub credentials, no Docker socket, no `.env`, no memory DB, no host
+home-directory mount beyond the dedicated auth volume). The volume source and
+in-container dir are configurable via the `worker_pi_auth_mount_source` and
+`worker_pi_auth_dir` settings (`YOLO_WORKER_PI_AUTH_MOUNT_SOURCE` /
+`YOLO_WORKER_PI_AUTH_DIR`).
 
 ## Filesystem Layout
 

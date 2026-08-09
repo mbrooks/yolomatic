@@ -34,6 +34,9 @@ vi.mock("../config.js", () => ({
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
 		workerOllamaHost: undefined,
+		workerPiAuthMountSource: "yolomatic_pi",
+		workerPiAuthDir: "/home/yolomatic/.pi/agent",
+		openaiApiKey: "sk-test",
 	})),
 	isBootstrapComplete: vi.fn(() => true),
 }));
@@ -175,6 +178,7 @@ describe("syncConfigToEnv", () => {
 	afterEach(() => {
 		process.env.PI_AGENT_MODEL = "";
 		process.env.PI_AGENT_PROVIDER = "";
+		process.env.OPENAI_API_KEY = "";
 		process.env.LOG_LEVEL = "";
 		process.env.LOG_PROMPTS = "";
 		process.env.LOG_THOUGHTS = "";
@@ -186,6 +190,7 @@ describe("syncConfigToEnv", () => {
 		syncConfigToEnv(baseConfig);
 		expect(process.env.PI_AGENT_MODEL).toBe("kimi");
 		expect(process.env.PI_AGENT_PROVIDER).toBe("ollama");
+		expect(process.env.OPENAI_API_KEY).toBe("sk-test");
 		expect(process.env.LOG_LEVEL).toBe("debug");
 		expect(process.env.LOG_PROMPTS).toBe("true");
 		expect(process.env.LOG_TOOLS).toBe("true");

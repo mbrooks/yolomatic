@@ -51,7 +51,7 @@ Open [http://127.0.0.1:6767/yolomatic/admin](http://127.0.0.1:6767/yolomatic/adm
 1. Create the master admin account (full name, username, and password). Additional admin users can be added later from the dashboard.
 2. Verify your GitHub token.
 3. Generate a webhook secret.
-4. Configure the AI / LLM provider (Ollama), the Ollama container name and sign-in status, and the LLM model.
+4. Configure the AI / LLM provider (Ollama, OpenAI, or ChatGPT Plus/Pro via Codex OAuth), the provider-specific sign-in / API key, and the LLM model. OpenAI uses an `OPENAI_API_KEY`; `openai-codex` runs the ChatGPT OAuth flow on the control plane and stores credentials on the shared `yolomatic_pi` volume so worker containers can read and refresh them.
 5. Select repositories and initialize their workspaces.
 
 Follow the logs with:

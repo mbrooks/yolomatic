@@ -61,6 +61,9 @@ export interface AppConfig {
 	workerControlBaseUrl: string;
 	workerDockerNetworkMode?: string;
 	workerOllamaHost?: string;
+	workerPiAuthMountSource: string;
+	workerPiAuthDir: string;
+	openaiApiKey: string;
 	adminPath: string;
 	adminDefaultPage: string;
 	issueNewCommentEnabled: boolean;
@@ -113,6 +116,9 @@ export function getConfig(store: SettingsStore): AppConfig {
 		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
 		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,
 		workerOllamaHost: store.get("worker_ollama_host") ?? undefined,
+		workerPiAuthMountSource: store.getString("worker_pi_auth_mount_source", "yolomatic_pi"),
+		workerPiAuthDir: store.getString("worker_pi_auth_dir", "/home/yolomatic/.pi/agent"),
+		openaiApiKey: store.get("openai_api_key") ?? "",
 		adminPath: normalizeAdminPath(store.get("admin_path")),
 		adminDefaultPage: (() => {
 			const raw = store.get("admin_default_page")?.trim();

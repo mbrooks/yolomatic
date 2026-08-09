@@ -399,6 +399,126 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("forwards OPENAI_API_KEY from process.env when configured", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		process.env.OPENAI_API_KEY = "sk-from-env";
+
+		try {
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("OPENAI_API_KEY=sk-from-env");
+			expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
+			expect(args.some((arg: string) => arg.startsWith("OLLAMA_HOST="))).toBe(false);
+		} finally {
+			delete process.env.OPENAI_API_KEY;
+		}
+	});
+
+	it("prefers an explicit workerOpenAiApiKey option over process.env", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			workerOpenAiApiKey: "sk-explicit",
+			soulPath: "/app/SOUL.md",
+		});
+
+		process.env.OPENAI_API_KEY = "sk-from-env";
+
+		try {
+			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			expect(args).toContain("OPENAI_API_KEY=sk-explicit");
+			expect(args).not.toContain("OPENAI_API_KEY=sk-from-env");
+		} finally {
+			delete process.env.OPENAI_API_KEY;
+		}
+	});
+
+	it("omits OPENAI_API_KEY when neither option nor env is set", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		delete process.env.OPENAI_API_KEY;
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args.some((arg: string) => arg.startsWith("OPENAI_API_KEY="))).toBe(false);
+	});
+
+	it("mounts the shared pi auth volume read-only and forwards PI_CODING_AGENT_DIR when configured", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			workerPiAuthMountSource: "yolomatic_pi",
+			workerPiAuthDir: "/home/yolomatic/.pi/agent",
+			soulPath: "/app/SOUL.md",
+		});
+
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toContain("type=volume,src=yolomatic_pi,dst=/home/yolomatic/.pi/agent,ro");
+		expect(args).toContain("PI_CODING_AGENT_DIR=/home/yolomatic/.pi/agent");
+	});
+
+	it("uses a bind mount when the pi auth source is an absolute path", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			workerPiAuthMountSource: "/var/lib/yolomatic/pi-auth",
+			workerPiAuthDir: "/home/yolomatic/.pi/agent",
+			soulPath: "/app/SOUL.md",
+		});
+
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toContain("type=bind,src=/var/lib/yolomatic/pi-auth,dst=/home/yolomatic/.pi/agent,ro");
+		expect(args).toContain("PI_CODING_AGENT_DIR=/home/yolomatic/.pi/agent");
+	});
+
+	it("omits the pi auth mount and PI_CODING_AGENT_DIR when not configured", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args.some((arg: string) => arg.startsWith("PI_CODING_AGENT_DIR="))).toBe(false);
+		expect(args.some((arg: string) => arg.includes("/home/yolomatic/.pi/agent"))).toBe(false);
+	});
+
 	it("forwards YOLO_WORKER_INIT_* env vars when present", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({

@@ -53,6 +53,12 @@ export interface DockerWorkerExecutorOptions {
 	workerDockerNetworkMode?: string;
 	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
+	/** Docker volume or bind source holding the shared pi auth.json (OpenAI Codex OAuth credentials). */
+	workerPiAuthMountSource?: string;
+	/** In-container path the shared pi auth volume is mounted at (forwarded as PI_CODING_AGENT_DIR). */
+	workerPiAuthDir?: string;
+	/** Optional OpenAI platform API key forwarded to workers as OPENAI_API_KEY. */
+	workerOpenAiApiKey?: string;
 	soulPath: string;
 	/** Scoped GitHub gateway used to serve worker tool_request calls. */
 	githubGateway?: WorkerGitHubGateway;
@@ -622,6 +628,17 @@ export class DockerWorkerExecutor implements ExecutionService {
 			args.push("-e", `OLLAMA_HOST=${ollamaHost}`);
 		}
 
+		const openaiApiKey = this.resolveWorkerOpenAiApiKey();
+		if (openaiApiKey) {
+			args.push("-e", `OPENAI_API_KEY=${openaiApiKey}`);
+		}
+
+		const piAuthMount = this.buildPiAuthMount();
+		if (piAuthMount) {
+			args.push("--mount", piAuthMount.spec);
+			args.push("-e", `PI_CODING_AGENT_DIR=${piAuthMount.dir}`);
+		}
+
 		args.push(
 			"-e",
 			"YOLO_SESSION_KEY",
@@ -753,6 +770,34 @@ export class DockerWorkerExecutor implements ExecutionService {
 		}
 
 		return raw;
+	}
+
+	/**
+	 * Resolves the OpenAI API key to forward into worker containers. An
+	 * explicit option takes precedence; otherwise the control plane's
+	 * `OPENAI_API_KEY` env var (synced from settings) is forwarded.
+	 */
+	resolveWorkerOpenAiApiKey(): string | undefined {
+		const explicit = this.options.workerOpenAiApiKey?.trim();
+		if (explicit) return explicit;
+		return process.env.OPENAI_API_KEY?.trim() || undefined;
+	}
+
+	/**
+	 * Builds the read-only mount spec for the shared pi auth volume plus the
+	 * in-container directory workers read `auth.json` from. Returns undefined
+	 * when no auth volume source is configured, so Ollama-only workers keep
+	 * their existing launch shape unchanged.
+	 */
+	buildPiAuthMount(): { spec: string; dir: string } | undefined {
+		const source = this.options.workerPiAuthMountSource?.trim();
+		const dir = this.options.workerPiAuthDir?.trim();
+		if (!source || !dir) return undefined;
+		const mountType = path.isAbsolute(source) ? "bind" : "volume";
+		return {
+			spec: `type=${mountType},src=${source},dst=${dir},ro`,
+			dir,
+		};
 	}
 
 	private async ensureWorkerImage(): Promise<void> {

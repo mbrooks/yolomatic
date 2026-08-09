@@ -46,6 +46,7 @@ export function syncConfigToEnv(nextConfig: AppConfig): void {
 	// Sync database settings to process.env so legacy code paths pick them up.
 	process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
 	process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
+	process.env.OPENAI_API_KEY = nextConfig.openaiApiKey ?? "";
 	process.env.LOG_LEVEL = nextConfig.logLevel;
 	process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
 	process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
@@ -134,6 +135,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workerDockerNetworkMode: config.workerDockerNetworkMode,
 		workerRpcServer,
 		workerOllamaHost: config.workerOllamaHost,
+		workerPiAuthMountSource: config.workerPiAuthMountSource,
+		workerPiAuthDir: config.workerPiAuthDir,
 		soulPath: config.soulPath,
 		githubGateway,
 	});

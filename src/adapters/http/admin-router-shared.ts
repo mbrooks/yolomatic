@@ -53,6 +53,7 @@ const missingDependencyErrors = {
 	repositoryStore: "Repository store not configured",
 	refinementStore: "Refinement store not configured",
 	ollamaSignInService: "Ollama sign-in service not configured",
+	openaiCodexAuthService: "OpenAI Codex auth service not configured",
 	sessionAuth: "Admin authentication not configured",
 	userStore: "User store not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
@@ -186,6 +187,7 @@ export interface AdminRouterDeps {
 	adminPath?: string;
 	adminDefaultPage?: string;
 	ollamaSignInService?: import("../../ollama/signin-status.js").OllamaSignInService;
+	openaiCodexAuthService?: import("../../openai/codex-auth.js").OpenAICodexAuthService;
 }
 
 export function resolveAdminPath(deps: AdminRouterDeps): string {
