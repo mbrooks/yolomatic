@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-    <img src="assets/yolomatic-logo.png" alt="Yolomatic logo" width="280">
+    <img src="assets/yolomatic-logo.png" alt="Yolomatic logo" width="600">
   </picture>
 
   <h1>Yolomatic</h1>
