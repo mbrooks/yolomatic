@@ -6,12 +6,12 @@ Last updated: 2026-08-01
 
 ## Purpose
 
-Yeetomatic should let an authorized maintainer replace a newly opened issue's
+Yolomatic should let an authorized maintainer replace a newly opened issue's
 body with a more complete Proposed Task. Refinement begins only after an
-authenticated `/yeetomatic issue-refinement` command, optionally followed by a
+authenticated `/yolomatic issue-refinement` command, optionally followed by a
 steering prompt that shapes the refinement pass.
 
-Opening an issue does not start refinement. Yeetomatic posts a static comment
+Opening an issue does not start refinement. Yolomatic posts a static comment
 explaining the command and worker capabilities, warning maintainers to verify
 the issue because its content can influence worker behavior.
 
@@ -26,7 +26,7 @@ Docker image or long-lived refinement service is not required.
 
 ## Trust Model
 
-Issue refinement uses a trust-based security model. Yeetomatic authorizes the
+Issue refinement uses a trust-based security model. Yolomatic authorizes the
 GitHub user who sends the exact command and then allows the worker to treat the
 issue and repository as task input.
 
@@ -38,7 +38,7 @@ command only when they trust the issue content and repository context to be
 processed by the configured model and worker tools.
 
 The normal worker boundary still applies: GitHub credentials and deterministic
-GitHub mutations remain in the Yeetomatic control plane. The worker returns a
+GitHub mutations remain in the Yolomatic control plane. The worker returns a
 result; it does not update the issue, commit, push, or create a pull request.
 
 ## Goals
@@ -50,7 +50,7 @@ result; it does not update the issue, commit, push, or create a pull request.
   the request and test its conclusions.
 - Use `.pi/skills/issue-refinement/SKILL.md` from the target repository when it
   exists.
-- Fall back to Yeetomatic's built-in issue-refinement prompt defaults when the
+- Fall back to Yolomatic's built-in issue-refinement prompt defaults when the
   repository skill is absent.
 - Automatically replace the issue body with the returned Proposed Task.
 - Preserve the original body and refinement provenance for audit and recovery.
@@ -71,42 +71,42 @@ result; it does not update the issue, commit, push, or create a pull request.
 
 ### 1. Post static instructions
 
-When an eligible issue is opened, Yeetomatic posts exactly one static comment:
+When an eligible issue is opened, Yolomatic posts exactly one static comment:
 
 ```markdown
-## Yeetomatic issue refinement
+## Yolomatic issue refinement
 
-A repository collaborator or the configured admin can ask Yeetomatic to investigate this issue and
-replace its body with a more complete Proposed Task. Yeetomatic uses this
+A repository collaborator or the configured admin can ask Yolomatic to investigate this issue and
+replace its body with a more complete Proposed Task. Yolomatic uses this
 repository's `issue-refinement` skill when available, otherwise it uses its
 built-in issue-refinement defaults.
 
 To start, comment:
 
-`/yeetomatic issue-refinement`
+`/yolomatic issue-refinement`
 
 Optional trailing text after the command is treated as a steering prompt that
 shapes the refinement pass, e.g.:
 
-`/yeetomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback`
+`/yolomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback`
 
 The command starts an LLM-driven worker with repository, shell, test, and
 network access. Because issue content can influence the worker's behavior,
 verify the issue before starting refinement.
 
-When refinement succeeds, Yeetomatic automatically replaces this issue body.
-The original body is retained in Yeetomatic's refinement history. Refinement
+When refinement succeeds, Yolomatic automatically replaces this issue body.
+The original body is retained in Yolomatic's refinement history. Refinement
 does not start implementation or create a pull request.
 ```
 
 The comment is defined in control-plane code. Creating it does not prepare a
 worktree, launch a worker, or create an implementation session.
 
-Yeetomatic does not post the instructions when:
+Yolomatic does not post the instructions when:
 
-- the repository is not managed by this Yeetomatic instance;
+- the repository is not managed by this Yolomatic instance;
 - the issue is closed or is a pull request;
-- the issue was opened by the configured Yeetomatic account or another bot;
+- the issue was opened by the configured Yolomatic account or another bot;
 - issue refinement is disabled for the repository; or
 - an instruction comment has already been recorded for the issue.
 
@@ -120,13 +120,13 @@ Only issues opened after the repo's polling baseline can receive it.
 An authorized maintainer comments:
 
 ```text
-/yeetomatic issue-refinement
+/yolomatic issue-refinement
 ```
 
 or, to steer the refinement pass:
 
 ```text
-/yeetomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback
+/yolomatic issue-refinement Focus on the migration path and add acceptance criteria for rollback
 ```
 
 The command must appear at the start of the trimmed comment (matching is
@@ -137,18 +137,18 @@ prompt: it is recorded on the durable refinement attempt and surfaced to the
 worker as authoritative guidance for that pass (focus areas, requested
 changes, constraints) while the worker still investigates the issue and
 produces a self-contained Proposed Task. Embedded or quoted commands (e.g.
-`` `/yeetomatic issue-refinement` `` and `Please run /yeetomatic
+`` `/yolomatic issue-refinement` `` and `Please run /yolomatic
 issue-refinement`) and Markdown wrappers around the command token itself are
 still rejected. The no-argument form is unchanged.
 
-After accepting the command, Yeetomatic:
+After accepting the command, Yolomatic:
 
 1. re-fetches the issue and verifies that it is still open;
 2. records the current title, body, and body fingerprint;
 3. atomically claims the issue's task-admission key;
 4. prepares a temporary refinement worktree from the effective default branch;
 5. selects the repository's `issue-refinement` skill when present, otherwise
-   selecting Yeetomatic's built-in prompt defaults;
+   selecting Yolomatic's built-in prompt defaults;
 6. launches a fresh instance of the existing Docker worker for refinement;
 7. lets the worker investigate, make experimental edits, and run relevant tests;
 8. receives a Proposed Task and a concise record of the investigation;
@@ -157,14 +157,14 @@ After accepting the command, Yeetomatic:
 11. posts a short completion comment identifying the requesting maintainer, noting when the title was also updated; and
 12. destroys the refinement container and temporary worktree without delivery.
 
-If the issue changes while refinement is running, Yeetomatic leaves the newer
+If the issue changes while refinement is running, Yolomatic leaves the newer
 body unchanged and asks the maintainer to run the command again.
 
 ### 3. Update the issue body
 
 Refinement may optionally update the issue title in addition to the body. When
 the worker returns a non-empty `proposedTitle` that differs from the original
-title, and the title has not changed during the run, Yeetomatic applies it
+title, and the title has not changed during the run, Yolomatic applies it
 alongside the body. When the worker omits or empties `proposedTitle`, the
 title is left unchanged. The Proposed Task becomes the issue body, typically
 using sections such as:
@@ -187,7 +187,7 @@ using sections such as:
 - ...
 ```
 
-After the update, Yeetomatic posts:
+After the update, Yolomatic posts:
 
 ```markdown
 Issue refined at the request of @maintainer. The issue body now contains the
@@ -203,14 +203,14 @@ title and body now contain the Proposed Task.
 sequenceDiagram
     actor User as GitHub user
     participant GH as GitHub
-    participant CP as Yeetomatic control plane
+    participant CP as Yolomatic control plane
     participant Worker as Disposable refinement worker
 
     User->>GH: Open issue
     GH->>CP: issues.opened
     CP->>GH: Post static instructions and verification warning
     Note over CP,Worker: No worker starts on issue creation
-    User->>GH: Comment /yeetomatic issue-refinement
+    User->>GH: Comment /yolomatic issue-refinement
     GH->>CP: issue_comment.created
     CP->>CP: Authenticate, authorize, refetch, and claim issue
     CP->>CP: Create temporary refinement worktree
@@ -236,7 +236,7 @@ issue. Polling events are read through the authenticated GitHub API and carry
 the same identity information in a normalized form.
 
 The configured `admin_github_username` and explicit repository
-collaborators may run `/yeetomatic issue-refinement`. The command must start
+collaborators may run `/yolomatic issue-refinement`. The command must start
 the trimmed comment (case-insensitive); trailing text after the command is
 treated as a steering prompt and does not change who may run the command.
 Authorization uses the event sender identity: `sender.login` for webhook events
@@ -252,8 +252,8 @@ Every request must also satisfy these checks:
 
 - the webhook action is `created`;
 - the comment is on an open issue, not a pull request;
-- the sender is a human and is not the configured Yeetomatic account;
-- the command starts with `/yeetomatic issue-refinement` (the trailing-text
+- the sender is a human and is not the configured Yolomatic account;
+- the command starts with `/yolomatic issue-refinement` (the trailing-text
   steering-prompt form is accepted);
 - the repository is managed and refinement is enabled;
 - no implementation or refinement task is active; and
@@ -269,7 +269,7 @@ The worker looks for the target repository's skill at:
 
 The skill is read from the temporary refinement worktree prepared from the
 effective default branch. When it exists, the worker follows it. When it is
-missing, the worker follows Yeetomatic's built-in issue-refinement defaults
+missing, the worker follows Yolomatic's built-in issue-refinement defaults
 provided in the refinement prompt. A present skill that cannot be read or
 executed produces a failed refinement attempt instead of silently switching
 instructions.
@@ -289,7 +289,7 @@ Refinement uses the existing disposable worker workflow with a distinct
 - the existing agent and tool runtime.
 
 The host creates a temporary refinement worktree rather than using the normal
-`yeetomatic/issue-{number}` implementation worktree. The worker may modify this
+`yolomatic/issue-{number}` implementation worktree. The worker may modify this
 worktree and run the application or tests to investigate the issue. Those
 changes are evidence for refinement only and are discarded after the attempt.
 
@@ -324,7 +324,7 @@ session. Each command creates an immutable attempt with these conceptual states:
 
 | State | Meaning |
 | --- | --- |
-| `instructed` | Yeetomatic posted the static workflow instructions. |
+| `instructed` | Yolomatic posted the static workflow instructions. |
 | `running` | An authorized command owns the issue task key. |
 | `applied` | The Proposed Task replaced the issue body. |
 | `stale` | The issue changed during refinement, so no update occurred. |
@@ -348,10 +348,10 @@ Repeated delivery of one command event cannot launch another run or update the
 issue twice. A later authenticated command may refine the body again and
 creates a new attempt linked to the prior one.
 
-Yeetomatic-authored `issues.edited` events caused by applying the result are
+Yolomatic-authored `issues.edited` events caused by applying the result are
 ignored by normal issue-edit steering and cannot start implementation. For
 webhook events, the `sender.login` guard recognizes edits authored by the
-configured Yeetomatic account. For polling events, where the issues list API does
+configured Yolomatic account. For polling events, where the issues list API does
 not expose the editor, a polled `issues.edited` event whose body matches the
 most recent `applied` refinement attempt's `proposedTaskBody` is treated as the
 same automatic edit and ignored.
@@ -361,7 +361,7 @@ same automatic edit and ignored.
 Refinement is a pre-implementation workflow:
 
 - an unassigned issue remains unassigned after refinement;
-- automatic body replacement does not assign the issue to Yeetomatic;
+- automatic body replacement does not assign the issue to Yolomatic;
 - normal implementation starts later through assignment or the admin dashboard;
 - refinement and implementation share the issue-level task-admission key and
   cannot overlap;
@@ -369,7 +369,7 @@ Refinement is a pre-implementation workflow:
   refined; and
 - implementation reads the refined body when its session is created.
 
-Repositories that automatically assign new issues to Yeetomatic need a
+Repositories that automatically assign new issues to Yolomatic need a
 repository-level admission policy if maintainers must have time to request
 refinement before implementation. Without that policy, normal assignment-based
 pickup retains its existing behavior and may make the issue ineligible before
@@ -377,7 +377,7 @@ the refinement command is sent.
 
 ## Failure Behavior
 
-- Missing repository skill: use Yeetomatic's built-in issue-refinement defaults
+- Missing repository skill: use Yolomatic's built-in issue-refinement defaults
   and record that source in the attempt.
 - Present but unreadable or invalid skill: fail the attempt and report the
   configuration problem.
@@ -404,7 +404,7 @@ the refinement command is sent.
 The implementation is expected to add or extend these boundaries:
 
 - deterministic `issues.opened` instruction-comment handling;
-- `/yeetomatic issue-refinement` command parsing (start-of-comment match with
+- `/yolomatic issue-refinement` command parsing (start-of-comment match with
   optional steering-prompt suffix) before ordinary feedback;
 - administrator authorization from signed webhook identity;
 - repository `issue-refinement` skill selection with a missing-skill fallback
@@ -418,7 +418,7 @@ The implementation is expected to add or extend these boundaries:
 - `GitHubService.updateIssueBody` for the automatic mutation;
 - a per-repo polling baseline that gates the static instruction comment so
   pre-existing issues picked up on the initial poll do not receive it; and
-- source-neutral recognition of Yeetomatic-authored `issues.edited` events,
+- source-neutral recognition of Yolomatic-authored `issues.edited` events,
   using `sender.login` for webhooks and the durable applied-body fingerprint for
   polling.
 
@@ -430,7 +430,7 @@ The implementation is expected to add or extend these boundaries:
 - Opening an issue does not launch a refinement worker.
 - The configured `admin_github_username` and explicit repository collaborators
   can start refinement from either a webhook or a polled comment.
-- The `/yeetomatic issue-refinement` command (with or without a trailing
+- The `/yolomatic issue-refinement` command (with or without a trailing
   steering prompt) starts a fresh instance of the existing Docker worker
   workflow.
 - On polling-mode repositories, the first poll establishes a per-repo baseline
@@ -441,7 +441,7 @@ The implementation is expected to add or extend these boundaries:
   applied Proposed Task body), so it does not steer or mutate a session.
 - The worker follows the target repository's `issue-refinement` skill when it
   exists.
-- A missing repository skill uses Yeetomatic's built-in issue-refinement prompt
+- A missing repository skill uses Yolomatic's built-in issue-refinement prompt
   defaults.
 - The worker can inspect the repository, make temporary edits, run the
   application and tests, and investigate its conclusions before responding.

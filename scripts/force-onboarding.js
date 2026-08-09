@@ -19,7 +19,7 @@ if (!existsSync(dbPath)) {
 			`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
 			 ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
 		).run("onboarding_complete", "false", new Date().toISOString());
-		process.stdout.write(`Onboarding reset in ${dbPath}. Refresh /yeetomatic/admin to run the wizard.\n`);
+		process.stdout.write(`Onboarding reset in ${dbPath}. Refresh /yolomatic/admin to run the wizard.\n`);
 	} finally {
 		db.close();
 	}

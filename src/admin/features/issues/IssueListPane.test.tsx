@@ -5,8 +5,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { IssueListPane } from "./IssueListPane.js";
 
 const mockIssues = [
-	{ number: 1, title: "Bug report", body: "desc", state: "open", labels: ["bug", "ui"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
-	{ number: 2, title: "Feature request", body: "", state: "open", labels: [], assignees: [], html_url: "https://github.com/mbrooks/yeetomatic/issues/2" },
+	{ number: 1, title: "Bug report", body: "desc", state: "open", labels: ["bug", "ui"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yolomatic/issues/1" },
+	{ number: 2, title: "Feature request", body: "", state: "open", labels: [], assignees: [], html_url: "https://github.com/mbrooks/yolomatic/issues/2" },
 ];
 
 describe("IssueListPane", () => {

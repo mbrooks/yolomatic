@@ -9,7 +9,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			title: "Test",
 			body: "Body",
@@ -22,12 +22,12 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		const key = sessionStorageKey("mbrooks", "yeetomatic", 1, "implementation");
+		const key = sessionStorageKey("mbrooks", "yolomatic", 1, "implementation");
 		recordSessionLog(key, { level: "info", message: "Prompt sent" });
 		recordSessionLog(key, { level: "tool", message: "read file" });
 
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -41,7 +41,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 2,
 			title: "Test",
 			body: "Body",
@@ -56,7 +56,7 @@ describe("GetSessionLog", () => {
 		} as unknown as SessionRepository;
 
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "yeetomatic", 2);
+		const result = await query.execute("mbrooks", "yolomatic", 2);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -68,7 +68,7 @@ describe("GetSessionLog", () => {
 		_resetSessionLogs();
 		const state: SessionState = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 3,
 			title: "Test",
 			body: "Body",
@@ -81,17 +81,17 @@ describe("GetSessionLog", () => {
 		const repo: SessionRepository = {
 			get: vi.fn(async () => state),
 		} as unknown as SessionRepository;
-		const key = sessionStorageKey("mbrooks", "yeetomatic", 3, "implementation");
+		const key = sessionStorageKey("mbrooks", "yolomatic", 3, "implementation");
 		recordSessionLog(key, { level: "info", message: "old" });
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		recordSessionLog(key, { level: "info", message: "new" });
 
 		const query = new GetSessionLog(repo);
-		const full = await query.execute("mbrooks", "yeetomatic", 3);
+		const full = await query.execute("mbrooks", "yolomatic", 3);
 		expect(full.success).toBe(true);
 		if (!full.success) return;
 		const since = full.data.logs[0].timestamp;
-		const filtered = await query.execute("mbrooks", "yeetomatic", 3, since);
+		const filtered = await query.execute("mbrooks", "yolomatic", 3, since);
 		expect(filtered.success).toBe(true);
 		if (filtered.success) {
 			expect(filtered.data.logs.length).toBe(1);
@@ -105,7 +105,7 @@ describe("GetSessionLog", () => {
 			get: vi.fn(async () => null),
 		} as unknown as SessionRepository;
 		const query = new GetSessionLog(repo);
-		const result = await query.execute("mbrooks", "yeetomatic", 999);
+		const result = await query.execute("mbrooks", "yolomatic", 999);
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("not_found");

@@ -31,32 +31,32 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app
-COPY scripts/container-entrypoint.sh /usr/local/bin/yeetomatic-container-entrypoint
+COPY scripts/container-entrypoint.sh /usr/local/bin/yolomatic-container-entrypoint
 
 # This installation runs as root, but /app is re-owned below.
 RUN cd /app/.pi/npm \
   && npm install @ollama/pi-web-search || true
 
-RUN useradd --create-home --shell /bin/bash yeetomatic \
+RUN useradd --create-home --shell /bin/bash yolomatic \
   && mkdir -p \
-      /home/yeetomatic/.pi/agent/sessions \
-      /home/yeetomatic/.npm \
+      /home/yolomatic/.pi/agent/sessions \
+      /home/yolomatic/.npm \
       /app/sessions \
       /app/workspaces \
       /app/memory \
-  && chown -R yeetomatic:yeetomatic \
+  && chown -R yolomatic:yolomatic \
       /app \
-      /home/yeetomatic \
-  && chmod 0755 /usr/local/bin/yeetomatic-container-entrypoint
+      /home/yolomatic \
+  && chmod 0755 /usr/local/bin/yolomatic-container-entrypoint
 
-# All runtime npm operations use a cache owned by yeetomatic.
-ENV HOME=/home/yeetomatic
-ENV NPM_CONFIG_CACHE=/home/yeetomatic/.npm
-ENV PI_CODING_AGENT_DIR=/home/yeetomatic/.pi/agent
+# All runtime npm operations use a cache owned by yolomatic.
+ENV HOME=/home/yolomatic
+ENV NPM_CONFIG_CACHE=/home/yolomatic/.npm
+ENV PI_CODING_AGENT_DIR=/home/yolomatic/.pi/agent
 
 FROM base-runtime AS worker
 
-USER yeetomatic
+USER yolomatic
 
 CMD ["node", "./dist/worker/entrypoint.js"]
 
@@ -64,7 +64,7 @@ CMD ["node", "./dist/worker/entrypoint.js"]
 # Control-plane runtime stage
 FROM base-runtime AS runtime
 
-# Install GitHub CLI and Docker CLI before switching to yeetomatic.
+# Install GitHub CLI and Docker CLI before switching to yolomatic.
 RUN install -m 0755 -d /etc/apt/keyrings \
   && curl -fsSL https://download.docker.com/linux/debian/gpg \
       -o /etc/apt/keyrings/docker.asc \
@@ -82,15 +82,15 @@ RUN install -m 0755 -d /etc/apt/keyrings \
       docker-ce-cli \
   && rm -rf /var/lib/apt/lists/*
 
-# Grant yeetomatic access to a Docker socket owned by GID 999.
+# Grant yolomatic access to a Docker socket owned by GID 999.
 RUN groupadd -g 999 docker \
-  && usermod -aG docker yeetomatic \
-  && chown -R yeetomatic:yeetomatic /app /home/yeetomatic
+  && usermod -aG docker yolomatic \
+  && chown -R yolomatic:yolomatic /app /home/yolomatic
 
-# NOTE: no `USER yeetomatic` here. The entrypoint runs as root so it can
+# NOTE: no `USER yolomatic` here. The entrypoint runs as root so it can
 # repair named-volume ownership and grant access to the mounted Docker socket,
-# then drops privileges itself via `exec runuser -u yeetomatic -- "$@"`.
-ENTRYPOINT ["yeetomatic-container-entrypoint"]
+# then drops privileges itself via `exec runuser -u yolomatic -- "$@"`.
+ENTRYPOINT ["yolomatic-container-entrypoint"]
 
 EXPOSE 6767
 

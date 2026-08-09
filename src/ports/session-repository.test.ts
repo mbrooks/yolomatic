@@ -11,16 +11,16 @@ describe("SessionRepository", () => {
 			updateStatus: vi.fn(async () => ({ kind: "refinement" })),
 		} as unknown as SessionRepository;
 
-		await repository.get("mbrooks", "yeetomatic", 534, "refinement");
-		await repository.delete("mbrooks", "yeetomatic", 534, "refinement");
-		await repository.createSession("mbrooks", "yeetomatic", 534, "Title", "Body", "/tmp/worktree", "refinement", []);
-		await repository.updateStatus("mbrooks", "yeetomatic", 534, "working", undefined, "refinement");
+		await repository.get("mbrooks", "yolomatic", 534, "refinement");
+		await repository.delete("mbrooks", "yolomatic", 534, "refinement");
+		await repository.createSession("mbrooks", "yolomatic", 534, "Title", "Body", "/tmp/worktree", "refinement", []);
+		await repository.updateStatus("mbrooks", "yolomatic", 534, "working", undefined, "refinement");
 
-		expect(repository.get).toHaveBeenCalledWith("mbrooks", "yeetomatic", 534, "refinement");
-		expect(repository.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 534, "refinement");
+		expect(repository.get).toHaveBeenCalledWith("mbrooks", "yolomatic", 534, "refinement");
+		expect(repository.delete).toHaveBeenCalledWith("mbrooks", "yolomatic", 534, "refinement");
 		expect(repository.createSession).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			534,
 			"Title",
 			"Body",
@@ -30,7 +30,7 @@ describe("SessionRepository", () => {
 		);
 		expect(repository.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			534,
 			"working",
 			undefined,

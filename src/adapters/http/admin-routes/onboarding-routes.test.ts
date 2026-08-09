@@ -9,12 +9,12 @@ import os from "node:os";
 import path from "node:path";
 
 async function tmpStore(): Promise<SettingsStore> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-onboarding-"));
 	return new SettingsStore(path.join(dir, "settings.sqlite"));
 }
 
 async function tmpStores(): Promise<{ settings: SettingsStore; repository: RepositoryStore }> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-onboarding-"));
 	return {
 		settings: new SettingsStore(path.join(dir, "settings.sqlite")),
 		repository: new RepositoryStore(path.join(dir, "settings.sqlite")),
@@ -55,7 +55,7 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 	return {
 		adminAssetsDir: "/tmp/admin-assets",
-		adminPath: "/yeetomatic/admin",
+		adminPath: "/yolomatic/admin",
 		adminDefaultPage: "#/dashboard",
 		settingsStore: store,
 		repositoryStore: repoStore,
@@ -386,7 +386,7 @@ describe("handleOnboardingRoutes", () => {
 
 		it("returns configured repositories when repositoryStore is available", async () => {
 			const stores = await tmpStores();
-			await stores.repository.upsert({ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" });
+			await stores.repository.upsert({ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" });
 			const req = mockRequest({
 				url: "/api/onboarding/repos",
 				method: "POST",
@@ -399,7 +399,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "yeetomatic" }]);
+			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "yolomatic" }]);
 		});
 
 		it("returns an empty configured list when repositoryStore is absent", async () => {
@@ -465,7 +465,7 @@ describe("handleOnboardingRoutes", () => {
 				body: JSON.stringify({
 					token: "ghp_fake",
 					username: "user",
-					repos: [{ owner: "mbrooks", repo: "yeetomatic" }],
+					repos: [{ owner: "mbrooks", repo: "yolomatic" }],
 				}),
 			});
 			const res = mockResponse();
@@ -475,11 +475,11 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.initialized).toEqual(["mbrooks/yeetomatic"]);
-			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+			expect(body.initialized).toEqual(["mbrooks/yolomatic"]);
+			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "yolomatic");
 			const managed = await stores.repository.list();
 			expect(managed).toHaveLength(1);
-			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "yeetomatic" });
+			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "yolomatic" });
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {
@@ -739,7 +739,7 @@ describe("handleOnboardingRoutes", () => {
 
 			await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama-signin");
 
-			expect(checkSignInStatus).toHaveBeenCalledWith({ containerName: "yeetomatic-ollama" });
+			expect(checkSignInStatus).toHaveBeenCalledWith({ containerName: "yolomatic-ollama" });
 			});
 
 		it("does not require an admin session (no 503 onboarding-mode response)", async () => {
@@ -1284,31 +1284,31 @@ describe("handleOnboardingRoutes", () => {
 			});
 	});
 
-	describe("GET /yeetomatic/admin", () => {
+	describe("GET /yolomatic/admin", () => {
 		it("returns HTML", async () => {
-			const req = mockRequest({ url: "/yeetomatic/admin", method: "GET" });
+			const req = mockRequest({ url: "/yolomatic/admin", method: "GET" });
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yeetomatic/admin");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yolomatic/admin");
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 		});
 
 		it("serves assets under the configured admin path", async () => {
-			const req = mockRequest({ url: "/yeetomatic/admin/assets/main.js", method: "GET" });
+			const req = mockRequest({ url: "/yolomatic/admin/assets/main.js", method: "GET" });
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yeetomatic/admin/assets/main.js");
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/yolomatic/admin/assets/main.js");
 
 			expect(handled).toBe(true);
 		});
 
 		it("injects the configured admin path and default page into the served HTML", async () => {
-			const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-onboarding-html-"));
+			const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-onboarding-html-"));
 			await writeFile(
 				path.join(dir, "index.html"),
-				'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div></body></html>',
+				'<!doctype html><html><head><title>Yolomatic Admin</title></head><body><div id="root"></div></body></html>',
 			);
 			try {
 				const req = mockRequest({ url: "/custom/admin", method: "GET" });
@@ -1325,8 +1325,8 @@ describe("handleOnboardingRoutes", () => {
 				expect(handled).toBe(true);
 				expect(res.statusCode).toBe(200);
 				const body = String(res.body);
-				expect(body).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/custom/admin"');
-				expect(body).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+				expect(body).toContain('window.__YOLO_ADMIN_PATH__ = "/custom/admin"');
+				expect(body).toContain('window.__YOLO_ADMIN_DEFAULT_PAGE__ = "#/repos"');
 			} finally {
 				await rm(dir, { force: true, recursive: true });
 			}

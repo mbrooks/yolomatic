@@ -70,11 +70,11 @@ describe("handleSessionRoutes", () => {
 	it("returns 404 for unmatched session GET paths", async () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/yeetomatic/1", "GET"),
+			request("/api/sessions/mbrooks/yolomatic/1", "GET"),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1"),
-			"/api/sessions/mbrooks/yeetomatic/1",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1"),
+			"/api/sessions/mbrooks/yolomatic/1",
 		);
 
 		expect(handled).toBe(true);
@@ -94,11 +94,11 @@ describe("handleSessionRoutes", () => {
 			} as unknown as AdminRouterDeps["getSessionLog"],
 		};
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/yeetomatic/1/implementation/log", "GET"),
+			request("/api/sessions/mbrooks/yolomatic/1/implementation/log", "GET"),
 			res,
 			okDeps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/log"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/log"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/log",
 		);
 
 		expect(handled).toBe(true);
@@ -119,11 +119,11 @@ describe("handleSessionRoutes", () => {
 			} as unknown as AdminRouterDeps["getSessionLog"],
 		};
 		const handled = await handleSessionRoutes(
-			request("/api/sessions/mbrooks/yeetomatic/1/implementation/log", "GET"),
+			request("/api/sessions/mbrooks/yolomatic/1/implementation/log", "GET"),
 			res,
 			failDeps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/log"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/log"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/log",
 		);
 
 		expect(handled).toBe(true);
@@ -135,14 +135,14 @@ describe("handleSessionRoutes", () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+				"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/commands"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/commands"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -163,14 +163,14 @@ describe("handleSessionRoutes", () => {
 		};
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+				"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			failDeps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/commands"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/commands"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -191,14 +191,14 @@ describe("handleSessionRoutes", () => {
 
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+				"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 				"POST",
 				JSON.stringify({ command: "pause" }),
 			),
 			res,
 			throwingDeps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/commands"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/commands"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		);
 
 		expect(handled).toBe(true);
@@ -209,14 +209,14 @@ describe("handleSessionRoutes", () => {
 		const res = response();
 		const handled = await handleSessionRoutes(
 			request(
-				"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+				"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 				"POST",
 				JSON.stringify({ payload: { reason: "none" } }),
 			),
 			res,
 			deps,
-			new URL("http://localhost/api/sessions/mbrooks/yeetomatic/1/implementation/commands"),
-			"/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/1/implementation/commands"),
+			"/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		);
 
 		expect(handled).toBe(true);

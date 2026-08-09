@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	hasLabel,
 	hasAnyLabel,
-	isAssignedToYeetomatic,
+	isAssignedToYolomatic,
 	isAdmin,
 	shouldIgnoreIssueEvent,
 	shouldIgnoreCommentEvent,
@@ -36,11 +36,11 @@ describe("hasLabel", () => {
 
 describe("hasAnyLabel", () => {
 	it("returns true when any label matches", () => {
-		expect(hasAnyLabel([{ name: "bug" }, { name: "yeetomatic" }], ["yeetomatic", "yeetomatic-working"])).toBe(true);
+		expect(hasAnyLabel([{ name: "bug" }, { name: "yolomatic" }], ["yolomatic", "yolomatic-working"])).toBe(true);
 	});
 
 	it("returns false when no labels match", () => {
-		expect(hasAnyLabel([{ name: "bug" }], ["yeetomatic"])).toBe(false);
+		expect(hasAnyLabel([{ name: "bug" }], ["yolomatic"])).toBe(false);
 	});
 });
 
@@ -51,17 +51,17 @@ describe("DO_NOT_WORK_LABELS", () => {
 	});
 });
 
-describe("isAssignedToYeetomatic", () => {
+describe("isAssignedToYolomatic", () => {
 	it("returns true when assignee matches", () => {
-		expect(isAssignedToYeetomatic({ assignee: { login: "yeetomatic-bot" } }, "yeetomatic-bot")).toBe(true);
+		expect(isAssignedToYolomatic({ assignee: { login: "yolomatic-bot" } }, "yolomatic-bot")).toBe(true);
 	});
 
 	it("returns true when assignees include match", () => {
-		expect(isAssignedToYeetomatic({ assignees: [{ login: "yeetomatic-bot" }] }, "yeetomatic-bot")).toBe(true);
+		expect(isAssignedToYolomatic({ assignees: [{ login: "yolomatic-bot" }] }, "yolomatic-bot")).toBe(true);
 	});
 
 	it("returns false when no match", () => {
-		expect(isAssignedToYeetomatic({ assignees: [{ login: "other" }] }, "yeetomatic-bot")).toBe(false);
+		expect(isAssignedToYolomatic({ assignees: [{ login: "other" }] }, "yolomatic-bot")).toBe(false);
 	});
 });
 
@@ -102,36 +102,36 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "yeetomatic-bot" }] },
-				sender: { login: "yeetomatic-bot" },
+				issue: { assignees: [{ login: "yolomatic-bot" }] },
+				sender: { login: "yolomatic-bot" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores opened events not assigned to Yeetomatic", () => {
+	it("ignores opened events not assigned to Yolomatic", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
 				issue: { assignees: [] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores unassigned when Yeetomatic is still assigned", () => {
+	it("ignores unassigned when Yolomatic is still assigned", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "unassigned",
-				issue: { assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { assignees: [{ login: "yolomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -141,23 +141,23 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { assignees: [{ login: "yolomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			true,
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("allows opened events assigned to Yeetomatic", () => {
+	it("allows opened events assigned to Yolomatic", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { assignees: [{ login: "yolomatic-bot" }] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(false);
@@ -167,10 +167,10 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "opened",
-				issue: { assignees: [{ login: "yeetomatic-bot" }], labels: [{ name: "wontfix" }] },
+				issue: { assignees: [{ login: "yolomatic-bot" }], labels: [{ name: "wontfix" }] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -181,10 +181,10 @@ describe("shouldIgnoreIssueEvent", () => {
 		const result = shouldIgnoreIssueEvent(
 			{
 				action: "assigned",
-				issue: { assignees: [{ login: "yeetomatic-bot" }], labels: [{ name: "invalid" }] },
+				issue: { assignees: [{ login: "yolomatic-bot" }], labels: [{ name: "invalid" }] },
 				sender: { login: "user" },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 			false,
 		);
 		expect(result.ignore).toBe(true);
@@ -197,9 +197,9 @@ describe("shouldIgnoreCommentEvent", () => {
 			{
 				action: "edited",
 				comment: { body: "hello", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
@@ -208,15 +208,15 @@ describe("shouldIgnoreCommentEvent", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "@yeetomatic-bot please continue", user: { login: "user" } },
+				comment: { body: "@yolomatic-bot please continue", user: { login: "user" } },
 				issue: {
 					state: "closed",
-					labels: [{ name: "yeetomatic" }],
-					assignees: [{ login: "yeetomatic-bot" }],
-					user: { login: "yeetomatic-bot" },
+					labels: [{ name: "yolomatic" }],
+					assignees: [{ login: "yolomatic-bot" }],
+					user: { login: "yolomatic-bot" },
 				},
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result).toEqual({ ignore: true, reason: "issue is closed" });
 	});
@@ -225,10 +225,10 @@ describe("shouldIgnoreCommentEvent", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "hello", user: { login: "yeetomatic-bot" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				comment: { body: "hello", user: { login: "yolomatic-bot" } },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
@@ -238,33 +238,33 @@ describe("shouldIgnoreCommentEvent", () => {
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "github-actions", type: "Bot" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(true);
 	});
 
-	it("ignores comments when Yeetomatic is not assigned", () => {
+	it("ignores comments when Yolomatic is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "user" } },
 				issue: { labels: [], assignees: [] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yolomatic-bot" });
 	});
 
 	it("allows comments that mention the bot", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "Hey @yeetomatic-bot", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				comment: { body: "Hey @yolomatic-bot", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(false);
 		if (!result.ignore) {
@@ -273,14 +273,14 @@ describe("shouldIgnoreCommentEvent", () => {
 		}
 	});
 
-	it("accepts a /yeetomatic feedback command on an assigned issue without a label", () => {
+	it("accepts a /yolomatic feedback command on an assigned issue without a label", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "/yeetomatic feedback please retry", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				comment: { body: "/yolomatic feedback please retry", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(false);
 		if (!result.ignore) {
@@ -289,14 +289,14 @@ describe("shouldIgnoreCommentEvent", () => {
 		}
 	});
 
-	it("accepts a case-insensitive /Yeetomatic FEEDBACK command", () => {
+	it("accepts a case-insensitive /Yolomatic FEEDBACK command", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "/Yeetomatic FEEDBACK", user: { login: "user" } },
-				issue: { labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+				comment: { body: "/Yolomatic FEEDBACK", user: { login: "user" } },
+				issue: { labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(result.ignore).toBe(false);
 		if (!result.ignore) {
@@ -304,112 +304,112 @@ describe("shouldIgnoreCommentEvent", () => {
 		}
 	});
 
-	it("ignores a /yeetomatic feedback command when Yeetomatic is not assigned", () => {
+	it("ignores a /yolomatic feedback command when Yolomatic is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "/yeetomatic feedback", user: { login: "user" } },
-				issue: { labels: [{ name: "yeetomatic" }], assignees: [] },
+				comment: { body: "/yolomatic feedback", user: { login: "user" } },
+				issue: { labels: [{ name: "yolomatic" }], assignees: [] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yolomatic-bot" });
 	});
 
-	it("ignores a plain comment on an assigned issue that has a Yeetomatic-visible label", () => {
+	it("ignores a plain comment on an assigned issue that has a Yolomatic-visible label", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "just a status check, no trigger", user: { login: "user" } },
-				issue: { labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
+				issue: { labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "no mention or /yeetomatic feedback command" });
+		expect(result).toEqual({ ignore: true, reason: "no mention or /yolomatic feedback command" });
 	});
 
-	it("ignores a mention on an unassigned issue even with a Yeetomatic-visible label", () => {
+	it("ignores a mention on an unassigned issue even with a Yolomatic-visible label", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "@yeetomatic please help", user: { login: "user" } },
-				issue: { labels: [{ name: "yeetomatic" }], assignees: [{ login: "someone-else" }] },
+				comment: { body: "@yolomatic please help", user: { login: "user" } },
+				issue: { labels: [{ name: "yolomatic" }], assignees: [{ login: "someone-else" }] },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yolomatic-bot" });
 	});
 
 	it("ignores mentions when github_username does not match the assignee", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
-				comment: { body: "@yeetomatic please help", user: { login: "user" } },
-				issue: { labels: [{ name: "yeetomatic" }], assignees: [{ login: "yeetomaticmbrooks" }] },
+				comment: { body: "@yolomatic please help", user: { login: "user" } },
+				issue: { labels: [{ name: "yolomatic" }], assignees: [{ login: "yolomaticmbrooks" }] },
 			},
 			"mbrooks",
 		);
 		expect(result).toEqual({ ignore: true, reason: "not assigned to mbrooks" });
 	});
 
-	it("ignores comments on Yeetomatic-created issues when Yeetomatic is not assigned", () => {
+	it("ignores comments on Yolomatic-created issues when Yolomatic is not assigned", () => {
 		const result = shouldIgnoreCommentEvent(
 			{
 				action: "created",
 				comment: { body: "hello", user: { login: "user" } },
-				issue: { labels: [{ name: "yeetomatic" }], assignees: [], user: { login: "yeetomatic-bot" } },
+				issue: { labels: [{ name: "yolomatic" }], assignees: [], user: { login: "yolomatic-bot" } },
 			},
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
-		expect(result).toEqual({ ignore: true, reason: "not assigned to yeetomatic-bot" });
+		expect(result).toEqual({ ignore: true, reason: "not assigned to yolomatic-bot" });
 	});
 });
 
 describe("parseIssueRefinementCommand", () => {
 	it("matches the no-argument command with an empty steering prompt", () => {
-		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement")).toEqual({ matched: true, steeringPrompt: "" });
+		expect(parseIssueRefinementCommand("/yolomatic issue-refinement")).toEqual({ matched: true, steeringPrompt: "" });
 	});
 
 	it("is case-insensitive for the command token", () => {
-		expect(parseIssueRefinementCommand("/Yeetomatic Issue-Refinement")).toEqual({ matched: true, steeringPrompt: "" });
+		expect(parseIssueRefinementCommand("/Yolomatic Issue-Refinement")).toEqual({ matched: true, steeringPrompt: "" });
 	});
 
 	it("extracts trailing text as the steering prompt", () => {
-		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement Focus on rollback")).toEqual({
+		expect(parseIssueRefinementCommand("/yolomatic issue-refinement Focus on rollback")).toEqual({
 			matched: true,
 			steeringPrompt: "Focus on rollback",
 		});
 	});
 
 	it("trims leading and trailing whitespace around the comment and steering prompt", () => {
-		expect(parseIssueRefinementCommand("  /yeetomatic issue-refinement   focus on migration   ")).toEqual({
+		expect(parseIssueRefinementCommand("  /yolomatic issue-refinement   focus on migration   ")).toEqual({
 			matched: true,
 			steeringPrompt: "focus on migration",
 		});
 	});
 
 	it("treats trailing whitespace only as the empty steering prompt", () => {
-		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement   \n\t")).toEqual({ matched: true, steeringPrompt: "" });
+		expect(parseIssueRefinementCommand("/yolomatic issue-refinement   \n\t")).toEqual({ matched: true, steeringPrompt: "" });
 	});
 
 	it("collapses multiple separators into the trimmed steering prompt", () => {
-		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement    add    criteria")).toEqual({
+		expect(parseIssueRefinementCommand("/yolomatic issue-refinement    add    criteria")).toEqual({
 			matched: true,
 			steeringPrompt: "add    criteria",
 		});
 	});
 
 	it("rejects embedded commands", () => {
-		expect(parseIssueRefinementCommand("Please run /yeetomatic issue-refinement")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("Please run /yolomatic issue-refinement")).toEqual({ matched: false });
 	});
 
 	it("rejects backtick-wrapped command tokens", () => {
-		expect(parseIssueRefinementCommand("`/yeetomatic issue-refinement`")).toEqual({ matched: false });
-		expect(parseIssueRefinementCommand("` /yeetomatic issue-refinement`")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("`/yolomatic issue-refinement`")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("` /yolomatic issue-refinement`")).toEqual({ matched: false });
 	});
 
 	it("rejects a command glued to trailing text with no separating whitespace", () => {
-		expect(parseIssueRefinementCommand("/yeetomatic issue-refinement--verbose")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("/yolomatic issue-refinement--verbose")).toEqual({ matched: false });
 	});
 
 	it("rejects empty or whitespace-only bodies", () => {
@@ -419,51 +419,51 @@ describe("parseIssueRefinementCommand", () => {
 
 	it("rejects unrelated text", () => {
 		expect(parseIssueRefinementCommand("hello world")).toEqual({ matched: false });
-		expect(parseIssueRefinementCommand("/yeetomatic stop")).toEqual({ matched: false });
+		expect(parseIssueRefinementCommand("/yolomatic stop")).toEqual({ matched: false });
 	});
 });
 
 describe("isIssueRefinementCommand", () => {
 	it("accepts the exact command", () => {
-		expect(isIssueRefinementCommand("/yeetomatic issue-refinement")).toBe(true);
+		expect(isIssueRefinementCommand("/yolomatic issue-refinement")).toBe(true);
 	});
 
 	it("is case-insensitive", () => {
-		expect(isIssueRefinementCommand("/Yeetomatic Issue-Refinement")).toBe(true);
+		expect(isIssueRefinementCommand("/Yolomatic Issue-Refinement")).toBe(true);
 	});
 
 	it("accepts trailing steering-prompt text as a match", () => {
-		expect(isIssueRefinementCommand("/yeetomatic issue-refinement please")).toBe(true);
-		expect(isIssueRefinementCommand("/yeetomatic issue-refinement --verbose focus")).toBe(true);
+		expect(isIssueRefinementCommand("/yolomatic issue-refinement please")).toBe(true);
+		expect(isIssueRefinementCommand("/yolomatic issue-refinement --verbose focus")).toBe(true);
 	});
 
 	it("rejects embedded commands", () => {
-		expect(isIssueRefinementCommand("Please run /yeetomatic issue-refinement")).toBe(false);
-		expect(isIssueRefinementCommand("`/yeetomatic issue-refinement`")).toBe(false);
+		expect(isIssueRefinementCommand("Please run /yolomatic issue-refinement")).toBe(false);
+		expect(isIssueRefinementCommand("`/yolomatic issue-refinement`")).toBe(false);
 	});
 });
 
 describe("isStopCommand", () => {
-	it("matches exact /yeetomatic stop", () => {
-		expect(isStopCommand("/yeetomatic stop")).toBe(true);
+	it("matches exact /yolomatic stop", () => {
+		expect(isStopCommand("/yolomatic stop")).toBe(true);
 	});
 
 	it("strips leading and trailing whitespace before matching", () => {
-		expect(isStopCommand("   /yeetomatic stop   ")).toBe(true);
-		expect(isStopCommand("\n/yeetomatic stop\n")).toBe(true);
+		expect(isStopCommand("   /yolomatic stop   ")).toBe(true);
+		expect(isStopCommand("\n/yolomatic stop\n")).toBe(true);
 	});
 
 	it("is case-insensitive", () => {
-		expect(isStopCommand("/Yeetomatic STOP")).toBe(true);
+		expect(isStopCommand("/Yolomatic STOP")).toBe(true);
 	});
 
 	it("ignores extra text", () => {
-		expect(isStopCommand("/yeetomatic stop now")).toBe(false);
+		expect(isStopCommand("/yolomatic stop now")).toBe(false);
 	});
 
 	it("rejects embedded commands that do not start the trimmed body", () => {
-		expect(isStopCommand("please /yeetomatic stop")).toBe(false);
-		expect(isStopCommand("`/yeetomatic stop`")).toBe(false);
+		expect(isStopCommand("please /yolomatic stop")).toBe(false);
+		expect(isStopCommand("`/yolomatic stop`")).toBe(false);
 	});
 });
 
@@ -543,45 +543,45 @@ describe("formatUptime", () => {
 });
 
 describe("isFeedbackCommand", () => {
-	it("matches the exact /yeetomatic feedback command", () => {
-		expect(isFeedbackCommand("/yeetomatic feedback")).toBe(true);
+	it("matches the exact /yolomatic feedback command", () => {
+		expect(isFeedbackCommand("/yolomatic feedback")).toBe(true);
 	});
 
 	it("is case-insensitive", () => {
-		expect(isFeedbackCommand("/Yeetomatic FEEDBACK")).toBe(true);
-		expect(isFeedbackCommand("/YEETOMATIC Feedback")).toBe(true);
+		expect(isFeedbackCommand("/Yolomatic FEEDBACK")).toBe(true);
+		expect(isFeedbackCommand("/YOLO Feedback")).toBe(true);
 	});
 
 	it("strips leading and trailing whitespace before matching", () => {
-		expect(isFeedbackCommand("   /yeetomatic feedback   ")).toBe(true);
-		expect(isFeedbackCommand("\n/yeetomatic feedback\n")).toBe(true);
+		expect(isFeedbackCommand("   /yolomatic feedback   ")).toBe(true);
+		expect(isFeedbackCommand("\n/yolomatic feedback\n")).toBe(true);
 	});
 
 	it("accepts trailing text after the command as the feedback payload", () => {
-		expect(isFeedbackCommand("/yeetomatic feedback please retry")).toBe(true);
-		expect(isFeedbackCommand("/yeetomatic feedback\nplease retry now")).toBe(true);
+		expect(isFeedbackCommand("/yolomatic feedback please retry")).toBe(true);
+		expect(isFeedbackCommand("/yolomatic feedback\nplease retry now")).toBe(true);
 	});
 
 	it("rejects embedded commands that do not start the trimmed body", () => {
-		expect(isFeedbackCommand("Please /yeetomatic feedback now")).toBe(false);
-		expect(isFeedbackCommand("run /yeetomatic feedback")).toBe(false);
+		expect(isFeedbackCommand("Please /yolomatic feedback now")).toBe(false);
+		expect(isFeedbackCommand("run /yolomatic feedback")).toBe(false);
 	});
 
 	it("rejects backtick-wrapped command tokens", () => {
-		expect(isFeedbackCommand("`/yeetomatic feedback`")).toBe(false);
-		expect(isFeedbackCommand("` /yeetomatic feedback`")).toBe(false);
+		expect(isFeedbackCommand("`/yolomatic feedback`")).toBe(false);
+		expect(isFeedbackCommand("` /yolomatic feedback`")).toBe(false);
 	});
 
 	it("rejects bodies without the command", () => {
-		expect(isFeedbackCommand("@yeetomatic please help")).toBe(false);
-		expect(isFeedbackCommand("/yeetomatic stop")).toBe(false);
-		expect(isFeedbackCommand("/yeetomatic issue-refinement")).toBe(false);
+		expect(isFeedbackCommand("@yolomatic please help")).toBe(false);
+		expect(isFeedbackCommand("/yolomatic stop")).toBe(false);
+		expect(isFeedbackCommand("/yolomatic issue-refinement")).toBe(false);
 		expect(isFeedbackCommand("just a comment")).toBe(false);
 	});
 
-	it("does not match /yeetomaticfeedback without the separating space", () => {
-		expect(isFeedbackCommand("/yeetomaticfeedback")).toBe(false);
-		expect(isFeedbackCommand("/yeetomatic feedbacknow")).toBe(false);
+	it("does not match /yolomaticfeedback without the separating space", () => {
+		expect(isFeedbackCommand("/yolomaticfeedback")).toBe(false);
+		expect(isFeedbackCommand("/yolomatic feedbacknow")).toBe(false);
 	});
 
 	it("rejects empty or whitespace-only bodies", () => {
@@ -592,34 +592,34 @@ describe("isFeedbackCommand", () => {
 
 describe("commentTriggersFeedback", () => {
 	it("returns true for a mention of the configured account", () => {
-		expect(commentTriggersFeedback("Hey @yeetomatic-bot", "yeetomatic-bot")).toBe(true);
+		expect(commentTriggersFeedback("Hey @yolomatic-bot", "yolomatic-bot")).toBe(true);
 	});
 
-	it("returns true for an @yeetomatic mention regardless of configured account", () => {
-		expect(commentTriggersFeedback("Hey @yeetomatic", "mbrooks")).toBe(true);
+	it("returns true for an @yolomatic mention regardless of configured account", () => {
+		expect(commentTriggersFeedback("Hey @yolomatic", "mbrooks")).toBe(true);
 	});
 
-	it("returns true for the /yeetomatic feedback command", () => {
-		expect(commentTriggersFeedback("/yeetomatic feedback", "yeetomatic-bot")).toBe(true);
+	it("returns true for the /yolomatic feedback command", () => {
+		expect(commentTriggersFeedback("/yolomatic feedback", "yolomatic-bot")).toBe(true);
 	});
 
 	it("returns true for the feedback command with trailing text", () => {
-		expect(commentTriggersFeedback("/yeetomatic feedback please retry", "yeetomatic-bot")).toBe(true);
+		expect(commentTriggersFeedback("/yolomatic feedback please retry", "yolomatic-bot")).toBe(true);
 	});
 
 	it("returns false for an embedded feedback command", () => {
-		expect(commentTriggersFeedback("Please run /yeetomatic feedback", "yeetomatic-bot")).toBe(false);
+		expect(commentTriggersFeedback("Please run /yolomatic feedback", "yolomatic-bot")).toBe(false);
 	});
 
 	it("returns false for a plain comment with no trigger", () => {
-		expect(commentTriggersFeedback("just a status check", "yeetomatic-bot")).toBe(false);
+		expect(commentTriggersFeedback("just a status check", "yolomatic-bot")).toBe(false);
 	});
 
 	it("returns false for the stop command", () => {
-		expect(commentTriggersFeedback("/yeetomatic stop", "yeetomatic-bot")).toBe(false);
+		expect(commentTriggersFeedback("/yolomatic stop", "yolomatic-bot")).toBe(false);
 	});
 
-	it("is case-insensitive for @yeetomatic", () => {
-		expect(commentTriggersFeedback("HEY @YEETOMATIC", "mbrooks")).toBe(true);
+	it("is case-insensitive for @yolomatic", () => {
+		expect(commentTriggersFeedback("HEY @YOLO", "mbrooks")).toBe(true);
 	});
 });

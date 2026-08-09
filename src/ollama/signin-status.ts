@@ -5,8 +5,8 @@ import type { SettingsStore } from "../settings/store.js";
 
 const execFileDefault = promisify(execFileCallback);
 
-/** Default Ollama container name (matches the `yeetomatic-ollama` service in docker-compose.yml). */
-export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
+/** Default Ollama container name (matches the `yolomatic-ollama` service in docker-compose.yml). */
+export const DEFAULT_OLLAMA_CONTAINER_NAME = "yolomatic-ollama";
 
 /** Bounded timeout for the non-interactive `ollama signin` invocation. */
 export const DEFAULT_OLLAMA_SIGNIN_TIMEOUT_MS = 8000;

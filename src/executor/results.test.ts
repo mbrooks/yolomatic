@@ -4,15 +4,20 @@ import { detectStatusMarker, extractText, getLastAssistantText, isExecutionEnvir
 
 describe("detectStatusMarker", () => {
 	it("returns the status for an explicit working marker", () => {
-		expect(detectStatusMarker("YEETOMATIC_STATUS: working\nStill working.")).toBe("working");
+		expect(detectStatusMarker("YOLO_STATUS: working\nStill working.")).toBe("working");
 	});
 
 	it("returns the status for an explicit waiting-feedback marker", () => {
-		expect(detectStatusMarker("YEETOMATIC_STATUS: waiting-feedback\nNeed info.")).toBe("waiting-feedback");
+		expect(detectStatusMarker("YOLO_STATUS: waiting-feedback\nNeed info.")).toBe("waiting-feedback");
 	});
 
 	it("returns the status for an explicit complete marker", () => {
-		expect(detectStatusMarker("YEETOMATIC_STATUS: complete\nDone.")).toBe("complete");
+		expect(detectStatusMarker("YOLO_STATUS: complete\nDone.")).toBe("complete");
+	});
+
+	it("rejects the legacy status marker", () => {
+		const legacyMarker = ["YEETO", "MATIC_STATUS: complete\nDone."].join("");
+		expect(detectStatusMarker(legacyMarker)).toBeNull();
 	});
 
 	it("returns null when no marker is present", () => {
@@ -21,8 +26,8 @@ describe("detectStatusMarker", () => {
 	});
 
 	it("returns null for an unsupported marker", () => {
-		expect(detectStatusMarker("YEETOMATIC_STATUS: done\nDone.")).toBeNull();
-		expect(detectStatusMarker("YEETOMATIC_STATUS: unknown\nOops.")).toBeNull();
+		expect(detectStatusMarker("YOLO_STATUS: done\nDone.")).toBeNull();
+		expect(detectStatusMarker("YOLO_STATUS: unknown\nOops.")).toBeNull();
 	});
 
 	it("returns null for an empty response", () => {
@@ -32,34 +37,34 @@ describe("detectStatusMarker", () => {
 
 	it("uses the last marker when multiple are present", () => {
 		expect(
-			detectStatusMarker("YEETOMATIC_STATUS: working\nGoing.\nYEETOMATIC_STATUS: complete\nDone."),
+			detectStatusMarker("YOLO_STATUS: working\nGoing.\nYOLO_STATUS: complete\nDone."),
 		).toBe("complete");
 	});
 });
 
 describe("parseExecutionResult", () => {
 	it("parses working status", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: working\nStill working.");
+		const result = parseExecutionResult("YOLO_STATUS: working\nStill working.");
 		expect(result.status).toBe("working");
 		expect(result.summary).toBe("Still working.");
 	});
 
 	it("parses waiting-feedback status", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: waiting-feedback\nNeed info.");
+		const result = parseExecutionResult("YOLO_STATUS: waiting-feedback\nNeed info.");
 		expect(result.status).toBe("waiting-feedback");
 		expect(result.summary).toBe("Need info.");
 	});
 
 	it("parses complete status", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: complete\nDone.");
+		const result = parseExecutionResult("YOLO_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("defaults to working for unknown status", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: unknown\nOops.");
+		const result = parseExecutionResult("YOLO_STATUS: unknown\nOops.");
 		expect(result.status).toBe("working");
-		expect(result.summary).toBe("YEETOMATIC_STATUS: unknown\nOops.");
+		expect(result.summary).toBe("YOLO_STATUS: unknown\nOops.");
 		// An unsupported marker is not a valid explicit `working` response.
 		expect(detectStatusMarker(result.rawResponse)).toBeNull();
 	});
@@ -73,13 +78,13 @@ describe("parseExecutionResult", () => {
 	});
 
 	it("keeps explicit working distinct from a missing marker", () => {
-		const explicit = parseExecutionResult("YEETOMATIC_STATUS: working\nStill working.");
+		const explicit = parseExecutionResult("YOLO_STATUS: working\nStill working.");
 		expect(explicit.status).toBe("working");
 		expect(detectStatusMarker(explicit.rawResponse)).toBe("working");
 	});
 
 	it("trims whitespace", () => {
-		const result = parseExecutionResult("\n  YEETOMATIC_STATUS: complete  \n  Summary  \n");
+		const result = parseExecutionResult("\n  YOLO_STATUS: complete  \n  Summary  \n");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Summary");
 	});
@@ -90,24 +95,24 @@ describe("parseExecutionResult", () => {
 	});
 
 	it("falls back to trimmed response when summary is empty", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: complete\n   ");
-		expect(result.summary).toBe("YEETOMATIC_STATUS: complete");
+		const result = parseExecutionResult("YOLO_STATUS: complete\n   ");
+		expect(result.summary).toBe("YOLO_STATUS: complete");
 	});
 
 	it("finds status line anywhere in the response", () => {
-		const result = parseExecutionResult("Some preamble.\nYEETOMATIC_STATUS: complete\nDone.");
+		const result = parseExecutionResult("Some preamble.\nYOLO_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("uses the last status line when multiple are present", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: working\nStill going.\nYEETOMATIC_STATUS: complete\nDone.");
+		const result = parseExecutionResult("YOLO_STATUS: working\nStill going.\nYOLO_STATUS: complete\nDone.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Done.");
 	});
 
 	it("ignores invalid status lines and finds a later valid one", () => {
-		const result = parseExecutionResult("YEETOMATIC_STATUS: unknown\nOops.\nYEETOMATIC_STATUS: complete\nFixed.");
+		const result = parseExecutionResult("YOLO_STATUS: unknown\nOops.\nYOLO_STATUS: complete\nFixed.");
 		expect(result.status).toBe("complete");
 		expect(result.summary).toBe("Fixed.");
 	});
@@ -203,11 +208,11 @@ describe("getLastAssistantText", () => {
 				role: "assistant",
 				content: [
 					{ type: "thinking", thinking: "I need to explain this clearly." },
-					{ type: "text", text: "YEETOMATIC_STATUS: complete\nDone." },
+					{ type: "text", text: "YOLO_STATUS: complete\nDone." },
 				],
 			}],
 		};
-		expect(getLastAssistantText(session)).toBe("YEETOMATIC_STATUS: complete\nDone.");
+		expect(getLastAssistantText(session)).toBe("YOLO_STATUS: complete\nDone.");
 		expect(parseExecutionResult(getLastAssistantText(session)).status).toBe("complete");
 	});
 

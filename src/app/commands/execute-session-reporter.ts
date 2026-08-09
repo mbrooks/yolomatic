@@ -45,7 +45,7 @@ export class ExecuteSessionReporter {
 			const body = [
 				"**Build failed**",
 				"",
-				"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+				"Yolomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
 				"",
 				`Error: ${message}`,
 			].join("\n");
@@ -55,7 +55,7 @@ export class ExecuteSessionReporter {
 		const stack = error instanceof Error ? error.stack ?? "" : "";
 		const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
 		const body = [
-			"**Yeetomatic failed.**",
+			"**Yolomatic failed.**",
 			"",
 			`Context: ${context}`,
 			`Error: ${message}`,
@@ -80,7 +80,7 @@ export class ExecuteSessionReporter {
 		await this.deps.sessions.updateStatus(args.owner, args.repo, args.sessionIssueNumber, "failed");
 		if (args.target.kind === "issue") {
 			await removeWorkflowLabels(this.deps.github, args.owner, args.repo, args.sessionIssueNumber);
-			await this.deps.github.addLabels(args.owner, args.repo, args.sessionIssueNumber, ["yeetomatic-failed"]);
+			await this.deps.github.addLabels(args.owner, args.repo, args.sessionIssueNumber, ["yolomatic-failed"]);
 		}
 	}
 
@@ -103,7 +103,7 @@ export class ExecuteSessionReporter {
 		if (result.status === "waiting-feedback") {
 			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "waiting-feedback");
 			if (target.kind === "issue") {
-				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-feedback-required"]);
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yolomatic-feedback-required"]);
 			}
 			await this.postComment(
 				target,
@@ -111,7 +111,7 @@ export class ExecuteSessionReporter {
 				repo,
 				[
 					"Need clarification:",
-					result.summary || "Yeetomatic needs more information before continuing.",
+					result.summary || "Yolomatic needs more information before continuing.",
 				].join("\n\n"),
 				sessionIssueNumber,
 			);
@@ -121,7 +121,7 @@ export class ExecuteSessionReporter {
 		if (result.status === "cancelled") {
 			await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "cancelled");
 			if (target.kind === "issue") {
-				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-cancelled"]);
+				await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yolomatic-cancelled"]);
 			}
 			await this.postComment(
 				target,
@@ -132,7 +132,7 @@ export class ExecuteSessionReporter {
 					"",
 					result.summary || this.defaultCancelledSummary(target),
 					"",
-					"Yeetomatic is idle and ready for the next task.",
+					"Yolomatic is idle and ready for the next task.",
 				].join("\n"),
 				sessionIssueNumber,
 			);
@@ -169,7 +169,7 @@ export class ExecuteSessionReporter {
 
 		await this.deps.sessions.updateStatus(owner, repo, sessionIssueNumber, "working");
 		if (target.kind === "issue") {
-			await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yeetomatic-working"]);
+			await this.deps.github.addLabels(owner, repo, sessionIssueNumber, ["yolomatic-working"]);
 		}
 		await this.postComment(
 			target,
@@ -177,8 +177,8 @@ export class ExecuteSessionReporter {
 			repo,
 			[
 				target.kind === "issue"
-					? "Yeetomatic is still working on this issue."
-					: "Yeetomatic is still working on the review feedback.",
+					? "Yolomatic is still working on this issue."
+					: "Yolomatic is still working on the review feedback.",
 				"",
 				result.summary || "Execution is in progress.",
 			].join("\n"),
@@ -202,10 +202,10 @@ export class ExecuteSessionReporter {
 		if (this.deps.selfReportEnabled) {
 			const issueUrl = await this.fileSelfReport(this.createDeliveryFatalError(state, message, diagnostics));
 			commentBody = [
-				"**Yeetomatic delivery failed.**",
+				"**Yolomatic delivery failed.**",
 				"",
 				scopeHint,
-				`A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`,
+				`A bug report has been filed in \`mbrooks/yolomatic\`: ${issueUrl}`,
 				"",
 				"<details>",
 				"<summary>Delivery diagnostics</summary>",
@@ -228,7 +228,7 @@ export class ExecuteSessionReporter {
 			const stack = error instanceof Error ? (error.stack ?? "") : "";
 			const truncatedStack = stack.length > 3000 ? stack.slice(0, 3000) + "\n... (truncated)" : stack;
 			commentBody = [
-				"**Yeetomatic delivery failed.**",
+				"**Yolomatic delivery failed.**",
 				"",
 				scopeHint,
 				`Context: Delivering completed work`,
@@ -259,10 +259,10 @@ export class ExecuteSessionReporter {
 
 		await this.postComment(target, owner, repo, commentBody, issueNumber);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-feedback-required");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-pr-created");
-		await this.deps.github.removeLabel(owner, repo, issueNumber, "yeetomatic-complete");
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yolomatic-feedback-required");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yolomatic-pr-created");
+		await this.deps.github.removeLabel(owner, repo, issueNumber, "yolomatic-complete");
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-working", "yolomatic-delivery-failed"]);
 	}
 
 	private classifyDeliveryError(message: string): FatalErrorCategory {
@@ -300,7 +300,7 @@ export class ExecuteSessionReporter {
 				lsWorkspace: diagnostics.lsWorkspace,
 				gitStatus: diagnostics.gitStatus,
 				gitDiff: diagnostics.gitDiff,
-				gitBranch: `yeetomatic/issue-${state.issueNumber}`,
+				gitBranch: `yolomatic/issue-${state.issueNumber}`,
 				nodeVersion: process.version,
 				timestamp: new Date().toISOString(),
 			},
@@ -337,7 +337,7 @@ export class ExecuteSessionReporter {
 			lower.includes("workflow") &&
 			lower.includes("scope")
 		) {
-			return "The GitHub PAT is missing the `workflow` scope. Update the token in GitHub settings and restart Yeetomatic.";
+			return "The GitHub PAT is missing the `workflow` scope. Update the token in GitHub settings and restart Yolomatic.";
 		}
 		return "";
 	}
@@ -345,7 +345,7 @@ export class ExecuteSessionReporter {
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {
 		const body = SelfMonitor.formatBugReportBody(error.evidence);
 		const title = SelfMonitor.getIssueTitle(error.evidence);
-		return this.deps.github.fileSelfReport(title, body, ["yeetomatic-self-report", "bug"]);
+		return this.deps.github.fileSelfReport(title, body, ["yolomatic-self-report", "bug"]);
 	}
 
 	private async handlePullRequestCompletion(
@@ -357,7 +357,7 @@ export class ExecuteSessionReporter {
 		result: ExecutionResult,
 		expectedRemoteHead?: string,
 	): Promise<void> {
-		const branchName = state.branch ?? `yeetomatic/issue-${issueNumber}`;
+		const branchName = state.branch ?? `yolomatic/issue-${issueNumber}`;
 		const commitMessage = generateCommitMessage(state.labels, issueNumber, result.summary);
 		const pushed = expectedRemoteHead
 			? await this.deps.workspaces.commitAndPushPath(
@@ -375,7 +375,7 @@ export class ExecuteSessionReporter {
 				repo,
 				prNumber,
 				[
-					"**Yeetomatic iteration complete.**",
+					"**Yolomatic iteration complete.**",
 					"",
 					"Changes pushed to the PR branch.",
 					"",
@@ -391,7 +391,7 @@ export class ExecuteSessionReporter {
 			repo,
 			prNumber,
 			[
-				"**Yeetomatic iteration complete.**",
+				"**Yolomatic iteration complete.**",
 				"",
 				"No changes were needed.",
 				"",
@@ -403,8 +403,8 @@ export class ExecuteSessionReporter {
 
 	private defaultCancelledSummary(target: ExecutionCommentTarget): string {
 		return target.kind === "issue"
-			? "Yeetomatic has stopped working on this issue."
-			: "Yeetomatic has stopped working on this review.";
+			? "Yolomatic has stopped working on this issue."
+			: "Yolomatic has stopped working on this review.";
 	}
 
 	private adminUrl(owner: string, repo: string, issueNumber: number): string | undefined {

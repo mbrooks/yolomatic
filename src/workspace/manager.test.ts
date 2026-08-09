@@ -27,12 +27,12 @@ describe("WorkspaceManager", () => {
 		expect(manager.getWorktreePath("MBrooks", "CaseBot", 42)).toBe(
 			path.join("/tmp/workspaces", "mbrooks-casebot", ".worktrees", "issue-42"),
 		);
-		expect(manager.getBranchName(42)).toBe("yeetomatic/issue-42");
+		expect(manager.getBranchName(42)).toBe("yolomatic/issue-42");
 	});
 
 	it("initializes a repo by cloning the bare repository", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-init-repo-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-init-repo-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
@@ -41,7 +41,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.initializeRepo("mbrooks", "yeetomatic");
+		await manager.initializeRepo("mbrooks", "yolomatic");
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "clone",
@@ -53,8 +53,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("fetches existing bare repo during initializeRepo instead of cloning", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-init-repo-valid-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-init-repo-valid-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		await mkdir(bareRepoPath, { recursive: true });
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
@@ -65,7 +65,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.initializeRepo("mbrooks", "yeetomatic");
+		await manager.initializeRepo("mbrooks", "yolomatic");
 
 		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin",
@@ -80,8 +80,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("creates worktree by cloning bare repo and adding worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worktree-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
@@ -95,9 +95,9 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
-		expect(worktree.branch).toBe("yeetomatic/issue-42");
+		expect(worktree.branch).toBe("yolomatic/issue-42");
 		expect(worktree.path).toBe(path.join(bareRepoPath, ".worktrees", "issue-42"));
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
@@ -110,14 +110,14 @@ describe("WorkspaceManager", () => {
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktree.path, "-b", "yeetomatic/issue-42", "origin/HEAD"],
+			["worktree", "add", worktree.path, "-b", "yolomatic/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 	});
 
 	it("fetches existing bare repo instead of cloning when directory is valid", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-valid-bare-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-valid-bare-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -144,9 +144,9 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
-		expect(worktree.branch).toBe("yeetomatic/issue-42");
+		expect(worktree.branch).toBe("yolomatic/issue-42");
 
 		const fetchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "fetch" && args[1] === "origin",
@@ -161,8 +161,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("re-clones when bare repo directory exists but is not a valid git repository", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-corrupted-bare-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-corrupted-bare-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -189,9 +189,9 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
-		expect(worktree.branch).toBe("yeetomatic/issue-42");
+		expect(worktree.branch).toBe("yolomatic/issue-42");
 
 		const cloneCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([cmd, args]) => cmd === "git" && args[0] === "clone",
@@ -205,8 +205,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("returns existing worktree if already created", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worktree-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		let worktreeCreated = false;
@@ -222,7 +222,7 @@ describe("WorkspaceManager", () => {
 			if (args[0] === "worktree" && args[1] === "list") {
 				return {
 					stdout: worktreeCreated
-						? `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-42\n`
+						? `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/yolomatic/issue-42\n`
 						: "",
 					stderr: "",
 				};
@@ -238,18 +238,18 @@ describe("WorkspaceManager", () => {
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
 		// First call creates the worktree
-		const worktree1 = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree1 = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 		expect(worktree1.path).toBe(worktreePath);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "yeetomatic/issue-42", "origin/HEAD"],
+			["worktree", "add", worktreePath, "-b", "yolomatic/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 
 		// Second call returns existing
-		const worktree2 = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree2 = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 		expect(worktree2.path).toBe(worktreePath);
-		expect(worktree2.branch).toBe("yeetomatic/issue-42");
+		expect(worktree2.branch).toBe("yolomatic/issue-42");
 
 		// Should not call worktree add again
 		const worktreeAddCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
@@ -259,15 +259,15 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("creates worktree from existing branch if branch already exists", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-existing-branch-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-existing-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
 			}
 			if (args[0] === "show-ref") {
-				return { stdout: "abcd1234 refs/heads/yeetomatic/issue-42", stderr: "" };
+				return { stdout: "abcd1234 refs/heads/yolomatic/issue-42", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "list") {
 				return { stdout: "", stderr: "" };
@@ -279,36 +279,36 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const worktree = await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		const worktree = await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
-		expect(worktree.branch).toBe("yeetomatic/issue-42");
+		expect(worktree.branch).toBe("yolomatic/issue-42");
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["branch", "-f", "yeetomatic/issue-42", "origin/HEAD"],
+			["branch", "-f", "yolomatic/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", "--force", worktreePath, "yeetomatic/issue-42"],
+			["worktree", "add", "--force", worktreePath, "yolomatic/issue-42"],
 			{ cwd: bareRepoPath },
 		);
 	});
 
 	it("delegates syncWorktree to the worktree manager", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-manager-sync-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-manager-sync-"));
 		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 		const syncSpy = vi.fn(async () => undefined);
 		vi.spyOn(manager as unknown as { worktrees: { syncWorktree: typeof syncSpy } }, "worktrees", "get").mockReturnValue({ syncWorktree: syncSpy });
 
-		await manager.syncWorktree("mbrooks", "yeetomatic", 42);
+		await manager.syncWorktree("mbrooks", "yolomatic", 42);
 
-		expect(syncSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(syncSpy).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 	});
 
 	it("commits and pushes from worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-"));
-		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-commit-"));
+		const worktreePath = path.join(root, "mbrooks-yolomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				const error = new Error("changes exist") as Error & { code?: number };
@@ -319,9 +319,9 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yolomatic", 42)).toBe(true);
 
-		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yeetomatic"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yolomatic"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["config", "user.email", "mbrooks@users.noreply.github.com"],
@@ -330,18 +330,18 @@ describe("WorkspaceManager", () => {
 		expect(runCommand).toHaveBeenCalledWith("git", ["add", "-A"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["commit", "-m", "Yeetomatic: Changes for issue #42"],
+			["commit", "-m", "Yolomatic: Changes for issue #42"],
 			{ cwd: worktreePath },
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["push", "origin", "yeetomatic/issue-42"],
+			["push", "origin", "yolomatic/issue-42"],
 			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
 	it("commits and pushes from a custom worktree path", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-path-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-commit-path-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
@@ -354,10 +354,10 @@ describe("WorkspaceManager", () => {
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
 		expect(
-			await manager.commitAndPushPath(worktreePath, "yeetomatic/custom-test", "chore: Update deps", "main"),
+			await manager.commitAndPushPath(worktreePath, "yolomatic/custom-test", "chore: Update deps", "main"),
 		).toBe(true);
 
-		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yeetomatic"], { cwd: worktreePath });
+		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yolomatic"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith("git", ["add", "-A"], { cwd: worktreePath });
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -366,13 +366,13 @@ describe("WorkspaceManager", () => {
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["push", "origin", "yeetomatic/custom-test"],
+			["push", "origin", "yolomatic/custom-test"],
 			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
 	it("uses default branch for commitAndPushPath when baseBranch is omitted", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-default-base-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-default-base-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
@@ -398,7 +398,7 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("uses provided baseBranch for commitAndPushPath", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-custom-base-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-custom-base-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
@@ -421,7 +421,7 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("returns false when commitAndPushPath has no changes and no commits ahead", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-path-no-changes-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-path-no-changes-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
@@ -438,7 +438,7 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("returns false when there are no changes and no commits ahead of base", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-no-changes-no-commits-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-no-changes-no-commits-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				return { stdout: "", stderr: "" };
@@ -450,12 +450,12 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(false);
+		expect(await manager.commitAndPush("mbrooks", "yolomatic", 42)).toBe(false);
 	});
 
 	it("pushes when there are no new changes but commits already exist on branch", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-existing-commits-"));
-		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-existing-commits-"));
+		const worktreePath = path.join(root, "mbrooks-yolomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				return { stdout: "", stderr: "" };
@@ -467,17 +467,17 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42)).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yolomatic", 42)).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["push", "origin", "yeetomatic/issue-42"],
+			["push", "origin", "yolomatic/issue-42"],
 			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
 	it("throws when push fails", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-push-fails-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-push-fails-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				const error = new Error("changes exist") as Error & { code?: number };
@@ -491,11 +491,11 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.commitAndPush("mbrooks", "yeetomatic", 42)).rejects.toThrow("Authentication failed");
+		await expect(manager.commitAndPush("mbrooks", "yolomatic", 42)).rejects.toThrow("Authentication failed");
 	});
 
 	it("retries a non-fast-forward push with the captured remote head as an explicit lease", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-push-lease-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-push-lease-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const expectedRemoteHead = "a".repeat(40);
 		let pushAttempts = 0;
@@ -518,28 +518,28 @@ describe("WorkspaceManager", () => {
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
 		await expect(
-			manager.commitAndPushPath(worktreePath, "yeetomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
+			manager.commitAndPushPath(worktreePath, "yolomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
 		).resolves.toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["push", "origin", "yeetomatic/issue-42"],
+			["push", "origin", "yolomatic/issue-42"],
 			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			[
 				"push",
-				`--force-with-lease=refs/heads/yeetomatic/issue-42:${expectedRemoteHead}`,
+				`--force-with-lease=refs/heads/yolomatic/issue-42:${expectedRemoteHead}`,
 				"origin",
-				"yeetomatic/issue-42",
+				"yolomatic/issue-42",
 			],
 			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
 		);
 	});
 
 	it("surfaces a rejected lease instead of overwriting a concurrently updated branch", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-stale-push-lease-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-stale-push-lease-"));
 		const worktreePath = path.join(root, "custom-worktree");
 		const expectedRemoteHead = "b".repeat(40);
 		let pushAttempts = 0;
@@ -561,14 +561,14 @@ describe("WorkspaceManager", () => {
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
 		await expect(
-			manager.commitAndPushPath(worktreePath, "yeetomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
+			manager.commitAndPushPath(worktreePath, "yolomatic/issue-42", "fix: Resolve feedback", undefined, expectedRemoteHead),
 		).rejects.toThrow("remote branch changed during execution");
 		expect(pushAttempts).toBe(2);
 	});
 
 	it("commits with a custom message when provided", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-commit-msg-"));
-		const worktreePath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "issue-42");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-commit-msg-"));
+		const worktreePath = path.join(root, "mbrooks-yolomatic", ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
 				const error = new Error("changes exist") as Error & { code?: number };
@@ -579,7 +579,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		expect(await manager.commitAndPush("mbrooks", "yeetomatic", 42, "feat: Add widget support")).toBe(true);
+		expect(await manager.commitAndPush("mbrooks", "yolomatic", 42, "feat: Add widget support")).toBe(true);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -589,14 +589,14 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("removes worktree if it exists", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-remove-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-remove-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "list") {
 				return {
-					stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-42\n`,
+					stdout: `worktree ${worktreePath}\nHEAD abcd1234\nbranch refs/heads/yolomatic/issue-42\n`,
 					stderr: "",
 				};
 			}
@@ -607,7 +607,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.removeWorktree("mbrooks", "yeetomatic", 42);
+		await manager.removeWorktree("mbrooks", "yolomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith("git", ["worktree", "remove", worktreePath], {
 			cwd: bareRepoPath,
@@ -615,8 +615,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("prunes stale worktrees before adding new worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-prune-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-prune-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
@@ -637,7 +637,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
 		// Verify prune and fetch are called before add
 		const calls = (runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
@@ -652,14 +652,14 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("throws diagnostic error when worktree add fails", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worktree-error-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worktree-error-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				return { stdout: "abcd1234\n", stderr: "" };
 			}
 			if (args[0] === "show-ref") {
-				return { stdout: "abcd1234 refs/heads/yeetomatic/issue-42", stderr: "" };
+				return { stdout: "abcd1234 refs/heads/yolomatic/issue-42", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "list") {
 				return { stdout: "", stderr: "" };
@@ -668,23 +668,23 @@ describe("WorkspaceManager", () => {
 				return { stdout: "", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "add") {
-				throw new Error("fatal: 'yeetomatic/issue-42' is already used by worktree");
+				throw new Error("fatal: 'yolomatic/issue-42' is already used by worktree");
 			}
 			return { stdout: "", stderr: "" };
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
-			"[workspace] ERROR: Cannot create worktree for yeetomatic/issue-42",
+		await expect(manager.createOrGetWorktree("mbrooks", "yolomatic", 42)).rejects.toThrow(
+			"[workspace] ERROR: Cannot create worktree for yolomatic/issue-42",
 		);
-		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
+		await expect(manager.createOrGetWorktree("mbrooks", "yolomatic", 42)).rejects.toThrow(
 			"git worktree prune",
 		);
 	});
 
 	it("updates the default branch before creating a new worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-fetch-default-branch-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-fetch-default-branch-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "show-ref") {
@@ -705,7 +705,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
@@ -714,14 +714,14 @@ describe("WorkspaceManager", () => {
 		);
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "yeetomatic/issue-42", "origin/HEAD"],
+			["worktree", "add", worktreePath, "-b", "yolomatic/issue-42", "origin/HEAD"],
 			{ cwd: bareRepoPath },
 		);
 	});
 
 	it("falls back to bare HEAD when remote refs are unavailable", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-bare-head-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-bare-head-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
@@ -751,18 +751,18 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 42);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 42);
 
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
-			["worktree", "add", worktreePath, "-b", "yeetomatic/issue-42", "HEAD"],
+			["worktree", "add", worktreePath, "-b", "yolomatic/issue-42", "HEAD"],
 			{ cwd: bareRepoPath },
 		);
 	});
 
 	it("throws EmptyRepositoryError when no refs exist at all", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-empty-repo-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-empty-repo-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
 				const error = new Error(`fatal: Needed a single revision: ${args[2]}`) as Error & { code?: number };
@@ -787,15 +787,15 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(EmptyRepositoryError);
-		await expect(manager.createOrGetWorktree("mbrooks", "yeetomatic", 42)).rejects.toThrow(
+		await expect(manager.createOrGetWorktree("mbrooks", "yolomatic", 42)).rejects.toThrow(EmptyRepositoryError);
+		await expect(manager.createOrGetWorktree("mbrooks", "yolomatic", 42)).rejects.toThrow(
 			"The repository appears to be empty",
 		);
 	});
 
 	it("does nothing when removing a non-existent worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-remove-missing-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-remove-missing-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-99");
 
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
@@ -806,7 +806,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.removeWorktree("mbrooks", "yeetomatic", 99);
+		await manager.removeWorktree("mbrooks", "yolomatic", 99);
 		// git worktree remove should NOT be called
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -815,7 +815,7 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("detects no changes when git diff exits cleanly", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-no-changes-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-no-changes-"));
 		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
@@ -825,7 +825,7 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("detects no cached changes when git diff --cached exits cleanly", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-no-cached-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-no-cached-"));
 		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
@@ -835,8 +835,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("evicts oldest worktree when limit is reached with FIFO", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-fifo-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-fifo-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -854,11 +854,11 @@ describe("WorkspaceManager", () => {
 					stdout: [
 						`worktree ${worktree1}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-1",
+						"branch refs/heads/yolomatic/issue-1",
 						"",
 						`worktree ${worktree2}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-2",
+						"branch refs/heads/yolomatic/issue-2",
 						"",
 					].join("\n"),
 					stderr: "",
@@ -891,7 +891,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -902,8 +902,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("evicts least recently used worktree with LRU", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-lru-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-lru-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -921,11 +921,11 @@ describe("WorkspaceManager", () => {
 					stdout: [
 						`worktree ${worktree1}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-1",
+						"branch refs/heads/yolomatic/issue-1",
 						"",
 						`worktree ${worktree2}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-2",
+						"branch refs/heads/yolomatic/issue-2",
 						"",
 					].join("\n"),
 					stderr: "",
@@ -958,7 +958,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -969,8 +969,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("updates mtime of existing worktree when returned to track LRU", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-lru-touch-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-lru-touch-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -981,7 +981,7 @@ describe("WorkspaceManager", () => {
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
 				return {
-					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-1\n`,
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yolomatic/issue-1\n`,
 					stderr: "",
 				};
 			}
@@ -992,15 +992,15 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 1);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 1);
 
 		const afterStat = await stat(worktree1);
 		expect(afterStat.mtimeMs).toBeGreaterThanOrEqual(beforeStat.mtimeMs);
 	});
 
 	it("stashes uncommitted changes before evicting a worktree", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-stash-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-stash-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 		const worktree2 = path.join(bareRepoPath, ".worktrees", "issue-2");
 
@@ -1014,11 +1014,11 @@ describe("WorkspaceManager", () => {
 					stdout: [
 						`worktree ${worktree1}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-1",
+						"branch refs/heads/yolomatic/issue-1",
 						"",
 						`worktree ${worktree2}`,
 						"HEAD abcd1234",
-						"branch refs/heads/yeetomatic/issue-2",
+						"branch refs/heads/yolomatic/issue-2",
 						"",
 					].join("\n"),
 					stderr: "",
@@ -1060,19 +1060,19 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 3);
 
 		const stashCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "stash" && args[1] === "push",
 		);
 		expect(stashCalls).toHaveLength(1);
 		expect(stashCalls[0][1]).toContain("-u");
-		expect(stashCalls[0][1]).toContain("Yeetomatic auto-stash before eviction of issue-1");
+		expect(stashCalls[0][1]).toContain("Yolomatic auto-stash before eviction of issue-1");
 	});
 
 	it("logs eviction to stdout", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-log-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-log-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -1081,7 +1081,7 @@ describe("WorkspaceManager", () => {
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
 				return {
-					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-1\n`,
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yolomatic/issue-1\n`,
 					stderr: "",
 				};
 			}
@@ -1114,21 +1114,21 @@ describe("WorkspaceManager", () => {
 
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 3);
 
 		expect(writeSpy).toHaveBeenCalledWith(
 			expect.stringContaining("[workspace] Evicted worktree"),
 		);
 		expect(writeSpy).toHaveBeenCalledWith(
-			expect.stringContaining("mbrooks/yeetomatic"),
+			expect.stringContaining("mbrooks/yolomatic"),
 		);
 
 		writeSpy.mockRestore();
 	});
 
 	it("does not evict when under the worktree limit", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-no-evict-"));
-		const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-no-evict-"));
+		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const worktree1 = path.join(bareRepoPath, ".worktrees", "issue-1");
 
 		await mkdir(bareRepoPath, { recursive: true });
@@ -1137,7 +1137,7 @@ describe("WorkspaceManager", () => {
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "list" && args[2] === "--porcelain") {
 				return {
-					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yeetomatic/issue-1\n`,
+					stdout: `worktree ${worktree1}\nHEAD abcd1234\nbranch refs/heads/yolomatic/issue-1\n`,
 					stderr: "",
 				};
 			}
@@ -1165,7 +1165,7 @@ describe("WorkspaceManager", () => {
 			runCommand,
 		);
 
-		await manager.createOrGetWorktree("mbrooks", "yeetomatic", 3);
+		await manager.createOrGetWorktree("mbrooks", "yolomatic", 3);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -1174,13 +1174,13 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("creates a refinement worktree on origin default branch", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-refinement-"));
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
 				return { stdout: ".\n", stderr: "" };
 			}
 			if (args[0] === "worktree" && args[1] === "list") {
-				return { stdout: `worktree ${path.join(root, "mbrooks-yeetomatic")}\n`, stderr: "" };
+				return { stdout: `worktree ${path.join(root, "mbrooks-yolomatic")}\n`, stderr: "" };
 			}
 			if (args[0] === "fetch") {
 				return { stdout: "", stderr: "" };
@@ -1195,19 +1195,19 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		const refinementPath = await manager.createRefinementWorktree("mbrooks", "yeetomatic", 7);
+		const refinementPath = await manager.createRefinementWorktree("mbrooks", "yolomatic", 7);
 
-		expect(refinementPath).toBe(path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-7"));
+		expect(refinementPath).toBe(path.join(root, "mbrooks-yolomatic", ".worktrees", "refinement", "issue-7"));
 		const addCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "add",
 		);
 		expect(addCalls).toHaveLength(1);
-		expect(addCalls[0]![1]).toContain("yeetomatic/refinement-issue-7");
+		expect(addCalls[0]![1]).toContain("yolomatic/refinement-issue-7");
 	});
 
 	it("removes an existing refinement worktree before creating a new one", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-cleanup-"));
-		const refinementPath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-8");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-refinement-cleanup-"));
+		const refinementPath = path.join(root, "mbrooks-yolomatic", ".worktrees", "refinement", "issue-8");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse" && args[1] === "--git-dir") {
 				return { stdout: ".\n", stderr: "" };
@@ -1231,7 +1231,7 @@ describe("WorkspaceManager", () => {
 		});
 		const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-		await manager.createRefinementWorktree("mbrooks", "yeetomatic", 8);
+		await manager.createRefinementWorktree("mbrooks", "yolomatic", 8);
 
 		const removeCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>).filter(
 			([_cmd, args]) => args[0] === "worktree" && args[1] === "remove",
@@ -1241,8 +1241,8 @@ describe("WorkspaceManager", () => {
 	});
 
 	it("removes a refinement worktree by path", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-refinement-rm-"));
-		const refinementPath = path.join(root, "mbrooks-yeetomatic", ".worktrees", "refinement", "issue-9");
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-refinement-rm-"));
+		const refinementPath = path.join(root, "mbrooks-yolomatic", ".worktrees", "refinement", "issue-9");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "worktree" && args[1] === "remove") {
 				return { stdout: "", stderr: "" };
@@ -1262,8 +1262,8 @@ describe("WorkspaceManager", () => {
 
 	describe("updateDefaultBranchFromOrigin", () => {
 		it("ensures the bare repo and delegates the local ref update to BareRepoManager", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-"));
-			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-update-default-"));
+			const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 			await mkdir(bareRepoPath, { recursive: true });
 			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 				if (args[0] === "rev-parse" && args[1] === "--git-dir") {
@@ -1285,7 +1285,7 @@ describe("WorkspaceManager", () => {
 			});
 			const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yolomatic");
 
 			expect(result).toEqual({ branch: "main", before: null, after: "after1234", updated: true });
 			expect(runCommand).toHaveBeenCalledWith(
@@ -1296,8 +1296,8 @@ describe("WorkspaceManager", () => {
 		});
 
 		it("respects a per-repo resolveDefaultBranch override", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-override-"));
-			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-update-default-override-"));
+			const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 			await mkdir(bareRepoPath, { recursive: true });
 			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
@@ -1317,7 +1317,7 @@ describe("WorkspaceManager", () => {
 				runCommand,
 			);
 
-			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yolomatic");
 
 			expect(result).toEqual({ branch: "develop", before: null, after: "after1234", updated: true });
 			expect(runCommand).toHaveBeenCalledWith(
@@ -1328,8 +1328,8 @@ describe("WorkspaceManager", () => {
 		});
 
 		it("reports updated=false when already up to date", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-noop-"));
-			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-update-default-noop-"));
+			const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 			await mkdir(bareRepoPath, { recursive: true });
 			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
@@ -1338,7 +1338,7 @@ describe("WorkspaceManager", () => {
 			});
 			const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic");
+			const result = await manager.updateDefaultBranchFromOrigin("mbrooks", "yolomatic");
 
 			expect(result).toEqual({ branch: "main", before: "same1234", after: "same1234", updated: false });
 			const branchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>)
@@ -1347,8 +1347,8 @@ describe("WorkspaceManager", () => {
 		});
 
 		it("propagates the missing-origin-branch error and performs no branch mutation", async () => {
-			const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-update-default-missing-"));
-			const bareRepoPath = path.join(root, "mbrooks-yeetomatic");
+			const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-update-default-missing-"));
+			const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 			await mkdir(bareRepoPath, { recursive: true });
 			const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 				if (args[0] === "rev-parse" && args[1] === "--git-dir") return { stdout: ".\n", stderr: "" };
@@ -1361,7 +1361,7 @@ describe("WorkspaceManager", () => {
 			});
 			const manager = new WorkspaceManager(createConfig(root), runCommand);
 
-			await expect(manager.updateDefaultBranchFromOrigin("mbrooks", "yeetomatic")).rejects.toThrow(
+			await expect(manager.updateDefaultBranchFromOrigin("mbrooks", "yolomatic")).rejects.toThrow(
 				"origin/main does not exist",
 			);
 			const branchCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>)

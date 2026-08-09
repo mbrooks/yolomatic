@@ -65,12 +65,12 @@ function fileStats(size: number) {
 
 describe("resolveInitScriptPath", () => {
 	it("uses absolute paths as-is", () => {
-		expect(resolveInitScriptPath("/workspace", "/abs/yeetstrap.sh")).toBe("/abs/yeetstrap.sh");
+		expect(resolveInitScriptPath("/workspace", "/abs/yolostrap.sh")).toBe("/abs/yolostrap.sh");
 	});
 
 	it("resolves relative paths against the workspace", () => {
-		expect(resolveInitScriptPath("/workspace/issue-1", "yeetstrap.sh")).toBe(
-			path.join("/workspace/issue-1", "yeetstrap.sh"),
+		expect(resolveInitScriptPath("/workspace/issue-1", "yolostrap.sh")).toBe(
+			path.join("/workspace/issue-1", "yolostrap.sh"),
 		);
 	});
 });
@@ -107,11 +107,11 @@ describe("runEnvironmentInit", () => {
 		expect(log).not.toHaveBeenCalled();
 	});
 
-	it("skips when YEETOMATIC_WORKER_INIT_SKIP=1 in env", async () => {
+	it("skips when YOLO_WORKER_INIT_SKIP=1 in env", async () => {
 		const result = await runEnvironmentInit({
 			workspacePath: "/ws",
 			log,
-			env: { YEETOMATIC_WORKER_INIT_SKIP: "1" },
+			env: { YOLO_WORKER_INIT_SKIP: "1" },
 		});
 
 		expect(result).toEqual({ skipped: true });
@@ -121,22 +121,22 @@ describe("runEnvironmentInit", () => {
 	it("runs the script, streams stdout/stderr as env_init log events, and resolves on exit 0", async () => {
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
 
-		const promise = runEnvironmentInit({ workspacePath: "/ws", scriptPath: "/ws/yeetstrap.sh", log });
+		const promise = runEnvironmentInit({ workspacePath: "/ws", scriptPath: "/ws/yolostrap.sh", log });
 
 		await new Promise((resolve) => setImmediate(resolve));
 		const spawnCall = spawnController.calls[0];
 		expect(spawnCall.cmd).toBe("bash");
 		expect(spawnCall.args[0]).toBe("-c");
-		expect(spawnCall.args[1]).toBe('cd "/ws" && exec bash -- "/ws/yeetstrap.sh"');
+		expect(spawnCall.args[1]).toBe('cd "/ws" && exec bash -- "/ws/yolostrap.sh"');
 		expect(spawnCall.options.cwd).toBe("/ws");
-		expect(spawnCall.options.env.YEETOMATIC_SESSION_WS_URL).toBeUndefined();
+		expect(spawnCall.options.env.YOLO_SESSION_WS_URL).toBeUndefined();
 
 		spawnCall.child.stdout.emit("data", Buffer.from("installing\n"));
 		spawnCall.child.stderr.emit("data", Buffer.from("warn line\n"));
 		spawnCall.child.emit("exit", 0, null);
 
 		const result = await promise;
-		expect(result).toEqual({ skipped: false, scriptPath: "/ws/yeetstrap.sh" });
+		expect(result).toEqual({ skipped: false, scriptPath: "/ws/yolostrap.sh" });
 		expect(log).toHaveBeenCalledWith({
 			level: "info",
 			message: "installing\n",
@@ -261,13 +261,13 @@ describe("runEnvironmentInit", () => {
 		expect(spawnController.calls).toHaveLength(0);
 	});
 
-	it("uses an absolute YEETOMATIC_WORKER_INIT_SCRIPT as-is", async () => {
+	it("uses an absolute YOLO_WORKER_INIT_SCRIPT as-is", async () => {
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
 
 		const promise = runEnvironmentInit({
 			workspacePath: "/ws",
 			log,
-			env: { YEETOMATIC_WORKER_INIT_SCRIPT: "/custom/init.sh" },
+			env: { YOLO_WORKER_INIT_SCRIPT: "/custom/init.sh" },
 		});
 		await new Promise((resolve) => setImmediate(resolve));
 
@@ -277,14 +277,14 @@ describe("runEnvironmentInit", () => {
 		expect(spawnController.calls[0].args[1]).toBe('cd "/ws" && exec bash -- "/custom/init.sh"');
 	});
 
-	it("resolves a relative YEETOMATIC_WORKER_INIT_SCRIPT against the workspace path", async () => {
+	it("resolves a relative YOLO_WORKER_INIT_SCRIPT against the workspace path", async () => {
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
 		const expected = path.resolve("/ws/repo", "scripts/init.sh");
 
 		const promise = runEnvironmentInit({
 			workspacePath: "/ws/repo",
 			log,
-			env: { YEETOMATIC_WORKER_INIT_SCRIPT: "scripts/init.sh" },
+			env: { YOLO_WORKER_INIT_SCRIPT: "scripts/init.sh" },
 		});
 		await new Promise((resolve) => setImmediate(resolve));
 
@@ -293,9 +293,9 @@ describe("runEnvironmentInit", () => {
 		await promise;
 	});
 
-	it("defaults to yeetstrap.sh relative to the workspace", async () => {
+	it("defaults to yolostrap.sh relative to the workspace", async () => {
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
-		const expected = path.resolve("/ws/repo", "yeetstrap.sh");
+		const expected = path.resolve("/ws/repo", "yolostrap.sh");
 
 		const promise = runEnvironmentInit({ workspacePath: "/ws/repo", log });
 		await new Promise((resolve) => setImmediate(resolve));
@@ -305,25 +305,25 @@ describe("runEnvironmentInit", () => {
 		await promise;
 	});
 
-	it("unsets YEETOMATIC_SESSION_WS_URL from the spawned env", async () => {
+	it("unsets YOLO_SESSION_WS_URL from the spawned env", async () => {
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
 
 		const promise = runEnvironmentInit({
 			workspacePath: "/ws",
 			scriptPath: "/ws/y.sh",
 			log,
-			env: { YEETOMATIC_SESSION_WS_URL: "ws://secret", YEETOMATIC_SESSION_KEY: "owner/repo#1" },
+			env: { YOLO_SESSION_WS_URL: "ws://secret", YOLO_SESSION_KEY: "owner/repo#1" },
 		});
 		await new Promise((resolve) => setImmediate(resolve));
 
 		const spawnEnv = spawnController.calls[0].options.env as NodeJS.ProcessEnv;
-		expect(spawnEnv.YEETOMATIC_SESSION_WS_URL).toBeUndefined();
-		expect(spawnEnv.YEETOMATIC_SESSION_KEY).toBe("owner/repo#1");
+		expect(spawnEnv.YOLO_SESSION_WS_URL).toBeUndefined();
+		expect(spawnEnv.YOLO_SESSION_KEY).toBe("owner/repo#1");
 		spawnController.calls[0].child.emit("exit", 0, null);
 		await promise;
 	});
 
-	it("parses YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS from env", async () => {
+	it("parses YOLO_WORKER_INIT_TIMEOUT_SECONDS from env", async () => {
 		vi.useFakeTimers();
 		statMock.stat.mockResolvedValueOnce(fileStats(100) as never);
 
@@ -331,7 +331,7 @@ describe("runEnvironmentInit", () => {
 			workspacePath: "/ws",
 			scriptPath: "/ws/y.sh",
 			log,
-			env: { YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS: "2" },
+			env: { YOLO_WORKER_INIT_TIMEOUT_SECONDS: "2" },
 		});
 		await vi.advanceTimersByTimeAsync(0);
 		const child = spawnController.calls[0].child;
@@ -351,7 +351,7 @@ describe("runEnvironmentInit", () => {
 			workspacePath: "/ws",
 			scriptPath: "/ws/y.sh",
 			log,
-			env: { YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS: "not-a-number" },
+			env: { YOLO_WORKER_INIT_TIMEOUT_SECONDS: "not-a-number" },
 		});
 		await new Promise((resolve) => setImmediate(resolve));
 		spawnController.calls[0].child.emit("exit", 0, null);

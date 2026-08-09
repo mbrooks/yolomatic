@@ -9,7 +9,7 @@ vi.mock("../config.js", () => ({
 		memoryDir: "/tmp/memory",
 		defaultBranch: "main",
 		githubToken: "token",
-		githubUsername: "yeetomatic-bot",
+		githubUsername: "yolomatic-bot",
 		workspacesDir: "/tmp/workspaces",
 		soulPath: "/tmp/SOUL.md",
 		selfReportEnabled: true,
@@ -29,7 +29,7 @@ vi.mock("../config.js", () => ({
 		logResponses: true,
 		githubEventMode: "webhook",
 		githubPollIntervalMs: 60000,
-		workerImage: "yeetomatic-worker:latest",
+		workerImage: "yolomatic-worker:latest",
 		workerWorkspaceMountSource: "/tmp/workspaces",
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
@@ -167,7 +167,7 @@ describe("noOpHandlers", () => {
 	});
 
 	it("isInFlight returns false", () => {
-		expect(noOpHandlers.isInFlight("mbrooks", "yeetomatic", 1)).toBe(false);
+		expect(noOpHandlers.isInFlight("mbrooks", "yolomatic", 1)).toBe(false);
 	});
 });
 
@@ -234,30 +234,30 @@ describe("buildRuntimeGraph", () => {
 			}),
 		);
 
-		await options.restartSession("mbrooks", "yeetomatic", 513);
-		expect(graph.handlers.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 513);
+		await options.restartSession("mbrooks", "yolomatic", 513);
+		expect(graph.handlers.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 513);
 	});
 
 	it("resolve helpers passed to handlers resolve default branch and event mode", () => {
 		const deps = makeDeps();
 		const managedRepo = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			githubEventMode: "polling" as const,
 			defaultBranch: "develop",
 		};
 		(deps.repositoryStore.listSync as ReturnType<typeof vi.fn>).mockReturnValue([managedRepo]);
 		(deps.repositoryStore.getSync as ReturnType<typeof vi.fn>).mockImplementation(
-			(owner: string, repo: string) => (owner === "mbrooks" && repo === "yeetomatic" ? managedRepo : null),
+			(owner: string, repo: string) => (owner === "mbrooks" && repo === "yolomatic" ? managedRepo : null),
 		);
 		buildRuntimeGraph(baseConfig, deps);
 		const handlerDeps = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
 			resolveDefaultBranch: (owner: string, repo: string) => string;
 			resolveGitHubEventMode: (owner: string, repo: string) => string;
 		};
-		expect(handlerDeps.resolveDefaultBranch("mbrooks", "yeetomatic")).toBe("develop");
+		expect(handlerDeps.resolveDefaultBranch("mbrooks", "yolomatic")).toBe("develop");
 		expect(handlerDeps.resolveDefaultBranch("other", "repo")).toBe("main");
-		expect(handlerDeps.resolveGitHubEventMode("mbrooks", "yeetomatic")).toBe("polling");
+		expect(handlerDeps.resolveGitHubEventMode("mbrooks", "yolomatic")).toBe("polling");
 		expect(handlerDeps.resolveGitHubEventMode("other", "repo")).toBe("webhook");
 	});
 
@@ -307,7 +307,7 @@ describe("startRuntime", () => {
 		const pollingConfig = { ...baseConfig, githubEventMode: "polling" as const, githubPollIntervalMs: 30000 };
 		await startRuntime(pollingConfig, makeDeps());
 		expect(startGitHubPolling).toHaveBeenCalledWith(
-			expect.objectContaining({ intervalMs: 30000, githubUsername: "yeetomatic-bot" }),
+			expect.objectContaining({ intervalMs: 30000, githubUsername: "yolomatic-bot" }),
 		);
 	});
 
@@ -315,13 +315,13 @@ describe("startRuntime", () => {
 		const deps = makeDeps();
 		const managedRepo = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			githubEventMode: "polling" as const,
 			defaultBranch: null,
 		};
 		(deps.repositoryStore.listSync as ReturnType<typeof vi.fn>).mockReturnValue([managedRepo]);
 		(deps.repositoryStore.getSync as ReturnType<typeof vi.fn>).mockImplementation(
-			(owner: string, repo: string) => (owner === "mbrooks" && repo === "yeetomatic" ? managedRepo : null),
+			(owner: string, repo: string) => (owner === "mbrooks" && repo === "yolomatic" ? managedRepo : null),
 		);
 		const pollingConfig = { ...baseConfig, githubEventMode: "webhook" as const };
 		await startRuntime(pollingConfig, deps);
@@ -329,9 +329,9 @@ describe("startRuntime", () => {
 			resolveGitHubEventMode: (owner: string, repo: string) => string;
 			shouldPollRepo: (owner: string, repo: string) => boolean;
 		};
-		expect(pollingDeps.resolveGitHubEventMode("mbrooks", "yeetomatic")).toBe("polling");
+		expect(pollingDeps.resolveGitHubEventMode("mbrooks", "yolomatic")).toBe("polling");
 		expect(pollingDeps.resolveGitHubEventMode("other", "repo")).toBe("webhook");
-		expect(pollingDeps.shouldPollRepo("mbrooks", "yeetomatic")).toBe(true);
+		expect(pollingDeps.shouldPollRepo("mbrooks", "yolomatic")).toBe(true);
 		expect(pollingDeps.shouldPollRepo("other", "repo")).toBe(false);
 	});
 
@@ -352,7 +352,7 @@ describe("startRuntime", () => {
 							ageMs: 99999999,
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 99,
 								status: "working",
 								staleDetectedAt: null,
@@ -373,7 +373,7 @@ describe("startRuntime", () => {
 				}) as never,
 		);
 		await startRuntime(baseConfig, makeDeps());
-		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "interrupted_or_abandoned");
+		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "interrupted_or_abandoned");
 	});
 
 	it("swallows stale detection errors", async () => {
@@ -392,7 +392,7 @@ describe("startRuntime", () => {
 		sessionStoreMock.getAll.mockImplementationOnce(async () => [
 			{
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				status: "working",
 				workspacePath: "/tmp/ws",
@@ -404,7 +404,7 @@ describe("startRuntime", () => {
 		] as never);
 		await startRuntime(baseConfig, makeDeps());
 		const handlersInstance = (GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 	});
 
 	it("marks interrupted refinement sessions failed without resuming them", async () => {
@@ -412,7 +412,7 @@ describe("startRuntime", () => {
 			{
 				kind: "refinement",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 517,
 				status: "working",
 				workspacePath: "/tmp/refinement",
@@ -429,7 +429,7 @@ describe("startRuntime", () => {
 		const sessionManager = vi.mocked(SessionManager).mock.results.at(-1)?.value;
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			517,
 			"failed",
 			expect.objectContaining({ summary: "interrupted by restart", resumeOnBoot: undefined }),

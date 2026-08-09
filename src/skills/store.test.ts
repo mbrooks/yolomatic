@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { unlinkSync } from "node:fs";
 import { SkillStore } from "./store.js";
 
-const TEST_DB = "/tmp/yeetomatic-skill-store-test.sqlite";
+const TEST_DB = "/tmp/yolomatic-skill-store-test.sqlite";
 
 describe("SkillStore", () => {
 	let store: SkillStore;

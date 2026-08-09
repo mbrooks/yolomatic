@@ -6,7 +6,7 @@ Last verified: 2026-08-01 against `github/main` at `26171605efdd`
 
 ## Purpose
 
-This protocol defines how Yeetomatic starts a worker container for one issue session and exposes the worker session URL.
+This protocol defines how Yolomatic starts a worker container for one issue session and exposes the worker session URL.
 
 ## Design Choice
 
@@ -14,24 +14,24 @@ Keep launch input simple:
 
 - repository content is provided through a single workspace mount
 - session metadata is not pushed through stdin
-- the worker receives launch configuration from Yeetomatic after opening the worker session WebSocket
+- the worker receives launch configuration from Yolomatic after opening the worker session WebSocket
 - cancellation requests a graceful agent abort and has a `docker stop`
   fallback
 
-This keeps the authoritative control surface in one place: the session server hosted by Yeetomatic.
+This keeps the authoritative control surface in one place: the session server hosted by Yolomatic.
 
 ## Worker Image
 
 The worker image is a Debian-based image built for agent execution. It contains:
 
 - Node.js
-- the agent runtime and Yeetomatic worker entrypoint
+- the agent runtime and Yolomatic worker entrypoint
 - git
 - common shell tools
 
-The worker runs as the non-root `yeetomatic` user with `HOME=/home/yeetomatic` and `PI_CODING_AGENT_DIR=/home/yeetomatic/.pi/agent`. System package installation with `apt-get` is therefore not available during an ordinary worker session. Node packages and other user-writable tooling may still be installed when the workspace permits it.
+The worker runs as the non-root `yolomatic` user with `HOME=/home/yolomatic` and `PI_CODING_AGENT_DIR=/home/yolomatic/.pi/agent`. System package installation with `apt-get` is therefore not available during an ordinary worker session. Node packages and other user-writable tooling may still be installed when the workspace permits it.
 
-Before the first worker launch in each control-plane process, Yeetomatic builds the `worker` Dockerfile target and tags it with the current WebSocket transport label. Docker reuses unchanged build layers, and subsequent launches in the same process reuse that completed image-build promise.
+Before the first worker launch in each control-plane process, Yolomatic builds the `worker` Dockerfile target and tags it with the current WebSocket transport label. Docker reuses unchanged build layers, and subsequent launches in the same process reuse that completed image-build promise.
 
 ## Docker Run Shape
 
@@ -39,16 +39,16 @@ Illustrative command:
 
 ```bash
 docker run --rm \
-  --name yeetomatic-session-mbrooks-yeetomatic-395 \
-  --network container:yeetomatic \
-  --mount type=volume,src=yeetomatic_workspaces,dst=/app/workspaces \
-  -e YEETOMATIC_SESSION_KEY=mbrooks/yeetomatic#395 \
-  -e YEETOMATIC_SESSION_WS_URL=ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token> \
-  -e YEETOMATIC_SOUL_PATH=/app/SOUL.md \
+  --name yolomatic-session-mbrooks-yolomatic-395 \
+  --network container:yolomatic \
+  --mount type=volume,src=yolomatic_workspaces,dst=/app/workspaces \
+  -e YOLO_SESSION_KEY=mbrooks/yolomatic#395 \
+  -e YOLO_SESSION_WS_URL=ws://127.0.0.1:6767/yolomatic-worker/ws?sessionKey=mbrooks%2Fyolomatic%23395&token=<opaque-token> \
+  -e YOLO_SOUL_PATH=/app/SOUL.md \
   -e PI_AGENT_PROVIDER=ollama \
   -e PI_AGENT_MODEL=glm-5.2:cloud \
   -e OLLAMA_HOST=http://127.0.0.1:11434 \
-  yeetomatic-worker:latest
+  yolomatic-worker:latest
 ```
 
 Notes:
@@ -68,7 +68,7 @@ Notes:
 
 - an absolute source becomes a bind mount
 - a non-absolute source becomes a Docker volume mount
-- when Yeetomatic itself runs in a container and `HOSTNAME` is available, it
+- when Yolomatic itself runs in a container and `HOSTNAME` is available, it
   inspects that container and reuses the actual volume name or bind source
   mounted at `WORKSPACES_DIR`
 - if self-inspection is unavailable, it falls back to the configured source
@@ -77,7 +77,7 @@ The resolved source is cached for the life of the executor. Only the workspace
 mount is passed to workers.
 
 Compose still provisions `/app/runtime` on the control plane and defines the
-legacy `YEETOMATIC_WORKER_RUNTIME_*` environment variables. The current config
+legacy `YOLO_WORKER_RUNTIME_*` environment variables. The current config
 and Docker worker executor do not read those variables or pass that volume to
 workers; worker RPC uses WebSocket instead.
 
@@ -87,7 +87,7 @@ The session URL exists only for the lifetime of one active worker run.
 
 Example:
 
-- `ws://127.0.0.1:6767/yeetomatic-worker/ws?sessionKey=mbrooks%2Fyeetomatic%23395&token=<opaque-token>`
+- `ws://127.0.0.1:6767/yolomatic-worker/ws?sessionKey=mbrooks%2Fyolomatic%23395&token=<opaque-token>`
 
 For non-compose deployments, the base URL may instead point at `host.docker.internal` or another worker-reachable control-plane address. The key requirement is that the value matches the worker container's network perspective.
 
@@ -99,17 +99,17 @@ accepted and the reservation is disposed when the launch attempt ends.
 ## Network and Ollama Resolution
 
 When `worker_docker_network_mode` starts with `container:`, the worker joins
-that container's network namespace. Compose uses `container:yeetomatic`, so the
+that container's network namespace. Compose uses `container:yolomatic`, so the
 control plane and Ollama are available to the worker on loopback.
 
-For other network modes, Yeetomatic adds the Docker host-gateway alias for
+For other network modes, Yolomatic adds the Docker host-gateway alias for
 `host.docker.internal`. An explicit `worker_ollama_host` is forwarded unchanged.
 Otherwise, a control-plane `OLLAMA_HOST` using `127.0.0.1` or `localhost` is
 rewritten to `host.docker.internal` unless container-network sharing is active.
 
 ## Launch Validation
 
-Before launching a container, Yeetomatic:
+Before launching a container, Yolomatic:
 
 1. builds the worker image once for the current control-plane process
 2. resolves the primary worktree path under `WORKSPACES_DIR`
@@ -117,7 +117,7 @@ Before launching a container, Yeetomatic:
 4. rejects an `origin` URL containing embedded credentials
 5. creates a session URL from the configured control base URL
 
-If any step fails, Yeetomatic does not start that launch attempt and existing
+If any step fails, Yolomatic does not start that launch attempt and existing
 session reporting handles the error. A rejected image-build promise remains
 shared for that executor, so another image build is not attempted until the
 control-plane process restarts.
@@ -126,11 +126,11 @@ control-plane process restarts.
 
 The launch handshake is:
 
-1. Yeetomatic allocates a dedicated per-session token and WebSocket reservation.
-2. Yeetomatic launches the worker container with session URL and session key env vars.
+1. Yolomatic allocates a dedicated per-session token and WebSocket reservation.
+2. Yolomatic launches the worker container with session URL and session key env vars.
 3. The worker connects and sends `hello`.
-4. Yeetomatic validates that the session key matches the reserved session.
-5. Yeetomatic replies with `launch_config` and waits for its acknowledgement.
+4. Yolomatic validates that the session key matches the reserved session.
+5. Yolomatic replies with `launch_config` and waits for its acknowledgement.
 6. The worker acknowledges and begins execution.
 
 ## Launch Payload
@@ -165,7 +165,7 @@ nor worker enforces that value as a runtime deadline.
 
 The worker name is deterministic:
 
-- `yeetomatic-session-{owner}-{repo}-{issueNumber}`
+- `yolomatic-session-{owner}-{repo}-{issueNumber}`
 
 Characters outside Docker's accepted name set are replaced with `-`. A Docker
 name conflict triggers guarded recovery:
@@ -174,7 +174,7 @@ name conflict triggers guarded recovery:
 2. remove it only when the state is `created`, `dead`, or `exited`
 3. retry launch with a new WebSocket reservation
 
-Yeetomatic allows three recovered retries after the first attempt. It does not
+Yolomatic allows three recovered retries after the first attempt. It does not
 remove a running container, a container whose state cannot be inspected, or a
 stopped container that Docker cannot remove.
 
@@ -184,7 +184,7 @@ same-session container is treated as a running name conflict and preserved.
 
 ## Cancellation
 
-Yeetomatic may cancel a session in two ways:
+Yolomatic may cancel a session in two ways:
 
 1. graceful:
    - send `control` with `action: "stop"`

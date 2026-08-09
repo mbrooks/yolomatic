@@ -1,13 +1,13 @@
 import type { SessionState } from "../session/store.js";
 
-const YEETOMATIC_BRANCH_RE = /^yeetomatic\/issue-(\d+)$/u;
+const YOLO_BRANCH_RE = /^yolomatic\/issue-(\d+)$/u;
 
 export function expectedBranchForIssue(issueNumber: number): string {
-	return `yeetomatic/issue-${issueNumber}`;
+	return `yolomatic/issue-${issueNumber}`;
 }
 
 export function extractIssueNumberFromBranch(branch: string): number | null {
-	const match = YEETOMATIC_BRANCH_RE.exec(branch);
+	const match = YOLO_BRANCH_RE.exec(branch);
 	return match ? Number.parseInt(match[1], 10) : null;
 }
 
@@ -21,7 +21,7 @@ export function validatePRSessionMapping(
 		if (session.prNumber === prNumber) {
 			return null;
 		}
-		return `PR #${prNumber} head branch '${headRef}' is not a Yeetomatic issue branch and is not associated with this session.`;
+		return `PR #${prNumber} head branch '${headRef}' is not a Yolomatic issue branch and is not associated with this session.`;
 	}
 
 	if (headIssueNumber !== session.issueNumber) {

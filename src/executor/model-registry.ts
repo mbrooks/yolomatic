@@ -21,10 +21,10 @@ function resolveOllamaBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /**
- * Creates a Yeetomatic model registry with custom providers defined in code.
+ * Creates a Yolomatic model registry with custom providers defined in code.
  * This replaces the previous models.json-based configuration.
  */
-export function createYeetomaticModelRegistry(authStorage: AuthStorage): ModelRegistry {
+export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelRegistry {
 	const registry = ModelRegistry.inMemory(authStorage);
 
 	registry.registerProvider("ollama", {

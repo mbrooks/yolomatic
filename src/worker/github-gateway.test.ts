@@ -13,13 +13,13 @@ import type { SessionState } from "../session/store.js";
 function makeState(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		issueNumber: 502,
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		owner: "mbrooks",
 		title: "Expose GitHub management tool to workers",
 		body: "Body",
 		status: "working",
 		sessionPath: "/tmp/session.jsonl",
-		workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-502",
+		workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-502",
 		lastActivity: new Date().toISOString(),
 		seeded: false,
 		...overrides,
@@ -53,7 +53,7 @@ function makeFakeGateway(overrides: Partial<GitHubGatewayService> = {}): GitHubG
 		closeIssue: vi.fn(async () => undefined),
 		updateIssueBody: vi.fn(async () => undefined),
 		updateIssueTitle: vi.fn(async () => undefined),
-		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "yolomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
 		getCollaboratorPermissionLevel: vi.fn(async () => null),
@@ -90,11 +90,11 @@ function makeFakeGateway(overrides: Partial<GitHubGatewayService> = {}): GitHubG
 		getPullRequestDetail: vi.fn(async (owner, repo, prNumber): Promise<GatewayPullRequestDetail | null> => {
 			return {
 				number: prNumber,
-				title: "Yeetomatic: Expose GitHub management tool to workers",
+				title: "Yolomatic: Expose GitHub management tool to workers",
 				body: "pr body",
 				state: "open",
 				merged: false,
-				head_ref: "yeetomatic/issue-502",
+				head_ref: "yolomatic/issue-502",
 				base_ref: "main",
 				html_url: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
 				created_at: "2026-08-01T00:00:00Z",
@@ -134,7 +134,7 @@ describe("WorkerGitHubGateway", () => {
 		const fake = makeFakeGateway();
 		const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 		const res = await gateway.handle(state, { tool: "get_authenticated_user", params: {} });
-		expect(res).toEqual({ ok: true, data: { login: "yeetomatic-bot" } });
+		expect(res).toEqual({ ok: true, data: { login: "yolomatic-bot" } });
 	});
 
 	it("fetches the session issue with comments by default", async () => {
@@ -144,8 +144,8 @@ describe("WorkerGitHubGateway", () => {
 		expect(res.ok).toBe(true);
 		expect((res.data as { issue: { number: number } }).issue.number).toBe(502);
 		expect((res.data as { comments: unknown[] }).comments).toHaveLength(1);
-		expect(fake.getIssueDetail).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502);
-		expect(fake.listIssueComments).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502);
+		expect(fake.getIssueDetail).toHaveBeenCalledWith("mbrooks", "yolomatic", 502);
+		expect(fake.listIssueComments).toHaveBeenCalledWith("mbrooks", "yolomatic", 502);
 	});
 
 	it("skips issue comments when include_comments is false", async () => {
@@ -160,7 +160,7 @@ describe("WorkerGitHubGateway", () => {
 		const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 		const res = await gateway.handle(state, { tool: "set_comment", params: { body: "hi" } });
 		expect(res).toEqual({ ok: true, data: { comment_id: 100 } });
-		expect(fake.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, "hi");
+		expect(fake.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, "hi");
 	});
 
 	it("rejects a comment with no body without calling postComment", async () => {
@@ -179,7 +179,7 @@ describe("WorkerGitHubGateway", () => {
 			params: { state: "closed", assignee: "mbrooks" },
 		});
 		expect(res.ok).toBe(true);
-		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, {
+		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, {
 			state: "closed",
 			assignees: ["mbrooks"],
 		});
@@ -189,7 +189,7 @@ describe("WorkerGitHubGateway", () => {
 		const fake = makeFakeGateway();
 		const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 		await gateway.handle(state, { tool: "set_status", params: { assignee: null } });
-		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, { assignees: [] });
+		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, { assignees: [] });
 	});
 
 	it("replaces all labels when labels is provided", async () => {
@@ -197,7 +197,7 @@ describe("WorkerGitHubGateway", () => {
 		const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 		const res = await gateway.handle(state, { tool: "set_labels", params: { labels: ["a", "b"] } });
 		expect(res.ok).toBe(true);
-		expect(fake.setLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, ["a", "b"]);
+		expect(fake.setLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, ["a", "b"]);
 		expect((res.data as { labels: string[] }).labels).toEqual(["a", "b"]);
 	});
 
@@ -209,7 +209,7 @@ describe("WorkerGitHubGateway", () => {
 			params: { addLabels: ["new"], removeLabels: ["needs-clarification"] },
 		});
 		expect(res.ok).toBe(true);
-		expect(fake.setLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, ["new"]);
+		expect(fake.setLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, ["new"]);
 	});
 
 	it("rejects set_labels with no label arguments", async () => {
@@ -228,7 +228,7 @@ describe("WorkerGitHubGateway", () => {
 			params: { title: "New title", body: "New body" },
 		});
 		expect(res.ok).toBe(true);
-		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502, {
+		expect(fake.updateIssue).toHaveBeenCalledWith("mbrooks", "yolomatic", 502, {
 			title: "New title",
 			body: "New body",
 		});
@@ -248,7 +248,7 @@ describe("WorkerGitHubGateway", () => {
 			const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 			const res = await gateway.handle(linkedState, { tool: "fetch_pr", params: {} });
 			expect(res.ok).toBe(true);
-			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yeetomatic", 77);
+			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yolomatic", 77);
 			expect(fake.listPullRequestsForHead).not.toHaveBeenCalled();
 		});
 
@@ -258,7 +258,7 @@ describe("WorkerGitHubGateway", () => {
 			const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 			const res = await gateway.handle(linkedState, { tool: "fetch_pr", params: { pr_number: 77 } });
 			expect(res.ok).toBe(true);
-			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yeetomatic", 77);
+			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yolomatic", 77);
 			expect(fake.listPullRequestsForHead).not.toHaveBeenCalled();
 		});
 
@@ -267,9 +267,9 @@ describe("WorkerGitHubGateway", () => {
 				listPullRequestsForHead: vi.fn(async () => [
 					{
 						number: 88,
-						title: "Yeetomatic: ...",
-						html_url: "https://github.com/mbrooks/yeetomatic/pull/88",
-						head_ref: "yeetomatic/issue-502",
+						title: "Yolomatic: ...",
+						html_url: "https://github.com/mbrooks/yolomatic/pull/88",
+						head_ref: "yolomatic/issue-502",
 						base_ref: "main",
 						state: "open",
 						merged: false,
@@ -279,8 +279,8 @@ describe("WorkerGitHubGateway", () => {
 			const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 			const res = await gateway.handle(state, { tool: "set_pr_comment", params: { body: "x", pr_number: 88 } });
 			expect(res.ok).toBe(true);
-			expect(fake.postPRComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 88, "x");
-			expect(fake.listPullRequestsForHead).toHaveBeenCalledWith("mbrooks", "yeetomatic", "yeetomatic/issue-502", "open");
+			expect(fake.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 88, "x");
+			expect(fake.listPullRequestsForHead).toHaveBeenCalledWith("mbrooks", "yolomatic", "yolomatic/issue-502", "open");
 		});
 
 		it("rejects an out-of-scope pr_number as a scope error without the target op", async () => {
@@ -299,9 +299,9 @@ describe("WorkerGitHubGateway", () => {
 				listPullRequestsForHead: vi.fn(async () => [
 					{
 						number: 42,
-						title: "Yeetomatic: ...",
+						title: "Yolomatic: ...",
 						html_url: "u",
-						head_ref: "yeetomatic/issue-502",
+						head_ref: "yolomatic/issue-502",
 						base_ref: "main",
 						state: "open",
 						merged: false,
@@ -311,7 +311,7 @@ describe("WorkerGitHubGateway", () => {
 			const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 			const res = await gateway.handle(state, { tool: "fetch_pr", params: {} });
 			expect(res.ok).toBe(true);
-			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+			expect(fake.getPullRequestDetail).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 		});
 
 		it("errors when no associated PR exists and none is requested", async () => {
@@ -331,7 +331,7 @@ describe("WorkerGitHubGateway", () => {
 				params: { title: "T", body: "B", state: "open", labels: ["x"] },
 			});
 			expect(res.ok).toBe(true);
-			expect(fake.updatePullRequest).toHaveBeenCalledWith("mbrooks", "yeetomatic", 77, {
+			expect(fake.updatePullRequest).toHaveBeenCalledWith("mbrooks", "yolomatic", 77, {
 				title: "T",
 				body: "B",
 				state: "open",
@@ -349,7 +349,7 @@ describe("WorkerGitHubGateway", () => {
 			const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 			const res = await gateway.handle(linkedState, { tool: "list_pr_review_comments", params: {} });
 			expect(res.ok).toBe(true);
-			expect(fake.listPullRequestReviewComments).toHaveBeenCalledWith("mbrooks", "yeetomatic", 77);
+			expect(fake.listPullRequestReviewComments).toHaveBeenCalledWith("mbrooks", "yolomatic", 77);
 		});
 	});
 
@@ -375,7 +375,7 @@ describe("WorkerGitHubGateway", () => {
 		const fake = makeFakeGateway();
 const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 		await gateway.handle(state, { tool: "fetch_issue", params: {} });
-		expect(fake.getIssueDetail).toHaveBeenCalledWith("mbrooks", "yeetomatic", 502);
+		expect(fake.getIssueDetail).toHaveBeenCalledWith("mbrooks", "yolomatic", 502);
 	});
 
 	describe("update_main_from_origin", () => {
@@ -394,7 +394,7 @@ const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 				ok: true,
 				data: { branch: "main", before: "a".repeat(40), after: "b".repeat(40), updated: true },
 			});
-			expect(workspace.updateDefaultBranchFromOrigin).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+			expect(workspace.updateDefaultBranchFromOrigin).toHaveBeenCalledWith("mbrooks", "yolomatic");
 		});
 
 		it("reports an already-up-to-date ref as updated=false", async () => {
@@ -435,7 +435,7 @@ const gateway = new WorkerGitHubGateway(fake, makeFakeWorkspace());
 				tool: "update_main_from_origin",
 				params: { owner: "other", repo: "other-repo", branch: "develop" },
 			});
-			expect(workspace.updateDefaultBranchFromOrigin).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+			expect(workspace.updateDefaultBranchFromOrigin).toHaveBeenCalledWith("mbrooks", "yolomatic");
 		});
 	});
 });

@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { SettingsStore } from "./settings/store.js";
 
-export const DEFAULT_ADMIN_PATH = "/yeetomatic/admin";
+export const DEFAULT_ADMIN_PATH = "/yolomatic/admin";
 export const DEFAULT_ADMIN_DEFAULT_PAGE = "#/dashboard";
 
 /**
@@ -108,7 +108,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 		logResponses: store.getBoolean("log_responses", true),
 		githubEventMode,
 		githubPollIntervalMs: Math.max(1000, store.getNumber("github_poll_interval_ms", 60000)),
-		workerImage: store.get("worker_image") ?? "yeetomatic-worker:latest",
+		workerImage: store.get("worker_image") ?? "yolomatic-worker:latest",
 		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
 		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,

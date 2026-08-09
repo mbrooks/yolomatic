@@ -173,7 +173,7 @@ export class SelfMonitor {
 			case "disk_full":
 				return "Free up disk space on the host. Check `df -h` and clean up old worktrees, logs, or temporary files.";
 			case "github_pat_scope_missing":
-			return "The GitHub Personal Access Token needs the `workflow` scope to create or update GitHub Actions files. Update the token settings in GitHub and restart Yeetomatic.";
+			return "The GitHub Personal Access Token needs the `workflow` scope to create or update GitHub Actions files. Update the token settings in GitHub and restart Yolomatic.";
 		case "git_worktree_failure":
 				return "Run `git worktree list` and `git worktree prune` to clean up stale entries. Check for untracked files that block checkout.";
 			case "missing_toolchain_binary":
@@ -185,10 +185,10 @@ export class SelfMonitor {
 
 	static getIssueTitle(evidence: Evidence): string {
 		const short = evidence.fatalError.message.slice(0, 80);
-		return `Yeetomatic self-report: ${short}`;
+		return `Yolomatic self-report: ${short}`;
 	}
 
 	static getTargetRepo(): { owner: string; repo: string } {
-		return { owner: "mbrooks", repo: "yeetomatic" };
+		return { owner: "mbrooks", repo: "yolomatic" };
 	}
 }

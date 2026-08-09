@@ -30,14 +30,14 @@ function makeSession(status: "working" | "pending" | "waiting-feedback" | "compl
 	return {
 		kind: "implementation" as const,
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		issueNumber: 1,
 		status,
 		title: null,
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "yeetomatic/issue-1",
+		branch: "yolomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,
@@ -96,7 +96,7 @@ describe("useSessionLog websocket", () => {
 			await Promise.resolve();
 		});
 
-		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "implementation", expect.any(Function));
+		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "implementation", expect.any(Function));
 	});
 
 	it("appends log entries received via websocket", async () => {

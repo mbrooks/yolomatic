@@ -57,7 +57,7 @@ import type { AccessibleRepo } from "../ports/github-service.js";
 
 function makeGithub(overrides = {}) {
 	return {
-		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }] as AccessibleRepo[]),
+		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }] as AccessibleRepo[]),
 		listIssuesUpdatedSince: vi.fn(async () => []),
 		listIssueEventsSince: vi.fn(async () => []),
 		listIssueCommentsSince: vi.fn(async () => []),
@@ -79,9 +79,9 @@ describe("tickGitHubPolling", () => {
 	it("checks subject due status from last checked time", () => {
 		const now = new Date("2026-06-04T12:00:00.000Z");
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-03T11:00:00.000Z",
@@ -99,7 +99,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-01T12:00:00.000Z"),
 			dispatch: vi.fn(),
@@ -121,8 +121,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:30.000Z",
 					updated_at: "2026-06-01T12:00:30.000Z",
 					labels: [],
-					assignee: { login: "yeetomatic-bot" },
-					assignees: [{ login: "yeetomatic-bot" }],
+					assignee: { login: "yolomatic-bot" },
+					assignees: [{ login: "yolomatic-bot" }],
 					user: { login: "human" },
 				},
 			]),
@@ -132,12 +132,12 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			dispatch,
 		});
 
-		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yeetomatic", "2026-06-01T11:58:00.000Z");
+		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yolomatic", "2026-06-01T11:58:00.000Z");
 		expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
 			type: "issue",
 			payload: expect.objectContaining({ action: "opened" }),
@@ -155,7 +155,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			listManagedRepos,
 			dispatch,
@@ -174,9 +174,9 @@ describe("tickGitHubPolling", () => {
 			state: "open",
 			created_at: "2026-06-01T12:00:30.000Z",
 			updated_at: "2026-06-01T12:00:30.000Z",
-			labels: [{ name: "yeetomatic" }],
-			assignee: { login: "yeetomatic-bot" },
-			assignees: [{ login: "yeetomatic-bot" }],
+			labels: [{ name: "yolomatic" }],
+			assignee: { login: "yolomatic-bot" },
+			assignees: [{ login: "yolomatic-bot" }],
 			user: { login: "human" },
 		};
 		const pr = {
@@ -187,26 +187,26 @@ describe("tickGitHubPolling", () => {
 			merged: false,
 			created_at: "2026-06-01T12:00:30.000Z",
 			updated_at: "2026-06-01T12:00:30.000Z",
-			head: { ref: "yeetomatic/issue-1" },
+			head: { ref: "yolomatic/issue-1" },
 			user: { login: "human" },
 		};
 
-		expect(normalizePolledIssue("mbrooks", "yeetomatic", issue, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "issue" }));
-		expect(normalizePolledIssue("mbrooks", "yeetomatic", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("edited");
-		expect(normalizePolledIssueTimelineEvent("mbrooks", "yeetomatic", {
+		expect(normalizePolledIssue("mbrooks", "yolomatic", issue, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "issue" }));
+		expect(normalizePolledIssue("mbrooks", "yolomatic", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("edited");
+		expect(normalizePolledIssueTimelineEvent("mbrooks", "yolomatic", {
 			id: 3,
 			event: "assigned",
 			created_at: "2026-06-01T12:00:00.000Z",
 			actor: { login: "human" },
 			issue,
 		})).toEqual(expect.objectContaining({ type: "issue" }));
-		expect(normalizePolledIssueTimelineEvent("mbrooks", "yeetomatic", {
+		expect(normalizePolledIssueTimelineEvent("mbrooks", "yolomatic", {
 			id: 4,
 			event: "labeled",
 			created_at: "2026-06-01T12:00:00.000Z",
 			issue,
 		})).toBeNull();
-		expect(normalizePolledIssueComment("mbrooks", "yeetomatic", {
+		expect(normalizePolledIssueComment("mbrooks", "yolomatic", {
 			id: 5,
 			body: "Comment",
 			created_at: "2026-06-01T12:00:00.000Z",
@@ -214,9 +214,9 @@ describe("tickGitHubPolling", () => {
 			user: { login: "human", type: "User" },
 			issue: { ...issue, pull_request: { url: "https://api.github.com/pr" } },
 		})).toEqual(expect.objectContaining({ type: "issue_comment" }));
-		expect(normalizePolledPullRequest("mbrooks", "yeetomatic", pr, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "pull_request" }));
-		expect(normalizePolledPullRequest("mbrooks", "yeetomatic", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("synchronize");
-		expect(normalizePolledPRReview("mbrooks", "yeetomatic", {
+		expect(normalizePolledPullRequest("mbrooks", "yolomatic", pr, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "pull_request" }));
+		expect(normalizePolledPullRequest("mbrooks", "yolomatic", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("synchronize");
+		expect(normalizePolledPRReview("mbrooks", "yolomatic", {
 			id: 6,
 			body: "Review",
 			state: "commented",
@@ -224,7 +224,7 @@ describe("tickGitHubPolling", () => {
 			user: { login: "reviewer" },
 			pull_request: pr,
 		})).toEqual(expect.objectContaining({ type: "pull_request_review" }));
-		expect(normalizePolledPRReviewComment("mbrooks", "yeetomatic", {
+		expect(normalizePolledPRReviewComment("mbrooks", "yolomatic", {
 			id: 7,
 			body: "Fix",
 			created_at: "2026-06-01T12:00:00.000Z",
@@ -241,7 +241,7 @@ describe("tickGitHubPolling", () => {
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
 				{ owner: "mbrooks", repo: "bad", fullName: "mbrooks/bad", visibility: "private" },
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async (_owner: string, repo: string) => {
 				if (repo === "bad") throw new Error("boom");
@@ -280,7 +280,7 @@ describe("tickGitHubPolling", () => {
 		});
 		const dispatch = vi.fn(async (_event: unknown) => {});
 
-		await tickGitHubPolling({ github, eventStore: store, githubUsername: "yeetomatic-bot", intervalMs: 60000, dispatch });
+		await tickGitHubPolling({ github, eventStore: store, githubUsername: "yolomatic-bot", intervalMs: 60000, dispatch });
 
 		const dispatchedTypes = dispatch.mock.calls.map((call) => (call[0] as { type: string }).type);
 		expect(dispatchedTypes).toEqual(["issue_comment", "issue"]);
@@ -328,7 +328,7 @@ describe("tickGitHubPolling", () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
 
 		try {
-			await tickGitHubPolling({ github, eventStore: store, githubUsername: "yeetomatic-bot", intervalMs: 60000, dispatch });
+			await tickGitHubPolling({ github, eventStore: store, githubUsername: "yolomatic-bot", intervalMs: 60000, dispatch });
 
 			expect(dispatch).toHaveBeenCalledTimes(2);
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] dispatch failed id="));
@@ -339,9 +339,9 @@ describe("tickGitHubPolling", () => {
 
 	it("checks due issue subjects and marks them checked", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -359,8 +359,8 @@ describe("tickGitHubPolling", () => {
 				created_at: "2026-06-01T12:00:00.000Z",
 				updated_at: "2026-06-04T12:00:00.000Z",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 				user: { login: "human" },
 			}]),
 			listIssueEventsSince: vi.fn(async () => [{
@@ -376,8 +376,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:00.000Z",
 					updated_at: "2026-06-04T12:00:00.000Z",
 					labels: [],
-					assignee: { login: "yeetomatic-bot" },
-					assignees: [{ login: "yeetomatic-bot" }],
+					assignee: { login: "yolomatic-bot" },
+					assignees: [{ login: "yolomatic-bot" }],
 					user: { login: "human" },
 				},
 			}]),
@@ -395,8 +395,8 @@ describe("tickGitHubPolling", () => {
 					created_at: "2026-06-01T12:00:00.000Z",
 					updated_at: "2026-06-04T12:00:00.000Z",
 					labels: [],
-					assignee: { login: "yeetomatic-bot" },
-					assignees: [{ login: "yeetomatic-bot" }],
+					assignee: { login: "yolomatic-bot" },
+					assignees: [{ login: "yolomatic-bot" }],
 					user: { login: "human" },
 				},
 			}]),
@@ -406,22 +406,22 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch,
 		});
 
-		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yeetomatic", "2026-06-01T11:58:00.000Z");
+		expect(github.listIssuesUpdatedSince).toHaveBeenCalledWith("mbrooks", "yolomatic", "2026-06-01T11:58:00.000Z");
 		expect(dispatch).toHaveBeenCalledTimes(3);
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:issue:1", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yolomatic:issue:1", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("checks due PR subjects and ignores subjects that are not due", async () => {
 		const due: GitHubPollSubject = {
-			subjectKey: "mbrooks/yeetomatic:pull_request:4",
+			subjectKey: "mbrooks/yolomatic:pull_request:4",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "pull_request",
 			number: 4,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -430,7 +430,7 @@ describe("tickGitHubPolling", () => {
 		};
 		const notDue: GitHubPollSubject = {
 			...due,
-			subjectKey: "mbrooks/yeetomatic:issue:9",
+			subjectKey: "mbrooks/yolomatic:issue:9",
 			subjectType: "issue",
 			number: 9,
 			lastActivityAt: "2026-06-04T11:59:00.000Z",
@@ -445,7 +445,7 @@ describe("tickGitHubPolling", () => {
 			merged: false,
 			created_at: "2026-06-01T12:00:00.000Z",
 			updated_at: "2026-06-04T12:00:00.000Z",
-			head: { ref: "yeetomatic/issue-1" },
+			head: { ref: "yolomatic/issue-1" },
 			user: { login: "human" },
 		};
 		const github = makeGithub({
@@ -473,7 +473,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch,
@@ -482,14 +482,14 @@ describe("tickGitHubPolling", () => {
 		expect(github.listPullRequestsUpdatedSince).toHaveBeenCalledTimes(1);
 		expect(github.listIssuesUpdatedSince).not.toHaveBeenCalled();
 		expect(dispatch).toHaveBeenCalledTimes(3);
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:pull_request:4", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yolomatic:pull_request:4", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("marks due subjects checked even when a subject check fails", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -504,19 +504,19 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => new Date("2026-06-04T12:00:00.000Z"),
 			dispatch: vi.fn(),
 		});
-		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yeetomatic:issue:1", "2026-06-04T12:00:00.000Z");
+		expect(store.markPollingSubjectChecked).toHaveBeenCalledWith("mbrooks/yolomatic:issue:1", "2026-06-04T12:00:00.000Z");
 	});
 
 	it("starts and stops the polling interval", () => {
 		startGitHubPolling({
 			github: makeGithub(),
 			eventStore: makeStore(null),
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			dispatch: vi.fn(),
 		});
@@ -537,7 +537,7 @@ describe("tickGitHubPolling", () => {
 			startGitHubPolling({
 				github: makeGithub(),
 				eventStore: store,
-				githubUsername: "yeetomatic-bot",
+				githubUsername: "yolomatic-bot",
 				intervalMs: 1000,
 				dispatch: vi.fn(),
 			});
@@ -556,7 +556,7 @@ describe("tickGitHubPolling", () => {
 		const store = makeStore("2026-06-01T12:00:00.000Z");
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 			]),
 		});
 		const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
@@ -566,14 +566,14 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "yeetomatic-bot",
+				githubUsername: "yolomatic-bot",
 				intervalMs: 60000,
 				now: () => now,
 				dispatch: vi.fn(),
 			});
 
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick started at 2026-06-01T12:00:00.000Z\n"));
-			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking mbrooks/yeetomatic (lastEventReceivedAt=2026-06-01T12:00:00.000Z, since=2026-06-01T11:58:00.000Z)\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking mbrooks/yolomatic (lastEventReceivedAt=2026-06-01T12:00:00.000Z, since=2026-06-01T11:58:00.000Z)\n"));
 			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] tick completed: 0 events dispatched\n"));
 		} finally {
 			writeSpy.mockRestore();
@@ -589,7 +589,7 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "yeetomatic-bot",
+				githubUsername: "yolomatic-bot",
 				intervalMs: 60000,
 				now: () => new Date("2026-06-01T12:00:00.000Z"),
 				dispatch: vi.fn(),
@@ -605,9 +605,9 @@ describe("tickGitHubPolling", () => {
 
 	it("logs effective interval when checking due polling subjects", async () => {
 		const subject: GitHubPollSubject = {
-			subjectKey: "mbrooks/yeetomatic:issue:1",
+			subjectKey: "mbrooks/yolomatic:issue:1",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			subjectType: "issue",
 			number: 1,
 			lastActivityAt: "2026-06-01T12:00:00.000Z",
@@ -627,13 +627,13 @@ describe("tickGitHubPolling", () => {
 			await tickGitHubPolling({
 				github,
 				eventStore: store,
-				githubUsername: "yeetomatic-bot",
+				githubUsername: "yolomatic-bot",
 				intervalMs: 60000,
 				now: () => new Date("2026-06-04T12:00:00.000Z"),
 				dispatch: vi.fn(),
 			});
 
-			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking subject mbrooks/yeetomatic:issue:1 (effective interval=3600000ms)\n"));
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] checking subject mbrooks/yolomatic:issue:1 (effective interval=3600000ms)\n"));
 		} finally {
 			writeSpy.mockRestore();
 		}
@@ -643,7 +643,7 @@ describe("tickGitHubPolling", () => {
 		const store = makeStore("2026-06-01T12:00:00.000Z");
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async () => []),
 		});
@@ -652,14 +652,14 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => now,
 			dispatch: vi.fn(),
 		});
 
-		expect(store.setRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yeetomatic", now.toISOString());
-		expect(store.getRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+		expect(store.setRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yolomatic", now.toISOString());
+		expect(store.getRepoPollBaseline).toHaveBeenCalledWith("mbrooks", "yolomatic");
 	});
 
 	it("does not reinitialize the per-repo baseline once it exists", async () => {
@@ -667,7 +667,7 @@ describe("tickGitHubPolling", () => {
 		store.getRepoPollBaseline = vi.fn(() => "2026-06-01T12:00:00.000Z");
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async () => []),
 		});
@@ -675,7 +675,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			dispatch: vi.fn(),
 		});
@@ -699,7 +699,7 @@ describe("tickGitHubPolling", () => {
 		};
 		const github = makeGithub({
 			listAccessibleRepositories: vi.fn(async () => [
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 			]),
 			listIssuesUpdatedSince: vi.fn(async () => [preExisting]),
 		});
@@ -709,7 +709,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => firstTickNow,
 			dispatch: firstDispatch,
@@ -725,7 +725,7 @@ describe("tickGitHubPolling", () => {
 			type: "issue",
 			payload: expect.objectContaining({ action: "opened" }),
 		}));
-		expect(store.getRepoPollBaseline?.("mbrooks", "yeetomatic")).toBe(firstTickNow.toISOString());
+		expect(store.getRepoPollBaseline?.("mbrooks", "yolomatic")).toBe(firstTickNow.toISOString());
 
 		// Second tick sees a newly opened issue. Because the repo baseline is
 		// now set, the issue is eligible for the static instruction comment.
@@ -743,7 +743,7 @@ describe("tickGitHubPolling", () => {
 		await tickGitHubPolling({
 			github,
 			eventStore: store,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			intervalMs: 60000,
 			now: () => secondTickNow,
 			dispatch: secondDispatch,
@@ -768,7 +768,7 @@ describe("tickGitHubPolling", () => {
 			assignees: [],
 			user: { login: "human" },
 		};
-		const event = normalizePolledIssue("mbrooks", "yeetomatic", issue, "2026-06-01T12:00:00.000Z");
+		const event = normalizePolledIssue("mbrooks", "yolomatic", issue, "2026-06-01T12:00:00.000Z");
 		expect((event.payload as { issue: { created_at: string } }).issue.created_at).toBe("2026-06-01T12:00:30.000Z");
 	});
 
@@ -778,7 +778,7 @@ describe("tickGitHubPolling", () => {
 			const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
 			const github = makeGithub({
 				listAccessibleRepositories: vi.fn(async () => [
-					{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+					{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 					{ owner: "mbrooks", repo: "webhook-only", fullName: "mbrooks/webhook-only", visibility: "private" },
 				] as AccessibleRepo[]),
 			});
@@ -787,7 +787,7 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github,
 					eventStore: makeStore("2026-06-01T12:00:00.000Z"),
-					githubUsername: "yeetomatic-bot",
+					githubUsername: "yolomatic-bot",
 					intervalMs: 60000,
 					resolveGitHubEventMode: (owner, repo) => (repo === "webhook-only" ? "webhook" : "both"),
 					dispatch: vi.fn(),
@@ -795,7 +795,7 @@ describe("tickGitHubPolling", () => {
 				await vi.advanceTimersByTimeAsync(0);
 
 				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] Starting GitHub polling (base interval=60000ms)\n"));
-				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yeetomatic (mode=both, base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yolomatic (mode=both, base interval=60000ms)\n"));
 				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] skipping mbrooks/webhook-only (mode=webhook)\n"));
 			} finally {
 				stopGitHubPolling();
@@ -812,13 +812,13 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github: makeGithub(),
 					eventStore: makeStore(null),
-					githubUsername: "yeetomatic-bot",
+					githubUsername: "yolomatic-bot",
 					intervalMs: 60000,
 					dispatch: vi.fn(),
 				});
 				await vi.advanceTimersByTimeAsync(0);
 
-				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yeetomatic (mode=polling, base interval=60000ms)\n"));
+				expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[github-poll] polling mbrooks/yolomatic (mode=polling, base interval=60000ms)\n"));
 			} finally {
 				stopGitHubPolling();
 				writeSpy.mockRestore();
@@ -837,7 +837,7 @@ describe("tickGitHubPolling", () => {
 				startGitHubPolling({
 					github,
 					eventStore: makeStore(null),
-					githubUsername: "yeetomatic-bot",
+					githubUsername: "yolomatic-bot",
 					intervalMs: 60000,
 					resolveGitHubEventMode: () => "polling",
 					dispatch: vi.fn(),

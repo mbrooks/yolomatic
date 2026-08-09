@@ -16,7 +16,7 @@ function createMockOctokit(overrides?: Partial<{
 			addLabels: vi.fn(async () => ({ data: {} })),
 			removeLabel: vi.fn(async () => ({ data: {} })),
 			get: vi.fn(async () => ({ data: { state: "open" } })),
-			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/yeetomatic/issues/1" } })),
+			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/yolomatic/issues/1" } })),
 			listLabelsForRepo: vi.fn(async () => ({ data: [] })),
 			listForRepo: vi.fn(async () => ({ data: [] })),
 			update: vi.fn(async () => ({ data: {} })),
@@ -25,7 +25,7 @@ function createMockOctokit(overrides?: Partial<{
 		},
 		pulls: {
 			get: vi.fn(async () => ({ data: { head: { ref: "main" }, state: "open", merged: false } })),
-			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/yeetomatic/pulls/1" } })),
+			create: vi.fn(async () => ({ data: { number: 1, html_url: "https://github.com/mbrooks/yolomatic/pulls/1" } })),
 			list: vi.fn(async () => ({ data: [] })),
 			listReviewComments: vi.fn(async () => ({ data: [] })),
 			updateBranch: vi.fn(async () => ({ data: { message: "update" } })),
@@ -37,7 +37,7 @@ function createMockOctokit(overrides?: Partial<{
 			listCommits: vi.fn(async () => ({ data: [] })),
 			listInvitationsForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			acceptInvitationForAuthenticatedUser: vi.fn(async () => ({ data: {} })),
-			get: vi.fn(async () => ({ data: { default_branch: "main", full_name: "mbrooks/yeetomatic", visibility: "private" } })),
+			get: vi.fn(async () => ({ data: { default_branch: "main", full_name: "mbrooks/yolomatic", visibility: "private" } })),
 			createOrUpdateFileContents: vi.fn(async () => ({ data: {} })),
 			listForAuthenticatedUser: vi.fn(async () => ({ data: [] })),
 			getCollaboratorPermissionLevel: vi.fn(async () => ({ data: { permission: "read" } })),
@@ -65,8 +65,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.createComment", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.postComment("mbrooks", "yeetomatic", 1, "hello");
-			expect(octokit.issues.createComment).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, body: "hello" });
+			await adapter.postComment("mbrooks", "yolomatic", 1, "hello");
+			expect(octokit.issues.createComment).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, body: "hello" });
 		});
 	});
 
@@ -74,8 +74,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.createComment with prNumber", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.postPRComment("mbrooks", "yeetomatic", 2, "review");
-			expect(octokit.issues.createComment).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 2, body: "review" });
+			await adapter.postPRComment("mbrooks", "yolomatic", 2, "review");
+			expect(octokit.issues.createComment).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 2, body: "review" });
 		});
 	});
 
@@ -83,8 +83,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.addLabels", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.addLabels("mbrooks", "yeetomatic", 1, ["bug", "ui"]);
-			expect(octokit.issues.addLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, labels: ["bug", "ui"] });
+			await adapter.addLabels("mbrooks", "yolomatic", 1, ["bug", "ui"]);
+			expect(octokit.issues.addLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, labels: ["bug", "ui"] });
 		});
 	});
 
@@ -92,8 +92,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.removeLabel", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.removeLabel("mbrooks", "yeetomatic", 1, "bug");
-			expect(octokit.issues.removeLabel).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, name: "bug" });
+			await adapter.removeLabel("mbrooks", "yolomatic", 1, "bug");
+			expect(octokit.issues.removeLabel).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, name: "bug" });
 		});
 
 		it("silently swallows 404 errors", async () => {
@@ -105,7 +105,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.removeLabel("mbrooks", "yeetomatic", 1, "bug")).resolves.toBeUndefined();
+			await expect(adapter.removeLabel("mbrooks", "yolomatic", 1, "bug")).resolves.toBeUndefined();
 		});
 
 		it("rethrows non-404 errors", async () => {
@@ -117,7 +117,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.removeLabel("mbrooks", "yeetomatic", 1, "bug")).rejects.toThrow("Server Error");
+			await expect(adapter.removeLabel("mbrooks", "yolomatic", 1, "bug")).rejects.toThrow("Server Error");
 		});
 	});
 
@@ -125,7 +125,7 @@ describe("GitHubServiceAdapter", () => {
 		it("returns mapped PR info", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getPullRequest("mbrooks", "yeetomatic", 1);
+			const result = await adapter.getPullRequest("mbrooks", "yolomatic", 1);
 			expect(result).toEqual({ head: { ref: "main" }, state: "open", merged: false, mergeable: null, mergeableState: "unknown", draft: false });
 		});
 
@@ -134,7 +134,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: {
 					get: vi.fn(async () => ({
 						data: {
-							head: { ref: "yeetomatic/issue-1", sha: "abc" },
+							head: { ref: "yolomatic/issue-1", sha: "abc" },
 							state: "open",
 							merged: false,
 							mergeable: true,
@@ -145,16 +145,16 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getPullRequest("mbrooks", "yeetomatic", 7);
+			const result = await adapter.getPullRequest("mbrooks", "yolomatic", 7);
 			expect(result).toEqual({
-				head: { ref: "yeetomatic/issue-1", sha: "abc" },
+				head: { ref: "yolomatic/issue-1", sha: "abc" },
 				state: "open",
 				merged: false,
 				mergeable: true,
 				mergeableState: "clean",
 				draft: true,
 			});
-			expect(octokit.pulls.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 7 });
+			expect(octokit.pulls.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", pull_number: 7 });
 		});
 
 		it("returns null on error", async () => {
@@ -164,7 +164,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getPullRequest("mbrooks", "yeetomatic", 99);
+			const result = await adapter.getPullRequest("mbrooks", "yolomatic", 99);
 			expect(result).toBeNull();
 		});
 	});
@@ -173,32 +173,32 @@ describe("GitHubServiceAdapter", () => {
 		it("returns created PR", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main");
-			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/pulls/1" });
+			const result = await adapter.createPullRequest("mbrooks", "yolomatic", "Title", "Body", "feature", "main");
+			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/yolomatic/pulls/1" });
 		});
 
 		it("forwards the draft option to octokit.pulls.create", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main", true);
-			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", title: "Title", body: "Body", head: "feature", base: "main", draft: true });
+			await adapter.createPullRequest("mbrooks", "yolomatic", "Title", "Body", "feature", "main", true);
+			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", title: "Title", body: "Body", head: "feature", base: "main", draft: true });
 		});
 
 		it("omits draft when not specified", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main");
-			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", title: "Title", body: "Body", head: "feature", base: "main" });
+			await adapter.createPullRequest("mbrooks", "yolomatic", "Title", "Body", "feature", "main");
+			expect(octokit.pulls.create).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", title: "Title", body: "Body", head: "feature", base: "main" });
 		});
 
 		it("marks a pull request ready for review via the ready-for-review endpoint", async () => {
 			const request = vi.fn(async () => ({ data: {} }));
 			const octokit = createMockOctokit({ request });
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.markPullRequestReadyForReview("mbrooks", "yeetomatic", 42);
+			await adapter.markPullRequestReadyForReview("mbrooks", "yolomatic", 42);
 			expect(request).toHaveBeenCalledWith(
 				"POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review",
-				{ owner: "mbrooks", repo: "yeetomatic", pull_number: 42 },
+				{ owner: "mbrooks", repo: "yolomatic", pull_number: 42 },
 			);
 			expect(octokit.pulls.update).not.toHaveBeenCalled();
 		});
@@ -210,7 +210,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main");
+			const result = await adapter.createPullRequest("mbrooks", "yolomatic", "Title", "Body", "feature", "main");
 			expect(result).toBeNull();
 		});
 
@@ -221,7 +221,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.createPullRequest("mbrooks", "yeetomatic", "Title", "Body", "feature", "main")).rejects.toThrow("Auth failed");
+			await expect(adapter.createPullRequest("mbrooks", "yolomatic", "Title", "Body", "feature", "main")).rejects.toThrow("Auth failed");
 		});
 	});
 
@@ -229,17 +229,17 @@ describe("GitHubServiceAdapter", () => {
 		it("calls pulls.updateBranch without expected_head_sha by default", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequestBranch("mbrooks", "yeetomatic", 42);
-			expect(octokit.pulls.updateBranch).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 42 });
+			await adapter.updatePullRequestBranch("mbrooks", "yolomatic", 42);
+			expect(octokit.pulls.updateBranch).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", pull_number: 42 });
 		});
 
 		it("passes expected_head_sha when provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequestBranch("mbrooks", "yeetomatic", 42, "abcdef");
+			await adapter.updatePullRequestBranch("mbrooks", "yolomatic", 42, "abcdef");
 			expect(octokit.pulls.updateBranch).toHaveBeenCalledWith({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				pull_number: 42,
 				expected_head_sha: "abcdef",
 			});
@@ -250,7 +250,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: { updateBranch: vi.fn(async () => { throw new Error("422 Unprocessable Entity: merge conflict"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.updatePullRequestBranch("mbrooks", "yeetomatic", 42)).rejects.toThrow(/update-branch failed/);
+			await expect(adapter.updatePullRequestBranch("mbrooks", "yolomatic", 42)).rejects.toThrow(/update-branch failed/);
 		});
 
 		it("rethrows non-conflict errors unchanged", async () => {
@@ -258,7 +258,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: { updateBranch: vi.fn(async () => { throw new Error("network down"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.updatePullRequestBranch("mbrooks", "yeetomatic", 42)).rejects.toThrow("network down");
+			await expect(adapter.updatePullRequestBranch("mbrooks", "yolomatic", 42)).rejects.toThrow("network down");
 		});
 	});
 
@@ -268,14 +268,14 @@ describe("GitHubServiceAdapter", () => {
 				pulls: {
 					list: vi.fn(async () => ({
 						data: [
-							{ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/pulls/1" },
-							{ number: 2, html_url: "https://github.com/mbrooks/yeetomatic/pulls/2" },
+							{ number: 1, html_url: "https://github.com/mbrooks/yolomatic/pulls/1" },
+							{ number: 2, html_url: "https://github.com/mbrooks/yolomatic/pulls/2" },
 						],
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listPullRequests("mbrooks", "yeetomatic", { head: "feature", base: "main", state: "open" });
+			const result = await adapter.listPullRequests("mbrooks", "yolomatic", { head: "feature", base: "main", state: "open" });
 			expect(result).toHaveLength(2);
 			expect(result[0].number).toBe(1);
 		});
@@ -285,7 +285,7 @@ describe("GitHubServiceAdapter", () => {
 		it("returns issue state", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssue("mbrooks", "yeetomatic", 1);
+			const result = await adapter.getIssue("mbrooks", "yolomatic", 1);
 			expect(result).toEqual({ state: "open" });
 		});
 
@@ -296,7 +296,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssue("mbrooks", "yeetomatic", 1);
+			const result = await adapter.getIssue("mbrooks", "yolomatic", 1);
 			expect(result).toEqual({ state: "open", title: "My Title", body: "b" });
 		});
 
@@ -307,7 +307,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssue("mbrooks", "yeetomatic", 99);
+			const result = await adapter.getIssue("mbrooks", "yolomatic", 99);
 			expect(result).toBeNull();
 		});
 	});
@@ -316,8 +316,8 @@ describe("GitHubServiceAdapter", () => {
 		it("returns created issue", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.createIssue("mbrooks", "yeetomatic", "Title", "Body", ["bug"], ["mbrooks"]);
-			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/issues/1" });
+			const result = await adapter.createIssue("mbrooks", "yolomatic", "Title", "Body", ["bug"], ["mbrooks"]);
+			expect(result).toEqual({ number: 1, html_url: "https://github.com/mbrooks/yolomatic/issues/1" });
 		});
 	});
 
@@ -325,14 +325,14 @@ describe("GitHubServiceAdapter", () => {
 		it("fetches repo default branch and creates README via contents API", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.initializeEmptyRepo("mbrooks", "yeetomatic", "main");
-			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic" });
+			await adapter.initializeEmptyRepo("mbrooks", "yolomatic", "main");
+			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic" });
 			expect(octokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				path: "README.md",
 				message: "Initial commit",
-				content: Buffer.from("# yeetomatic\n\nAuto-initialized by Yeetomatic.\n").toString("base64"),
+				content: Buffer.from("# yolomatic\n\nAuto-initialized by Yolomatic.\n").toString("base64"),
 				branch: "main",
 			});
 		});
@@ -345,7 +345,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.initializeEmptyRepo("mbrooks", "yeetomatic", "master");
+			await adapter.initializeEmptyRepo("mbrooks", "yolomatic", "master");
 			expect(octokit.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
 				expect.objectContaining({ branch: "master" }),
 			);
@@ -365,7 +365,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listReviewComments("mbrooks", "yeetomatic", 1, 10);
+			const result = await adapter.listReviewComments("mbrooks", "yolomatic", 1, 10);
 			expect(result).toHaveLength(2);
 			expect(result[0]).toEqual({ id: 1, body: "nice", user: { login: "a" }, path: "f.ts", line: 5 });
 			expect(result[1]).toEqual({ id: 2, body: "", user: undefined, path: undefined, line: null });
@@ -378,7 +378,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listReviewComments("mbrooks", "yeetomatic", 1, 10);
+			const result = await adapter.listReviewComments("mbrooks", "yolomatic", 1, 10);
 			expect(result).toEqual([]);
 		});
 	});
@@ -393,14 +393,14 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listLabels("mbrooks", "yeetomatic");
+			const result = await adapter.listLabels("mbrooks", "yolomatic");
 			expect(result).toEqual(["bug", "feature"]);
 		});
 
 		it("returns empty array on error", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listLabels("mbrooks", "yeetomatic");
+			const result = await adapter.listLabels("mbrooks", "yolomatic");
 			expect(result).toEqual([]);
 		});
 	});
@@ -425,7 +425,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssueTemplates("mbrooks", "yeetomatic");
+			const result = await adapter.getIssueTemplates("mbrooks", "yolomatic");
 			expect(result).toEqual([{ name: "bug", body: "Template body" }]);
 		});
 
@@ -436,14 +436,14 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssueTemplates("mbrooks", "yeetomatic");
+			const result = await adapter.getIssueTemplates("mbrooks", "yolomatic");
 			expect(result).toEqual([]);
 		});
 
 		it("returns empty array on error", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getIssueTemplates("mbrooks", "yeetomatic");
+			const result = await adapter.getIssueTemplates("mbrooks", "yolomatic");
 			expect(result).toEqual([]);
 		});
 	});
@@ -461,14 +461,14 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listRecentCommits("mbrooks", "yeetomatic", 5);
+			const result = await adapter.listRecentCommits("mbrooks", "yolomatic", 5);
 			expect(result).toEqual(["abc1234: first commit", "def1234: second commit"]);
 		});
 
 		it("returns empty array on error", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listRecentCommits("mbrooks", "yeetomatic");
+			const result = await adapter.listRecentCommits("mbrooks", "yolomatic");
 			expect(result).toEqual([]);
 		});
 	});
@@ -486,10 +486,10 @@ describe("GitHubServiceAdapter", () => {
 				request,
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listRelatedIssues("mbrooks", "yeetomatic", "bug", 5);
+			const result = await adapter.listRelatedIssues("mbrooks", "yolomatic", "bug", 5);
 			expect(result).toEqual([{ number: 1, title: "Bug", state: "open" }]);
 			expect(request).toHaveBeenCalledWith("GET /search/issues", {
-				q: "repo:mbrooks/yeetomatic is:issue bug in:title",
+				q: "repo:mbrooks/yolomatic is:issue bug in:title",
 				per_page: 5,
 			});
 			expect(octokit.search.issuesAndPullRequests).not.toHaveBeenCalled();
@@ -502,7 +502,7 @@ describe("GitHubServiceAdapter", () => {
 				}),
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listRelatedIssues("mbrooks", "yeetomatic", "bug");
+			const result = await adapter.listRelatedIssues("mbrooks", "yolomatic", "bug");
 			expect(result).toEqual([]);
 		});
 	});
@@ -520,7 +520,7 @@ describe("GitHubServiceAdapter", () => {
 								state: "open",
 								labels: [{ name: "bug" }],
 								assignees: [{ login: "mbrooks" }],
-								html_url: "https://github.com/mbrooks/yeetomatic/issues/1",
+								html_url: "https://github.com/mbrooks/yolomatic/issues/1",
 							},
 							{
 								number: 2,
@@ -529,14 +529,14 @@ describe("GitHubServiceAdapter", () => {
 								state: "open",
 								labels: [],
 								assignees: [],
-								html_url: "https://github.com/mbrooks/yeetomatic/issues/2",
+								html_url: "https://github.com/mbrooks/yolomatic/issues/2",
 							},
 						],
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listOpenIssues("mbrooks", "yeetomatic");
+			const result = await adapter.listOpenIssues("mbrooks", "yolomatic");
 			expect(result).toHaveLength(2);
 			expect(result[0]).toEqual({
 				number: 1,
@@ -545,7 +545,7 @@ describe("GitHubServiceAdapter", () => {
 				state: "open",
 				labels: ["bug"],
 				assignees: ["mbrooks"],
-				html_url: "https://github.com/mbrooks/yeetomatic/issues/1",
+				html_url: "https://github.com/mbrooks/yolomatic/issues/1",
 			});
 			expect(result[1]).toEqual({
 				number: 2,
@@ -554,7 +554,7 @@ describe("GitHubServiceAdapter", () => {
 				state: "open",
 				labels: [],
 				assignees: [],
-				html_url: "https://github.com/mbrooks/yeetomatic/issues/2",
+				html_url: "https://github.com/mbrooks/yolomatic/issues/2",
 			});
 		});
 
@@ -570,14 +570,14 @@ describe("GitHubServiceAdapter", () => {
 								state: "open",
 								labels: [{ name: "" }, { name: "bug" }],
 								assignees: [{ login: "" }, { login: "user" }],
-								html_url: "https://github.com/mbrooks/yeetomatic/issues/1",
+								html_url: "https://github.com/mbrooks/yolomatic/issues/1",
 							},
 						],
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listOpenIssues("mbrooks", "yeetomatic");
+			const result = await adapter.listOpenIssues("mbrooks", "yolomatic");
 			expect(result[0].labels).toEqual(["bug"]);
 			expect(result[0].assignees).toEqual(["user"]);
 		});
@@ -594,14 +594,14 @@ describe("GitHubServiceAdapter", () => {
 								state: "open",
 								labels: ["bug", "ui"],
 								assignees: [],
-								html_url: "https://github.com/mbrooks/yeetomatic/issues/1",
+								html_url: "https://github.com/mbrooks/yolomatic/issues/1",
 							},
 						],
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listOpenIssues("mbrooks", "yeetomatic");
+			const result = await adapter.listOpenIssues("mbrooks", "yolomatic");
 			expect(result[0].labels).toEqual(["bug", "ui"]);
 		});
 
@@ -614,7 +614,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.listOpenIssues("mbrooks", "yeetomatic");
+			const result = await adapter.listOpenIssues("mbrooks", "yolomatic");
 			expect(result).toEqual([]);
 		});
 	});
@@ -718,8 +718,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.update with assignees", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssueAssignees("mbrooks", "yeetomatic", 1, ["yeetomatic-bot"]);
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, assignees: ["yeetomatic-bot"] });
+			await adapter.updateIssueAssignees("mbrooks", "yolomatic", 1, ["yolomatic-bot"]);
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, assignees: ["yolomatic-bot"] });
 		});
 	});
 
@@ -727,8 +727,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.update with state closed", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.closeIssue("mbrooks", "yeetomatic", 1);
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, state: "closed" });
+			await adapter.closeIssue("mbrooks", "yolomatic", 1);
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, state: "closed" });
 		});
 	});
 
@@ -736,8 +736,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.update with title", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssueTitle("mbrooks", "yeetomatic", 1, "New Title");
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, title: "New Title" });
+			await adapter.updateIssueTitle("mbrooks", "yolomatic", 1, "New Title");
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, title: "New Title" });
 		});
 	});
 
@@ -782,7 +782,7 @@ describe("GitHubServiceAdapter", () => {
 				repos: {
 					listForAuthenticatedUser: vi.fn(async () => ({
 						data: [
-							{ name: "yeetomatic", full_name: "mbrooks/yeetomatic", owner: { login: "mbrooks" }, visibility: "private" },
+							{ name: "yolomatic", full_name: "mbrooks/yolomatic", owner: { login: "mbrooks" }, visibility: "private" },
 							{ name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" }, visibility: "public" },
 						],
 					})),
@@ -791,7 +791,7 @@ describe("GitHubServiceAdapter", () => {
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
 			const result = await adapter.listAccessibleRepositories();
 			expect(result).toHaveLength(2);
-			expect(result[0]).toEqual({ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" });
+			expect(result[0]).toEqual({ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" });
 			expect(result[1]).toEqual({ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" });
 		});
 
@@ -800,7 +800,7 @@ describe("GitHubServiceAdapter", () => {
 				repos: {
 					listForAuthenticatedUser: vi.fn(async () => ({
 						data: [
-							{ name: "yeetomatic", full_name: "mbrooks/yeetomatic", owner: { login: "mbrooks" }, private: true },
+							{ name: "yolomatic", full_name: "mbrooks/yolomatic", owner: { login: "mbrooks" }, private: true },
 							{ name: "hello-world", full_name: "octocat/hello-world", owner: { login: "octocat" }, private: false },
 						],
 					})),
@@ -829,14 +829,14 @@ describe("GitHubServiceAdapter", () => {
 			const octokit = createMockOctokit({
 				repos: {
 					get: vi.fn(async () => ({
-						data: { name: "yeetomatic", full_name: "mbrooks/yeetomatic", owner: { login: "mbrooks" }, visibility: "private" },
+						data: { name: "yolomatic", full_name: "mbrooks/yolomatic", owner: { login: "mbrooks" }, visibility: "private" },
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getRepository("mbrooks", "yeetomatic");
-			expect(result).toEqual({ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" });
-			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic" });
+			const result = await adapter.getRepository("mbrooks", "yolomatic");
+			expect(result).toEqual({ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" });
+			expect(octokit.repos.get).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic" });
 		});
 
 		it("falls back to private flag when visibility is missing", async () => {
@@ -872,9 +872,9 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yolomatic", "octocat");
 			expect(result).toBe("admin");
-			expect(octokit.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", username: "octocat" });
+			expect(octokit.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", username: "octocat" });
 		});
 
 		it("returns null when the permission value is unrecognized", async () => {
@@ -884,7 +884,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yolomatic", "octocat");
 			expect(result).toBeNull();
 		});
 
@@ -895,7 +895,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yolomatic", "octocat");
 			expect(result).toBeNull();
 		});
 
@@ -906,7 +906,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.getCollaboratorPermissionLevel("mbrooks", "yolomatic", "octocat");
 			expect(result).toBeNull();
 		});
 	});
@@ -919,9 +919,9 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.isCollaborator("mbrooks", "yolomatic", "octocat");
 			expect(result).toBe(true);
-			expect(octokit.repos.checkCollaborator).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", username: "octocat" });
+			expect(octokit.repos.checkCollaborator).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", username: "octocat" });
 		});
 
 		it("returns false when checkCollaborator responds with a non-204 status", async () => {
@@ -931,7 +931,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.isCollaborator("mbrooks", "yolomatic", "octocat");
 			expect(result).toBe(false);
 		});
 
@@ -944,7 +944,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const result = await adapter.isCollaborator("mbrooks", "yeetomatic", "octocat");
+			const result = await adapter.isCollaborator("mbrooks", "yolomatic", "octocat");
 			expect(result).toBe(false);
 		});
 	});
@@ -961,7 +961,7 @@ describe("GitHubServiceAdapter", () => {
 							state: "open",
 							labels: [{ name: "bug" }, "ui"],
 							assignees: [{ login: "mbrooks" }],
-							html_url: "https://github.com/mbrooks/yeetomatic/issues/502",
+							html_url: "https://github.com/mbrooks/yolomatic/issues/502",
 							created_at: "2026-08-01T00:00:00Z",
 							updated_at: "2026-08-01T01:00:00Z",
 						},
@@ -969,7 +969,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const detail = await adapter.getIssueDetail("mbrooks", "yeetomatic", 502);
+			const detail = await adapter.getIssueDetail("mbrooks", "yolomatic", 502);
 			expect(detail).toEqual({
 				number: 502,
 				title: "Expose gateway",
@@ -977,7 +977,7 @@ describe("GitHubServiceAdapter", () => {
 				state: "open",
 				labels: ["bug", "ui"],
 				assignees: ["mbrooks"],
-				html_url: "https://github.com/mbrooks/yeetomatic/issues/502",
+				html_url: "https://github.com/mbrooks/yolomatic/issues/502",
 				created_at: "2026-08-01T00:00:00Z",
 				updated_at: "2026-08-01T01:00:00Z",
 			});
@@ -988,7 +988,7 @@ describe("GitHubServiceAdapter", () => {
 				issues: { get: vi.fn(async () => { throw new Error("nope"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			expect(await adapter.getIssueDetail("mbrooks", "yeetomatic", 1)).toBeNull();
+			expect(await adapter.getIssueDetail("mbrooks", "yolomatic", 1)).toBeNull();
 		});
 
 		it("treats closed state as closed and null body as empty", async () => {
@@ -1000,7 +1000,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const detail = await adapter.getIssueDetail("mbrooks", "yeetomatic", 1);
+			const detail = await adapter.getIssueDetail("mbrooks", "yolomatic", 1);
 			expect(detail?.state).toBe("closed");
 			expect(detail?.body).toBe("");
 		});
@@ -1019,7 +1019,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const comments = await adapter.listIssueComments("mbrooks", "yeetomatic", 1);
+			const comments = await adapter.listIssueComments("mbrooks", "yolomatic", 1);
 			expect(comments).toEqual([
 				{ id: 1, body: "c1", author: "mbrooks", created_at: "a", updated_at: "b", html_url: "u1" },
 				{ id: 2, body: "", author: "unknown", created_at: "a", updated_at: "b", html_url: "u2" },
@@ -1031,7 +1031,7 @@ describe("GitHubServiceAdapter", () => {
 				issues: { listComments: vi.fn(async () => { throw new Error("nope"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			expect(await adapter.listIssueComments("mbrooks", "yeetomatic", 1)).toEqual([]);
+			expect(await adapter.listIssueComments("mbrooks", "yolomatic", 1)).toEqual([]);
 		});
 	});
 
@@ -1039,22 +1039,22 @@ describe("GitHubServiceAdapter", () => {
 		it("sends only provided fields to issues.update", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssue("mbrooks", "yeetomatic", 1, { title: "T", state: "closed", assignees: ["a"], labels: ["b"] });
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, title: "T", state: "closed", assignees: ["a"], labels: ["b"] });
+			await adapter.updateIssue("mbrooks", "yolomatic", 1, { title: "T", state: "closed", assignees: ["a"], labels: ["b"] });
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, title: "T", state: "closed", assignees: ["a"], labels: ["b"] });
 		});
 
 		it("is a no-op when no fields are provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssue("mbrooks", "yeetomatic", 1, {});
+			await adapter.updateIssue("mbrooks", "yolomatic", 1, {});
 			expect(octokit.issues.update).not.toHaveBeenCalled();
 		});
 
 		it("sends body when provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updateIssue("mbrooks", "yeetomatic", 1, { body: "new body" });
-			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, body: "new body" });
+			await adapter.updateIssue("mbrooks", "yolomatic", 1, { body: "new body" });
+			expect(octokit.issues.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, body: "new body" });
 		});
 	});
 
@@ -1062,8 +1062,8 @@ describe("GitHubServiceAdapter", () => {
 		it("calls issues.setLabels with the given labels", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.setLabels("mbrooks", "yeetomatic", 1, ["a", "b"]);
-			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 1, labels: ["a", "b"] });
+			await adapter.setLabels("mbrooks", "yolomatic", 1, ["a", "b"]);
+			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 1, labels: ["a", "b"] });
 		});
 
 		it("swallows 404 when clearing labels on an unlabeled issue", async () => {
@@ -1073,7 +1073,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.setLabels("mbrooks", "yeetomatic", 1, [])).resolves.toBeUndefined();
+			await expect(adapter.setLabels("mbrooks", "yolomatic", 1, [])).resolves.toBeUndefined();
 		});
 
 		it("rethrows non-404 errors from setLabels", async () => {
@@ -1083,7 +1083,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await expect(adapter.setLabels("mbrooks", "yeetomatic", 1, ["x"])).rejects.toThrow("Boom");
+			await expect(adapter.setLabels("mbrooks", "yolomatic", 1, ["x"])).rejects.toThrow("Boom");
 		});
 	});
 
@@ -1094,17 +1094,17 @@ describe("GitHubServiceAdapter", () => {
 					get: vi.fn(async () => ({
 						data: {
 							number: 7, title: "PR", body: "b", state: "open", merged: false,
-							head: { ref: "yeetomatic/issue-502" }, base: { ref: "main" },
+							head: { ref: "yolomatic/issue-502" }, base: { ref: "main" },
 							html_url: "u", created_at: "a", updated_at: "b",
 						},
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const pr = await adapter.getPullRequestDetail("mbrooks", "yeetomatic", 7);
+			const pr = await adapter.getPullRequestDetail("mbrooks", "yolomatic", 7);
 			expect(pr).toEqual({
 				number: 7, title: "PR", body: "b", state: "open", merged: false,
-				head_ref: "yeetomatic/issue-502", base_ref: "main", html_url: "u", created_at: "a", updated_at: "b",
+				head_ref: "yolomatic/issue-502", base_ref: "main", html_url: "u", created_at: "a", updated_at: "b",
 			});
 		});
 
@@ -1113,7 +1113,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: { get: vi.fn(async () => { throw new Error("nope"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			expect(await adapter.getPullRequestDetail("mbrooks", "yeetomatic", 1)).toBeNull();
+			expect(await adapter.getPullRequestDetail("mbrooks", "yolomatic", 1)).toBeNull();
 		});
 
 		it("maps closed state and null body", async () => {
@@ -1125,7 +1125,7 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const pr = await adapter.getPullRequestDetail("mbrooks", "yeetomatic", 1);
+			const pr = await adapter.getPullRequestDetail("mbrooks", "yolomatic", 1);
 			expect(pr?.state).toBe("closed");
 			expect(pr?.body).toBe("");
 			expect(pr?.merged).toBe(true);
@@ -1142,8 +1142,8 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const comments = await adapter.listPullRequestComments("mbrooks", "yeetomatic", 7);
-			expect(octokit.issues.listComments).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 7, per_page: 100 });
+			const comments = await adapter.listPullRequestComments("mbrooks", "yolomatic", 7);
+			expect(octokit.issues.listComments).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 7, per_page: 100 });
 			expect(comments).toHaveLength(1);
 			expect(comments[0].author).toBe("r");
 		});
@@ -1162,8 +1162,8 @@ describe("GitHubServiceAdapter", () => {
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const comments = await adapter.listPullRequestReviewComments("mbrooks", "yeetomatic", 7);
-			expect(octokit.pulls.listReviewComments).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 7, per_page: 100 });
+			const comments = await adapter.listPullRequestReviewComments("mbrooks", "yolomatic", 7);
+			expect(octokit.pulls.listReviewComments).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", pull_number: 7, per_page: 100 });
 			expect(comments).toEqual([
 				{ id: 1, body: "nit", user: { login: "rev" }, path: "a.ts", line: 3 },
 				{ id: 2, body: "", user: undefined, path: "b.ts", line: null },
@@ -1175,7 +1175,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: { listReviewComments: vi.fn(async () => { throw new Error("nope"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			expect(await adapter.listPullRequestReviewComments("mbrooks", "yeetomatic", 7)).toEqual([]);
+			expect(await adapter.listPullRequestReviewComments("mbrooks", "yolomatic", 7)).toEqual([]);
 		});
 	});
 
@@ -1185,15 +1185,15 @@ describe("GitHubServiceAdapter", () => {
 				pulls: {
 					list: vi.fn(async () => ({
 						data: [
-							{ number: 88, title: "PR", html_url: "u", head: { ref: "yeetomatic/issue-502" }, base: { ref: "main" }, state: "open" },
+							{ number: 88, title: "PR", html_url: "u", head: { ref: "yolomatic/issue-502" }, base: { ref: "main" }, state: "open" },
 						],
 					})),
 				},
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			const prs = await adapter.listPullRequestsForHead("mbrooks", "yeetomatic", "yeetomatic/issue-502", "open");
-			expect(octokit.pulls.list).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", head: "yeetomatic/issue-502", state: "open", per_page: 100 });
-			expect(prs).toEqual([{ number: 88, title: "PR", html_url: "u", head_ref: "yeetomatic/issue-502", base_ref: "main", state: "open", merged: false }]);
+			const prs = await adapter.listPullRequestsForHead("mbrooks", "yolomatic", "yolomatic/issue-502", "open");
+			expect(octokit.pulls.list).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", head: "yolomatic/issue-502", state: "open", per_page: 100 });
+			expect(prs).toEqual([{ number: 88, title: "PR", html_url: "u", head_ref: "yolomatic/issue-502", base_ref: "main", state: "open", merged: false }]);
 		});
 
 		it("returns empty on error", async () => {
@@ -1201,7 +1201,7 @@ describe("GitHubServiceAdapter", () => {
 				pulls: { list: vi.fn(async () => { throw new Error("nope"); }) },
 			});
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			expect(await adapter.listPullRequestsForHead("mbrooks", "yeetomatic", "h", "open")).toEqual([]);
+			expect(await adapter.listPullRequestsForHead("mbrooks", "yolomatic", "h", "open")).toEqual([]);
 		});
 	});
 
@@ -1209,31 +1209,31 @@ describe("GitHubServiceAdapter", () => {
 		it("updates title/body/state via pulls.update", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequest("mbrooks", "yeetomatic", 7, { title: "T", body: "B", state: "open" });
-			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 7, title: "T", body: "B", state: "open" });
+			await adapter.updatePullRequest("mbrooks", "yolomatic", 7, { title: "T", body: "B", state: "open" });
+			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", pull_number: 7, title: "T", body: "B", state: "open" });
 			expect(octokit.issues.setLabels).not.toHaveBeenCalled();
 		});
 
 		it("sets labels via the issues API when labels provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequest("mbrooks", "yeetomatic", 7, { labels: ["x"] });
+			await adapter.updatePullRequest("mbrooks", "yolomatic", 7, { labels: ["x"] });
 			expect(octokit.pulls.update).not.toHaveBeenCalled();
-			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 7, labels: ["x"] });
+			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 7, labels: ["x"] });
 		});
 
 		it("updates both metadata and labels when both provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequest("mbrooks", "yeetomatic", 7, { title: "T", labels: ["x"] });
-			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", pull_number: 7, title: "T" });
-			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yeetomatic", issue_number: 7, labels: ["x"] });
+			await adapter.updatePullRequest("mbrooks", "yolomatic", 7, { title: "T", labels: ["x"] });
+			expect(octokit.pulls.update).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", pull_number: 7, title: "T" });
+			expect(octokit.issues.setLabels).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", issue_number: 7, labels: ["x"] });
 		});
 
 		it("is a no-op when no fields are provided", async () => {
 			const octokit = createMockOctokit();
 			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
-			await adapter.updatePullRequest("mbrooks", "yeetomatic", 7, {});
+			await adapter.updatePullRequest("mbrooks", "yolomatic", 7, {});
 			expect(octokit.pulls.update).not.toHaveBeenCalled();
 			expect(octokit.issues.setLabels).not.toHaveBeenCalled();
 		});

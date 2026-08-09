@@ -75,7 +75,7 @@ describe("useRefinementLog", () => {
 			}),
 		);
 
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 1));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", 1));
 
 		await act(async () => {
 			await flush();
@@ -85,7 +85,7 @@ describe("useRefinementLog", () => {
 		expect(result.current.attempts).toHaveLength(1);
 		expect(result.current.attempts[0].state).toBe("applied");
 		expect(result.current.logs.some((l) => l.message === "Refinement started")).toBe(true);
-		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "refinement", expect.any(Function));
+		expect(subscribeLogSpy).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "refinement", expect.any(Function));
 	});
 
 	it("appends log entries received via websocket", async () => {
@@ -97,7 +97,7 @@ describe("useRefinementLog", () => {
 			),
 		);
 
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 2));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", 2));
 
 		await act(async () => {
 			await flush();
@@ -124,7 +124,7 @@ describe("useRefinementLog", () => {
 			),
 		);
 
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 3));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", 3));
 
 		await act(async () => {
 			await flush();
@@ -137,7 +137,7 @@ describe("useRefinementLog", () => {
 
 	it("is idle when issueNumber is null", async () => {
 		fetchSpy.mockImplementation(makeFetchHandler(() => jsonResponse({ available: false, logs: [] })));
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", null));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", null));
 
 		await act(async () => {
 			await flush();
@@ -157,7 +157,7 @@ describe("useRefinementLog", () => {
 			}),
 		);
 
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 4));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", 4));
 
 		await act(async () => {
 			await flush();
@@ -177,7 +177,7 @@ describe("useRefinementLog", () => {
 			}),
 		);
 
-		const { result } = renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 5));
+		const { result } = renderHook(() => useRefinementLog("mbrooks", "yolomatic", 5));
 
 		await act(async () => {
 			await flush();
@@ -197,7 +197,7 @@ describe("useRefinementLog", () => {
 			),
 		);
 
-		renderHook(() => useRefinementLog("mbrooks", "yeetomatic", 6));
+		renderHook(() => useRefinementLog("mbrooks", "yolomatic", 6));
 
 		await act(async () => {
 			await flush();

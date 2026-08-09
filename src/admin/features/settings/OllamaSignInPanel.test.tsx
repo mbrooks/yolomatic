@@ -66,7 +66,7 @@ describe("OllamaSignInPanel", () => {
 	});
 
 	it("renders the sign-in URL and docker exec command when not signed in", async () => {
-		render(<OllamaSignInPanel fetchStatus={vi.fn(async () => notSignedIn())} containerName="yeetomatic-ollama" />);
+		render(<OllamaSignInPanel fetchStatus={vi.fn(async () => notSignedIn())} containerName="yolomatic-ollama" />);
 
 		await waitFor(() =>
 			expect(screen.queryByText("Not signed in.")).not.toBeNull(),
@@ -75,7 +75,7 @@ describe("OllamaSignInPanel", () => {
 			screen.queryByText("https://ollama.com/connect?name=x&key=y"),
 		).not.toBeNull();
 		const code = screen.getByText(
-			"docker exec -it yeetomatic-ollama ollama login",
+			"docker exec -it yolomatic-ollama ollama login",
 		);
 		expect(code).not.toBeNull();
 	});

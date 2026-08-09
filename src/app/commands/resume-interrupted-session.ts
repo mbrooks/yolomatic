@@ -40,11 +40,11 @@ export class ResumeInterruptedSession {
 					owner,
 					repo,
 					issueNumber,
-					"Yeetomatic was restarted while working on this issue. Resuming work...",
+					"Yolomatic was restarted while working on this issue. Resuming work...",
 				);
 				await this.executor.run(session, queuedComment);
 			} else if (session.status === "pending") {
-				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Yeetomatic was restarted while queued. Picking up work...");
+				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Yolomatic was restarted while queued. Picking up work...");
 				await this.executor.run(session, queuedComment);
 			} else if (session.status === "waiting-feedback") {
 				await markIssueWorking(
@@ -52,11 +52,11 @@ export class ResumeInterruptedSession {
 					owner,
 					repo,
 					issueNumber,
-					"Yeetomatic was restarted with queued feedback. Resuming work...",
+					"Yolomatic was restarted with queued feedback. Resuming work...",
 				);
 				await this.executor.run(session, queuedComment);
 			} else {
-				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Yeetomatic was restarted. Resuming work...");
+				await markIssueWorking(this.deps.github, owner, repo, issueNumber, "Yolomatic was restarted. Resuming work...");
 				await this.executor.run(session, queuedComment);
 			}
 		} finally {

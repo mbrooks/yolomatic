@@ -70,7 +70,7 @@ export class GitCommandRunner {
 	}
 
 	async ensureGitIdentity(worktreePath: string): Promise<void> {
-		const name = "Yeetomatic";
+		const name = "Yolomatic";
 		const email = `${this.config.githubUsername}@users.noreply.github.com`;
 
 		await this.run("git", ["config", "user.name", name], { cwd: worktreePath });

@@ -25,7 +25,7 @@ describe("GetRefinementLog", () => {
 	});
 
 	it("returns not_found when no refinement attempt exists", async () => {
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.code).toBe("not_found");
@@ -36,7 +36,7 @@ describe("GetRefinementLog", () => {
 	it("returns logs when a refinement attempt exists", async () => {
 		store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			requester: "admin",
 			originalTitle: "T",
@@ -45,11 +45,11 @@ describe("GetRefinementLog", () => {
 			instructionSource: "prompt-defaults",
 			state: "applied",
 		});
-		const key = sessionStorageKey("mbrooks", "yeetomatic", 1, "refinement");
+		const key = sessionStorageKey("mbrooks", "yolomatic", 1, "refinement");
 		recordSessionLog(key, { level: "info", message: "Refinement started" });
 		recordSessionLog(key, { level: "info", message: "Applied refined issue body" });
 
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -61,7 +61,7 @@ describe("GetRefinementLog", () => {
 	it("returns an empty log list when no logs were recorded but an attempt exists", async () => {
 		store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 4,
 			requester: "admin",
 			originalTitle: "T",
@@ -70,7 +70,7 @@ describe("GetRefinementLog", () => {
 			instructionSource: "prompt-defaults",
 			state: "instructed",
 		});
-		const result = await query.execute("mbrooks", "yeetomatic", 4);
+		const result = await query.execute("mbrooks", "yolomatic", 4);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.available).toBe(true);
@@ -81,7 +81,7 @@ describe("GetRefinementLog", () => {
 	it("filters logs by since timestamp", async () => {
 		store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 2,
 			requester: "admin",
 			originalTitle: "T",
@@ -90,14 +90,14 @@ describe("GetRefinementLog", () => {
 			instructionSource: "prompt-defaults",
 			state: "applied",
 		});
-		const key = sessionStorageKey("mbrooks", "yeetomatic", 2, "refinement");
+		const key = sessionStorageKey("mbrooks", "yolomatic", 2, "refinement");
 		recordSessionLog(key, { level: "info", message: "first" });
 		await new Promise((r) => setTimeout(r, 10));
 		const all = getSessionLogs(key);
 		const since = all[0].timestamp;
 		recordSessionLog(key, { level: "info", message: "second" });
 
-		const result = await query.execute("mbrooks", "yeetomatic", 2, since);
+		const result = await query.execute("mbrooks", "yolomatic", 2, since);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.logs).toHaveLength(1);

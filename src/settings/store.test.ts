@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { unlinkSync } from "node:fs";
 import { SettingsStore } from "./store.js";
 
-const TEST_DB = "/tmp/yeetomatic-settings-store-test.sqlite";
+const TEST_DB = "/tmp/yolomatic-settings-store-test.sqlite";
 
 describe("SettingsStore", () => {
 	let store: SettingsStore;
@@ -75,11 +75,11 @@ describe("SettingsStore", () => {
 	});
 
 	it("getAllViews returns actual values for non-sensitive fields", () => {
-		store.seedFromEnv({ GITHUB_USERNAME: "yeetomatic-bot", PORT: "9090" });
+		store.seedFromEnv({ GITHUB_USERNAME: "yolomatic-bot", PORT: "9090" });
 		const views = store.getAllViews();
 		const userView = views.find((v) => v.key === "github_username");
 		const portView = views.find((v) => v.key === "port");
-		expect(userView?.value).toBe("yeetomatic-bot");
+		expect(userView?.value).toBe("yolomatic-bot");
 		expect(portView?.value).toBe(9090);
 	});
 

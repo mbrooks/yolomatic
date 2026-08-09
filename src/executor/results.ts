@@ -6,14 +6,14 @@ export interface ExecutionResult {
 	rawResponse: string;
 }
 
-const STATUS_MARKER_PATTERN = /^YEETOMATIC_STATUS:\s*(working|waiting-feedback|complete)$/u;
+const STATUS_MARKER_PATTERN = /^YOLO_STATUS:\s*(working|waiting-feedback|complete)$/u;
 
 /**
- * Strictly detect an explicit `YEETOMATIC_STATUS` marker in the response.
+ * Strictly detect an explicit `YOLO_STATUS` marker in the response.
  *
  * Returns the recognized status when an exact marker is present, or `null`
  * when the response has no marker or an unsupported marker (for example
- * `YEETOMATIC_STATUS: done`). A missing or unsupported marker must not be
+ * `YOLO_STATUS: done`). A missing or unsupported marker must not be
  * silently interpreted as `working`; callers use a `null` result to drive the
  * one-shot status-correction protocol.
  */

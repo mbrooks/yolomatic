@@ -22,7 +22,7 @@ describe("ListRefinementAttempts", () => {
 	});
 
 	it("returns an empty list when no attempts exist", async () => {
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.attempts).toEqual([]);
@@ -34,7 +34,7 @@ describe("ListRefinementAttempts", () => {
 		vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
 		const first = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			requester: "admin",
 			originalTitle: "T",
@@ -47,7 +47,7 @@ describe("ListRefinementAttempts", () => {
 		vi.setSystemTime(new Date("2026-01-01T00:00:00.001Z"));
 		const second = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			requester: "admin",
 			originalTitle: "T",
@@ -61,7 +61,7 @@ describe("ListRefinementAttempts", () => {
 			failureReason: undefined,
 		});
 
-		const result = await query.execute("mbrooks", "yeetomatic", 1);
+		const result = await query.execute("mbrooks", "yolomatic", 1);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.attempts).toHaveLength(2);
@@ -79,7 +79,7 @@ describe("ListRefinementAttempts", () => {
 	it("exposes failure reason for failed attempts", async () => {
 		store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 3,
 			requester: "admin",
 			originalTitle: "T",
@@ -89,7 +89,7 @@ describe("ListRefinementAttempts", () => {
 			state: "failed",
 			failureReason: "worker crashed",
 		});
-		const result = await query.execute("mbrooks", "yeetomatic", 3);
+		const result = await query.execute("mbrooks", "yolomatic", 3);
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.attempts[0].failureReason).toBe("worker crashed");

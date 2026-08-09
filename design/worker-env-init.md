@@ -6,7 +6,7 @@ Last updated: 2026-08-05
 
 ## Purpose
 
-Yeetomatic should deterministically initialize the worker environment before
+Yolomatic should deterministically initialize the worker environment before
 the agent starts. Today a fresh disposable worker container is launched per
 issue execution, and the agent is handed the workspace as-is. Repository
 dependencies (for example `node_modules` from `npm install`) may be missing or
@@ -29,14 +29,14 @@ workspace.
 
 ## Trust Model
 
-The init script is repository content, not Yeetomatic configuration. It runs
+The init script is repository content, not Yolomatic configuration. It runs
 inside the same trust boundary as the agent itself: the worker container that
-Yeetomatic launches for an issue already executes arbitrary shell commands,
+Yolomatic launches for an issue already executes arbitrary shell commands,
 reads and writes the mounted workspace, and reaches the network. The init
 script does not add new capabilities; it runs earlier in the same container
 with the same privileges as the agent.
 
-The worker runs as the non-root `yeetomatic` user with `HOME=/home/yeetomatic`.
+The worker runs as the non-root `yolomatic` user with `HOME=/home/yolomatic`.
 System package installation with `apt-get` is not available during an ordinary
 worker session (the worker image has no root and no `apt-get` cache mounted).
 The init script is therefore limited to user-writable tooling: `npm install`,
@@ -61,7 +61,7 @@ attempted," not "always rebuilt from scratch."
   turn.
 - Keep the mechanism opt-in by convention: no script, no change in behavior.
 - Keep the mechanism repository-owned: the script lives in the repository
-  workspace, not in the Yeetomatic image or control-plane config.
+  workspace, not in the Yolomatic image or control-plane config.
 - Stream the script's stdout and stderr to the control plane as session log
   events so a maintainer can watch `npm install` progress in the session log.
 - Fail closed: a non-zero exit from the init script aborts the worker session
@@ -94,16 +94,16 @@ attempted," not "always rebuilt from scratch."
 The worker looks for the init script at a path relative to the resolved
 workspace path, using these precedence rules:
 
-1. `YEETOMATIC_WORKER_INIT_SCRIPT` if set and non-empty (resolved relative to
+1. `YOLO_WORKER_INIT_SCRIPT` if set and non-empty (resolved relative to
    the workspace path when not absolute).
-2. Otherwise `yeetstrap.sh` relative to the workspace path.
+2. Otherwise `yolostrap.sh` relative to the workspace path.
 
 The repository root is the established convention for project-level entry
 points: it is where a maintainer already expects to find tooling scripts such
 as `build.sh`, `test.sh`, or `Makefile`-driven wrappers. Placing the init
-script at the repository root as `yeetstrap.sh` makes it discoverable alongside
-those existing scripts and does not require a Yeetomatic-specific directory to
-exist. The `.pi/` directory remains reserved for Yeetomatic-owned artifacts
+script at the repository root as `yolostrap.sh` makes it discoverable alongside
+those existing scripts and does not require a Yolomatic-specific directory to
+exist. The `.pi/` directory remains reserved for Yolomatic-owned artifacts
 (skills under `.pi/skills/`, trusted extensions under `.pi/extensions/`); the
 init script is repository-owned tooling and belongs at the root, not under
 `.pi/`.
@@ -111,7 +111,7 @@ init script is repository-owned tooling and belongs at the root, not under
 The script must:
 
 - be a regular file,
-- be readable by the `yeetomatic` user,
+- be readable by the `yolomatic` user,
 - be non-empty,
 - have a `#!/...` shebang or be executable as a `bash` script.
 
@@ -123,7 +123,7 @@ hosts or through filters that drop the mode.
 ## Invocation
 
 The worker performs the following steps in order, inside the worker container,
-as the `yeetomatic` user, after the `launch_config` acknowledgement is sent
+as the `yolomatic` user, after the `launch_config` acknowledgement is sent
 and before `PiAgentExecutor` is constructed:
 
 1. Resolve the workspace path from `launch_config.payload.session.workspacePath`.
@@ -145,7 +145,7 @@ and before `PiAgentExecutor` is constructed:
 
    The `cd` is explicit and redundant with step 2 but makes the script's
    working directory deterministic even if the script itself `cd`s away and
-   back. `exec bash` (not `./yeetstrap.sh`) ignores the executable bit and the
+   back. `exec bash` (not `./yolostrap.sh`) ignores the executable bit and the
    script's own shebang choice, so the script runs under the worker image's
    `bash` regardless of how it was committed.
 
@@ -154,7 +154,7 @@ and before `PiAgentExecutor` is constructed:
    `PI_AGENT_PROVIDER`, `PI_AGENT_MODEL`, `NODE_ENV`, and the workspace
    relative `PATH` additions the worker image already provides. The script
    does not see `GITHUB_TOKEN` (the worker never has it) and does not see
-   `YEETOMATIC_SESSION_WS_URL` after the handshake (the worker may unset
+   `YOLO_SESSION_WS_URL` after the handshake (the worker may unset
    request-scoped env before spawning the script; see Environment Hygiene
    below).
 8. Pipe stdout and stderr to the worker's session log emitter as
@@ -169,7 +169,7 @@ script exceeds it, the worker kills the process, emits a final `env_init`
 error log line, and aborts the session. The timeout is long enough for a cold
 `npm install` of a large monoread and short enough that a hung script does not
 burn the full `maxRuntimeSeconds` budget. The timeout is configurable via
-`YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS` (default `1800`).
+`YOLO_WORKER_INIT_TIMEOUT_SECONDS` (default `1800`).
 
 ## Failure Handling
 
@@ -203,10 +203,10 @@ script manually inside a worker shell.
 The init script runs with the worker process environment, with two
 exceptions:
 
-- `YEETOMATIC_SESSION_WS_URL` is unset before the script is spawned. The
+- `YOLO_SESSION_WS_URL` is unset before the script is spawned. The
   WebSocket URL is a single-use reservation token; the script should not see
   it and has no use for it.
-- `YEETOMATIC_SESSION_KEY` is preserved. It is a non-secret
+- `YOLO_SESSION_KEY` is preserved. It is a non-secret
   `owner/repo#number` descriptor and is useful for log lines the script might
   emit.
 
@@ -222,18 +222,18 @@ idempotent or that the environment is rebuilt from scratch each time.
 
 The shared workspace mount is the cache. Concrete example for a Node project:
 
-1. First worker launch: `yeetstrap.sh` runs `npm ci`. `node_modules` is
+1. First worker launch: `yolostrap.sh` runs `npm ci`. `node_modules` is
    materialized inside the workspace. The container exits.
-2. Second worker launch (same repo, same workspace volume): `yeetstrap.sh`
+2. Second worker launch (same repo, same workspace volume): `yolostrap.sh`
    runs `npm ci` again. `npm` sees `node_modules` already present and
    matching the lockfile, does a fast verification, and exits near-instantly.
    The agent starts with a warm environment.
 
 A repository that wants a truly clean rebuild each time can make its
-`yeetstrap.sh` remove `node_modules` first. That is a repository policy
-decision, not a Yeetomatic decision.
+`yolostrap.sh` remove `node_modules` first. That is a repository policy
+decision, not a Yolomatic decision.
 
-Yeetomatic does not checksum the environment before or after the init script.
+Yolomatic does not checksum the environment before or after the init script.
 The contract is "run this script; if it succeeds, start the agent." A
 repository that wants stronger guarantees (for example, refuse to start if
 `npm ci` produced a modified lockfile) encodes that in the script and exits
@@ -247,9 +247,9 @@ None of these variables are required; all have safe defaults.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `YEETOMATIC_WORKER_INIT_SCRIPT` | `yeetstrap.sh` | Path to the init script, resolved relative to the workspace path when not absolute. Set to an absolute path to point outside the workspace (rare). |
-| `YEETOMATIC_WORKER_INIT_SKIP` | `0` | When set to `1` (or `true`), the worker skips the init phase entirely even if a script is present. Used by maintainers to debug a broken environment. |
-| `YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS` | `1800` | Wall-clock seconds before the init script is killed. |
+| `YOLO_WORKER_INIT_SCRIPT` | `yolostrap.sh` | Path to the init script, resolved relative to the workspace path when not absolute. Set to an absolute path to point outside the workspace (rare). |
+| `YOLO_WORKER_INIT_SKIP` | `0` | When set to `1` (or `true`), the worker skips the init phase entirely even if a script is present. Used by maintainers to debug a broken environment. |
+| `YOLO_WORKER_INIT_TIMEOUT_SECONDS` | `1800` | Wall-clock seconds before the init script is killed. |
 
 The control plane reads these from its own process environment in
 `DockerWorkerExecutor.buildDockerRunArgs` and forwards them to the worker
@@ -259,7 +259,7 @@ only passes them through. This keeps the authoritative interpretation in the
 worker, where the script actually runs.
 
 The `.env.example` file should document these three variables as optional,
-grouped with the existing `YEETOMATIC_WORKER_*` variables.
+grouped with the existing `YOLO_WORKER_*` variables.
 
 ## Where the Init Step Lives in Code
 
@@ -303,7 +303,7 @@ branches.
 
 The control-plane change is a one-block addition to
 `DockerWorkerExecutor.buildDockerRunArgs` that forwards the three
-`YEETOMATIC_WORKER_INIT_*` variables when they are present in
+`YOLO_WORKER_INIT_*` variables when they are present in
 `process.env`, mirroring the existing `PI_AGENT_*` forwarding. No control
 plane logic interprets these values.
 
@@ -353,7 +353,7 @@ dependency materialization, not a hook to install system packages.
   unrelated to the refinement task. The skip is a hard skip keyed on the
   refinement prompt kind (`launch_config.payload.prompt.kind ===
   "issue-refinement"`) in the worker runtime, independent of
-  `YEETOMATIC_WORKER_INIT_SKIP`. A repository's `yeetstrap.sh` therefore runs
+  `YOLO_WORKER_INIT_SKIP`. A repository's `yolostrap.sh` therefore runs
   before the implementation agent but not before the refinement agent.
 - **PR review workers**: same as the implementation worker. The init script runs.
 
@@ -371,9 +371,9 @@ Two properties are worth restating:
 - The init script runs as the non-root worker user, with no GitHub
   credentials, no Docker socket, and no control-plane state access. It can
   only mutate the mounted workspace and reach the network.
-- The init script is discovered by convention (`yeetstrap.sh`) and is
+- The init script is discovered by convention (`yolostrap.sh`) and is
   overridable or skippable by the control plane. A maintainer who does not
-  trust a repository's init script sets `YEETOMATIC_WORKER_INIT_SKIP=1` for
+  trust a repository's init script sets `YOLO_WORKER_INIT_SKIP=1` for
   that launch.
 
 Because the workspace mount is shared across launches and across the
@@ -384,7 +384,7 @@ script does not widen this surface.
 ## Disabling
 
 A maintainer disables the init step for a launch by setting
-`YEETOMATIC_WORKER_INIT_SKIP=1` in the control-plane environment before the
+`YOLO_WORKER_INIT_SKIP=1` in the control-plane environment before the
 worker is launched. The variable is forwarded to the worker, the worker
 reads it before stats-ing the script, and the init phase is skipped
 silently. The agent then starts against whatever environment the workspace
@@ -400,7 +400,7 @@ This is the escape hatch for:
 
 ## Example Init Scripts
 
-Minimal Node project (`yeetstrap.sh`):
+Minimal Node project (`yolostrap.sh`):
 
 ```bash
 #!/usr/bin/env bash
@@ -455,7 +455,7 @@ npm run --silent typecheck
 Unit tests in `src/worker/env-init.test.ts` cover:
 
 - script absent -> resolve to "skip", no spawn, no log.
-- `YEETOMATIC_WORKER_INIT_SKIP=1` -> resolve to "skip", no spawn even when
+- `YOLO_WORKER_INIT_SKIP=1` -> resolve to "skip", no spawn even when
   script exists.
 - script present, exits 0 -> resolve, stdout/stderr framed as `event_batch`
   payloads with `details.type: "env_init"`.
@@ -465,21 +465,21 @@ Unit tests in `src/worker/env-init.test.ts` cover:
 - timeout -> reject with `EnvInitError` of kind `timeout`, process killed.
 - unreadable or empty script -> reject with `EnvInitError` of kind
   `invalid_script`.
-- absolute `YEETOMATIC_WORKER_INIT_SCRIPT` -> used as-is.
-- relative `YEETOMATIC_WORKER_INIT_SCRIPT` -> resolved against workspace path.
+- absolute `YOLO_WORKER_INIT_SCRIPT` -> used as-is.
+- relative `YOLO_WORKER_INIT_SCRIPT` -> resolved against workspace path.
 - abort signal fires during init -> script killed, rejection propagates.
 
 Integration coverage in `src/worker/runtime.test.ts` extends the existing
 runtime tests to assert that:
 
-- a workspace with `yeetstrap.sh` runs the script before the executor is
+- a workspace with `yolostrap.sh` runs the script before the executor is
   constructed,
-- a workspace without `yeetstrap.sh` skips straight to the executor, and
+- a workspace without `yolostrap.sh` skips straight to the executor, and
 - a failing init script causes the runtime to emit an `error` message and
   rethrow without constructing the executor.
 
 `src/executor/docker-worker.test.ts` gains assertions that
-`buildDockerRunArgs` forwards `YEETOMATIC_WORKER_INIT_*` variables when
+`buildDockerRunArgs` forwards `YOLO_WORKER_INIT_*` variables when
 present and omits them when absent.
 
 Guardrail coverage for the new `src/worker/env-init.ts` must meet the 80%
@@ -501,8 +501,8 @@ threshold for statements, branches, functions, and lines, per the project's
   preparation is wasted there and can fail the refinement attempt for
   reasons unrelated to the refinement task. The skip is a hard skip keyed on
   the refinement prompt kind in the worker runtime, independent of
-  `YEETOMATIC_WORKER_INIT_SKIP`.
-- Should `YEETOMATIC_WORKER_INIT_SCRIPT` support a `disabled` sentinel
-  value in addition to `YEETOMATIC_WORKER_INIT_SKIP`? Current proposal: no,
+  `YOLO_WORKER_INIT_SKIP`.
+- Should `YOLO_WORKER_INIT_SCRIPT` support a `disabled` sentinel
+  value in addition to `YOLO_WORKER_INIT_SKIP`? Current proposal: no,
   two mechanisms for the same thing is confusing; `SKIP` is the single
   off switch.

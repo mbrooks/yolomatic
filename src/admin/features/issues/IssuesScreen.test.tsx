@@ -55,7 +55,7 @@ describe("IssuesScreen", () => {
 		render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="yeetomatic"
+				repo="yolomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -69,7 +69,7 @@ describe("IssuesScreen", () => {
 		render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="yeetomatic"
+				repo="yolomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -83,7 +83,7 @@ describe("IssuesScreen", () => {
 		const { rerender } = render(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="yeetomatic"
+				repo="yolomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
@@ -92,22 +92,22 @@ describe("IssuesScreen", () => {
 			expect(screen.getByText("Bug")).toBeDefined();
 		});
 		fireEvent.click(screen.getByText("Bug"));
-		expect(screen.getByText("Assign to Yeetomatic")).toBeDefined();
+		expect(screen.getByText("Assign to Yolomatic")).toBeDefined();
 
 		mockIssuesRef.current = [
-			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["yeetomatic"], html_url: "https://github.com/o/r/issues/1" },
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["yolomatic"], html_url: "https://github.com/o/r/issues/1" },
 		];
 		rerender(
 			<IssuesScreen
 				owner="mbrooks"
-				repo="yeetomatic"
+				repo="yolomatic"
 				onBack={vi.fn()}
 				onSelectTab={vi.fn()}
 			/>,
 		);
 		await waitFor(() => {
-			expect(screen.queryByText("Assign to Yeetomatic")).toBeNull();
+			expect(screen.queryByText("Assign to Yolomatic")).toBeNull();
 		});
-		expect(screen.getByText("yeetomatic")).toBeDefined();
+		expect(screen.getByText("yolomatic")).toBeDefined();
 	});
 });

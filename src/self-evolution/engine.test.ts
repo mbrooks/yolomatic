@@ -7,7 +7,7 @@ import { Validator } from "./validator.js";
 
 function makeGithub() {
 	return {
-		createIssue: vi.fn(async () => ({ number: 1, html_url: "https://github.com/mbrooks/yeetomatic/issues/1" })),
+		createIssue: vi.fn(async () => ({ number: 1, html_url: "https://github.com/mbrooks/yolomatic/issues/1" })),
 		postComment: vi.fn(async () => 1),
 		addLabels: vi.fn(),
 		removeLabel: vi.fn(),
@@ -31,7 +31,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: "/tmp/repo",
-			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
+			selfReportRepo: { owner: "mbrooks", repo: "yolomatic" },
 		});
 
 		const error = new Error("JSON parse error");
@@ -45,7 +45,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: "/tmp/repo",
-			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
+			selfReportRepo: { owner: "mbrooks", repo: "yolomatic" },
 		});
 
 		const error = new Error("Random code error");
@@ -54,15 +54,15 @@ describe("SelfEvolutionEngine", () => {
 
 		expect(github.createIssue).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			expect.stringContaining("Self-evolution patch"),
 			expect.stringContaining("Root Cause Analysis"),
-			["yeetomatic-self-evolution", "bug"],
+			["yolomatic-self-evolution", "bug"],
 		);
 	});
 
 	it("applies patch, validates, and files issue for successful fix", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-engine-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-engine-"));
 		const srcDir = path.join(dir, "src");
 		await mkdir(srcDir, { recursive: true });
 		const filePath = path.join(srcDir, "demo.ts");
@@ -72,7 +72,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: dir,
-			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
+			selfReportRepo: { owner: "mbrooks", repo: "yolomatic" },
 		});
 		const validator = new Validator();
 		vi.spyOn(validator, "validate").mockResolvedValue({ ok: true, output: "pass" });
@@ -87,7 +87,7 @@ describe("SelfEvolutionEngine", () => {
 	});
 
 	it("rolls back patch when validation fails", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-engine-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-engine-"));
 		const srcDir = path.join(dir, "src");
 		await mkdir(srcDir, { recursive: true });
 		const filePath = path.join(srcDir, "demo.ts");
@@ -97,7 +97,7 @@ describe("SelfEvolutionEngine", () => {
 		const engine = new SelfEvolutionEngine({
 			github: github as any,
 			repoPath: dir,
-			selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
+			selfReportRepo: { owner: "mbrooks", repo: "yolomatic" },
 		});
 		const validator = new Validator();
 		vi.spyOn(validator, "validate").mockResolvedValue({ ok: false, output: "fail" });

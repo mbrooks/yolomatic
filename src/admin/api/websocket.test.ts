@@ -86,15 +86,15 @@ describe("webSocketManager", () => {
 
 	it("connects and subscribes to logs", () => {
 		const cb = vi.fn();
-		const unsub = webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, cb);
+		const unsub = webSocketManager.subscribeLog("mbrooks", "yolomatic", 1, cb);
 		expect(sockets).toHaveLength(1);
 		const socket = sockets[0];
 		socket.triggerOpen();
 
-		expect(socket.url).toBe("ws://localhost:6767/yeetomatic/admin/ws");
+		expect(socket.url).toBe("ws://localhost:6767/yolomatic/admin/ws");
 		expect(webSocketManager.connectionStatus).toBe("open");
 		expect(socket.sent).toContain(
-			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" }),
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation" }),
 		);
 
 		unsub();
@@ -102,36 +102,36 @@ describe("webSocketManager", () => {
 
 	it("keeps refinement log subscriptions on their own channel", () => {
 		const cb = vi.fn();
-		const unsub = webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, "refinement", cb);
+		const unsub = webSocketManager.subscribeLog("mbrooks", "yolomatic", 1, "refinement", cb);
 		const socket = sockets[0];
 		socket.triggerOpen();
 
 		expect(socket.sent).toContain(
-			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement" }),
+			JSON.stringify({ type: "subscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "refinement" }),
 		);
 
 		socket.triggerMessage({
 			type: "log-entry",
-			sessionKey: "github-mbrooks-yeetomatic-issue-1-refinement",
+			sessionKey: "github-mbrooks-yolomatic-issue-1-refinement",
 			entry: { timestamp: "2025-01-01T00:00:00Z", level: "info", message: "refining" },
 		});
 		expect(cb).toHaveBeenCalledWith(expect.objectContaining({ message: "refining" }));
 
 		unsub();
 		expect(socket.sent).toContain(
-			JSON.stringify({ type: "unsubscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement" }),
+			JSON.stringify({ type: "unsubscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "refinement" }),
 		);
 	});
 
 	it("receives log entries via websocket", () => {
 		const cb = vi.fn();
-		webSocketManager.subscribeLog("mbrooks", "yeetomatic", 1, cb);
+		webSocketManager.subscribeLog("mbrooks", "yolomatic", 1, cb);
 		const socket = sockets[0];
 		socket.triggerOpen();
 
 		socket.triggerMessage({
 			type: "log-entry",
-			sessionKey: "github-mbrooks-yeetomatic-issue-1-implementation",
+			sessionKey: "github-mbrooks-yolomatic-issue-1-implementation",
 			entry: { timestamp: "2025-01-01T00:00:00Z", level: "info", message: "hello" },
 		});
 
@@ -270,11 +270,11 @@ describe("webSocketManager", () => {
 		expect(() => unsub()).not.toThrow();
 	});
 
-	it("uses window.__YEETOMATIC_ADMIN_PATH__ when building the websocket url", () => {
-		(window as unknown as { __YEETOMATIC_ADMIN_PATH__: string }).__YEETOMATIC_ADMIN_PATH__ = "/custom/admin";
+	it("uses window.__YOLO_ADMIN_PATH__ when building the websocket url", () => {
+		(window as unknown as { __YOLO_ADMIN_PATH__: string }).__YOLO_ADMIN_PATH__ = "/custom/admin";
 		webSocketManager.subscribeLog("custom-owner", "custom-repo", 77, () => {});
 		const socket = sockets[sockets.length - 1];
 		expect(socket.url).toBe("ws://localhost:6767/custom/admin/ws");
-		delete (window as unknown as { __YEETOMATIC_ADMIN_PATH__?: string }).__YEETOMATIC_ADMIN_PATH__;
+		delete (window as unknown as { __YOLO_ADMIN_PATH__?: string }).__YOLO_ADMIN_PATH__;
 	});
 });

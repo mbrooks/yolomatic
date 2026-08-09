@@ -9,7 +9,7 @@ import { SettingsStore } from "../../settings/store.js";
 import { AdminSessionAuth } from "./admin-auth.js";
 import { UserStore } from "../../users/store.js";
 
-const TEST_DB = "/tmp/yeetomatic-admin-router-test.sqlite";
+const TEST_DB = "/tmp/yolomatic-admin-router-test.sqlite";
 
 vi.mock("./asset-server.js", () => ({
 	adminHtml: vi.fn(async () => "<html></html>"),
@@ -18,9 +18,9 @@ vi.mock("./asset-server.js", () => ({
 	}),
 }));
 
-const VALID_COOKIE = "yeetomatic_admin_session=valid";
+const VALID_COOKIE = "yolomatic_admin_session=valid";
 function hasValidCookie(req: http.IncomingMessage): boolean {
-	return typeof req.headers.cookie === "string" && req.headers.cookie.includes("yeetomatic_admin_session=");
+	return typeof req.headers.cookie === "string" && req.headers.cookie.includes("yolomatic_admin_session=");
 }
 const sessionAuth = {
 	requireAdminJson: (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -201,7 +201,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/does-not-exist",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -213,7 +213,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -240,9 +240,9 @@ describe.sequential("handleAdminRoute", () => {
 			saveRepoSkill,
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ description: "Updated description" }),
 		});
 		const res = mockResponse();
@@ -250,8 +250,8 @@ describe.sequential("handleAdminRoute", () => {
 		const handled = await handleAdminRoute(req, res, deps);
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(200);
-		expect(getRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", "triage");
-		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yeetomatic", {
+		expect(getRepoSkill).toHaveBeenCalledWith("mbrooks", "yolomatic", "triage");
+		expect(saveRepoSkill).toHaveBeenCalledWith("mbrooks", "yolomatic", {
 			name: "triage",
 			description: "Updated description",
 			content: "Existing body",
@@ -262,7 +262,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({
 				github_token: "tok",
 				github_username: "user",
@@ -283,11 +283,11 @@ describe.sequential("handleAdminRoute", () => {
 		expect(store.getString("github_token")).toBe("tok");
 	});
 
-	it("GET /yeetomatic/admin returns HTML when credentials configured", async () => {
+	it("GET /yolomatic/admin returns HTML when credentials configured", async () => {
 		const req = mockRequest({
-			url: "/yeetomatic/admin",
+			url: "/yolomatic/admin",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -297,11 +297,11 @@ describe.sequential("handleAdminRoute", () => {
 		expect(String(res.body)).toContain("<html>");
 	});
 
-	it("GET /yeetomatic/admin/assets/main.js serves asset", async () => {
+	it("GET /yolomatic/admin/assets/main.js serves asset", async () => {
 		const req = mockRequest({
-			url: "/yeetomatic/admin/assets/main.js",
+			url: "/yolomatic/admin/assets/main.js",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -322,7 +322,7 @@ describe.sequential("handleAdminRoute", () => {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 1,
 							status: "working",
 							lastActivity: "2025-01-01T00:00:00Z",
@@ -345,7 +345,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status/working",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -361,7 +361,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/maintenance",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -376,7 +376,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/maintenance",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ enabled: true }),
 		});
 		const res = mockResponse();
@@ -393,7 +393,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -406,9 +406,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/sessions/:owner/:repo/:issue/log returns log", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			url: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -421,9 +421,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands runs command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			url: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ command: "stop" }),
 		});
 		const res = mockResponse();
@@ -447,12 +447,12 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/settings blanks sensitive values", async () => {
 		store.set("github_token", "supersecret");
-		store.set("github_username", "yeetomatic");
+		store.set("github_username", "yolomatic");
 
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -464,7 +464,7 @@ describe.sequential("handleAdminRoute", () => {
 		const userView = body.settings.find((s: { key: string }) => s.key === "github_username");
 		expect(tokenView.value).toBe("");
 		expect(tokenView.sensitive).toBe(true);
-		expect(userView.value).toBe("yeetomatic");
+		expect(userView.value).toBe("yolomatic");
 		expect(userView.sensitive).toBe(false);
 	});
 
@@ -474,7 +474,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ github_username: "new" }),
 		});
 		const res = mockResponse();
@@ -493,7 +493,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ github_token: "" }),
 		});
 		const res = mockResponse();
@@ -510,7 +510,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ github_token: "tok" }),
 		});
 		const res = mockResponse();
@@ -526,7 +526,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/maintenance",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: "not json",
 		});
 		const res = mockResponse();
@@ -548,7 +548,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status/working",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -569,7 +569,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -588,9 +588,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			url: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -601,9 +601,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/commands rejects missing command", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			url: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({}),
 		});
 		const res = mockResponse();
@@ -625,9 +625,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			url: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ command: "stop" }),
 		});
 		const res = mockResponse();
@@ -650,7 +650,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: "not json",
 		});
 		const res = mockResponse();
@@ -665,7 +665,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -681,7 +681,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ port: 8080 }),
 		});
 		const res = mockResponse();
@@ -703,7 +703,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -719,7 +719,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({
 				github_token: "tok",
 				github_username: "user",
@@ -737,9 +737,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(body.error).toBe("Settings store not configured");
 	});
 
-	it("GET /yeetomatic/admin allows access without a session during onboarding", async () => {
+	it("GET /yolomatic/admin allows access without a session during onboarding", async () => {
 		const req = mockRequest({
-			url: "/yeetomatic/admin",
+			url: "/yolomatic/admin",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -762,7 +762,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -778,7 +778,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ port: 8080 }),
 		});
 		const res = mockResponse();
@@ -801,7 +801,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/onboarding/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -818,7 +818,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/maintenance",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -833,7 +833,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/maintenance",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ enabled: false }),
 		});
 		const res = mockResponse();
@@ -856,7 +856,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status/working",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -877,7 +877,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -903,7 +903,7 @@ describe.sequential("handleAdminRoute", () => {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 1,
 							status: "complete",
 							lastActivity: "2025-01-01T00:00:00Z",
@@ -926,7 +926,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/status/working",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -940,9 +940,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/sessions/:owner/:repo/:issue/unknown returns 404", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/unknown",
+			url: "/api/sessions/mbrooks/yolomatic/1/unknown",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -953,9 +953,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/sessions/:owner/:repo/:issue/unknown returns 404", async () => {
 		const req = mockRequest({
-			url: "/api/sessions/mbrooks/yeetomatic/1/unknown",
+			url: "/api/sessions/mbrooks/yolomatic/1/unknown",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ command: "stop" }),
 		});
 		const res = mockResponse();
@@ -965,9 +965,9 @@ describe.sequential("handleAdminRoute", () => {
 		expect(res.statusCode).toBe(404);
 	});
 
-	it("GET /yeetomatic/admin serves HTML without a session", async () => {
+	it("GET /yolomatic/admin serves HTML without a session", async () => {
 		const req = mockRequest({
-			url: "/yeetomatic/admin",
+			url: "/yolomatic/admin",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -982,7 +982,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: "not json",
 		});
 		const res = mockResponse();
@@ -1002,7 +1002,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/settings",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1015,7 +1015,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/unknown",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1029,7 +1029,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1044,7 +1044,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1066,7 +1066,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
 		});
 		const res = mockResponse();
@@ -1090,7 +1090,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1113,7 +1113,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "new" }),
 		});
 		const res = mockResponse();
@@ -1129,7 +1129,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1155,7 +1155,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, { ...deps, skillStore: undefined });
@@ -1171,7 +1171,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1185,9 +1185,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET /api/repos/:owner/:repo/skills returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1217,9 +1217,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1235,9 +1235,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills lists repo skills", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1250,7 +1250,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -1269,9 +1269,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1291,9 +1291,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
 		});
 		const res = mockResponse();
@@ -1314,9 +1314,9 @@ describe.sequential("handleAdminRoute", () => {
 		} as never;
 
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
 		});
 		const res = mockResponse();
@@ -1330,7 +1330,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
 			body: JSON.stringify({ name: "triage", content: "# Triage", enabled: true }),
 		});
@@ -1343,9 +1343,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 400 on invalid json", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: "not-json",
 		});
 		const res = mockResponse();
@@ -1357,9 +1357,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills returns 500 when repoSkillService is missing", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage", content: "# Triage" }),
 		});
 		const res = mockResponse();
@@ -1371,9 +1371,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/skills requires name and content", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage" }),
 		});
 		const res = mockResponse();
@@ -1393,7 +1393,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "DELETE",
 		});
 		const res = mockResponse();
@@ -1405,9 +1405,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("DELETE returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
@@ -1419,9 +1419,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("DELETE /api/repos/:owner/:repo/skills/:name removes a repo skill", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1440,9 +1440,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: false, error: "git error" })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1460,9 +1460,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => { throw new Error("boom"); }),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "DELETE",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1494,9 +1494,9 @@ describe.sequential("handleAdminRoute", () => {
 			} as never,
 		};
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills",
+			url: "/api/repos/mbrooks/yolomatic/skills",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, serverDeps);
@@ -1511,9 +1511,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET returns 500 when repoSkillService missing for detail", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, noRepoSkillDeps);
@@ -1531,9 +1531,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1551,7 +1551,7 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
 			body: JSON.stringify({ name: "triage" }),
 		});
@@ -1564,9 +1564,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("PATCH returns 500 when repoSkillService missing", async () => {
 		const noRepoSkillDeps = { ...deps, repoSkillService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage" }),
 		});
 		const res = mockResponse();
@@ -1585,9 +1585,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage" }),
 		});
 		const res = mockResponse();
@@ -1606,9 +1606,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: "not-json",
 		});
 		const res = mockResponse();
@@ -1621,9 +1621,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("returns 404 for unknown routes inside skills", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/extra/path",
+			url: "/api/repos/mbrooks/yolomatic/skills/extra/path",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1638,9 +1638,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1658,9 +1658,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 		const handled = await handleAdminRoute(req, res, deps);
@@ -1672,7 +1672,7 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/skills/:name returns 401 when not admin", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "GET",
 		});
 		const res = mockResponse();
@@ -1689,9 +1689,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage", description: "updated", content: "c", enabled: true }),
 		});
 		const res = mockResponse();
@@ -1710,9 +1710,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "renamed" }),
 		});
 		const res = mockResponse();
@@ -1731,9 +1731,9 @@ describe.sequential("handleAdminRoute", () => {
 			deleteRepoSkill: vi.fn(async () => ({ success: true })),
 		} as never;
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/skills/triage",
+			url: "/api/repos/mbrooks/yolomatic/skills/triage",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "triage" }),
 		});
 		const res = mockResponse();
@@ -1746,12 +1746,12 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("GET /api/repos/:owner/:repo/issues returns open issues", async () => {
 		githubService.listOpenIssues.mockResolvedValue([
-			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yeetomatic/issues/1" },
+			{ number: 1, title: "Bug", body: "desc", state: "open", labels: ["bug"], assignees: ["mbrooks"], html_url: "https://github.com/mbrooks/yolomatic/issues/1" },
 		]);
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues",
+			url: "/api/repos/mbrooks/yolomatic/issues",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1761,15 +1761,15 @@ describe.sequential("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.issues).toHaveLength(1);
 		expect(body.issues[0].number).toBe(1);
-		expect(githubService.listOpenIssues).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+		expect(githubService.listOpenIssues).toHaveBeenCalledWith("mbrooks", "yolomatic");
 	});
 
 	it("GET /api/repos/:owner/:repo/issues returns 500 when githubService missing", async () => {
 		const noGhDeps = { ...deps, githubService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues",
+			url: "/api/repos/mbrooks/yolomatic/issues",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1783,9 +1783,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("GET /api/repos/:owner/:repo/issues handles service error", async () => {
 		githubService.listOpenIssues.mockRejectedValue(new Error("Network error"));
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues",
+			url: "/api/repos/mbrooks/yolomatic/issues",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1796,12 +1796,12 @@ describe.sequential("handleAdminRoute", () => {
 		expect(body.error).toContain("Network error");
 	});
 
-	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to Yeetomatic username", async () => {
-		store.set("github_username", "yeetomatic-bot");
+	it("POST /api/repos/:owner/:repo/issues/:number/assign assigns to Yolomatic username", async () => {
+		store.set("github_username", "yolomatic-bot");
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/42/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
@@ -1812,16 +1812,16 @@ describe.sequential("handleAdminRoute", () => {
 		const body = JSON.parse(String(res.body));
 		expect(body.started).toBe(true);
 		expect(body.status).toBe("queued");
-		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic-bot"]);
-		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Bug", "desc", ["bug"]);
+		expect(githubService.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, ["yolomatic-bot"]);
+		expect(deps.startIssueSession!.execute).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Bug", "desc", ["bug"]);
 	});
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when githubService missing", async () => {
 		const noGhDeps = { ...deps, githubService: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/42/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
@@ -1836,9 +1836,9 @@ describe.sequential("handleAdminRoute", () => {
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when settingsStore missing", async () => {
 		const noStoreDeps = { ...deps, settingsStore: undefined };
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/42/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
@@ -1852,9 +1852,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns 500 when github_username not set", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/42/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
@@ -1863,16 +1863,16 @@ describe.sequential("handleAdminRoute", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
 		const body = JSON.parse(String(res.body));
-		expect(body.error).toBe("Yeetomatic GitHub username not configured");
+		expect(body.error).toBe("Yolomatic GitHub username not configured");
 	});
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign handles service error", async () => {
-		store.set("github_username", "yeetomatic-bot");
+		store.set("github_username", "yolomatic-bot");
 		githubService.updateIssueAssignees.mockRejectedValue(new Error("API error"));
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/42/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/42/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ title: "Bug", body: "desc", labels: ["bug"] }),
 		});
 		const res = mockResponse();
@@ -1886,9 +1886,9 @@ describe.sequential("handleAdminRoute", () => {
 
 	it("POST /api/repos/:owner/:repo/issues/:number/assign returns false for invalid issue number", async () => {
 		const req = mockRequest({
-			url: "/api/repos/mbrooks/yeetomatic/issues/abc/assign",
+			url: "/api/repos/mbrooks/yolomatic/issues/abc/assign",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1906,7 +1906,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "Updated" }),
 		});
 		const res = mockResponse();
@@ -1926,7 +1926,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/skills/skill-1",
 			method: "PATCH",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 			body: JSON.stringify({ name: "Updated" }),
 		});
 		const res = mockResponse();
@@ -1952,7 +1952,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1969,7 +1969,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -1985,7 +1985,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations",
 			method: "GET",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -2000,7 +2000,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations/1/accept",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -2017,7 +2017,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations/1/accept",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -2033,7 +2033,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations/1/accept",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -2072,7 +2072,7 @@ describe.sequential("handleAdminRoute", () => {
 		const req = mockRequest({
 			url: "/api/github/invitations/abc/accept",
 			method: "POST",
-			headers: { cookie: "yeetomatic_admin_session=valid" },
+			headers: { cookie: "yolomatic_admin_session=valid" },
 		});
 		const res = mockResponse();
 
@@ -2089,7 +2089,7 @@ describe.sequential("handleAdminRoute — Basic Auth route scoping", () => {
 	let realDeps: Parameters<typeof handleAdminRoute>[2];
 
 	beforeEach(async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-admin-router-basic-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-admin-router-basic-"));
 		userStore = new UserStore(path.join(dir, "users.sqlite"));
 		userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
 		realDeps = {

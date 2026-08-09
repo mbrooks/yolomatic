@@ -14,7 +14,7 @@ async function withMockCurl(
 	responses: string[],
 	fn: (extraEnv: Record<string, string>) => Promise<void>,
 ): Promise<void> {
-	const dir = await mkdtemp(join(tmpdir(), "yeetomatic-mock-curl-"));
+	const dir = await mkdtemp(join(tmpdir(), "yolomatic-mock-curl-"));
 	try {
 		const mockCurl = join(dir, "curl");
 		const counterFile = join(dir, "counter");
@@ -44,12 +44,12 @@ echo '${responses[responses.length - 1] ?? '{"working":false,"count":0}'}'
 	}
 }
 
-describe("update-yeetomatic-if-needed.sh", () => {
+describe("update-yolomatic-if-needed.sh", () => {
 	it("polls working status and proceeds when no sessions are working", async () => {
 		await withMockCurl(
 			['{"working":true,"count":1}', '{"working":false,"count":0}'],
 			async (extraEnv) => {
-				const { stdout } = await execFileAsync(BASH, ["scripts/update-yeetomatic-if-needed.sh"], {
+				const { stdout } = await execFileAsync(BASH, ["scripts/update-yolomatic-if-needed.sh"], {
 					cwd: process.cwd(),
 					env: {
 						...process.env,
@@ -74,7 +74,7 @@ describe("update-yeetomatic-if-needed.sh", () => {
 		await withMockCurl(
 			['{"working":true,"count":1}', '{"working":true,"count":1}'],
 			async (extraEnv) => {
-				const { stdout } = await execFileAsync(BASH, ["scripts/update-yeetomatic-if-needed.sh"], {
+				const { stdout } = await execFileAsync(BASH, ["scripts/update-yolomatic-if-needed.sh"], {
 					cwd: process.cwd(),
 					env: {
 						...process.env,
@@ -94,7 +94,7 @@ describe("update-yeetomatic-if-needed.sh", () => {
 	});
 
 	it("skips drain check when admin credentials are missing", async () => {
-		const { stdout } = await execFileAsync(BASH, ["scripts/update-yeetomatic-if-needed.sh"], {
+		const { stdout } = await execFileAsync(BASH, ["scripts/update-yolomatic-if-needed.sh"], {
 			cwd: process.cwd(),
 			env: {
 				...process.env,
@@ -111,9 +111,9 @@ describe("update-yeetomatic-if-needed.sh", () => {
 	});
 
 	it("proceeds when curl is not available", async () => {
-		const dir = await mkdtemp(join(tmpdir(), "yeetomatic-no-curl-"));
+		const dir = await mkdtemp(join(tmpdir(), "yolomatic-no-curl-"));
 		try {
-			const { stdout } = await execFileAsync(BASH, ["scripts/update-yeetomatic-if-needed.sh"], {
+			const { stdout } = await execFileAsync(BASH, ["scripts/update-yolomatic-if-needed.sh"], {
 				cwd: process.cwd(),
 				env: {
 					...process.env,
@@ -127,7 +127,7 @@ describe("update-yeetomatic-if-needed.sh", () => {
 					MAX_TRIES: "1",
 				},
 			});
-			expect(stdout).toContain("Warning: could not reach Yeetomatic status API. Proceeding with deploy.");
+			expect(stdout).toContain("Warning: could not reach Yolomatic status API. Proceeding with deploy.");
 		} finally {
 			// temp dir cleaned by OS
 		}

@@ -57,7 +57,7 @@ export interface WorkerWorkspaceGateway {
  * Allowed targets:
  * - the session's own issue (owner/repo/issueNumber from SessionState); and
  * - the PR associated with that issue: `state.prNumber` when present, plus any
- *   other open PR whose head is the session branch `yeetomatic/issue-{n}`.
+ *   other open PR whose head is the session branch `yolomatic/issue-{n}`.
  *
  * Any request targeting a different owner/repo/issue_number is rejected without
  * a GitHub call. A `pr_number` that is neither `state.prNumber` nor a session
@@ -315,7 +315,7 @@ export class WorkerGitHubGateway {
 	}
 
 	private async listBranchPrs(state: SessionState): Promise<GatewayPullRequestSummary[]> {
-		const head = `yeetomatic/issue-${state.issueNumber}`;
+		const head = `yolomatic/issue-${state.issueNumber}`;
 		return this.github.listPullRequestsForHead(state.owner, state.repo, head, "open");
 	}
 

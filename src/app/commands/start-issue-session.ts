@@ -123,7 +123,7 @@ export class StartIssueSession {
 				repo,
 				issueNumber,
 				session,
-				"Picked up by Yeetomatic. Working on it...",
+				"Picked up by Yolomatic. Working on it...",
 				undefined,
 				this.adminSessionUrl(owner, repo, issueNumber),
 			);

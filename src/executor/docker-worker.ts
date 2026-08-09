@@ -26,7 +26,7 @@ import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from 
 import type { WorkerGitHubGateway } from "../worker/github-gateway.js";
 
 const execFileAsync = promisify(execFile);
-const WORKER_IMAGE_TRANSPORT_LABEL = "io.yeetomatic.worker.transport";
+const WORKER_IMAGE_TRANSPORT_LABEL = "io.yolomatic.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 const MAX_WORKER_LAUNCH_RETRIES = 3;
 const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
@@ -220,10 +220,10 @@ export class DockerWorkerExecutor implements ExecutionService {
 			cwd: this.options.projectRoot,
 			env: {
 				...process.env,
-				YEETOMATIC_SESSION_KEY: sessionKey,
-				YEETOMATIC_SESSION_WS_URL: workerSessionUrl,
-				YEETOMATIC_SOUL_PATH: this.options.soulPath,
-				YEETOMATIC_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
+				YOLO_SESSION_KEY: sessionKey,
+				YOLO_SESSION_WS_URL: workerSessionUrl,
+				YOLO_SOUL_PATH: this.options.soulPath,
+				YOLO_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
 			},
 			stdio: ["ignore", "pipe", "pipe"],
 		});
@@ -605,17 +605,17 @@ export class DockerWorkerExecutor implements ExecutionService {
 		if (process.env.PI_AGENT_MODEL?.trim()) {
 			args.push("-e", `PI_AGENT_MODEL=${process.env.PI_AGENT_MODEL.trim()}`);
 		}
-		const initScript = process.env.YEETOMATIC_WORKER_INIT_SCRIPT?.trim();
+		const initScript = process.env.YOLO_WORKER_INIT_SCRIPT?.trim();
 		if (initScript) {
-			args.push("-e", `YEETOMATIC_WORKER_INIT_SCRIPT=${initScript}`);
+			args.push("-e", `YOLO_WORKER_INIT_SCRIPT=${initScript}`);
 		}
-		const initSkip = process.env.YEETOMATIC_WORKER_INIT_SKIP?.trim();
+		const initSkip = process.env.YOLO_WORKER_INIT_SKIP?.trim();
 		if (initSkip) {
-			args.push("-e", `YEETOMATIC_WORKER_INIT_SKIP=${initSkip}`);
+			args.push("-e", `YOLO_WORKER_INIT_SKIP=${initSkip}`);
 		}
-		const initTimeout = process.env.YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS?.trim();
+		const initTimeout = process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS?.trim();
 		if (initTimeout) {
-			args.push("-e", `YEETOMATIC_WORKER_INIT_TIMEOUT_SECONDS=${initTimeout}`);
+			args.push("-e", `YOLO_WORKER_INIT_TIMEOUT_SECONDS=${initTimeout}`);
 		}
 		const ollamaHost = this.resolveWorkerOllamaHost();
 		if (ollamaHost) {
@@ -624,11 +624,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 
 		args.push(
 			"-e",
-			"YEETOMATIC_SESSION_KEY",
+			"YOLO_SESSION_KEY",
 			"-e",
-			"YEETOMATIC_SESSION_WS_URL",
+			"YOLO_SESSION_WS_URL",
 			"-e",
-			"YEETOMATIC_SOUL_PATH",
+			"YOLO_SOUL_PATH",
 			this.options.workerImage,
 		);
 
@@ -781,7 +781,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private buildContainerName(state: SessionState, kind?: string): string {
-		const prefix = kind === "issue-refinement" ? "yeetomatic-refinement" : "yeetomatic-session";
+		const prefix = kind === "issue-refinement" ? "yolomatic-refinement" : "yolomatic-session";
 		return `${prefix}-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
 	}
 

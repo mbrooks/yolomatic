@@ -98,7 +98,7 @@ export class WorkspaceManager implements WorkspaceService {
 
 		const hasStagedChanges = await this.git.hasChanges(worktreePath, true);
 		if (hasStagedChanges) {
-			await this.git.run("git", ["commit", "-m", message ?? `Yeetomatic: Changes for branch ${branchName}`], {
+			await this.git.run("git", ["commit", "-m", message ?? `Yolomatic: Changes for branch ${branchName}`], {
 				cwd: worktreePath,
 			});
 		}
@@ -136,7 +136,7 @@ export class WorkspaceManager implements WorkspaceService {
 		const bareRepoPath = await this.bareRepos.ensureBareRepo(normalizedOwner, normalizedRepo);
 		const basePath = this.worktrees.getWorktreePath(normalizedOwner, normalizedRepo, issueNumber);
 		const refinementPath = path.join(path.dirname(basePath), "refinement", `issue-${issueNumber}`);
-		const branchName = `yeetomatic/refinement-issue-${issueNumber}`;
+		const branchName = `yolomatic/refinement-issue-${issueNumber}`;
 		const defaultBranch = this.config.resolveDefaultBranch?.(normalizedOwner, normalizedRepo) ?? this.config.defaultBranch ?? "main";
 
 		if (await this.worktrees.worktreeExists(bareRepoPath, refinementPath)) {
@@ -164,7 +164,7 @@ export class WorkspaceManager implements WorkspaceService {
 	async commitAndPush(owner: string, repo: string, issueNumber: number, message?: string): Promise<boolean> {
 		const worktreePath = this.getWorktreePath(owner, repo, issueNumber);
 		const branchName = this.getBranchName(issueNumber);
-		return this.commitAndPushPath(worktreePath, branchName, message ?? `Yeetomatic: Changes for issue #${issueNumber}`);
+		return this.commitAndPushPath(worktreePath, branchName, message ?? `Yolomatic: Changes for issue #${issueNumber}`);
 	}
 
 	async hasChanges(workspacePath: string, cached = false): Promise<boolean> {

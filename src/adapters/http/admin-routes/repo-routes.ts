@@ -256,9 +256,9 @@ const registry = new AdminRouteRegistry()
 			);
 			const [owner, repo, issueNumberStr] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
-			const yeetomaticUsername = settingsStore.get("github_username");
-			if (!yeetomaticUsername) {
-				sendJson(ctx.response, 500, { error: "Yeetomatic GitHub username not configured" });
+			const yolomaticUsername = settingsStore.get("github_username");
+			if (!yolomaticUsername) {
+				sendJson(ctx.response, 500, { error: "Yolomatic GitHub username not configured" });
 				return;
 			}
 			const body = ctx.body as {
@@ -269,7 +269,7 @@ const registry = new AdminRouteRegistry()
 			if (!body.title) {
 				throw new ValidationError("Missing required field: title");
 			}
-			await githubService.updateIssueAssignees(owner, repo, issueNumber, [yeetomaticUsername]);
+			await githubService.updateIssueAssignees(owner, repo, issueNumber, [yolomaticUsername]);
 			startIssueSession.execute(
 				owner,
 				repo,
@@ -304,9 +304,9 @@ const registry = new AdminRouteRegistry()
 			]);
 			const [owner, repo, issueNumberStr] = ctx.params;
 			const issueNumber = Number.parseInt(issueNumberStr, 10);
-			const yeetomaticUsername = settingsStore.get("github_username");
-			if (!yeetomaticUsername) {
-				sendJson(ctx.response, 500, { error: "Yeetomatic GitHub username not configured" });
+			const yolomaticUsername = settingsStore.get("github_username");
+			if (!yolomaticUsername) {
+				sendJson(ctx.response, 500, { error: "Yolomatic GitHub username not configured" });
 				return;
 			}
 			const body = ctx.body as {

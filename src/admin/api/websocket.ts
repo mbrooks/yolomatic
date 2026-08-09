@@ -2,12 +2,12 @@ import type { LogEntry, Session } from "../app/types.js";
 
 export type WebSocketStatus = "connecting" | "open" | "closed" | "error";
 
-export const DEFAULT_ADMIN_PATH = "/yeetomatic/admin";
+export const DEFAULT_ADMIN_PATH = "/yolomatic/admin";
 
 function adminWsPath(): string {
 	const configured =
-		typeof window !== "undefined" && typeof (window as unknown as { __YEETOMATIC_ADMIN_PATH__?: unknown }).__YEETOMATIC_ADMIN_PATH__ === "string"
-			? (window as unknown as { __YEETOMATIC_ADMIN_PATH__: string }).__YEETOMATIC_ADMIN_PATH__
+		typeof window !== "undefined" && typeof (window as unknown as { __YOLO_ADMIN_PATH__?: unknown }).__YOLO_ADMIN_PATH__ === "string"
+			? (window as unknown as { __YOLO_ADMIN_PATH__: string }).__YOLO_ADMIN_PATH__
 			: DEFAULT_ADMIN_PATH;
 	return configured === "/" ? "/ws" : `${configured}/ws`;
 }

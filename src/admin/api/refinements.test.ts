@@ -17,18 +17,18 @@ describe("refinements api", () => {
 		it("GETs the refinement log endpoint without a since cursor", async () => {
 			vi.mocked(apiGet).mockResolvedValueOnce({ available: false, logs: [] });
 
-			await fetchRefinementLog("mbrooks", "yeetomatic", 42);
+			await fetchRefinementLog("mbrooks", "yolomatic", 42);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/refinement/log");
+			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yolomatic/42/refinement/log");
 		});
 
 		it("appends the encoded since cursor when provided", async () => {
 			vi.mocked(apiGet).mockResolvedValueOnce({ available: false, logs: [] });
 
-			await fetchRefinementLog("mbrooks", "yeetomatic", 42, "2026-01-01T00:00:00Z");
+			await fetchRefinementLog("mbrooks", "yolomatic", 42, "2026-01-01T00:00:00Z");
 
 			expect(apiGet).toHaveBeenCalledWith(
-				"/api/refinements/mbrooks/yeetomatic/42/refinement/log?since=2026-01-01T00%3A00%3A00Z",
+				"/api/refinements/mbrooks/yolomatic/42/refinement/log?since=2026-01-01T00%3A00%3A00Z",
 			);
 		});
 
@@ -47,9 +47,9 @@ describe("refinements api", () => {
 		it("GETs the refinement attempts endpoint", async () => {
 			vi.mocked(apiGet).mockResolvedValueOnce({ attempts: [] });
 
-			await fetchRefinementAttempts("mbrooks", "yeetomatic", 42);
+			await fetchRefinementAttempts("mbrooks", "yolomatic", 42);
 
-			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yeetomatic/42/refinement/attempts");
+			expect(apiGet).toHaveBeenCalledWith("/api/refinements/mbrooks/yolomatic/42/refinement/attempts");
 		});
 
 		it("URL-encodes owner and repo segments", async () => {

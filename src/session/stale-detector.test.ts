@@ -87,7 +87,7 @@ function makeDetector(options: {
 describe("StaleSessionDetector", () => {
 	it("skips non-working sessions", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "pending" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "pending" })],
 		});
 
 		const result = await detector.detectStaleSessions();
@@ -97,7 +97,7 @@ describe("StaleSessionDetector", () => {
 
 	it("skips in-flight sessions", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			isInFlight: true,
 		});
 
@@ -112,7 +112,7 @@ describe("StaleSessionDetector", () => {
 				makeSession({
 					kind: "refinement",
 					owner: "mbrooks",
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					issueNumber: 1,
 					status: "working",
 				}),
@@ -127,7 +127,7 @@ describe("StaleSessionDetector", () => {
 
 	it("marks sessions below the threshold as not stale", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			thresholdMs: 1_000_000,
 		});
 
@@ -138,7 +138,7 @@ describe("StaleSessionDetector", () => {
 
 	it("classifies stale sessions with dirty worktrees as needs-review", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			hasChanges: true,
 			thresholdMs: 1,
 		});
@@ -152,7 +152,7 @@ describe("StaleSessionDetector", () => {
 	it("classifies closed issue + merged PR as stale-complete-candidate", async () => {
 		const detector = makeDetector({
 			sessions: [
-				makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
+				makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
 			],
 			thresholdMs: 1,
 			issueState: "closed",
@@ -167,7 +167,7 @@ describe("StaleSessionDetector", () => {
 	it("classifies missing/closed issue + closed PR as stale-abandoned-candidate", async () => {
 		const detector = makeDetector({
 			sessions: [
-				makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
+				makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
 			],
 			thresholdMs: 1,
 			issueState: "closed",
@@ -181,7 +181,7 @@ describe("StaleSessionDetector", () => {
 
 	it("classifies clean worktree with closed issue as safe-to-archive", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			thresholdMs: 1,
 			hasChanges: false,
 			issueState: "closed",
@@ -194,7 +194,7 @@ describe("StaleSessionDetector", () => {
 
 	it("handles worktree hasChanges errors gracefully", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			thresholdMs: 1,
 			hasChanges: async () => {
 				throw new Error("git error");
@@ -207,7 +207,7 @@ describe("StaleSessionDetector", () => {
 
 	it("handles missing issue state", async () => {
 		const detector = makeDetector({
-			sessions: [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" })],
+			sessions: [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" })],
 			thresholdMs: 1,
 			hasChanges: true,
 			issueError: true,
@@ -221,7 +221,7 @@ describe("StaleSessionDetector", () => {
 	it("handles missing pr state", async () => {
 		const detector = makeDetector({
 			sessions: [
-				makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
+				makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working", prNumber: 10, prUrl: "url" }),
 			],
 			thresholdMs: 1,
 			hasChanges: true,

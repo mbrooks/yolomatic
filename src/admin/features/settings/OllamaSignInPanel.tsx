@@ -15,7 +15,7 @@ export type FetchOllamaSignInStatus = () => Promise<OllamaSignInStatus>;
  * `fetchOllamaSignInStatus`.
  */
 export function OllamaSignInPanel({
-	containerName = "yeetomatic-ollama",
+	containerName = "yolomatic-ollama",
 	fetchStatus = fetchOllamaSignInStatus,
 }: {
 	containerName?: string;

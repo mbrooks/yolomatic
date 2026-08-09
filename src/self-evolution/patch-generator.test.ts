@@ -12,7 +12,7 @@ describe("PatchGenerator", () => {
 	});
 
 	it("applies optional chaining for undefined property read", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-patch-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-patch-"));
 		const filePath = path.join(dir, "demo.ts");
 		await writeFile(filePath, "const x = obj.prop;\n", "utf-8");
 
@@ -25,7 +25,7 @@ describe("PatchGenerator", () => {
 	});
 
 	it("returns null when no rule matches", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-patch-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-patch-"));
 		const filePath = path.join(dir, "demo.ts");
 		await writeFile(filePath, "const x = 1;\n", "utf-8");
 

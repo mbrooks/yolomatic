@@ -6,13 +6,13 @@ import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./webs
 describe("worker websocket transport", () => {
 	it("decodes string payloads", () => {
 		const message = decodeWorkerWebSocketMessage(
-			JSON.stringify(createWorkerMessage("hello", "mbrooks/yeetomatic#1", "msg-1", { workerVersion: "test", pid: 1 })) as never,
+			JSON.stringify(createWorkerMessage("hello", "mbrooks/yolomatic#1", "msg-1", { workerVersion: "test", pid: 1 })) as never,
 		);
 		expect(message.messageId).toBe("msg-1");
 	});
 
 	it("decodes ArrayBuffer payloads", () => {
-		const json = JSON.stringify(createWorkerMessage("ack", "mbrooks/yeetomatic#1", "msg-2", { ackMessageId: "msg-1" }));
+		const json = JSON.stringify(createWorkerMessage("ack", "mbrooks/yolomatic#1", "msg-2", { ackMessageId: "msg-1" }));
 		const buffer = Uint8Array.from(Buffer.from(json, "utf8")).buffer;
 		const message = decodeWorkerWebSocketMessage(buffer);
 		expect(message.type).toBe("ack");
@@ -20,7 +20,7 @@ describe("worker websocket transport", () => {
 
 	it("decodes mixed binary chunk arrays", () => {
 		const json = JSON.stringify(
-			createWorkerMessage("error", "mbrooks/yeetomatic#1", "msg-3", {
+			createWorkerMessage("error", "mbrooks/yolomatic#1", "msg-3", {
 				message: "boom",
 			}),
 		);
@@ -32,7 +32,7 @@ describe("worker websocket transport", () => {
 
 	it("passes Buffer payloads through unchanged", () => {
 		const raw = Buffer.from(
-			JSON.stringify(createWorkerMessage("complete", "mbrooks/yeetomatic#1", "msg-4", {
+			JSON.stringify(createWorkerMessage("complete", "mbrooks/yolomatic#1", "msg-4", {
 				result: { status: "complete", summary: "done", rawResponse: "" },
 			})),
 			"utf8",
@@ -52,7 +52,7 @@ describe("worker websocket transport", () => {
 
 		await sendWorkerWebSocketMessage(
 			ws as never,
-			createWorkerMessage("heartbeat", "mbrooks/yeetomatic#1", "msg-5", {
+			createWorkerMessage("heartbeat", "mbrooks/yolomatic#1", "msg-5", {
 				state: "running",
 				pid: 1,
 				timestamp: new Date().toISOString(),
@@ -73,7 +73,7 @@ describe("worker websocket transport", () => {
 		await expect(
 			sendWorkerWebSocketMessage(
 				ws as never,
-				createWorkerMessage("heartbeat", "mbrooks/yeetomatic#1", "msg-6", {
+				createWorkerMessage("heartbeat", "mbrooks/yolomatic#1", "msg-6", {
 					state: "running",
 					pid: 1,
 					timestamp: new Date().toISOString(),

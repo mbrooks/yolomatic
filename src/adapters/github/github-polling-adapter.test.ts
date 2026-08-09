@@ -40,20 +40,20 @@ describe("GitHubPollingAdapter", () => {
 						state: "open",
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:01:00Z",
-						labels: [{ name: "yeetomatic" }],
-						assignee: { login: "yeetomatic-bot" },
-						assignees: [{ login: "yeetomatic-bot" }],
+						labels: [{ name: "yolomatic" }],
+						assignee: { login: "yolomatic-bot" },
+						assignees: [{ login: "yolomatic-bot" }],
 						user: { login: "human" },
 					}],
 				})),
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		const result = await adapter.listIssuesUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z");
+		const result = await adapter.listIssuesUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z");
 		expect(result[0]).toEqual(expect.objectContaining({
 			number: 1,
-			labels: [{ name: "yeetomatic" }],
-			assignees: [{ login: "yeetomatic-bot" }],
+			labels: [{ name: "yolomatic" }],
+			assignees: [{ login: "yolomatic-bot" }],
 		}));
 	});
 
@@ -67,8 +67,8 @@ describe("GitHubPollingAdapter", () => {
 				created_at: "2026-06-01T00:00:00Z",
 				updated_at: "2026-06-01T00:01:00Z",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 				user: { login: "human" },
 			},
 			{
@@ -79,8 +79,8 @@ describe("GitHubPollingAdapter", () => {
 				created_at: "2026-06-01T00:00:00Z",
 				updated_at: "2026-06-01T00:02:00Z",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 				user: { login: "human" },
 			},
 		];
@@ -92,11 +92,11 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		const result = await adapter.listIssuesUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z");
+		const result = await adapter.listIssuesUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z");
 		expect(result).toHaveLength(1);
 		expect(result[0]).toEqual(expect.objectContaining({ number: 1, state: "open" }));
 		expect(octokit.issues.listForRepo).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "yeetomatic", state: "open" }),
+			expect.objectContaining({ owner: "mbrooks", repo: "yolomatic", state: "open" }),
 		);
 	});
 
@@ -109,7 +109,7 @@ describe("GitHubPollingAdapter", () => {
 						body: "Comment",
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:00:00Z",
-						issue_url: "https://api.github.com/repos/mbrooks/yeetomatic/issues/1",
+						issue_url: "https://api.github.com/repos/mbrooks/yolomatic/issues/1",
 						user: { login: "human", type: "User" },
 					}],
 				})),
@@ -129,7 +129,7 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		const result = await adapter.listIssueCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z");
+		const result = await adapter.listIssueCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z");
 		expect(result[0]).toEqual(expect.objectContaining({
 			id: 10,
 			issue: expect.objectContaining({ number: 1 }),
@@ -148,7 +148,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:05:00Z",
-						head: { ref: "yeetomatic/issue-1" },
+						head: { ref: "yolomatic/issue-1" },
 						user: { login: "human" },
 					}],
 				})),
@@ -161,7 +161,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:05:00Z",
-						head: { ref: "yeetomatic/issue-1" },
+						head: { ref: "yolomatic/issue-1" },
 						user: { login: "human" },
 					},
 				})),
@@ -171,7 +171,7 @@ describe("GitHubPollingAdapter", () => {
 						body: "Fix this",
 						created_at: "2026-06-01T00:05:00Z",
 						updated_at: "2026-06-01T00:05:00Z",
-						pull_request_url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/2",
+						pull_request_url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/2",
 						user: { login: "reviewer" },
 						path: "src/a.ts",
 						line: 4,
@@ -180,8 +180,8 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		await expect(adapter.listPullRequestsUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:01:00Z")).resolves.toHaveLength(1);
-		const comments = await adapter.listPRReviewCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:01:00Z");
+		await expect(adapter.listPullRequestsUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:01:00Z")).resolves.toHaveLength(1);
+		const comments = await adapter.listPRReviewCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:01:00Z");
 		expect(comments[0]).toEqual(expect.objectContaining({
 			id: 20,
 			pull_request: expect.objectContaining({ number: 2 }),
@@ -207,7 +207,7 @@ describe("GitHubPollingAdapter", () => {
 				})),
 				listEventsForTimeline: vi.fn(async () => ({
 					data: [
-						{ id: 1, event: "assigned", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" }, assignee: { login: "yeetomatic-bot" } },
+						{ id: 1, event: "assigned", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" }, assignee: { login: "yolomatic-bot" } },
 						{ id: 2, event: "labeled", created_at: "2026-06-01T00:02:00Z", actor: { login: "human" } },
 						{ id: 3, event: "unassigned", created_at: "2026-05-31T00:02:00Z", actor: { login: "human" } },
 					],
@@ -223,7 +223,7 @@ describe("GitHubPollingAdapter", () => {
 						merged: false,
 						created_at: "2026-06-01T00:00:00Z",
 						updated_at: "2026-06-01T00:02:00Z",
-						head: { ref: "yeetomatic/issue-1" },
+						head: { ref: "yolomatic/issue-1" },
 						user: { login: "human" },
 					}],
 				})),
@@ -236,8 +236,8 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		await expect(adapter.listIssueEventsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toHaveLength(1);
-		await expect(adapter.listPRReviewsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toHaveLength(1);
+		await expect(adapter.listIssueEventsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toHaveLength(1);
+		await expect(adapter.listPRReviewsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toHaveLength(1);
 	});
 
 	it("returns empty arrays when polling reads fail", async () => {
@@ -252,12 +252,12 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		await expect(adapter.listIssuesUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listIssueEventsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listIssueCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listPullRequestsUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listPRReviewsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listPRReviewCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listIssuesUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listIssueEventsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listIssueCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listPullRequestsUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listPRReviewsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listPRReviewCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
 	});
 
 	it("skips comments when related issue or PR context cannot be loaded", async () => {
@@ -266,7 +266,7 @@ describe("GitHubPollingAdapter", () => {
 				listCommentsForRepo: vi.fn(async () => ({
 					data: [
 						{ id: 1, issue_url: "", body: "no issue", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
-						{ id: 2, issue_url: "https://api.github.com/repos/mbrooks/yeetomatic/issues/2", body: "missing issue", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
+						{ id: 2, issue_url: "https://api.github.com/repos/mbrooks/yolomatic/issues/2", body: "missing issue", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
 					],
 				})),
 				get: vi.fn(async () => { throw new Error("missing"); }),
@@ -275,15 +275,15 @@ describe("GitHubPollingAdapter", () => {
 				listReviewCommentsForRepo: vi.fn(async () => ({
 					data: [
 						{ id: 3, pull_request_url: "", body: "no pr", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
-						{ id: 4, pull_request_url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/4", body: "missing pr", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
+						{ id: 4, pull_request_url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/4", body: "missing pr", created_at: "2026-06-01T00:00:00Z", user: { login: "human" } },
 					],
 				})),
 				get: vi.fn(async () => { throw new Error("missing"); }),
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		await expect(adapter.listIssueCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listPRReviewCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listIssueCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listPRReviewCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
 	});
 
 	it("maps sparse polling API responses through fallback fields", async () => {
@@ -292,14 +292,14 @@ describe("GitHubPollingAdapter", () => {
 				listForRepo: vi.fn(async () => ({
 					data: [{
 						number: 1,
-						labels: ["yeetomatic", {}],
-						assignees: [{ login: "" }, { login: "yeetomatic-bot" }],
+						labels: ["yolomatic", {}],
+						assignees: [{ login: "" }, { login: "yolomatic-bot" }],
 					}],
 				})),
 				listCommentsForRepo: vi.fn(async () => ({
 					data: [{
 						id: 11,
-						issue_url: "https://api.github.com/repos/mbrooks/yeetomatic/issues/1",
+						issue_url: "https://api.github.com/repos/mbrooks/yolomatic/issues/1",
 						created_at: "2026-06-01T00:00:00Z",
 					}],
 				})),
@@ -322,7 +322,7 @@ describe("GitHubPollingAdapter", () => {
 				listReviewCommentsForRepo: vi.fn(async () => ({
 					data: [{
 						id: 21,
-						pull_request_url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/2",
+						pull_request_url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/2",
 						created_at: "2026-06-01T00:00:00Z",
 					}],
 				})),
@@ -334,31 +334,31 @@ describe("GitHubPollingAdapter", () => {
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
 
 		expect(await adapter.listAccessibleRepositories()).toEqual([{ owner: "", repo: "", fullName: "", visibility: "public" }]);
-		expect(await adapter.listIssuesUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listIssuesUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({
 				title: "",
 				body: null,
 				state: "",
-				labels: [{ name: "yeetomatic" }, { name: undefined }],
+				labels: [{ name: "yolomatic" }, { name: undefined }],
 				assignee: null,
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignees: [{ login: "yolomatic-bot" }],
 				user: undefined,
 				pull_request: undefined,
 			}),
 		]);
-		expect(await adapter.listIssueEventsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listIssueEventsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({ id: 0, actor: undefined, assignee: undefined }),
 		]);
-		expect(await adapter.listIssueCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listIssueCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({ body: "", user: { login: "", type: undefined } }),
 		]);
-		expect(await adapter.listPullRequestsUpdatedSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listPullRequestsUpdatedSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({ title: "", body: null, state: "", merged: false, head: { ref: "" }, user: undefined }),
 		]);
-		expect(await adapter.listPRReviewsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listPRReviewsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({ body: null, user: { login: "" } }),
 		]);
-		expect(await adapter.listPRReviewCommentsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).toEqual([
+		expect(await adapter.listPRReviewCommentsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).toEqual([
 			expect.objectContaining({ body: "", updated_at: "2026-06-01T00:00:00Z", user: { login: "" } }),
 		]);
 	});
@@ -375,7 +375,7 @@ describe("GitHubPollingAdapter", () => {
 			},
 		});
 		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
-		await expect(adapter.listIssueEventsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
-		await expect(adapter.listPRReviewsSince("mbrooks", "yeetomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listIssueEventsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
+		await expect(adapter.listPRReviewsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
 	});
 });

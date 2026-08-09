@@ -6,8 +6,8 @@ interface IssueLabel {
 	name?: string;
 }
 
-export const YEETOMATIC_WORKFLOW_LABELS = ["yeetomatic-working", "yeetomatic-feedback-required", "yeetomatic-pr-created", "yeetomatic-complete"] as const;
-export const YEETOMATIC_VISIBLE_LABELS = [...YEETOMATIC_WORKFLOW_LABELS, "yeetomatic"] as const;
+export const YOLO_WORKFLOW_LABELS = ["yolomatic-working", "yolomatic-feedback-required", "yolomatic-pr-created", "yolomatic-complete"] as const;
+export const YOLO_VISIBLE_LABELS = [...YOLO_WORKFLOW_LABELS, "yolomatic"] as const;
 export const DO_NOT_WORK_LABELS = ["wontfix", "invalid"] as const;
 
 export function hasLabel(labels: IssueLabel[] | undefined, label: string): boolean {
@@ -18,11 +18,11 @@ export function hasAnyLabel(labels: IssueLabel[] | undefined, searchLabels: stri
 	return (labels ?? []).some((item) => item.name && searchLabels.includes(item.name));
 }
 
-export function hasYeetomaticVisibleLabel(labels: IssueLabel[] | undefined): boolean {
-	return hasAnyLabel(labels, [...YEETOMATIC_VISIBLE_LABELS]);
+export function hasYolomaticVisibleLabel(labels: IssueLabel[] | undefined): boolean {
+	return hasAnyLabel(labels, [...YOLO_VISIBLE_LABELS]);
 }
 
-export function isAssignedToYeetomatic(
+export function isAssignedToYolomatic(
 	issue: { assignee?: { login: string } | null; assignees?: { login: string }[] },
 	githubUsername: string,
 ): boolean {
@@ -59,21 +59,21 @@ export function shouldIgnoreIssueEvent(
 	}
 
 	if (action === "opened" || action === "assigned") {
-		if (!isAssignedToYeetomatic(issue, githubUsername)) {
+		if (!isAssignedToYolomatic(issue, githubUsername)) {
 			return { ignore: true, reason: `not assigned to ${githubUsername}` };
 		}
 	}
 
 	if (action === "unassigned") {
-		if (isAssignedToYeetomatic(issue, githubUsername)) {
-			return { ignore: true, reason: "Yeetomatic still assigned" };
+		if (isAssignedToYolomatic(issue, githubUsername)) {
+			return { ignore: true, reason: "Yolomatic still assigned" };
 		}
 	}
 
 	if (action === "edited") {
-		const hasYeetomaticLabel = hasYeetomaticVisibleLabel(issue.labels);
-		if (!isAssignedToYeetomatic(issue, githubUsername) && !hasYeetomaticLabel && issue.user?.login !== githubUsername) {
-			return { ignore: true, reason: "not a Yeetomatic issue" };
+		const hasYolomaticLabel = hasYolomaticVisibleLabel(issue.labels);
+		if (!isAssignedToYolomatic(issue, githubUsername) && !hasYolomaticLabel && issue.user?.login !== githubUsername) {
+			return { ignore: true, reason: "not a Yolomatic issue" };
 		}
 	}
 
@@ -85,18 +85,18 @@ export function shouldIgnoreIssueEvent(
 }
 
 /**
- * The `/yeetomatic feedback` comment command, used as an explicit trigger for
+ * The `/yolomatic feedback` comment command, used as an explicit trigger for
  * the feedback flow.
  */
-export const FEEDBACK_COMMAND = "/yeetomatic feedback";
+export const FEEDBACK_COMMAND = "/yolomatic feedback";
 
 /**
- * Tests whether a comment body begins with the given `/yeetomatic` command
+ * Tests whether a comment body begins with the given `/yolomatic` command
  * token. The command must start the trimmed comment (case-insensitive), and
  * the character immediately after the command token must be either absent
  * (the command is the entire trimmed body) or whitespace. This rejects
- * embedded or quoted commands (e.g. `Please run /yeetomatic feedback` or
- * `` `/yeetomatic feedback` ``) so commands do not trigger when contained in
+ * embedded or quoted commands (e.g. `Please run /yolomatic feedback` or
+ * `` `/yolomatic feedback` ``) so commands do not trigger when contained in
  * surrounding text. Leading and trailing whitespace around the comment is
  * stripped before matching.
  */
@@ -116,7 +116,7 @@ function commentStartsWithCommand(body: string, command: string): boolean {
 }
 
 /**
- * Whether a comment body is the `/yeetomatic feedback` command. The command
+ * Whether a comment body is the `/yolomatic feedback` command. The command
  * must start the trimmed comment (case-insensitive) and must not be embedded
  * or quoted within surrounding text. Trailing text after the command is
  * allowed and is treated as the feedback payload. This is a trigger marker,
@@ -128,14 +128,14 @@ export function isFeedbackCommand(body: string): boolean {
 
 /**
  * Whether a comment body explicitly triggers feedback by mentioning the
- * configured Yeetomatic account (`@{githubUsername}` or `@yeetomatic`) or by
- * starting the trimmed comment with the `/yeetomatic feedback` command. The
- * Yeetomatic-visible label is intentionally not part of this check.
+ * configured Yolomatic account (`@{githubUsername}` or `@yolomatic`) or by
+ * starting the trimmed comment with the `/yolomatic feedback` command. The
+ * Yolomatic-visible label is intentionally not part of this check.
  */
 export function commentTriggersFeedback(body: string, githubUsername: string): boolean {
 	const isMentioned =
 		body.includes(`@${githubUsername}`) ||
-		body.toLowerCase().includes("@yeetomatic");
+		body.toLowerCase().includes("@yolomatic");
 	return isMentioned || isFeedbackCommand(body);
 }
 
@@ -152,7 +152,7 @@ export function shouldIgnoreCommentEvent(
 		};
 	},
 	githubUsername: string,
-): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isFeedbackCommand: boolean; isCreatedByYeetomatic: boolean } {
+): { ignore: true; reason: string } | { ignore: false; isMentioned: boolean; isFeedbackCommand: boolean; isCreatedByYolomatic: boolean } {
 	if (payload.action !== "created") {
 		return { ignore: true, reason: `action is ${payload.action}` };
 	}
@@ -169,38 +169,38 @@ export function shouldIgnoreCommentEvent(
 		return { ignore: true, reason: "bot comment" };
 	}
 
-	const isAssigned = isAssignedToYeetomatic(payload.issue, githubUsername);
+	const isAssigned = isAssignedToYolomatic(payload.issue, githubUsername);
 	if (!isAssigned) {
 		return { ignore: true, reason: `not assigned to ${githubUsername}` };
 	}
 
-	const isCreatedByYeetomatic = payload.issue.user?.login === githubUsername;
+	const isCreatedByYolomatic = payload.issue.user?.login === githubUsername;
 	const isMentioned =
 		payload.comment.body.includes(`@${githubUsername}`) ||
-		payload.comment.body.toLowerCase().includes("@yeetomatic");
+		payload.comment.body.toLowerCase().includes("@yolomatic");
 	const isFeedbackCmd = isFeedbackCommand(payload.comment.body);
 
 	// The comment gate requires assignment AND an explicit trigger (mention or
-	// `/yeetomatic feedback`). The Yeetomatic-visible label is no longer part of
+	// `/yolomatic feedback`). The Yolomatic-visible label is no longer part of
 	// the gate (neither required nor sufficient).
 	if (!isMentioned && !isFeedbackCmd) {
-		return { ignore: true, reason: "no mention or /yeetomatic feedback command" };
+		return { ignore: true, reason: "no mention or /yolomatic feedback command" };
 	}
 
-	return { ignore: false, isMentioned, isFeedbackCommand: isFeedbackCmd, isCreatedByYeetomatic };
+	return { ignore: false, isMentioned, isFeedbackCommand: isFeedbackCmd, isCreatedByYolomatic };
 }
 
-const ISSUE_REFINEMENT_COMMAND = "/yeetomatic issue-refinement";
+const ISSUE_REFINEMENT_COMMAND = "/yolomatic issue-refinement";
 
 /**
  * Parse an issue-refinement command from a comment body.
  *
  * Matching reuses the shared {@link commentStartsWithCommand} helper so the
- * start-of-body rule is identical to the other `/yeetomatic` commands: the
+ * start-of-body rule is identical to the other `/yolomatic` commands: the
  * command must start the trimmed comment (case-insensitive), and the character
  * after the command token must be either absent or whitespace. This rejects
- * embedded or quoted commands (e.g. `` `/yeetomatic issue-refinement` `` or
- * `Please run /yeetomatic issue-refinement`) and Markdown-wrapped tokens.
+ * embedded or quoted commands (e.g. `` `/yolomatic issue-refinement` `` or
+ * `Please run /yolomatic issue-refinement`) and Markdown-wrapped tokens.
  *
  * When the command is the entire trimmed body, `steeringPrompt` is the empty
  * string. When the command is followed by whitespace then additional text, the
@@ -220,10 +220,10 @@ export function isIssueRefinementCommand(commentBody: string): boolean {
 	return parseIssueRefinementCommand(commentBody).matched;
 }
 
-const STOP_COMMAND = "/yeetomatic stop";
+const STOP_COMMAND = "/yolomatic stop";
 
 /**
- * Whether a comment body is the `/yeetomatic stop` command. The command must
+ * Whether a comment body is the `/yolomatic stop` command. The command must
  * start the trimmed comment (case-insensitive) and must not be embedded or
  * quoted within surrounding text. No trailing text is accepted: stop takes no
  * arguments.

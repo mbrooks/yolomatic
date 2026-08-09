@@ -25,13 +25,13 @@ function makeSession(partial: Partial<SessionState> & { owner: string; repo: str
 
 describe("sessionKey", () => {
 	it("formats owner/repo#issueNumber", () => {
-		expect(sessionKey("mbrooks", "yeetomatic", 42)).toBe("mbrooks/yeetomatic#42");
+		expect(sessionKey("mbrooks", "yolomatic", 42)).toBe("mbrooks/yolomatic#42");
 	});
 });
 
 describe("branchName", () => {
-	it("formats yeetomatic/issue-N", () => {
-		expect(branchName(42)).toBe("yeetomatic/issue-42");
+	it("formats yolomatic/issue-N", () => {
+		expect(branchName(42)).toBe("yolomatic/issue-42");
 	});
 });
 
@@ -44,21 +44,21 @@ describe("compatibility re-exports", () => {
 
 describe("detectSessionRisk", () => {
 	it("returns no risk for a normal session", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, title: "Fix bug", body: "Description" });
+		const session = makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 42, title: "Fix bug", body: "Description" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(false);
 		expect(risk.reasons).toHaveLength(0);
 	});
 
 	it("flags PR-shaped title", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, title: "Yeetomatic: Fix bug" });
+		const session = makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 42, title: "Yolomatic: Fix bug" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(true);
 		expect(risk.reasons).toContain("Session title looks like a generated PR title.");
 	});
 
 	it("flags body referencing a different issue", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, body: "Fixes #99" });
+		const session = makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 42, body: "Fixes #99" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(true);
 		expect(risk.reasons).toContain("Session body references issue #99.");
@@ -66,7 +66,7 @@ describe("detectSessionRisk", () => {
 	});
 
 	it("allows body referencing the same issue", () => {
-		const session = makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, body: "Fixes #42" });
+		const session = makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 42, body: "Fixes #42" });
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(false);
 		expect(risk.referencedIssueNumber).toBe(42);
@@ -76,26 +76,26 @@ describe("detectSessionRisk", () => {
 describe("buildRepoSummaries", () => {
 	it("groups sessions by repo and counts active", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "complete" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, status: "complete" }),
 			makeSession({ owner: "mbrooks", repo: "case", issueNumber: 3, status: "pending" }),
 		];
 		const summaries = buildRepoSummaries(sessions);
 		expect(summaries).toHaveLength(2);
 		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
-		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[1]).toEqual({ owner: "mbrooks", repo: "yolomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
 	});
 
 	it("counts first terminal session as inactive", () => {
-		const sessions = [makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "complete" })];
+		const sessions = [makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "complete" })];
 		const summaries = buildRepoSummaries(sessions);
-		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 1, activeCount: 0, implementationSessionCount: 1, implementationActiveCount: 0, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+		expect(summaries[0]).toEqual({ owner: "mbrooks", repo: "yolomatic", sessionCount: 1, activeCount: 0, implementationSessionCount: 1, implementationActiveCount: 0, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
 	});
 
 	it("reports implementation and refinement counts separately while preserving aggregate totals", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation", status: "working" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "refinement", status: "complete" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation", status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "refinement", status: "complete" }),
 		];
 		expect(buildRepoSummaries(sessions)[0]).toMatchObject({
 			sessionCount: 2,
@@ -115,24 +115,24 @@ describe("buildRepoSummaries", () => {
 describe("computeAgentStatus", () => {
 	it("returns busy when any session is working", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "pending" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, status: "pending" }),
 		];
 		expect(computeAgentStatus(sessions)).toBe("busy");
 	});
 
 	it("returns feedback when no working but feedback exists", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "waiting-feedback" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "complete" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "waiting-feedback" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, status: "complete" }),
 		];
 		expect(computeAgentStatus(sessions)).toBe("feedback");
 	});
 
 	it("returns online when all are terminal or pending", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "pending" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, status: "complete" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "pending" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, status: "complete" }),
 		];
 		expect(computeAgentStatus(sessions)).toBe("online");
 	});
@@ -141,9 +141,9 @@ describe("computeAgentStatus", () => {
 describe("sortSessionsByRecency", () => {
 	it("sorts by createdAt descending when available", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, createdAt: "2026-01-01T00:00:00Z" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, createdAt: "2026-01-03T00:00:00Z" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 3, createdAt: "2026-01-02T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, createdAt: "2026-01-01T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, createdAt: "2026-01-03T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 3, createdAt: "2026-01-02T00:00:00Z" }),
 		];
 		const sorted = sortSessionsByRecency(sessions);
 		expect(sorted.map((s) => s.issueNumber)).toEqual([2, 3, 1]);
@@ -151,8 +151,8 @@ describe("sortSessionsByRecency", () => {
 
 	it("falls back to lastActivity when createdAt is missing", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, lastActivity: "2026-01-01T00:00:00Z" }),
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 2, lastActivity: "2026-01-03T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, lastActivity: "2026-01-01T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, lastActivity: "2026-01-03T00:00:00Z" }),
 		];
 		const sorted = sortSessionsByRecency(sessions);
 		expect(sorted.map((s) => s.issueNumber)).toEqual([2, 1]);
