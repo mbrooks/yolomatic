@@ -13,7 +13,7 @@ Assign an issue to Yolomatic, and it creates an isolated Git worktree, launches 
 
 ## Why use Yolomatic?
 
-Yolomatic is a good fit when you want to delegate coding tasks without introducing a complex orchestration platform.
+Yolomatic is a good fit when you want to delegate coding tasks without introducing a complex orchestration platform. It also lets you run coding agents in "yolo mode" (dangerously skip permissions) safely on a dedicated server, without needing to run them on your desktop.
 
 Yolomatic is intentionally not a full-blown orchestration platform. Instead, it uses GitHub issues as a lightweight, flexible work queue.
 
