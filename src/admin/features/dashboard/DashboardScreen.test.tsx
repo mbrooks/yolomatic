@@ -10,14 +10,14 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 	return {
 		kind: "implementation",
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		issueNumber: 1,
 		status: "working",
 		title: null,
 		body: null,
 		summary: null,
 		workspacePath: "/ws/1",
-		branch: "yeetomatic/issue-1",
+		branch: "yolomatic/issue-1",
 		lastActivity: new Date().toISOString(),
 		createdAt: new Date(Date.now() - 3600000).toISOString(),
 		prUrl: null,
@@ -70,14 +70,14 @@ describe("DashboardScreen", () => {
 
 	it("renders recent session rows", () => {
 		const sessions = [
-			makeSession({ owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, status: "working" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, status: "working" }),
 			makeSession({ owner: "mbrooks", repo: "case", issueNumber: 2, status: "complete" }),
 		];
 		render(<DashboardScreen {...defaultProps} sessions={sessions} />);
 
 		const recentActivity = document.querySelector(".dashboard-section:has(h2):has(.activity-list)");
 		expect(recentActivity).not.toBeNull();
-		expect(within(recentActivity as HTMLElement).getByText("mbrooks/yeetomatic")).not.toBeNull();
+		expect(within(recentActivity as HTMLElement).getByText("mbrooks/yolomatic")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("#1")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("mbrooks/case")).not.toBeNull();
 		expect(within(recentActivity as HTMLElement).getByText("#2")).not.toBeNull();

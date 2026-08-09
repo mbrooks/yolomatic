@@ -162,7 +162,7 @@ export function RepositoriesSettingsSection(): React.ReactElement {
 			onAdded={handleRefresh}
 			description={
 				<>
-					Choose which repositories Yeetomatic should manage. Selections are persisted
+					Choose which repositories Yolomatic should manage. Selections are persisted
 					to the <code>repositories</code> table.
 				</>
 			}

@@ -6,7 +6,7 @@ import { SafeDeployer } from "./deployer.js";
 
 describe("SafeDeployer", () => {
 	it("applies a patch and can rollback", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-deploy-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-deploy-"));
 		const filePath = path.join(dir, "src.ts");
 		await writeFile(filePath, "original", "utf-8");
 

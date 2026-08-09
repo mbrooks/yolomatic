@@ -251,7 +251,7 @@ describe("runGuardrail", () => {
 	});
 
 	it("passes when tests exist and coverage is sufficient", async () => {
-		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-guard-"));
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-guard-"));
 		const summaryPath = path.join(tmpDir, "coverage-summary.json");
 		const summary = JSON.stringify({
 			total: { statements: { pct: 90 }, branches: { pct: 80 }, functions: { pct: 85 }, lines: { pct: 90 } },
@@ -269,7 +269,7 @@ describe("runGuardrail", () => {
 	});
 
 	it("fails coverage when report exists but metrics are below threshold", async () => {
-		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-guard-"));
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-guard-"));
 		const summaryPath = path.join(tmpDir, "coverage-summary.json");
 		const summary = JSON.stringify({
 			total: { statements: { pct: 90 }, branches: { pct: 80 }, functions: { pct: 85 }, lines: { pct: 90 } },

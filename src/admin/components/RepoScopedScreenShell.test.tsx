@@ -7,7 +7,7 @@ import { RepoScopedScreenShell } from "./RepoScopedScreenShell.js";
 function renderShell(overrides: Partial<React.ComponentProps<typeof RepoScopedScreenShell>> = {}) {
 	const props: React.ComponentProps<typeof RepoScopedScreenShell> = {
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		activeTab: "sessions",
 		onSelectTab: vi.fn(),
 		onBack: vi.fn(),
@@ -26,7 +26,7 @@ describe("RepoScopedScreenShell", () => {
 	it("renders shared repo navigation around workspace content", () => {
 		const props = renderShell();
 
-		expect(screen.getByText("mbrooks/yeetomatic")).toBeTruthy();
+		expect(screen.getByText("mbrooks/yolomatic")).toBeTruthy();
 		expect(screen.getByText("Repo content")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Issues" }));
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));

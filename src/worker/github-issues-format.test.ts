@@ -16,7 +16,7 @@ describe("formatIssue", () => {
 		state: "open",
 		labels: ["bug", "worker"],
 		assignees: ["mbrooks"],
-		html_url: "https://github.com/mbrooks/yeetomatic/issues/539",
+		html_url: "https://github.com/mbrooks/yolomatic/issues/539",
 		created_at: "2026-08-03T00:00:00Z",
 		updated_at: "2026-08-03T00:00:00Z",
 	};
@@ -25,11 +25,11 @@ describe("formatIssue", () => {
 		const comments: FetchedComment[] = [
 			{
 				id: 1,
-				body: "Picked up by Yeetomatic.",
-				author: "yeetomatic-bot",
+				body: "Picked up by Yolomatic.",
+				author: "yolomatic-bot",
 				created_at: "2026-08-03T00:01:00Z",
 				updated_at: "2026-08-03T00:01:00Z",
-				html_url: "https://github.com/mbrooks/yeetomatic/issues/539#issuecomment-1",
+				html_url: "https://github.com/mbrooks/yolomatic/issues/539#issuecomment-1",
 			},
 		];
 		const text = formatIssue(baseIssue, comments);
@@ -37,12 +37,12 @@ describe("formatIssue", () => {
 		expect(text).toContain("State: open");
 		expect(text).toContain("Labels: bug, worker");
 		expect(text).toContain("Assignees: mbrooks");
-		expect(text).toContain("https://github.com/mbrooks/yeetomatic/issues/539");
+		expect(text).toContain("https://github.com/mbrooks/yolomatic/issues/539");
 		// The body — the core of issue #539 — must be present.
 		expect(text).toContain("It needs to return the body/description as well to be helpful.");
 		expect(text).toContain("Comments (1):");
-		expect(text).toContain("@yeetomatic-bot");
-		expect(text).toContain("Picked up by Yeetomatic.");
+		expect(text).toContain("@yolomatic-bot");
+		expect(text).toContain("Picked up by Yolomatic.");
 	});
 
 	it("omits the labels/assignees lines when those lists are empty", () => {
@@ -94,9 +94,9 @@ describe("formatPullRequest", () => {
 		body: "Renders the full issue into content, not just the title.",
 		state: "open",
 		merged: false,
-		head_ref: "yeetomatic/issue-539",
+		head_ref: "yolomatic/issue-539",
 		base_ref: "main",
-		html_url: "https://github.com/mbrooks/yeetomatic/pull/42",
+		html_url: "https://github.com/mbrooks/yolomatic/pull/42",
 		created_at: "2026-08-03T00:00:00Z",
 		updated_at: "2026-08-03T00:00:00Z",
 	};
@@ -109,13 +109,13 @@ describe("formatPullRequest", () => {
 				author: "mbrooks",
 				created_at: "2026-08-03T00:02:00Z",
 				updated_at: "2026-08-03T00:02:00Z",
-				html_url: "https://github.com/mbrooks/yeetomatic/pull/42#issuecomment-2",
+				html_url: "https://github.com/mbrooks/yolomatic/pull/42#issuecomment-2",
 			},
 		];
 		const text = formatPullRequest(basePr, comments);
 		expect(text).toContain("PR #42: Fix fetch_issue content");
 		expect(text).toContain("[open]");
-		expect(text).toContain("Branch: yeetomatic/issue-539 -> main");
+		expect(text).toContain("Branch: yolomatic/issue-539 -> main");
 		expect(text).toContain("Renders the full issue into content, not just the title.");
 		expect(text).toContain("@mbrooks");
 		expect(text).toContain("Looks good.");

@@ -4,7 +4,7 @@ import { unlinkSync } from "node:fs";
 import { runMigrations, MIGRATIONS } from "./index.js";
 
 describe("migrations", () => {
-	const dbPath = "/tmp/yeetomatic-migrations-test.sqlite";
+	const dbPath = "/tmp/yolomatic-migrations-test.sqlite";
 
 	beforeEach(() => {
 		try {
@@ -117,10 +117,10 @@ describe("migrations", () => {
 	it("migrates legacy session rows and logs to kind-aware keys", () => {
 		const db = new DatabaseSync(dbPath);
 		for (const migration of MIGRATIONS.filter((entry) => entry.id < 9)) migration.up(db);
-		const legacyKey = "github-mbrooks-yeetomatic-issue-534";
+		const legacyKey = "github-mbrooks-yolomatic-issue-534";
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 534,
 			title: "Legacy implementation",
 			body: "Body",
@@ -132,14 +132,14 @@ describe("migrations", () => {
 		};
 		db.prepare(
 			"INSERT INTO sessions (session_key, owner, repo, issue_number, status, archived_at, state_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		).run(legacyKey, "mbrooks", "yeetomatic", 534, "working", null, JSON.stringify(state), state.lastActivity);
+		).run(legacyKey, "mbrooks", "yolomatic", 534, "working", null, JSON.stringify(state), state.lastActivity);
 		db.prepare(
 			"INSERT INTO session_logs (session_key, timestamp, level, message) VALUES (?, ?, ?, ?)",
 		).run(legacyKey, state.lastActivity, "info", "legacy log");
 
 		runMigrations(db);
 
-		const expectedKey = "github-mbrooks-yeetomatic-issue-534-implementation";
+		const expectedKey = "github-mbrooks-yolomatic-issue-534-implementation";
 		const row = db.prepare("SELECT session_key, state_json FROM sessions").get() as {
 			session_key: string;
 			state_json: string;

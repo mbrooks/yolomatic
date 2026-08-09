@@ -52,25 +52,25 @@ export interface IssueRefinementInstructionPayload {
 	sender: { login: string };
 }
 
-export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yeetomatic. Refining this issue. No implementation session will start.";
+export const ISSUE_REFINEMENT_STARTING_COMMENT = "Picked up by Yolomatic. Refining this issue. No implementation session will start.";
 
 /**
- * Build the short automatic comment Yeetomatic posts on newly opened issues.
+ * Build the short automatic comment Yolomatic posts on newly opened issues.
  *
- * Lists the available commands (assign-to-Yeetomatic, `/yeetomatic feedback`,
- * `/yeetomatic issue-refinement`, `/yeetomatic stop`) and, when an admin issue
+ * Lists the available commands (assign-to-Yolomatic, `/yolomatic feedback`,
+ * `/yolomatic issue-refinement`, `/yolomatic stop`) and, when an admin issue
  * URL is provided, appends a one-line status-tracking link. The detailed
  * refinement explanation lives in README.md / design/issue-refinement.md and
  * is not duplicated here.
  */
 export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: string): string {
 	const body = [
-		"Yeetomatic is available to work on this issue.",
+		"Yolomatic is available to work on this issue.",
 		"",
 		"- Assign the issue to `" + githubUsername + "` to start an implementation session and open a pull request.",
-		"- `/yeetomatic feedback` — once a session is active, steer it by posting a comment with this command (or by @-mentioning `" + githubUsername + "`). Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.",
-		"- `/yeetomatic issue-refinement` — have an authorized maintainer ask Yeetomatic to refine the issue body into a Proposed Task (no implementation or PR). Trailing text after the command is treated as a steering prompt that shapes the refinement pass.",
-		"- `/yeetomatic stop` — stop the active session (authorized maintainers only).",
+		"- `/yolomatic feedback` — once a session is active, steer it by posting a comment with this command (or by @-mentioning `" + githubUsername + "`). Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.",
+		"- `/yolomatic issue-refinement` — have an authorized maintainer ask Yolomatic to refine the issue body into a Proposed Task (no implementation or PR). Trailing text after the command is treated as a steering prompt that shapes the refinement pass.",
+		"- `/yolomatic stop` — stop the active session (authorized maintainers only).",
 	].join("\n");
 	return appendAdminLink(body, adminIssueUrl);
 }
@@ -214,7 +214,7 @@ export class HandleIssueRefinement {
 		if (this.deps.tasks.isActive(key)) {
 			process.stdout.write(`[refinement] ignored: ${key} has an active implementation task\n`);
 			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: an implementation task is active");
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation."));
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently working on this issue. Refinement cannot overlap with implementation."));
 			return;
 		}
 
@@ -228,7 +228,7 @@ export class HandleIssueRefinement {
 				owner,
 				repo,
 				issueNumber,
-				this.withAdminLink(owner, repo, issueNumber, "Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation."),
+				this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently working on this issue. Refinement cannot overlap with implementation."),
 			);
 			return;
 		}
@@ -243,7 +243,7 @@ export class HandleIssueRefinement {
 			this.inFlight.delete(key);
 			process.stdout.write(`[refinement] ignored: ${key} task key is already claimed\n`);
 			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: task key is already claimed");
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation."));
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently active on this issue. Refinement cannot overlap with implementation."));
 			return;
 		}
 
@@ -269,7 +269,7 @@ export class HandleIssueRefinement {
 				kind: "refinement",
 				title,
 				body,
-				branch: `yeetomatic/refinement-issue-${issueNumber}`,
+				branch: `yolomatic/refinement-issue-${issueNumber}`,
 				prNumber: undefined,
 				prUrl: undefined,
 				seeded: false,
@@ -356,7 +356,7 @@ export class HandleIssueRefinement {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
 				await this.failSession(owner, repo, issueNumber, reason);
 				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue closed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yeetomatic issue-refinement` again."));
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yolomatic issue-refinement` again."));
 				return;
 			}
 			const currentFingerprint = fingerprintBody(currentIssue.body ?? "");
@@ -365,7 +365,7 @@ export class HandleIssueRefinement {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
 				await this.failSession(owner, repo, issueNumber, reason);
 				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue body changed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yeetomatic issue-refinement` again."));
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yolomatic issue-refinement` again."));
 				return;
 			}
 			if (currentIssue.title !== undefined && currentIssue.title !== title) {
@@ -373,7 +373,7 @@ export class HandleIssueRefinement {
 				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
 				await this.failSession(owner, repo, issueNumber, reason);
 				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue title changed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue title changed during refinement. Please run `/yeetomatic issue-refinement` again."));
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue title changed during refinement. Please run `/yolomatic issue-refinement` again."));
 				return;
 			}
 

@@ -27,7 +27,7 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn?: () => void }): React.
 	return (
 		<div className="onboarding-screen">
 			<div className="onboarding-card">
-				<h1>Yeetomatic Admin</h1>
+				<h1>Yolomatic Admin</h1>
 				<p className="onboarding-subtitle">Sign in to the admin dashboard.</p>
 				{error && <div className="error-banner">{error}</div>}
 				<form className="onboarding-form" onSubmit={handleSubmit}>

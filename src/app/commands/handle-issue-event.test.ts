@@ -11,11 +11,11 @@ function createPayload(overrides?: Partial<IssueEventPayload>): IssueEventPayloa
 			title: "Test issue",
 			body: "Issue body",
 			labels: [],
-			assignee: { login: "yeetomatic-bot" },
-			assignees: [{ login: "yeetomatic-bot" }],
+			assignee: { login: "yolomatic-bot" },
+			assignees: [{ login: "yolomatic-bot" }],
 			user: { login: "human" },
 		},
-		repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+		repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		sender: { login: "human" },
 		...overrides,
 	};
@@ -30,7 +30,7 @@ function createDeps(overrides?: {
 		get: vi.fn(async () => null),
 		createSession: vi.fn(async () => ({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			status: "pending" as const,
 			title: "Test issue",
@@ -40,13 +40,13 @@ function createDeps(overrides?: {
 		})),
 		updateStatus: vi.fn(async () => ({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			status: "working",
 			seeded: true,
 			title: "Test issue",
 			body: "Issue body",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 			labels: [],
 		})),
 		markSeeded: vi.fn(async () => {}),
@@ -55,7 +55,7 @@ function createDeps(overrides?: {
 	const workspaces = {
 		createOrGetWorktree:
 			overrides?.createOrGetWorktree ??
-			vi.fn(async () => ({ path: "/tmp/worktree", branch: "yeetomatic/issue-1" })),
+			vi.fn(async () => ({ path: "/tmp/worktree", branch: "yolomatic/issue-1" })),
 		removeWorktree: vi.fn(async () => {}),
 		commitAndPush: vi.fn(async () => true),
 		hasChanges: vi.fn(async () => false),
@@ -106,7 +106,7 @@ function createDeps(overrides?: {
 		github,
 		clock: { now: () => new Date() },
 		defaultBranch: "main",
-		githubUsername: "yeetomatic-bot",
+		githubUsername: "yolomatic-bot",
 		selfReportEnabled: false,
 		executor: {
 			llm: {} as any,
@@ -116,19 +116,19 @@ function createDeps(overrides?: {
 			github: github as any,
 			tasks: tasks as any,
 			clock: { now: () => new Date() } as any,
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			executor: {
 				execute: vi.fn(async () => ({
 					status: "complete" as const,
 					summary: "Done.",
-					rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+					rawResponse: "YOLO_STATUS: complete\nDone.",
 				})),
 				executePRReview: vi.fn(async () => ({
 					status: "complete" as const,
 					summary: "Done.",
-					rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+					rawResponse: "YOLO_STATUS: complete\nDone.",
 				})),
 			} as any,
 		},
@@ -143,7 +143,7 @@ describe("HandleIssueEvent", () => {
 	it("ignores events sent by the bot itself", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
-		const payload = createPayload({ sender: { login: "yeetomatic-bot" } });
+		const payload = createPayload({ sender: { login: "yolomatic-bot" } });
 
 		await handler.execute(payload);
 
@@ -152,11 +152,11 @@ describe("HandleIssueEvent", () => {
 
 	it("reports in-flight status correctly", () => {
 		const deps = createDeps();
-		const inFlight = new Set(["mbrooks/yeetomatic#1"]);
+		const inFlight = new Set(["mbrooks/yolomatic#1"]);
 		const handler = new HandleIssueEvent({ ...(deps as any), inFlight });
 
-		expect(handler.isInFlight("mbrooks", "yeetomatic", 1)).toBe(true);
-		expect(handler.isInFlight("mbrooks", "yeetomatic", 2)).toBe(false);
+		expect(handler.isInFlight("mbrooks", "yolomatic", 1)).toBe(true);
+		expect(handler.isInFlight("mbrooks", "yolomatic", 2)).toBe(false);
 	});
 
 	it("reports refinement work as in flight", () => {
@@ -164,8 +164,8 @@ describe("HandleIssueEvent", () => {
 		const refinement = { isInFlight: vi.fn(() => true), postInstructions: vi.fn() };
 		const handler = new HandleIssueEvent({ ...(deps as any), refinement });
 
-		expect(handler.isInFlight("mbrooks", "yeetomatic", 1)).toBe(true);
-		expect(refinement.isInFlight).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(handler.isInFlight("mbrooks", "yolomatic", 1)).toBe(true);
+		expect(refinement.isInFlight).toHaveBeenCalledWith("mbrooks", "yolomatic", 1);
 	});
 
 	it("posts refinement instructions for newly opened issues", async () => {
@@ -182,7 +182,7 @@ describe("HandleIssueEvent", () => {
 		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 	});
 
-	it("ignores unassigned events when Yeetomatic is still assigned", async () => {
+	it("ignores unassigned events when Yolomatic is still assigned", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({ action: "unassigned" });
@@ -192,7 +192,7 @@ describe("HandleIssueEvent", () => {
 		expect(deps.workspaces.createOrGetWorktree).not.toHaveBeenCalled();
 	});
 
-	it("handles unassigned events by pausing work when Yeetomatic is unassigned", async () => {
+	it("handles unassigned events by pausing work when Yolomatic is unassigned", async () => {
 		const deps = createDeps();
 		deps.sessions.get = vi.fn(async () => ({ status: "working" } as any));
 		const handler = new HandleIssueEvent(deps as any);
@@ -211,11 +211,11 @@ describe("HandleIssueEvent", () => {
 
 		await handler.execute(payload);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending");
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Yeetomatic unassigned. Pausing work.");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "pending");
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Yolomatic unassigned. Pausing work.");
 	});
 
-	it("pauses waiting-feedback sessions when Yeetomatic is unassigned", async () => {
+	it("pauses waiting-feedback sessions when Yolomatic is unassigned", async () => {
 		const deps = createDeps();
 		deps.sessions.get = vi.fn(async () => ({ status: "waiting-feedback" }) as any);
 		const handler = new HandleIssueEvent(deps as any);
@@ -225,7 +225,7 @@ describe("HandleIssueEvent", () => {
 			issue: { ...createPayload().issue, assignee: null, assignees: [] },
 		}));
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "pending");
 	});
 
 	it("steers active execution on edited events", async () => {
@@ -234,12 +234,12 @@ describe("HandleIssueEvent", () => {
 		deps.tasks.isActive = vi.fn(() => true);
 		deps.tasks.steer = vi.fn(async () => true);
 		const handler = new HandleIssueEvent(deps as any);
-		const payload = createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] } });
+		const payload = createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yolomatic" }] } });
 
 		await handler.execute(payload);
 
 		expect(deps.tasks.steer).toHaveBeenCalled();
-		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Issue description updated. Steering to Yeetomatic.");
+		expect(deps.github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Issue description updated. Steering to Yolomatic.");
 	});
 
 	it("reports when an edited issue cannot be steered", async () => {
@@ -249,17 +249,17 @@ describe("HandleIssueEvent", () => {
 		deps.tasks.steer = vi.fn(async () => false);
 		const handler = new HandleIssueEvent(deps as any);
 
-		await handler.execute(createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] } }));
+		await handler.execute(createPayload({ action: "edited", issue: { ...createPayload().issue, labels: [{ name: "yolomatic" }] } }));
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue description updated but could not be steered.",
 		);
 	});
 
-	it("ignores edited events when not a Yeetomatic issue and no session", async () => {
+	it("ignores edited events when not a Yolomatic issue and no session", async () => {
 		const deps = createDeps();
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
@@ -283,7 +283,7 @@ describe("HandleIssueEvent", () => {
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
 			action: "edited",
-			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] },
+			issue: { ...createPayload().issue, labels: [{ name: "yolomatic" }] },
 		});
 
 		await handler.execute(payload);
@@ -303,7 +303,7 @@ describe("HandleIssueEvent", () => {
 		const payload = createPayload({
 			action: "edited",
 			source: "polling",
-			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }], body: "Refined body" },
+			issue: { ...createPayload().issue, labels: [{ name: "yolomatic" }], body: "Refined body" },
 		});
 
 		await handler.execute(payload);
@@ -322,12 +322,12 @@ describe("HandleIssueEvent", () => {
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload({
 			action: "edited",
-			issue: { ...createPayload().issue, labels: [{ name: "yeetomatic" }] },
+			issue: { ...createPayload().issue, labels: [{ name: "yolomatic" }] },
 		});
 
 		await handler.execute(payload);
 
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "working", {
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "working", {
 			body: "Issue body",
 			title: "Test issue",
 		});
@@ -355,7 +355,7 @@ describe("HandleIssueEvent", () => {
 
 	it("ignores in-flight issues", async () => {
 		const deps = createDeps();
-		const inFlight = new Set(["mbrooks/yeetomatic#1"]);
+		const inFlight = new Set(["mbrooks/yolomatic#1"]);
 		const handler = new HandleIssueEvent({ ...(deps as any), inFlight });
 		const payload = createPayload();
 
@@ -371,12 +371,12 @@ describe("HandleIssueEvent", () => {
 			.mockResolvedValueOnce(null)
 			.mockResolvedValue({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "pending",
 				title: "Test issue",
 				body: "Issue body",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			});
 		const handler = new HandleIssueEvent(deps as any);
@@ -384,10 +384,10 @@ describe("HandleIssueEvent", () => {
 
 		await handler.execute(payload);
 
-		expect(deps.workspaces.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(deps.workspaces.createOrGetWorktree).toHaveBeenCalledWith("mbrooks", "yolomatic", 1);
 		expect(deps.sessions.createSession).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Test issue",
 			"Issue body",
@@ -401,7 +401,7 @@ describe("HandleIssueEvent", () => {
 		const deps = createDeps();
 		(deps.sessions.createSession as any) = vi.fn(async () => ({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			status: "working" as const,
 			title: "Test issue",
@@ -428,11 +428,11 @@ describe("HandleIssueEvent", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Deploy in progress. Task will resume after restart.",
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending", { resumeOnBoot: true }, "implementation");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "pending", { resumeOnBoot: true }, "implementation");
 	});
 
 	it("auto-starts execution for accepted issues", async () => {
@@ -443,13 +443,13 @@ describe("HandleIssueEvent", () => {
 			if (getCallCount <= 2) return null;
 			return {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "working",
 				seeded: true,
 				title: "Test issue",
 				body: "Issue body",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
 		});
@@ -460,9 +460,9 @@ describe("HandleIssueEvent", () => {
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			"Picked up by Yeetomatic. Working on it...",
+			"Picked up by Yolomatic. Working on it...",
 		);
 	});
 
@@ -474,30 +474,30 @@ describe("HandleIssueEvent", () => {
 			if (getCallCount <= 2) return null;
 			return {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "working",
 				seeded: true,
 				title: "Test issue",
 				body: "Issue body",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
 		});
-		deps.adminBaseUrl = "http://host:6767/yeetomatic/admin";
+		deps.adminBaseUrl = "http://host:6767/yolomatic/admin";
 		deps.issueAdminLinkInCommentsEnabled = true;
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
 		await handler.execute(payload);
 
-		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/implementation";
+		const expectedUrl = "http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/1/implementation";
 		const pickupCall = (deps.github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
 		expect(pickupCall).toBeDefined();
 		expect(pickupCall[3]).toContain(`Track status: ${expectedUrl}`);
-		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yeetomatic/issues/1");
+		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yolomatic/issues/1");
 	});
 
 	it("omits the admin session link from the pickup comment when the toggle is disabled", async () => {
@@ -508,17 +508,17 @@ describe("HandleIssueEvent", () => {
 			if (getCallCount <= 2) return null;
 			return {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "working",
 				seeded: true,
 				title: "Test issue",
 				body: "Issue body",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
 		});
-		deps.adminBaseUrl = "http://host:6767/yeetomatic/admin";
+		deps.adminBaseUrl = "http://host:6767/yolomatic/admin";
 		deps.issueAdminLinkInCommentsEnabled = false;
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
@@ -526,9 +526,9 @@ describe("HandleIssueEvent", () => {
 		await handler.execute(payload);
 
 		const pickupCall = (deps.github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
-		expect(pickupCall[3]).toBe("Picked up by Yeetomatic. Working on it...");
+		expect(pickupCall[3]).toBe("Picked up by Yolomatic. Working on it...");
 		expect(pickupCall[3]).not.toContain("Track status:");
 	});
 
@@ -537,9 +537,9 @@ describe("HandleIssueEvent", () => {
 		const createOrGetWorktree = vi.fn(async () => {
 			callCount++;
 			if (callCount === 1) {
-				throw new EmptyRepositoryError("/tmp/workspaces/mbrooks-yeetomatic");
+				throw new EmptyRepositoryError("/tmp/workspaces/mbrooks-yolomatic");
 			}
-			return { path: "/tmp/worktree", branch: "yeetomatic/issue-1" };
+			return { path: "/tmp/worktree", branch: "yolomatic/issue-1" };
 		});
 		const initializeEmptyRepo = vi.fn(async () => {});
 		const deps = createDeps({ createOrGetWorktree, initializeEmptyRepo });
@@ -548,12 +548,12 @@ describe("HandleIssueEvent", () => {
 			.mockResolvedValueOnce(null)
 			.mockResolvedValue({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				status: "pending",
 				title: "Test issue",
 				body: "Issue body",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			});
 		const handler = new HandleIssueEvent(deps as any);
@@ -561,7 +561,7 @@ describe("HandleIssueEvent", () => {
 
 		await handler.execute(payload);
 
-		expect(initializeEmptyRepo).toHaveBeenCalledWith("mbrooks", "yeetomatic", "main");
+		expect(initializeEmptyRepo).toHaveBeenCalledWith("mbrooks", "yolomatic", "main");
 		expect(createOrGetWorktree).toHaveBeenCalledTimes(3);
 		expect(deps.sessions.createSession).toHaveBeenCalled();
 	});

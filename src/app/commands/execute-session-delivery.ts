@@ -72,7 +72,7 @@ export class ExecuteSessionDelivery {
 					repo,
 					issueNumber,
 					this.withLink(owner, repo, issueNumber, [
-						"**Yeetomatic Complete**",
+						"**Yolomatic Complete**",
 						"",
 						"Summary:",
 						result.summary || "No summary provided.",
@@ -119,13 +119,13 @@ export class ExecuteSessionDelivery {
 		process.stdout.write(`[execute] marked complete ${repo}#${issueNumber}\n`);
 
 		if (deliveryOutcome === "pr-created" && prUrl) {
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-pr-created"]);
+			await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-pr-created"]);
 			await this.deps.github.postComment(
 				owner,
 				repo,
 				issueNumber,
 				this.withLink(owner, repo, issueNumber, [
-					"**Yeetomatic Complete**",
+					"**Yolomatic Complete**",
 					"",
 					`PR created: ${prUrl}`,
 					"",
@@ -136,13 +136,13 @@ export class ExecuteSessionDelivery {
 				].join("\n")),
 			);
 		} else if (deliveryOutcome === "pr-existed" && prUrl) {
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-pr-created"]);
+			await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-pr-created"]);
 			await this.deps.github.postComment(
 				owner,
 				repo,
 				issueNumber,
 				this.withLink(owner, repo, issueNumber, [
-					"**Yeetomatic Complete**",
+					"**Yolomatic Complete**",
 					"",
 					`PR already exists: ${prUrl}`,
 					"",
@@ -158,7 +158,7 @@ export class ExecuteSessionDelivery {
 				repo,
 				issueNumber,
 				this.withLink(owner, repo, issueNumber, [
-					"**Yeetomatic Complete**",
+					"**Yolomatic Complete**",
 					"",
 					"Summary:",
 					result.summary || "No summary provided.",
@@ -178,7 +178,7 @@ export class ExecuteSessionDelivery {
 		current: import("../../session/store.js").SessionState,
 	): Promise<{ url?: string; number?: number; outcome: "pr-created" | "pr-existed" | "no-changes" }> {
 		const base = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
-		const head = `yeetomatic/issue-${issueNumber}`;
+		const head = `yolomatic/issue-${issueNumber}`;
 
 		const gitDiff = await this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(() => "");
 		const prBody = this.buildPRBody(issueNumber, current, result, gitDiff);
@@ -187,7 +187,7 @@ export class ExecuteSessionDelivery {
 			const pr = await this.deps.github.createPullRequest(
 				owner,
 				repo,
-				`Yeetomatic: ${issueTitle}`,
+				`Yolomatic: ${issueTitle}`,
 				prBody,
 				head,
 				base,
@@ -379,7 +379,7 @@ export class ExecuteSessionDelivery {
 			return false;
 		}
 
-		const branchName = current.branch ?? `yeetomatic/issue-${issueNumber}`;
+		const branchName = current.branch ?? `yolomatic/issue-${issueNumber}`;
 		const commitMessage = generateCommitMessage(current.labels, issueNumber, reworkResult.summary);
 		const pushed = await this.deps.workspaces.commitAndPushPath(
 			current.workspacePath,
@@ -415,7 +415,7 @@ export class ExecuteSessionDelivery {
 			? ["", "Conflicted files:", ...conflictedFiles.map((f) => `- \`${f}\``)].join("\n")
 			: "";
 		const prBody = [
-			"**Yeetomatic could not deliver this pull request.**",
+			"**Yolomatic could not deliver this pull request.**",
 			"",
 			reason,
 			"",

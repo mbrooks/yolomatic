@@ -18,13 +18,13 @@ function createConfig(workspacesDir: string): WorkspaceConfig {
 
 describe("GitCommandRunner", () => {
 	it("configures git identity from workspace config", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-git-runner-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-git-runner-"));
 		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 
 		await git.ensureGitIdentity("/tmp/worktree");
 
-		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yeetomatic"], { cwd: "/tmp/worktree" });
+		expect(runCommand).toHaveBeenCalledWith("git", ["config", "user.name", "Yolomatic"], { cwd: "/tmp/worktree" });
 		expect(runCommand).toHaveBeenCalledWith(
 			"git",
 			["config", "user.email", "mbrooks@users.noreply.github.com"],
@@ -33,7 +33,7 @@ describe("GitCommandRunner", () => {
 	});
 
 	it("passes GitHub authentication only through the git subprocess environment", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-git-auth-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-git-auth-"));
 		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: "", stderr: "" }));
 		const git = new GitCommandRunner(createConfig(root), runCommand);
 
@@ -57,7 +57,7 @@ describe("GitCommandRunner", () => {
 	});
 
 	it("checks commit distance against the configured default branch", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-git-ahead-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-git-ahead-"));
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "rev-list") {
 				return { stdout: "2\n", stderr: "" };
@@ -75,7 +75,7 @@ describe("GitCommandRunner", () => {
 	});
 
 	it("detects staged changes and falls back safely for status helpers", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-git-status-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-git-status-"));
 		let diffCalls = 0;
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "diff" && args[1] === "--quiet") {
@@ -104,7 +104,7 @@ describe("GitCommandRunner", () => {
 	});
 
 	it("returns clean results when workspace state commands succeed", async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-git-clean-"));
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-git-clean-"));
 		const runCommand: CommandRunner = vi.fn(async (_command, args) => {
 			if (args[0] === "status") {
 				return { stdout: "", stderr: "" };

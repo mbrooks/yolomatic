@@ -79,7 +79,7 @@ export class HandlePRReview {
 
 		const resolvedSession = await this.resolveSessionForPullRequest(owner, repo, prNumber, branch);
 		if (!resolvedSession) {
-			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not associated with a Yeetomatic session\n`);
+			process.stdout.write(`[webhook] ${eventType} ignored: branch ${branch} is not associated with a Yolomatic session\n`);
 			return;
 		}
 
@@ -99,7 +99,7 @@ export class HandlePRReview {
 				repo,
 				prNumber,
 				[
-					"**Yeetomatic stopped before execution.**",
+					"**Yolomatic stopped before execution.**",
 					"",
 					mappingError,
 					"",
@@ -236,7 +236,7 @@ export class HandlePRReview {
 				owner,
 				repo,
 				prNumber,
-				steered ? "Review feedback was steered to the active Yeetomatic task." : "Yeetomatic is busy. Review feedback could not be steered.",
+				steered ? "Review feedback was steered to the active Yolomatic task." : "Yolomatic is busy. Review feedback could not be steered.",
 			);
 			return;
 		}
@@ -277,7 +277,7 @@ export class HandlePRReview {
 			if (abortController.signal.aborted) {
 				process.stdout.write(`[webhook] PR review execution aborted for ${inFlightKey}\n`);
 				await this.deps.sessions.cancelSession(owner, repo, issueNumber);
-				await this.deps.github.postPRComment(owner, repo, prNumber, "Task cancelled by admin. Yeetomatic is idle.");
+				await this.deps.github.postPRComment(owner, repo, prNumber, "Task cancelled by admin. Yolomatic is idle.");
 				return;
 			}
 			const message = error instanceof Error ? error.message : String(error);
@@ -289,7 +289,7 @@ export class HandlePRReview {
 					[
 						"**Build failed**",
 						"",
-						"Yeetomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
+						"Yolomatic encountered a 429 rate-limit error from Ollama and auto-retry was exhausted. The session cannot continue until usage limits are reset or the model is switched.",
 						"",
 						`Error: ${message}`,
 					].join("\n"),
@@ -297,7 +297,7 @@ export class HandlePRReview {
 				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 				throw error;
 			}
-			await this.deps.github.postPRComment(owner, repo, prNumber, `**Yeetomatic failed.**\n\nError: ${message}`);
+			await this.deps.github.postPRComment(owner, repo, prNumber, `**Yolomatic failed.**\n\nError: ${message}`);
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 			throw error;
 		} finally {
@@ -346,7 +346,7 @@ export class HandlePRReview {
 		comments: Array<{ id: number; body: string; user: string }>,
 		reviewBody?: string,
 	): Promise<void> {
-		const lines = ["**Yeetomatic acknowledgement**"];
+		const lines = ["**Yolomatic acknowledgement**"];
 		if (reviewBody) {
 			lines.push("");
 			lines.push("Acknowledged the review comment.");

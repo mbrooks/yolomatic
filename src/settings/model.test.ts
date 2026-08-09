@@ -39,7 +39,7 @@ describe("settings/model", () => {
 
     it("returns a string as-is", () => {
       const def = getSettingDefinition("github_username")!;
-      expect(parseSettingValue(def, "yeetomatic-bot")).toBe("yeetomatic-bot");
+      expect(parseSettingValue(def, "yolomatic-bot")).toBe("yolomatic-bot");
     });
   });
 
@@ -57,7 +57,7 @@ describe("settings/model", () => {
 
     it("formats a string", () => {
       const def = getSettingDefinition("github_username")!;
-      expect(formatSettingValue(def, "yeetomatic-bot")).toBe("yeetomatic-bot");
+      expect(formatSettingValue(def, "yolomatic-bot")).toBe("yolomatic-bot");
     });
   });
 
@@ -90,7 +90,7 @@ describe("settings/model", () => {
     });
 
     it("trims string values", () => {
-      expect(coerceEnvValue("github_username", "  yeetomatic  ")).toBe("yeetomatic");
+      expect(coerceEnvValue("github_username", "  yolomatic  ")).toBe("yolomatic");
     });
   });
 
@@ -151,10 +151,10 @@ describe("settings/model", () => {
       expect(provider?.category).toBe("ai-llm");
     });
 
-    it("exposes a configurable ollama_container_name setting defaulting to yeetomatic-ollama", () => {
+    it("exposes a configurable ollama_container_name setting defaulting to yolomatic-ollama", () => {
       const container = getSettingDefinition("ollama_container_name");
       expect(container).toBeDefined();
-      expect(container?.default).toBe("yeetomatic-ollama");
+      expect(container?.default).toBe("yolomatic-ollama");
       expect(container?.envVar).toBe("OLLAMA_CONTAINER_NAME");
       expect(container?.category).toBe("ai-llm");
       expect(container?.type).toBe("string");

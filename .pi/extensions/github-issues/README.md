@@ -1,6 +1,6 @@
 # GitHub Issues Extension for pi-coding-agent (worker/gateway mode)
 
-This extension provides scoped GitHub issue and pull-request management tools for the Yeetomatic **disposable worker**. The worker never receives `GITHUB_TOKEN`; every tool call is routed over the worker session WebSocket to the control-plane `WorkerGitHubGateway`, which performs the GitHub call on the worker's behalf and enforces session scope.
+This extension provides scoped GitHub issue and pull-request management tools for the Yolomatic **disposable worker**. The worker never receives `GITHUB_TOKEN`; every tool call is routed over the worker session WebSocket to the control-plane `WorkerGitHubGateway`, which performs the GitHub call on the worker's behalf and enforces session scope.
 
 ## How it works
 
@@ -17,7 +17,7 @@ See `design/protocol-session-messages.md` for the `tool_request` / `tool_respons
 All operations are scoped to the live session:
 
 - **Issue tools** target the session's own issue (`owner`/`repo`/`issueNumber` from `SessionState`). They do not accept `owner`/`repo`/`issue_number` parameters, so the worker cannot attempt an out-of-scope call.
-- **PR tools** target the PR associated with the session: `state.prNumber` when present, plus any other open PR whose head is the session branch `yeetomatic/issue-{issueNumber}` (resolved via `listPullRequestsForHead`). PR tools accept an optional `pr_number` that must match one of these; any other `pr_number` is rejected as a scope error without performing the target GitHub operation.
+- **PR tools** target the PR associated with the session: `state.prNumber` when present, plus any other open PR whose head is the session branch `yolomatic/issue-{issueNumber}` (resolved via `listPullRequestsForHead`). PR tools accept an optional `pr_number` that must match one of these; any other `pr_number` is rejected as a scope error without performing the target GitHub operation.
 
 Requests targeting a different `owner`, `repo`, or `issue_number` are rejected without any GitHub call. Merging PRs, creating PRs, updating PR branches, editing/deleting comments, and pushing code remain control-plane-owned and are **not** exposed.
 
@@ -102,7 +102,7 @@ Response `data`:
 
 `before` is the previous SHA of the local default-branch ref (or `null` if it did not exist); `after` is the current `origin/{effectiveDefaultBranch}` SHA. `updated` is `true` when `before !== after`.
 
-Scoping: this tool never accepts `owner`/`repo`/`branch` parameters and cannot touch another repository. Missing-remote-branch and fetch failures are returned as ordinary gateway errors (`ok: false`, descriptive `error`, no `scopeError`). The operation only fast-forwards the local default-branch ref; it never rewrites `origin/{defaultBranch}` or modifies the session worktree branch `yeetomatic/issue-{n}`.
+Scoping: this tool never accepts `owner`/`repo`/`branch` parameters and cannot touch another repository. Missing-remote-branch and fetch failures are returned as ordinary gateway errors (`ok: false`, descriptive `error`, no `scopeError`). The operation only fast-forwards the local default-branch ref; it never rewrites `origin/{defaultBranch}` or modifies the session worktree branch `yolomatic/issue-{n}`.
 
 ## Removed worker tools
 

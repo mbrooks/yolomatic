@@ -70,7 +70,7 @@ describe("classifyFatalError", () => {
 		const result = classifyFatalError({
 			toolName: "bash",
 			result: {
-				output: "remote rejected: yeetomatic/issue-150 -> yeetomatic/issue-150 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
+				output: "remote rejected: yolomatic/issue-150 -> yolomatic/issue-150 (refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope)",
 				exitCode: 1,
 			},
 			isError: true,

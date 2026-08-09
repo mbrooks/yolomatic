@@ -18,7 +18,7 @@ function request(
 	return {
 		url,
 		method,
-		headers: { cookie: "yeetomatic_admin_session=valid", ...headers },
+		headers: { cookie: "yolomatic_admin_session=valid", ...headers },
 		async *[Symbol.asyncIterator]() {
 			for (const chunk of chunks) {
 				yield chunk;
@@ -58,7 +58,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 1,
 							status: "working",
 							lastActivity: new Date().toISOString(),
@@ -76,7 +76,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 }
 
 async function tmpUserStore(): Promise<UserStore> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-status-routes-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-status-routes-"));
 	const store = new UserStore(path.join(dir, "users.sqlite"));
 	store.createSync({ fullName: "Admin", username: "admin", password: "secret" });
 	return store;
@@ -92,7 +92,7 @@ function makeRealDeps(store: UserStore, overrides: Record<string, unknown> = {})
 					sessions: [
 						{
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 1,
 							status: "working",
 							lastActivity: new Date().toISOString(),

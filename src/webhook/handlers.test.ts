@@ -42,17 +42,17 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	function createDeps() {
 		const getSession = vi.fn(async () => ({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		}));
 		const octokit = {
 			issues: {
@@ -63,7 +63,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			pulls: {
 				get: vi.fn(async () => ({
 					data: {
-						head: { ref: "yeetomatic/issue-56" },
+						head: { ref: "yolomatic/issue-56" },
 						state: "open",
 						merged: false,
 						mergeable: true,
@@ -71,7 +71,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 						draft: false,
 					},
 				})),
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/99", number: 99 } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/99", number: 99 } })),
 				list: vi.fn(async () => ({ data: [] as any[] })),
 				listReviewComments: vi.fn(async () => ({ data: [] })),
 			},
@@ -79,13 +79,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const sessionManager = {
 			createSession: vi.fn(async () => ({
 				issueNumber: 56,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "complete" as never,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -93,13 +93,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			getSession,
 			updateStatus: vi.fn(async () => ({
 				issueNumber: 56,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as never,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -109,13 +109,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			incrementIterationCount: vi.fn(),
 			cancelSession: vi.fn(async () => ({
 				issueNumber: 56,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "cancelled" as never,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -127,10 +127,10 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-				branch: "yeetomatic/issue-56",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+				branch: "yolomatic/issue-56",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 56,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -144,12 +144,12 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as never,
 				summary: "Fixed.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
+				rawResponse: "YOLO_STATUS: complete\nFixed.",
 			})),
 			executePRReview: vi.fn(async () => ({
 				status: "complete" as never,
 				summary: "Fixed.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
+				rawResponse: "YOLO_STATUS: complete\nFixed.",
 			})),
 		};
 		return { octokit, sessionManager, workspaceManager, executor };
@@ -162,7 +162,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -170,13 +170,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handlePullRequestReviewCommentEvent({
 			action: "created",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			comment: { id: 1, body: "Fix this", user: { login: "user" } },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "implementation");
 	});
 
 	it("delegates review submission events to the active PR review command", async () => {
@@ -186,7 +186,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -194,13 +194,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handlePullRequestReviewEvent({
 			action: "submitted",
-			pull_request: { number: 99, head: { ref: "yeetomatic/issue-56" }, state: "open", merged: false },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			pull_request: { number: 99, head: { ref: "yolomatic/issue-56" }, state: "open", merged: false },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "LGTM", state: "approved", user: { login: "user" } },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "implementation");
 	});
 
 	it("throws when runExecution is called without a session", async () => {
@@ -208,13 +208,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		sessionManager.getSession.mockResolvedValue(null as never);
 		sessionManager.createSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		} as never);
@@ -223,7 +223,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -232,11 +232,11 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 			}),
-		).rejects.toThrow("No session for mbrooks/yeetomatic#56");
+		).rejects.toThrow("No session for mbrooks/yolomatic#56");
 	});
 
 	it("labels working when execution returns working status", async () => {
@@ -244,28 +244,28 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "working" as never,
 			summary: "Still working.",
-			rawResponse: "YEETOMATIC_STATUS: working\nStill working.",
+			rawResponse: "YOLO_STATUS: working\nStill working.",
 		});
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		});
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -273,15 +273,15 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-pr-created" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "working");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "working");
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-working"] }),
+			expect.objectContaining({ labels: ["yolomatic-working"] }),
 		);
 	});
 
@@ -289,13 +289,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.createSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		});
@@ -304,7 +304,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -312,8 +312,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -324,13 +324,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const pendingSession = {
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};
@@ -341,7 +341,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -349,25 +349,25 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
-	it("ignores comments on issues created by Yeetomatic when Yeetomatic is not assigned", async () => {
+	it("ignores comments on issues created by Yolomatic when Yolomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -376,7 +376,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -384,9 +384,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [], assignees: [], user: { login: "yeetomatic-bot" } },
+			issue: { number: 56, labels: [], assignees: [], user: { login: "yolomatic-bot" } },
 			comment: { body: "Just a comment", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -398,13 +398,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -413,7 +413,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -421,16 +421,16 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Please resume work", user: { login: "mbrooks", type: "User" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Please resume work", user: { login: "mbrooks", type: "User" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "working");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "working");
 		expect(executor.execute).toHaveBeenCalledWith(
 			expect.objectContaining({ issueNumber: 56 }),
-			"@yeetomatic-bot Please resume work",
+			"@yolomatic-bot Please resume work",
 			expect.any(AbortSignal),
 			expect.any(Function),
 			expect.any(Function),
@@ -445,7 +445,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -457,25 +457,25 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				number: 99,
 				labels: [],
 				assignees: [],
-				user: { login: "yeetomatic-bot" },
-				pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" },
+				user: { login: "yolomatic-bot" },
+				pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" },
 			},
 			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(octokit.pulls.get).toHaveBeenCalledWith({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			pull_number: 99,
 		});
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
-		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "implementation");
+		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith(
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
-			"yeetomatic/issue-56",
-			"Yeetomatic: Fixed",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+			"yolomatic/issue-56",
+			"Yolomatic: Fixed",
 		);
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
 	});
@@ -488,7 +488,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -500,15 +500,15 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				number: 99,
 				labels: [],
 				assignees: [],
-				user: { login: "yeetomatic-bot" },
-				pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" },
+				user: { login: "yolomatic-bot" },
+				pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" },
 			},
 			comment: { id: 123, body: "Can you rebase this?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "implementation");
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "implementation");
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
 		expect(workspaceManager.createOrGetWorktree).not.toHaveBeenCalled();
 		expect(executor.execute).not.toHaveBeenCalled();
@@ -519,7 +519,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		octokit.pulls.get.mockResolvedValue({
 			data: {
-				head: { ref: "yeetomatic/issue-57" },
+				head: { ref: "yolomatic/issue-57" },
 				state: "open",
 				merged: false,
 				mergeable: true,
@@ -529,24 +529,24 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		});
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		} as never);
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -554,20 +554,20 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Continue", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Continue", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			56,
 			"failed",
 			expect.objectContaining({
-				summary: expect.stringContaining("maps to 'yeetomatic/issue-57'"),
+				summary: expect.stringContaining("maps to 'yolomatic/issue-57'"),
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -578,14 +578,14 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		);
 	});
 
-	it("ignores unassigned issue comments without a Yeetomatic mention", async () => {
+	it("ignores unassigned issue comments without a Yolomatic mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -595,7 +595,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
 			comment: { body: "Just a comment", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -603,29 +603,29 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores unassigned issue comments with @yeetomatic mention", async () => {
+	it("ignores unassigned issue comments with @yolomatic mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValueOnce(null as never).mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		} as never);
 		sessionManager.createSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		} as never);
@@ -634,7 +634,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -643,8 +643,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @yeetomatic, help me", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { body: "Hey @yolomatic, help me", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -654,14 +654,14 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores assigned issue comments without a Yeetomatic label or mention", async () => {
+	it("ignores assigned issue comments without a Yolomatic label or mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -669,9 +669,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [], assignees: [{ login: "yeetomatic-bot" }] },
+			issue: { number: 56, labels: [], assignees: [{ login: "yolomatic-bot" }] },
 			comment: { body: "Just a comment", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -679,17 +679,17 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("does not add labels for an @yeetomatic mention when Yeetomatic is not assigned", async () => {
+	it("does not add labels for an @yolomatic mention when Yolomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -698,7 +698,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -707,8 +707,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @yeetomatic can you help?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { body: "Hey @yolomatic can you help?", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -718,17 +718,17 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores configured-username mentions when Yeetomatic is not assigned", async () => {
+	it("ignores configured-username mentions when Yolomatic is not assigned", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "pending" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -737,7 +737,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -746,8 +746,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await handlers.handleCommentEvent({
 			action: "created",
 			issue: { number: 56, labels: [], assignees: [] },
-			comment: { body: "Hey @yeetomatic-bot can you help?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { body: "Hey @yolomatic-bot can you help?", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -762,25 +762,25 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "complete" as never,
 			summary: "Fixed.",
-			rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
+			rawResponse: "YOLO_STATUS: complete\nFixed.",
 		});
-		const existingPrUrl = "https://github.com/mbrooks/yeetomatic/pull/42";
+		const existingPrUrl = "https://github.com/mbrooks/yolomatic/pull/42";
 		const existingPrNumber = 42;
 		octokit.pulls.create.mockRejectedValue(
-			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"A pull request already exists for mbrooks:yeetomatic/issue-6."}'),
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"A pull request already exists for mbrooks:yolomatic/issue-6."}'),
 		);
 		octokit.pulls.list.mockResolvedValue({
 			data: [{ number: existingPrNumber, html_url: existingPrUrl }],
 		});
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "working" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -790,7 +790,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -798,19 +798,19 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(octokit.pulls.list).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "yeetomatic", head: "mbrooks:yeetomatic/issue-56", base: "main", state: "open" }),
+			expect.objectContaining({ owner: "mbrooks", repo: "yolomatic", head: "mbrooks:yolomatic/issue-56", base: "main", state: "open" }),
 		);
-		expect(sessionManager.associatePR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, existingPrNumber, existingPrUrl);
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "complete");
+		expect(sessionManager.associatePR).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, existingPrNumber, existingPrUrl);
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "complete");
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
+			expect.objectContaining({ labels: ["yolomatic-pr-created"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining(existingPrUrl) }),
@@ -822,20 +822,20 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		executor.execute.mockResolvedValue({
 			status: "complete" as never,
 			summary: "Fixed.",
-			rawResponse: "YEETOMATIC_STATUS: complete\nFixed.",
+			rawResponse: "YOLO_STATUS: complete\nFixed.",
 		});
 		octokit.pulls.create.mockRejectedValue(
-			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and yeetomatic/issue-56."}'),
+			new Error('Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and yolomatic/issue-56."}'),
 		);
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "working" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -845,7 +845,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -853,29 +853,29 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56, "complete");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "complete");
 		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
+			expect.objectContaining({ labels: ["yolomatic-pr-created"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: expect.stringContaining("No code changes were necessary.") }),
 		);
 	});
 
-	it("ignores /yeetomatic stop from non-admin", async () => {
+	it("ignores /yolomatic stop from non-admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -884,19 +884,19 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "/yeetomatic stop", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "/yolomatic stop", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Only admins can stop Yeetomatic." }),
+			expect.objectContaining({ body: "Only admins can stop Yolomatic." }),
 		);
 	});
 
-	it("cancels in-flight execution on /yeetomatic stop from admin", async () => {
+	it("cancels in-flight execution on /yolomatic stop from admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => true),
@@ -909,7 +909,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -919,20 +919,20 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "/yolomatic stop", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yolomatic#56");
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Stopping Yeetomatic..." }),
+			expect.objectContaining({ body: "Stopping Yolomatic..." }),
 		);
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("marks session cancelled on /yeetomatic stop when not in-flight", async () => {
+	it("marks session cancelled on /yolomatic stop when not in-flight", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -942,13 +942,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		};
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "working" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -958,7 +958,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -968,25 +968,25 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "/yolomatic stop", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(sessionManager.cancelSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 56);
+		expect(sessionManager.cancelSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56);
 		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
-			expect.objectContaining({ owner: "mbrooks", repo: "yeetomatic", issue_number: 56, name: "yeetomatic-working" }),
+			expect.objectContaining({ owner: "mbrooks", repo: "yolomatic", issue_number: 56, name: "yolomatic-working" }),
 		);
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-cancelled"] }),
+			expect.objectContaining({ labels: ["yolomatic-cancelled"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Task cancelled by admin. Yeetomatic is idle." }),
+			expect.objectContaining({ body: "Task cancelled by admin. Yolomatic is idle." }),
 		);
 	});
 
-	it("steers comments when Yeetomatic is actively executing", async () => {
+	it("steers comments when Yolomatic is actively executing", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -997,13 +997,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		};
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "working" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -1013,7 +1013,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1022,21 +1022,21 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 56, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Do this instead", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Do this instead", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
-		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#56", "@yeetomatic-bot Do this instead");
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yolomatic#56");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yolomatic#56", "@yolomatic-bot Do this instead");
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({ body: "Steering comment received." }),
 		);
 	});
 
-	it("steers description updates when Yeetomatic is actively executing", async () => {
+	it("steers description updates when Yolomatic is actively executing", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const taskController = {
 			cancel: vi.fn(() => false),
@@ -1047,13 +1047,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		};
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Old body",
 			status: "working" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -1063,7 +1063,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1072,16 +1072,16 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
-		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#56", "New body");
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yolomatic#56");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yolomatic#56", "New body");
 		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Issue description updated. Steering to Yeetomatic." }),
+			expect.objectContaining({ body: "Issue description updated. Steering to Yolomatic." }),
 		);
 	});
 
@@ -1096,13 +1096,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		};
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Old body",
 			status: "waiting-feedback" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -1112,7 +1112,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1121,16 +1121,16 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#56");
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yolomatic#56");
 		expect(taskController.steer).not.toHaveBeenCalled();
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			56,
 			"waiting-feedback",
 			expect.objectContaining({ body: "New body", title: "New title" }),
@@ -1141,13 +1141,13 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue({
 			issueNumber: 57,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "paused" as never,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-57.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-57",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-57.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-57",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 		} as never);
@@ -1157,7 +1157,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1165,9 +1165,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 57, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Can you also add tests?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 57, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Can you also add tests?", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -1175,7 +1175,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(sessionManager.updateStatus).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "Yeetomatic is paused on this issue. It will resume when unpaused.",
+				body: "Yolomatic is paused on this issue. It will resume when unpaused.",
 			}),
 		);
 	});
@@ -1189,7 +1189,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1197,8 +1197,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 
 		await handlers.handleIssueEvent({
 			action: "edited",
-			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 56, title: "New title", body: "New body", labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -1214,15 +1214,15 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
 		});
 
-		expect(handlers.isInFlight("mbrooks", "yeetomatic", 56)).toBe(false);
-		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 56);
-		expect(handlers.isInFlight("mbrooks", "yeetomatic", 56)).toBe(false);
+		expect(handlers.isInFlight("mbrooks", "yolomatic", 56)).toBe(false);
+		await handlers.resumeInterruptedSession("mbrooks", "yolomatic", 56);
+		expect(handlers.isInFlight("mbrooks", "yolomatic", 56)).toBe(false);
 	});
 
 	it("considers repos managed when no repositoryStore is provided", async () => {
@@ -1232,7 +1232,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1241,8 +1241,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yeetomatic-bot" }] },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yolomatic-bot" }] },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 			}),
 		).resolves.toBeUndefined();
@@ -1251,14 +1251,14 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("considers only registered repos managed when repositoryStore is provided", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const repositoryStore = {
-			getSync: vi.fn((owner: string, repo: string) => (owner === "mbrooks" && repo === "yeetomatic" ? { owner, repo } : null)),
+			getSync: vi.fn((owner: string, repo: string) => (owner === "mbrooks" && repo === "yolomatic" ? { owner, repo } : null)),
 		};
 		const handlers = new GitHubIssueHandlers({
 			sessionManager: sessionManager as never,
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1268,11 +1268,11 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yeetomatic-bot" }] },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				issue: { number: 1, title: "T", body: "B", assignees: [{ login: "yolomatic-bot" }] },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "user" },
 			}),
 		).resolves.toBeUndefined();
-		expect(repositoryStore.getSync).toHaveBeenCalledWith("mbrooks", "yeetomatic");
+		expect(repositoryStore.getSync).toHaveBeenCalledWith("mbrooks", "yolomatic");
 	});
 });

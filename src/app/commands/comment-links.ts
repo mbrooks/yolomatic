@@ -2,7 +2,7 @@ import type { SessionKind } from "../../session/store.js";
 
 /**
  * Helpers for building and appending admin status-tracking links to the
- * user-facing comments Yeetomatic posts on issues.
+ * user-facing comments Yolomatic posts on issues.
  *
  * The admin SPA deep-links to a specific issue management view via the hash
  * route `#/repos/{owner}/{repo}/issues/{number}`, and to a live session view

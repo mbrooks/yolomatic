@@ -9,7 +9,7 @@ describe("RestartBanner", () => {
 		render(<RestartBanner />);
 
 		const banner = screen.getByRole("alert");
-		expect(screen.getByText("Yeetomatic is marked for restart. Maintenance mode active.")).toBeDefined();
+		expect(screen.getByText("Yolomatic is marked for restart. Maintenance mode active.")).toBeDefined();
 		expect(banner.className).toContain("border-yellow");
 		expect(banner.className).toContain("bg-[rgba(210,153,34,0.15)]");
 		expect(banner.className).not.toContain("restart-banner");

@@ -8,7 +8,7 @@ describe("HandleIssueComment", () => {
 		const sessions = {
 			get: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -25,7 +25,7 @@ describe("HandleIssueComment", () => {
 			archive: vi.fn(),
 			createSession: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -38,7 +38,7 @@ describe("HandleIssueComment", () => {
 			})),
 			updateStatus: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -62,7 +62,7 @@ describe("HandleIssueComment", () => {
 			markStale: vi.fn(),
 		};
 		const workspaces = {
-			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yeetomatic/issue-42" })),
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yolomatic/issue-42" })),
 			syncWorktree: vi.fn(async () => undefined),
 			removeWorktree: vi.fn(async () => {}),
 			commitAndPush: vi.fn(async () => true),
@@ -87,7 +87,7 @@ describe("HandleIssueComment", () => {
 			addLabels: vi.fn(async () => {}),
 			removeLabel: vi.fn(async () => {}),
 			getPullRequest: vi.fn(async () => ({
-				head: { ref: "yeetomatic/custom-branch-123" },
+				head: { ref: "yolomatic/custom-branch-123" },
 				state: "open",
 				merged: false,
 			})),
@@ -116,7 +116,7 @@ describe("HandleIssueComment", () => {
 			execute: vi.fn(async () => undefined),
 		};
 
-		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." }));
+		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YOLO_STATUS: complete\nDone." }));
 		const executorExecutePRReview = vi.fn();
 		const handlerDepsExecutor = {
 			sessions: sessions as never,
@@ -125,7 +125,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			clock: { now: () => new Date() } as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			selfReportEnabled: false,
 			executor: { execute: executorExecute, executePRReview: executorExecutePRReview } as never,
 		};
@@ -135,7 +135,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			github: github as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			adminGithubUsername: "admin",
 			executor: handlerDepsExecutor,
 			prReview: prReview as never,
@@ -153,7 +153,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			github: github as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			adminGithubUsername: "admin",
 			executor,
 			refinement: refinement as never,
@@ -161,15 +161,15 @@ describe("HandleIssueComment", () => {
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "/yeetomatic issue-refinement Focus on rollback", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "/yolomatic issue-refinement Focus on rollback", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
 		expect(refinement.execute).toHaveBeenCalledTimes(1);
 		const call = refinement.execute.mock.calls[0]!;
-		expect(call[0]).toMatchObject({ action: "created", repository: { name: "yeetomatic" } });
+		expect(call[0]).toMatchObject({ action: "created", repository: { name: "yolomatic" } });
 		expect(call[1]).toBe("Focus on rollback");
 	});
 
@@ -182,7 +182,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			github: github as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			adminGithubUsername: "admin",
 			executor,
 			refinement: refinement as never,
@@ -190,9 +190,9 @@ describe("HandleIssueComment", () => {
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 2, body: "/yeetomatic issue-refinement", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 2, body: "/yolomatic issue-refinement", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
@@ -209,7 +209,7 @@ describe("HandleIssueComment", () => {
 			tasks: tasks as never,
 			github: github as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			adminGithubUsername: "admin",
 			executor,
 			refinement: refinement as never,
@@ -217,9 +217,9 @@ describe("HandleIssueComment", () => {
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 3, body: "Please run /yeetomatic issue-refinement", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, title: "Issue", body: "Body", labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 3, body: "Please run /yolomatic issue-refinement", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
@@ -230,34 +230,34 @@ describe("HandleIssueComment", () => {
 		const { handler, sessions, github, prReview } = createHandler();
 		sessions.findSessionByPR.mockResolvedValue({
 			issueNumber: 56,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Title",
 			body: "Body",
 			status: "complete",
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 			lastActivity: new Date().toISOString(),
 			seeded: true,
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		} as never);
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" } },
 			comment: { id: 1, body: "Please regenerate this", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 		expect(prReview.execute).toHaveBeenCalledWith(
 			expect.objectContaining({
 				pull_request: expect.objectContaining({
 					number: 99,
-					head: { ref: "yeetomatic/custom-branch-123" },
+					head: { ref: "yolomatic/custom-branch-123" },
 				}),
 			}),
 		);
@@ -269,13 +269,13 @@ describe("HandleIssueComment", () => {
 
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" } },
 			comment: { id: 1, body: "Please regenerate this", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 		expect(prReview.execute).not.toHaveBeenCalled();
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
@@ -291,15 +291,15 @@ describe("HandleIssueComment", () => {
 				number: 42,
 				title: "Issue",
 				body: "Body",
-				labels: [{ name: "yeetomatic" }],
-				assignee: { login: "yeetomatic-bot" },
+				labels: [{ name: "yolomatic" }],
+				assignee: { login: "yolomatic-bot" },
 			},
-			comment: { id: 1, body: "@yeetomatic-bot Please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "@yolomatic-bot Please update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic is busy. Comment could not be steered.");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Yolomatic is busy. Comment could not be steered.");
 	});
 
 	it("queues feedback during draining mode", async () => {
@@ -312,18 +312,18 @@ describe("HandleIssueComment", () => {
 				number: 42,
 				title: "Issue",
 				body: "Body",
-				labels: [{ name: "yeetomatic" }],
-				assignee: { login: "yeetomatic-bot" },
+				labels: [{ name: "yolomatic" }],
+				assignee: { login: "yolomatic-bot" },
 			},
-			comment: { id: 1, body: "@yeetomatic-bot Please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "@yolomatic-bot Please update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(sessions.updateStatus).toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			42,
 			"Deploy in progress. Feedback will be processed after restart.",
 		);
@@ -335,7 +335,7 @@ describe("HandleIssueComment", () => {
 			action: "edited",
 			issue: { number: 42 },
 			comment: { id: 1, body: "hi", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -346,10 +346,10 @@ describe("HandleIssueComment", () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "hi", user: { login: "yeetomatic-bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "hi", user: { login: "yolomatic-bot" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
 		});
 
 		expect(github.postComment).not.toHaveBeenCalled();
@@ -359,9 +359,9 @@ describe("HandleIssueComment", () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
 			comment: { id: 1, body: "hi", user: { login: "other-bot", type: "Bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-bot" },
 		});
 
@@ -372,13 +372,13 @@ describe("HandleIssueComment", () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "/yeetomatic stop", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "/yolomatic stop", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Only admins can stop Yeetomatic.");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Only admins can stop Yolomatic.");
 	});
 
 	it("handles admin stop from an admin with an active task", async () => {
@@ -386,13 +386,13 @@ describe("HandleIssueComment", () => {
 		tasks.cancel.mockReturnValue(true);
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "/yolomatic stop", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Stopping Yeetomatic...");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Stopping Yolomatic...");
 	});
 
 	it("ignores comments that do not pass the policy gate", async () => {
@@ -401,7 +401,7 @@ describe("HandleIssueComment", () => {
 			action: "created",
 			issue: { number: 42, labels: [], assignee: null, assignees: [], user: { login: "someone" } },
 			comment: { id: 1, body: "hello world", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -415,13 +415,13 @@ describe("HandleIssueComment", () => {
 			issue: {
 				number: 42,
 				state: "closed",
-				labels: [{ name: "yeetomatic" }],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
-				user: { login: "yeetomatic-bot" },
+				labels: [{ name: "yolomatic" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
+				user: { login: "yolomatic-bot" },
 			},
-			comment: { id: 1, body: "@yeetomatic-bot please continue", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "@yolomatic-bot please continue", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -436,29 +436,29 @@ describe("HandleIssueComment", () => {
 		tasks.steer.mockResolvedValue(true);
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [], assignee: { login: "yeetomatic-bot" }, assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { id: 1, body: "@yeetomatic-bot please help", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [], assignee: { login: "yolomatic-bot" }, assignees: [{ login: "yolomatic-bot" }] },
+			comment: { id: 1, body: "@yolomatic-bot please help", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic"]);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Steering comment received.");
+		expect(github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, ["yolomatic"]);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Steering comment received.");
 	});
 
-	it("ignores comments on issues created by Yeetomatic when Yeetomatic is not assigned", async () => {
+	it("ignores comments on issues created by Yolomatic when Yolomatic is not assigned", async () => {
 		const { handler, github, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
 			issue: {
 				number: 42,
-				labels: [{ name: "yeetomatic" }],
+				labels: [{ name: "yolomatic" }],
 				assignee: { login: "other-user" },
 				assignees: [{ login: "other-user" }],
-				user: { login: "yeetomatic-bot" },
+				user: { login: "yolomatic-bot" },
 			},
-			comment: { id: 1, body: "@yeetomatic-bot following up", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "@yolomatic-bot following up", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -469,20 +469,20 @@ describe("HandleIssueComment", () => {
 
 	it("posts a paused message when the session is paused", async () => {
 		const { handler, github, sessions } = createHandler();
-		sessions.get.mockResolvedValue({ status: "paused", owner: "mbrooks", repo: "yeetomatic", issueNumber: 42, workspacePath: "/tmp/ws/issue-42" } as never);
+		sessions.get.mockResolvedValue({ status: "paused", owner: "mbrooks", repo: "yolomatic", issueNumber: 42, workspacePath: "/tmp/ws/issue-42" } as never);
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "@yolomatic-bot please update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			42,
-			"Yeetomatic is paused on this issue. It will resume when unpaused.",
+			"Yolomatic is paused on this issue. It will resume when unpaused.",
 		);
 	});
 
@@ -490,15 +490,15 @@ describe("HandleIssueComment", () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic" }], assignee: { login: "yeetomatic-bot" } },
-			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic" }], assignee: { login: "yolomatic-bot" } },
+			comment: { id: 1, body: "@yolomatic-bot please update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			42,
 			"Feedback received. Resuming work.",
 		);
@@ -509,9 +509,9 @@ describe("HandleIssueComment", () => {
 		github.getPullRequest.mockResolvedValue(null as never);
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" } },
 			comment: { id: 1, body: "please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -520,17 +520,17 @@ describe("HandleIssueComment", () => {
 
 	it("routes a PR timeline stop command to the mapped issue", async () => {
 		const { handler, github, tasks } = createHandler();
-		github.getPullRequest.mockResolvedValue({ head: { ref: "yeetomatic/issue-42" }, state: "open", merged: false } as never);
+		github.getPullRequest.mockResolvedValue({ head: { ref: "yolomatic/issue-42" }, state: "open", merged: false } as never);
 		tasks.cancel.mockReturnValue(true);
 		await handler.execute({
 			action: "created",
-			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/99" } },
-			comment: { id: 1, body: "/yeetomatic stop", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" } },
+			comment: { id: 1, body: "/yolomatic stop", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 		});
 
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99, "Stopping Yeetomatic...");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "Stopping Yolomatic...");
 	});
 
 describe("HandleIssueComment feedback gate behavior", () => {
@@ -542,12 +542,12 @@ describe("HandleIssueComment feedback gate behavior", () => {
 				number: 42,
 				title: "Issue",
 				body: "Body",
-				labels: [{ name: "yeetomatic-working" }],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				labels: [{ name: "yolomatic-working" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
 			comment: { id: 1, body: "just checking in, no trigger", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -557,7 +557,7 @@ describe("HandleIssueComment feedback gate behavior", () => {
 		expect(github.addLabels).not.toHaveBeenCalled();
 	});
 
-	it("accepts a /yeetomatic feedback command on an assigned issue and starts execution", async () => {
+	it("accepts a /yolomatic feedback command on an assigned issue and starts execution", async () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
@@ -566,23 +566,23 @@ describe("HandleIssueComment feedback gate behavior", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 1, body: "/yeetomatic feedback please rerun the tests", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "/yolomatic feedback please rerun the tests", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			42,
 			"Feedback received. Resuming work.",
 		);
 	});
 
-	it("does not auto-add the yeetomatic label for a /yeetomatic feedback command without a mention", async () => {
+	it("does not auto-add the yolomatic label for a /yolomatic feedback command without a mention", async () => {
 		const { handler, github } = createHandler();
 		await handler.execute({
 			action: "created",
@@ -591,18 +591,18 @@ describe("HandleIssueComment feedback gate behavior", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 1, body: "/yeetomatic feedback rerun", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "/yolomatic feedback rerun", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.addLabels).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, ["yeetomatic"]);
+		expect(github.addLabels).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 42, ["yolomatic"]);
 	});
 
-	it("ignores a /yeetomatic feedback command when the issue is not assigned to Yeetomatic", async () => {
+	it("ignores a /yolomatic feedback command when the issue is not assigned to Yolomatic", async () => {
 		const { handler, github, tasks, sessions } = createHandler();
 		await handler.execute({
 			action: "created",
@@ -610,12 +610,12 @@ describe("HandleIssueComment feedback gate behavior", () => {
 				number: 42,
 				title: "Issue",
 				body: "Body",
-				labels: [{ name: "yeetomatic" }],
+				labels: [{ name: "yolomatic" }],
 				assignee: { login: "someone-else" },
 				assignees: [{ login: "someone-else" }],
 			},
-			comment: { id: 1, body: "/yeetomatic feedback please help", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "/yolomatic feedback please help", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -630,7 +630,7 @@ describe("HandleIssueComment prior-context inclusion", () => {
 		const { handler, github, executorExecute } = createHandler();
 		github.listIssueComments.mockResolvedValue([
 			{ id: 10, body: "earlier discussion", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
-			{ id: 20, body: "@yeetomatic-bot please retry", author: "user", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
+			{ id: 20, body: "@yolomatic-bot please retry", author: "user", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
 		] as never);
 
 		await handler.execute({
@@ -640,15 +640,15 @@ describe("HandleIssueComment prior-context inclusion", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 20, body: "@yolomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
-		expect(github.listIssueComments).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42);
+		expect(github.listIssueComments).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 		expect(executorExecute).toHaveBeenCalledTimes(1);
 		const call = (executorExecute.mock.calls[0] as unknown[]);
 		// execute(state, comment, abortSignal, onSessionCreated, onActivity, priorComments)
@@ -671,11 +671,11 @@ describe("HandleIssueComment prior-context inclusion", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 20, body: "@yolomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -698,17 +698,17 @@ describe("HandleIssueComment prior-context inclusion", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 20, body: "@yolomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			42,
 			"Feedback received. Resuming work.",
 		);
@@ -728,11 +728,11 @@ describe("HandleIssueComment prior-context inclusion", () => {
 				title: "Issue",
 				body: "Body",
 				labels: [],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 20, body: "@yeetomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 20, body: "@yolomatic-bot please retry", user: { login: "user" }, created_at: "2026-08-02T00:00:00Z" },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -744,17 +744,17 @@ describe("HandleIssueComment prior-context inclusion", () => {
 });
 
 describe("HandleIssueComment prior-context gathering", () => {
-	it("selects prior non-trigger, non-Yeetomatic comments older than the trigger", () => {
+	it("selects prior non-trigger, non-Yolomatic comments older than the trigger", () => {
 		const comments = [
 			{ id: 10, body: "older plain comment", author: "mbrooks", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", html_url: "u" },
-			{ id: 20, body: "@yeetomatic-bot older trigger", author: "tarsmbrooks", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
-			{ id: 30, body: "yeetomatic's own comment", author: "yeetomatic-bot", created_at: "2026-08-03T00:00:00Z", updated_at: "2026-08-03T00:00:00Z", html_url: "u" },
-			{ id: 40, body: "/yeetomatic feedback older command trigger", author: "mbrooks", created_at: "2026-08-04T00:00:00Z", updated_at: "2026-08-04T00:00:00Z", html_url: "u" },
+			{ id: 20, body: "@yolomatic-bot older trigger", author: "tarsmbrooks", created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", html_url: "u" },
+			{ id: 30, body: "yolomatic's own comment", author: "yolomatic-bot", created_at: "2026-08-03T00:00:00Z", updated_at: "2026-08-03T00:00:00Z", html_url: "u" },
+			{ id: 40, body: "/yolomatic feedback older command trigger", author: "mbrooks", created_at: "2026-08-04T00:00:00Z", updated_at: "2026-08-04T00:00:00Z", html_url: "u" },
 		];
 		const selected = selectPriorContextComments(
 			comments,
-			{ id: 50, body: "@yeetomatic-bot please retry", created_at: "2026-08-05T00:00:00Z" },
-			"yeetomatic-bot",
+			{ id: 50, body: "@yolomatic-bot please retry", created_at: "2026-08-05T00:00:00Z" },
+			"yolomatic-bot",
 		);
 		expect(selected).toEqual([{ author: "mbrooks", body: "older plain comment" }]);
 	});
@@ -767,7 +767,7 @@ describe("HandleIssueComment prior-context gathering", () => {
 		const selected = selectPriorContextComments(
 			comments,
 			{ id: 20, body: "trigger", created_at: "2026-08-01T00:00:00Z" },
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(selected).toEqual([{ author: "mbrooks", body: "same ts, older id" }]);
 	});
@@ -779,7 +779,7 @@ describe("HandleIssueComment prior-context gathering", () => {
 		const selected = selectPriorContextComments(
 			comments,
 			{ body: "trigger with no id or timestamp" },
-			"yeetomatic-bot",
+			"yolomatic-bot",
 		);
 		expect(selected).toEqual([]);
 	});
@@ -807,7 +807,7 @@ describe("HandleIssueComment cancel race", () => {
 		// exercised end-to-end rather than via a stub.
 		const controller = new TaskController();
 		const steered: string[] = [];
-		const registration = controller.register("mbrooks/yeetomatic#42", () => {}, async (msg) => {
+		const registration = controller.register("mbrooks/yolomatic#42", () => {}, async (msg) => {
 			steered.push(msg);
 		});
 		expect(registration).not.toBeNull();
@@ -815,7 +815,7 @@ describe("HandleIssueComment cancel race", () => {
 		const sessions = {
 			get: vi.fn(async () => ({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 				title: "Issue",
 				body: "Body",
@@ -845,7 +845,7 @@ describe("HandleIssueComment cancel race", () => {
 			markStale: vi.fn(),
 		};
 		const workspaces = {
-			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yeetomatic/issue-42" })),
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-42", branch: "yolomatic/issue-42" })),
 			syncWorktree: vi.fn(async () => undefined),
 			removeWorktree: vi.fn(async () => {}),
 			commitAndPush: vi.fn(async () => true),
@@ -861,7 +861,7 @@ describe("HandleIssueComment cancel race", () => {
 			addLabels: vi.fn(async () => {}),
 			removeLabel: vi.fn(async () => {}),
 			getPullRequest: vi.fn(async () => ({
-				head: { ref: "yeetomatic/issue-42" },
+				head: { ref: "yolomatic/issue-42" },
 				state: "open",
 				merged: false,
 			})),
@@ -886,7 +886,7 @@ describe("HandleIssueComment cancel race", () => {
 			getAuthenticatedUser: vi.fn(async () => ({ login: "testuser" })),
 			listAccessibleRepositories: vi.fn(async () => []),
 		};
-		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YEETOMATIC_STATUS: complete\nDone." }));
+		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YOLO_STATUS: complete\nDone." }));
 		const handlerDepsExecutor = {
 			sessions: sessions as never,
 			workspaces: workspaces as never,
@@ -894,7 +894,7 @@ describe("HandleIssueComment cancel race", () => {
 			tasks: controller as never,
 			clock: { now: () => new Date() } as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			selfReportEnabled: false,
 			executor: { execute: executorExecute, executePRReview: vi.fn() } as never,
 		};
@@ -904,26 +904,26 @@ describe("HandleIssueComment cancel race", () => {
 			tasks: controller as never,
 			github: github as never,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			adminGithubUsername: "admin",
 			executor: handlerDepsExecutor,
 		});
 
 		// Admin Stop fires the abort but must NOT free the key.
-		expect(controller.cancel("mbrooks/yeetomatic#42")).toBe(true);
-		expect(controller.isActive("mbrooks/yeetomatic#42")).toBe(true);
+		expect(controller.cancel("mbrooks/yolomatic#42")).toBe(true);
+		expect(controller.isActive("mbrooks/yolomatic#42")).toBe(true);
 
 		// A feedback comment arrives in the wind-down window.
 		await handler.execute({
 			action: "created",
 			issue: {
 				number: 42,
-				labels: [{ name: "yeetomatic" }],
-				assignee: { login: "yeetomatic-bot" },
-				assignees: [{ login: "yeetomatic-bot" }],
+				labels: [{ name: "yolomatic" }],
+				assignee: { login: "yolomatic-bot" },
+				assignees: [{ login: "yolomatic-bot" }],
 			},
-			comment: { id: 1, body: "@yeetomatic-bot please update", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 1, body: "@yolomatic-bot please update", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
@@ -932,12 +932,12 @@ describe("HandleIssueComment cancel race", () => {
 		expect(executorExecute).not.toHaveBeenCalled();
 		expect(steered).toHaveLength(1);
 		expect(steered[0]).toContain("please update");
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Steering comment received.");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Steering comment received.");
 
 		// Once the run's finally block unregisters, the key is released and a
 		// later event can claim it again.
-		controller.unregister("mbrooks/yeetomatic#42", registration!);
-		expect(controller.isActive("mbrooks/yeetomatic#42")).toBe(false);
+		controller.unregister("mbrooks/yolomatic#42", registration!);
+		expect(controller.isActive("mbrooks/yolomatic#42")).toBe(false);
 	});
 });
 

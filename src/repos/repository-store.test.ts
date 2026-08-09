@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { unlinkSync } from "node:fs";
 import { RepositoryStore } from "./repository-store.js";
 
-const TEST_DB = "/tmp/yeetomatic-repository-store-test.sqlite";
+const TEST_DB = "/tmp/yolomatic-repository-store-test.sqlite";
 
 describe("RepositoryStore", () => {
 	let store: RepositoryStore;
@@ -45,15 +45,15 @@ describe("RepositoryStore", () => {
 	});
 
 	it("upserts and retrieves a repository", async () => {
-		const repo = await store.upsert({ owner: "mbrooks", repo: "yeetomatic" });
+		const repo = await store.upsert({ owner: "mbrooks", repo: "yolomatic" });
 		expect(repo.owner).toBe("mbrooks");
-		expect(repo.repo).toBe("yeetomatic");
-		expect(repo.id).toBe("mbrooks/yeetomatic");
+		expect(repo.repo).toBe("yolomatic");
+		expect(repo.id).toBe("mbrooks/yolomatic");
 		expect(repo.createdAt).toBe(repo.updatedAt);
 		expect(repo.githubEventMode).toBeNull();
 		expect(repo.visibility).toBeNull();
 
-		const found = await store.get("mbrooks", "yeetomatic");
+		const found = await store.get("mbrooks", "yolomatic");
 		expect(found).not.toBeNull();
 		expect(found!.id).toBe(repo.id);
 	});
@@ -61,15 +61,15 @@ describe("RepositoryStore", () => {
 	it("upsert updates an existing repository, preserving the id and bumping updated_at", async () => {
 		const original = await store.upsert({
 			owner: "mbrooks",
-			repo: "yeetomatic",
-			fullName: "mbrooks/yeetomatic",
+			repo: "yolomatic",
+			fullName: "mbrooks/yolomatic",
 			visibility: "private",
 		});
 		// Ensure updatedAt differs from createdAt on the second write.
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		const updated = await store.upsert({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			githubEventMode: "polling",
 			defaultBranch: "develop",
 		});
@@ -84,15 +84,15 @@ describe("RepositoryStore", () => {
 	it("matches owner and repo case-insensitively on get, upsert, and remove", async () => {
 		await store.upsert({
 			owner: "Mbrooks",
-			repo: "Yeetomatic",
-			fullName: "mbrooks/yeetomatic",
+			repo: "Yolomatic",
+			fullName: "mbrooks/yolomatic",
 		});
-		expect(await store.get("mbrooks", "yeetomatic")).not.toBeNull();
-		const updated = await store.upsert({ owner: "MBROOKS", repo: "YEETOMATIC", githubEventMode: "both" });
+		expect(await store.get("mbrooks", "yolomatic")).not.toBeNull();
+		const updated = await store.upsert({ owner: "MBROOKS", repo: "YOLO", githubEventMode: "both" });
 		expect(updated.owner).toBe("Mbrooks");
 		expect(updated.githubEventMode).toBe("both");
 		expect(await store.list()).toHaveLength(1);
-		expect(await store.remove("mbrooks", "yeetomatic")).toBe(true);
+		expect(await store.remove("mbrooks", "yolomatic")).toBe(true);
 		expect(await store.list()).toHaveLength(0);
 	});
 
@@ -107,10 +107,10 @@ describe("RepositoryStore", () => {
 	it("lists repositories ordered by owner then repo", async () => {
 		await store.upsert({ owner: "octocat", repo: "zebra" });
 		await store.upsert({ owner: "octocat", repo: "apple" });
-		await store.upsert({ owner: "mbrooks", repo: "yeetomatic" });
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic" });
 		const list = await store.list();
 		expect(list.map((r) => `${r.owner}/${r.repo}`)).toEqual([
-			"mbrooks/yeetomatic",
+			"mbrooks/yolomatic",
 			"octocat/apple",
 			"octocat/zebra",
 		]);
@@ -132,16 +132,16 @@ describe("RepositoryStore", () => {
 	it("persists nullable fields and visibility", async () => {
 		const repo = await store.upsert({
 			owner: "mbrooks",
-			repo: "yeetomatic",
-			fullName: "mbrooks/yeetomatic",
+			repo: "yolomatic",
+			fullName: "mbrooks/yolomatic",
 			visibility: "internal",
 			githubEventMode: "both",
 			defaultBranch: "main",
 		});
-		const found = await store.get("mbrooks", "yeetomatic");
+		const found = await store.get("mbrooks", "yolomatic");
 		expect(found).toEqual(repo);
 		expect(found!.visibility).toBe("internal");
-		expect(found!.fullName).toBe("mbrooks/yeetomatic");
+		expect(found!.fullName).toBe("mbrooks/yolomatic");
 	});
 
 	it("throws when upserting without owner or repo", async () => {

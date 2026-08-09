@@ -20,7 +20,7 @@ describe("RepoSettingsScreen", () => {
 		fetchSpy.mockReset();
 		fetchSpy.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input);
-			if (url === "/api/repos/mbrooks/yeetomatic/settings" && (!init || init.method === undefined)) {
+			if (url === "/api/repos/mbrooks/yolomatic/settings" && (!init || init.method === undefined)) {
 				return jsonResponse({
 					settings: [
 						{
@@ -45,10 +45,10 @@ describe("RepoSettingsScreen", () => {
 					],
 				});
 			}
-			if (url === "/api/repos/mbrooks/yeetomatic/settings" && init?.method === "PATCH") {
+			if (url === "/api/repos/mbrooks/yolomatic/settings" && init?.method === "PATCH") {
 				return jsonResponse({ updated: ["github_event_mode"], requiresRestart: ["github_event_mode"] });
 			}
-			if (url === "/api/repos/mbrooks/yeetomatic" && init?.method === "DELETE") {
+			if (url === "/api/repos/mbrooks/yolomatic" && init?.method === "DELETE") {
 				return jsonResponse({ removed: true });
 			}
 			throw new Error(`Unexpected fetch: ${url}`);
@@ -60,7 +60,7 @@ describe("RepoSettingsScreen", () => {
 	});
 
 	it("renders repo settings", async () => {
-		render(<RepoSettingsScreen owner="mbrooks" repo="yeetomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
 		await waitFor(() => {
 			expect(screen.getByText("Repository Settings")).toBeDefined();
 		});
@@ -69,7 +69,7 @@ describe("RepoSettingsScreen", () => {
 	});
 
 	it("saves repo setting changes", async () => {
-		render(<RepoSettingsScreen owner="mbrooks" repo="yeetomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
 		await waitFor(() => {
 			expect(screen.getByText("Repository Settings")).toBeDefined();
 		});
@@ -77,7 +77,7 @@ describe("RepoSettingsScreen", () => {
 		fireEvent.click(screen.getByText("Save Changes"));
 		await waitFor(() => {
 			expect(fetchSpy).toHaveBeenCalledWith(
-				"/api/repos/mbrooks/yeetomatic/settings",
+				"/api/repos/mbrooks/yolomatic/settings",
 				expect.objectContaining({ method: "PATCH" }),
 			);
 		});
@@ -86,8 +86,8 @@ describe("RepoSettingsScreen", () => {
 
 	it("removes the repository after confirmation and navigates to repos", async () => {
 		const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-		window.location.hash = "#/repos/mbrooks/yeetomatic/settings";
-		render(<RepoSettingsScreen owner="mbrooks" repo="yeetomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		window.location.hash = "#/repos/mbrooks/yolomatic/settings";
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
 		await waitFor(() => {
 			expect(screen.getByText("Repository Settings")).toBeDefined();
 		});
@@ -95,7 +95,7 @@ describe("RepoSettingsScreen", () => {
 		fireEvent.click(screen.getByRole("button", { name: /remove repository/i }));
 
 		await waitFor(() => {
-			expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yeetomatic", { method: "DELETE" });
+			expect(fetchSpy).toHaveBeenCalledWith("/api/repos/mbrooks/yolomatic", { method: "DELETE" });
 		});
 		expect(window.location.hash).toBe("#/repos");
 		confirmSpy.mockRestore();
@@ -103,7 +103,7 @@ describe("RepoSettingsScreen", () => {
 
 	it("does not remove the repository when confirmation is cancelled", async () => {
 		const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-		render(<RepoSettingsScreen owner="mbrooks" repo="yeetomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
 		await waitFor(() => {
 			expect(screen.getByText("Repository Settings")).toBeDefined();
 		});
@@ -111,7 +111,7 @@ describe("RepoSettingsScreen", () => {
 		fireEvent.click(screen.getByRole("button", { name: /remove repository/i }));
 
 		expect(fetchSpy).not.toHaveBeenCalledWith(
-			"/api/repos/mbrooks/yeetomatic",
+			"/api/repos/mbrooks/yolomatic",
 			expect.objectContaining({ method: "DELETE" }),
 		);
 		confirmSpy.mockRestore();
@@ -119,7 +119,7 @@ describe("RepoSettingsScreen", () => {
 
 	it("displays an error when removal fails", async () => {
 		const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-		render(<RepoSettingsScreen owner="mbrooks" repo="yeetomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
 		await waitFor(() => {
 			expect(screen.getByText("Repository Settings")).toBeDefined();
 		});

@@ -55,16 +55,16 @@ describe("RepositoriesSettingsSection", () => {
 	it("renders accessible repositories with configured repos preselected", async () => {
 		mockAccessible(
 			[
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			],
-			[{ owner: "mbrooks", repo: "yeetomatic" }],
+			[{ owner: "mbrooks", repo: "yolomatic" }],
 		);
 		render(<RepositoriesSettingsSection />);
 
-		const yeetomaticCheckbox = await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ }) as HTMLInputElement;
+		const yolomaticCheckbox = await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ }) as HTMLInputElement;
 		const helloCheckbox = screen.getByRole("checkbox", { name: /octocat\/hello-world/ }) as HTMLInputElement;
-		expect(yeetomaticCheckbox.checked).toBe(true);
+		expect(yolomaticCheckbox.checked).toBe(true);
 		expect(helloCheckbox.checked).toBe(false);
 		expect(screen.getByText("1 of 2 selected")).not.toBeNull();
 	});
@@ -91,10 +91,10 @@ describe("RepositoriesSettingsSection", () => {
 	it("toggles individual repo selection and enables save", async () => {
 		const fetchSpy = mockAccessible(
 			[
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			],
-			[{ owner: "mbrooks", repo: "yeetomatic" }],
+			[{ owner: "mbrooks", repo: "yolomatic" }],
 		);
 		render(<RepositoriesSettingsSection />);
 
@@ -112,14 +112,14 @@ describe("RepositoriesSettingsSection", () => {
 	it("Select All and Deselect All toggle the full displayed list", async () => {
 		mockAccessible(
 			[
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			],
-			[{ owner: "mbrooks", repo: "yeetomatic" }],
+			[{ owner: "mbrooks", repo: "yolomatic" }],
 		);
 		render(<RepositoriesSettingsSection />);
 
-		await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ });
+		await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ });
 
 		fireEvent.click(screen.getByRole("button", { name: "Select All" }));
 		expect(screen.getByText("2 of 2 selected")).not.toBeNull();
@@ -133,16 +133,16 @@ describe("RepositoriesSettingsSection", () => {
 	it("adds new selections via POST /api/repos and removes deselections via DELETE /api/repos/:owner/:repo", async () => {
 		const fetchSpy = mockAccessible(
 			[
-				{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" },
+				{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" },
 				{ owner: "octocat", repo: "hello-world", fullName: "octocat/hello-world", visibility: "public" },
 			],
-			[{ owner: "mbrooks", repo: "yeetomatic" }],
+			[{ owner: "mbrooks", repo: "yolomatic" }],
 		);
 		render(<RepositoriesSettingsSection />);
 
 		await screen.findByRole("checkbox", { name: /octocat\/hello-world/ });
-		// Deselect the configured repo (mbrooks/yeetomatic) and select the new one (octocat/hello-world).
-		fireEvent.click(screen.getByRole("checkbox", { name: /mbrooks\/yeetomatic/ }));
+		// Deselect the configured repo (mbrooks/yolomatic) and select the new one (octocat/hello-world).
+		fireEvent.click(screen.getByRole("checkbox", { name: /mbrooks\/yolomatic/ }));
 		fireEvent.click(screen.getByRole("checkbox", { name: /octocat\/hello-world/ }));
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
@@ -159,7 +159,7 @@ describe("RepositoriesSettingsSection", () => {
 
 		const deleteCall = fetchSpy.mock.calls.find(([input, init]) => {
 			const url = typeof input === "string" ? input : input.url;
-			return url === "/api/repos/mbrooks/yeetomatic" && init?.method === "DELETE";
+			return url === "/api/repos/mbrooks/yolomatic" && init?.method === "DELETE";
 		});
 		expect(deleteCall).toBeDefined();
 		// Save disabled again after persisting.
@@ -198,7 +198,7 @@ describe("RepositoriesSettingsSection", () => {
 			const method = init?.method;
 			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
 				return Promise.resolve(accessibleResponse(
-					[{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }],
+					[{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }],
 					[],
 				));
 			}
@@ -209,7 +209,7 @@ describe("RepositoriesSettingsSection", () => {
 		});
 		render(<RepositoriesSettingsSection />);
 
-		await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ });
+		await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ });
 		fireEvent.click(screen.getByRole("button", { name: "Select All" }));
 		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
@@ -226,7 +226,7 @@ describe("RepositoriesSettingsSection", () => {
 			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
 				accessibleCallCount++;
 				return Promise.resolve(accessibleResponse(
-					[{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }],
+					[{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }],
 					[],
 				));
 			}
@@ -237,7 +237,7 @@ describe("RepositoriesSettingsSection", () => {
 		});
 		render(<RepositoriesSettingsSection />);
 
-		await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ });
+		await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ });
 		expect(accessibleCallCount).toBe(1);
 
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
@@ -263,12 +263,12 @@ describe("RepositoriesSettingsSection", () => {
 
 	it("shows a validation error in the Add Repository modal when fields are blank", async () => {
 		mockAccessible(
-			[{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }],
+			[{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }],
 			[],
 		);
 		render(<RepositoriesSettingsSection />);
 
-		await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ });
+		await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ });
 		fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
 		fireEvent.click(screen.getByRole("button", { name: /^add repository$/i }));
 
@@ -286,7 +286,7 @@ describe("RepositoriesSettingsSection", () => {
 			if (url === "/api/repos/accessible" && (!method || method === "GET")) {
 				accessibleCallCount++;
 				return Promise.resolve(accessibleResponse(
-					[{ owner: "mbrooks", repo: "yeetomatic", fullName: "mbrooks/yeetomatic", visibility: "private" }],
+					[{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }],
 					[],
 				));
 			}
@@ -294,7 +294,7 @@ describe("RepositoriesSettingsSection", () => {
 		});
 		render(<RepositoriesSettingsSection />);
 
-		await screen.findByRole("checkbox", { name: /mbrooks\/yeetomatic/ });
+		await screen.findByRole("checkbox", { name: /mbrooks\/yolomatic/ });
 		expect(accessibleCallCount).toBe(1);
 
 		fireEvent.click(screen.getByRole("button", { name: /refresh/i }));

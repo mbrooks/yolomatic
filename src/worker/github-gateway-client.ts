@@ -23,7 +23,7 @@ export interface GatewayTransport {
 	call(request: { tool: string; params: Record<string, unknown> }): Promise<GatewayCallResult>;
 }
 
-const GATEWAY_TRANSPORT_KEY = Symbol.for("yeetomatic.worker.github-gateway-transport");
+const GATEWAY_TRANSPORT_KEY = Symbol.for("yolomatic.worker.github-gateway-transport");
 
 type GatewayTransportRegistry = typeof globalThis & {
 	[key: symbol]: GatewayTransport | undefined;

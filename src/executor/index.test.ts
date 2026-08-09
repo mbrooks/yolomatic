@@ -13,7 +13,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 }));
 
 vi.mock("./model-registry.js", () => ({
-	createYeetomaticModelRegistry: vi.fn(),
+	createYolomaticModelRegistry: vi.fn(),
 }));
 
 vi.mock("../logging/llm-logger.js", () => ({
@@ -34,7 +34,7 @@ vi.mock("../logging/session-log-store.js", () => ({
 import { PiAgentExecutor, preferTrustedExtension } from "./index.js";
 
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { createYeetomaticModelRegistry } from "./model-registry.js";
+import { createYolomaticModelRegistry } from "./model-registry.js";
 
 describe("PiAgentExecutor", () => {
 	afterEach(() => {
@@ -46,7 +46,7 @@ describe("PiAgentExecutor", () => {
 	function makeState(issueNumber = 1) {
 		return {
 			issueNumber,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -59,7 +59,7 @@ describe("PiAgentExecutor", () => {
 	}
 
 	async function makeSoulPath() {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 		return soulPath;
@@ -72,7 +72,7 @@ describe("PiAgentExecutor", () => {
 		};
 	}
 
-	function mockSuccessfulSession(content = "YEETOMATIC_STATUS: complete\nDone.") {
+	function mockSuccessfulSession(content = "YOLO_STATUS: complete\nDone.") {
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -158,7 +158,7 @@ describe("PiAgentExecutor", () => {
 
 	it("configures the trusted worker extension on the resource loader", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
 		const trustedExtensionPath = "/app/.pi/extensions/github-issues.ts";
 		const executor = new PiAgentExecutor({ soulPath, trustedExtensionPath });
@@ -175,7 +175,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("executes end-to-end with mocked Pi dependencies", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -188,7 +188,7 @@ describe("PiAgentExecutor", () => {
 			}),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone." },
+				{ role: "assistant", content: "YOLO_STATUS: complete\nDone." },
 			],
 		};
 
@@ -197,13 +197,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 1,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -234,7 +234,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("notifies onActivity for each model output event", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -247,7 +247,7 @@ describe("PiAgentExecutor", () => {
 			}),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone." },
+				{ role: "assistant", content: "YOLO_STATUS: complete\nDone." },
 			],
 		};
 
@@ -256,13 +256,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 101,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -293,7 +293,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("logs and rethrows when session.prompt throws", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -311,13 +311,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 2,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -333,7 +333,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("throws FatalSystemError when a fatal tool error is detected", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -362,13 +362,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 3,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -385,16 +385,16 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns cancelled when abort signal is already aborted", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 4,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -413,7 +413,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns failed when assistant message contains a 429 rate-limit error", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -422,7 +422,7 @@ describe("PiAgentExecutor", () => {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "YEETOMATIC_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
+				{ role: "assistant", content: "YOLO_STATUS: working\nStill going.", errorMessage: '429 "you have reached your weekly usage limit"' },
 			],
 		};
 
@@ -431,13 +431,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 6,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -455,7 +455,7 @@ describe("PiAgentExecutor", () => {
 	});
 
 	it("returns cancelled when abort signal fires during execution", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-executor-"));
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
 
@@ -476,13 +476,13 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
 		const state = {
 			issueNumber: 5,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
 			title: "Test",
 			body: "Body",
@@ -503,7 +503,7 @@ describe("PiAgentExecutor", () => {
 	it("uses an override prompt and passes the configured model into Pi", async () => {
 		const soulPath = await makeSoulPath();
 		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
 		const { mockSession } = mockSuccessfulSession();
 		const onSessionCreated = vi.fn();
 
@@ -523,7 +523,7 @@ describe("PiAgentExecutor", () => {
 
 	it("builds feedback and PR review prompts for continued sessions", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const feedbackSession = mockSuccessfulSession().mockSession;
 		const executor = new PiAgentExecutor({ soulPath });
 
@@ -537,7 +537,7 @@ describe("PiAgentExecutor", () => {
 
 	it("warns when the configured model cannot be resolved", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		mockSuccessfulSession();
 		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
@@ -552,13 +552,13 @@ describe("PiAgentExecutor", () => {
 
 	it("logs non-rate assistant errors without overriding the parsed result", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "YEETOMATIC_STATUS: complete\nDone.", errorMessage: "tool failed", stopReason: "error" },
+				{ role: "assistant", content: "YOLO_STATUS: complete\nDone.", errorMessage: "tool failed", stopReason: "error" },
 			],
 		};
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
@@ -572,13 +572,13 @@ describe("PiAgentExecutor", () => {
 
 	it("logs assistant error stop reasons without a message", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
 			messages: [
-				{ role: "assistant", content: "YEETOMATIC_STATUS: working\nRetrying.", stopReason: "error" },
+				{ role: "assistant", content: "YOLO_STATUS: working\nRetrying.", stopReason: "error" },
 			],
 		};
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
@@ -592,7 +592,7 @@ describe("PiAgentExecutor", () => {
 
 	it("marks execution-environment blocker responses as failed", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -616,9 +616,9 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a correction prompt when the first response has a valid marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
-			"YEETOMATIC_STATUS: complete\nDone.",
+			"YOLO_STATUS: complete\nDone.",
 		]);
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -630,10 +630,10 @@ describe("PiAgentExecutor", () => {
 
 	it("issues one correction prompt and returns complete when the first response lacks a marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Done. Summary: fixed the bug.\nStatus: complete",
-			"YEETOMATIC_STATUS: complete\nFixed the parser bug.",
+			"YOLO_STATUS: complete\nFixed the parser bug.",
 		]);
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -643,15 +643,15 @@ describe("PiAgentExecutor", () => {
 		expect(result.summary).toBe("Fixed the parser bug.");
 		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
 		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("rejected"));
-		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("YEETOMATIC_STATUS: complete"));
+		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("YOLO_STATUS: complete"));
 	});
 
 	it("treats an unsupported marker as invalid and corrects once", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
-			"YEETOMATIC_STATUS: done\nAll done.",
-			"YEETOMATIC_STATUS: complete\nDone.",
+			"YOLO_STATUS: done\nAll done.",
+			"YOLO_STATUS: complete\nDone.",
 		]);
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -663,10 +663,10 @@ describe("PiAgentExecutor", () => {
 
 	it("returns working when the corrected response is a valid working marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Still going.",
-			"YEETOMATIC_STATUS: working\nStill going.",
+			"YOLO_STATUS: working\nStill going.",
 		]);
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -678,10 +678,10 @@ describe("PiAgentExecutor", () => {
 
 	it("returns waiting-feedback when the corrected response is valid waiting-feedback", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"I have a question.",
-			"YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
+			"YOLO_STATUS: waiting-feedback\nNeed clarification.",
 		]);
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -694,7 +694,7 @@ describe("PiAgentExecutor", () => {
 
 	it("fails after one correction when the corrected response still lacks a marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Done. Summary: fixed.",
 			"I am done now. No status line.",
@@ -710,7 +710,7 @@ describe("PiAgentExecutor", () => {
 
 	it("fails when the correction prompt itself throws", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const { mockSession } = mockSequentialSession(
 			["Done."],
 			(callIndex) => {
@@ -731,10 +731,10 @@ describe("PiAgentExecutor", () => {
 
 	it("returns cancelled when abort fires during status correction", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const controller = new AbortController();
 		const { mockSession } = mockSequentialSession(
-			["Done.", "YEETOMATIC_STATUS: complete\nFixed."],
+			["Done.", "YOLO_STATUS: complete\nFixed."],
 			(callIndex) => {
 				if (callIndex === 1) controller.abort();
 			},
@@ -749,7 +749,7 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a status-correction prompt when abort is set before the correction branch", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const controller = new AbortController();
 		const { mockSession } = mockSequentialSession(
 			["Done. No status marker here."],
@@ -771,7 +771,7 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a status correction for refinement executions", async () => {
 		const soulPath = await makeSoulPath();
-		(createYeetomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
 		const refinementJson = JSON.stringify({
 			proposedTaskBody: "## Summary\nRefined.",
 			summary: "Clarified.",

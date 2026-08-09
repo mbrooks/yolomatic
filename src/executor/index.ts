@@ -8,7 +8,7 @@ import {
 	SessionManager as PiSessionManager,
 } from "@earendil-works/pi-coding-agent";
 import path from "node:path";
-import { createYeetomaticModelRegistry } from "./model-registry.js";
+import { createYolomaticModelRegistry } from "./model-registry.js";
 
 import { LlmLogger } from "../logging/llm-logger.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
@@ -150,7 +150,7 @@ export class PiAgentExecutor implements ExecutionService {
 		await loader.reload();
 
 		const authStorage = AuthStorage.create();
-		const modelRegistry = createYeetomaticModelRegistry(authStorage);
+		const modelRegistry = createYolomaticModelRegistry(authStorage);
 		const configuredModelOverride = this.getModelConfig();
 		const configuredModel = resolveConfiguredModel(modelRegistry, configuredModelOverride);
 		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();
@@ -370,7 +370,7 @@ export class PiAgentExecutor implements ExecutionService {
 	): Promise<ExecutionResult> {
 		recordSessionLog(key, {
 			level: "warn",
-			message: "Status protocol violation: worker response omitted a valid YEETOMATIC_STATUS marker. Issuing one correction prompt.",
+			message: "Status protocol violation: worker response omitted a valid YOLO_STATUS marker. Issuing one correction prompt.",
 			details: { type: "protocol_violation" },
 		});
 		const correctionPrompt = buildStatusCorrectionPrompt();
@@ -393,7 +393,7 @@ export class PiAgentExecutor implements ExecutionService {
 			});
 			return {
 				status: "failed",
-				summary: `Worker protocol failure: the worker response omitted a valid YEETOMATIC_STATUS marker and the correction prompt failed (${message}). No work was delivered.`,
+				summary: `Worker protocol failure: the worker response omitted a valid YOLO_STATUS marker and the correction prompt failed (${message}). No work was delivered.`,
 				rawResponse: originalRaw,
 			};
 		}
@@ -425,7 +425,7 @@ export class PiAgentExecutor implements ExecutionService {
 		});
 		return {
 			status: "failed",
-			summary: "Worker protocol failure: the worker did not return a valid YEETOMATIC_STATUS marker after one correction prompt. No work was delivered.",
+			summary: "Worker protocol failure: the worker did not return a valid YOLO_STATUS marker after one correction prompt. No work was delivered.",
 			rawResponse: correctedRaw || originalRaw,
 		};
 	}

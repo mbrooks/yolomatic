@@ -22,7 +22,7 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 		createSession: vi.fn(async (_o, _r, _n, title, body, workspacePath, labels) => {
 			currentState = {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				title,
 				body,
@@ -61,7 +61,7 @@ function makeMockRepo(state: SessionState | null = null): SessionRepository {
 function makeState(status: SessionState["status"]): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		issueNumber: 1,
 		title: "Test",
 		body: "Body",
@@ -89,7 +89,7 @@ function makeCommand(
 ) {
 	const repo = makeMockRepo(state);
 	const workspaces: WorkspaceService = {
-		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-1", branch: "yeetomatic/issue-1" })),
+		createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws/issue-1", branch: "yolomatic/issue-1" })),
 			updateDefaultBranchFromOrigin: vi.fn(async () => ({ branch: "main", before: null, after: "sha", updated: true })),
 			syncWorktree: vi.fn(async () => undefined),
 		removeWorktree: vi.fn(),
@@ -126,7 +126,7 @@ function makeCommand(
 		closeIssue: vi.fn(),
 		updateIssueBody: vi.fn(),
 		updateIssueTitle: vi.fn(),
-		getAuthenticatedUser: vi.fn(async () => ({ login: "yeetomatic-bot" })),
+		getAuthenticatedUser: vi.fn(async () => ({ login: "yolomatic-bot" })),
 		listAccessibleRepositories: vi.fn(async () => []),
 		getRepository: vi.fn(async () => null),
 		getCollaboratorPermissionLevel: vi.fn(async () => null),
@@ -155,7 +155,7 @@ function makeCommand(
 		executor,
 		clock,
 		"main",
-		"yeetomatic-bot",
+		"yolomatic-bot",
 		true,
 		overrides?.adminLink ?? {},
 	);
@@ -189,7 +189,7 @@ describe("StartIssueSession", () => {
 			executor,
 			clock,
 			defaultBranch: "main",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			selfReportEnabled: true,
 		});
 
@@ -198,21 +198,21 @@ describe("StartIssueSession", () => {
 
 	it("assigns issue, creates session, and starts execution", async () => {
 		const { command, github, executor } = makeCommand(null);
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", ["bug"]);
 
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.started).toBe(true);
 			expect(result.data.status).toBe("working");
 		}
-		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-bot"]);
+		expect(github.updateIssueAssignees).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-bot"]);
 		expect(executor.execute).toHaveBeenCalled();
 	});
 
 	it("returns conflict when session is already active", async () => {
 		const { command, tasks } = makeCommand(null);
 		(tasks.isActive as ReturnType<typeof vi.fn>).mockReturnValue(true);
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -225,7 +225,7 @@ describe("StartIssueSession", () => {
 		const { command, repo, github, executor } = makeCommand(makeState("working"));
 		await repo.save({ ...makeState("working"), kind: "refinement" });
 
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result).toEqual({ success: false, code: "conflict", message: "Issue refinement is currently running" });
 		expect(github.updateIssueAssignees).not.toHaveBeenCalled();
@@ -234,7 +234,7 @@ describe("StartIssueSession", () => {
 
 	it("returns started false when session already exists and is not pending", async () => {
 		const { command } = makeCommand(makeState("working"));
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -246,7 +246,7 @@ describe("StartIssueSession", () => {
 	it("handles errors during execution", async () => {
 		const { command, executor } = makeCommand(null);
 		(executor.execute as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Execution failed"));
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -258,7 +258,7 @@ describe("StartIssueSession", () => {
 	it("handles errors from ensureSessionExists", async () => {
 		const { command, workspaces } = makeCommand(null);
 		(workspaces.createOrGetWorktree as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Workspace error"));
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
@@ -276,12 +276,12 @@ describe("StartIssueSession", () => {
 			tasks,
 			executor,
 			{ now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 },
-			(owner, repoName) => (owner === "mbrooks" && repoName === "yeetomatic" ? "master" : "main"),
-			"yeetomatic-bot",
+			(owner, repoName) => (owner === "mbrooks" && repoName === "yolomatic" ? "master" : "main"),
+			"yolomatic-bot",
 			true,
 		);
 
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", []);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", []);
 
 		expect(result.success).toBe(true);
 		expect(executor.execute).toHaveBeenCalled();
@@ -290,20 +290,20 @@ describe("StartIssueSession", () => {
 	it("appends an admin session link to the pickup comment when enabled", async () => {
 		const { command, github } = makeCommand(null, {
 			adminLink: {
-				adminBaseUrl: "http://host:6767/yeetomatic/admin",
+				adminBaseUrl: "http://host:6767/yolomatic/admin",
 				issueAdminLinkInCommentsEnabled: true,
 			},
 		});
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", ["bug"]);
 
 		expect(result.success).toBe(true);
-		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/implementation";
+		const expectedUrl = "http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/1/implementation";
 		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
 		expect(pickupCall).toBeDefined();
 		expect(pickupCall[3]).toContain(`Track status: ${expectedUrl}`);
-		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yeetomatic/issues/1");
+		expect(pickupCall[3]).not.toContain("#/repos/mbrooks/yolomatic/issues/1");
 	});
 
 	it("omits the admin session link from the pickup comment when admin_base_url is empty", async () => {
@@ -313,29 +313,29 @@ describe("StartIssueSession", () => {
 				issueAdminLinkInCommentsEnabled: true,
 			},
 		});
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", ["bug"]);
 
 		expect(result.success).toBe(true);
 		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
 		expect(pickupCall).toBeDefined();
-		expect(pickupCall[3]).toBe("Picked up by Yeetomatic. Working on it...");
+		expect(pickupCall[3]).toBe("Picked up by Yolomatic. Working on it...");
 		expect(pickupCall[3]).not.toContain("Track status:");
 	});
 
 	it("omits the admin session link from the pickup comment when the toggle is disabled", async () => {
 		const { command, github } = makeCommand(null, {
 			adminLink: {
-				adminBaseUrl: "http://host:6767/yeetomatic/admin",
+				adminBaseUrl: "http://host:6767/yolomatic/admin",
 				issueAdminLinkInCommentsEnabled: false,
 			},
 		});
-		const result = await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		const result = await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", ["bug"]);
 
 		expect(result.success).toBe(true);
 		const pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
 		expect(pickupCall).toBeDefined();
 		expect(pickupCall[3]).not.toContain("Track status:");
@@ -350,12 +350,12 @@ describe("StartIssueSession", () => {
 				resolveIssueAdminLinkInCommentsEnabled: () => enabled,
 			},
 		});
-		await command.execute("mbrooks", "yeetomatic", 1, "Test", "Body", ["bug"]);
+		await command.execute("mbrooks", "yolomatic", 1, "Test", "Body", ["bug"]);
 		let pickupCall = ((github as any).postComment.mock.calls as unknown as Array<[string, string, number, string]>).find(
-			(c) => c[3].startsWith("Picked up by Yeetomatic. Working on it..."),
+			(c) => c[3].startsWith("Picked up by Yolomatic. Working on it..."),
 		)!;
 		expect(pickupCall[3]).toContain(
-			"Track status: http://host:6767/old/admin#/repos/mbrooks/yeetomatic/1/implementation",
+			"Track status: http://host:6767/old/admin#/repos/mbrooks/yolomatic/1/implementation",
 		);
 	});
 });

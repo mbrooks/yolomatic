@@ -179,7 +179,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("handshakes, forwards session logs, handles steering, and sends completion", async () => {
-		const sessionKey = "github-mbrooks-yeetomatic-issue-12-implementation";
+		const sessionKey = "github-mbrooks-yolomatic-issue-12-implementation";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 		let resolvePrompt!: () => void;
 		const promptReleased = new Promise<void>((resolve) => {
@@ -202,7 +202,7 @@ describe("runWorkerRuntime", () => {
 			return {
 				status: "complete",
 				summary: "done",
-				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+				rawResponse: "YOLO_STATUS: complete\ndone",
 			};
 		});
 
@@ -216,9 +216,9 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("launch_config", sessionKey, "launch-1", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 12,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-12",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-12",
 								title: "Issue title",
 								body: "Issue body",
 							},
@@ -268,9 +268,9 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", "other/session#1", "launch-bad", {
 						session: {
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 99,
-							workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
+							workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
 							title: "Bad session",
 							body: "Body",
 						},
@@ -283,7 +283,7 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-99",
-				sessionKey: "github-mbrooks-yeetomatic-issue-99-implementation",
+				sessionKey: "github-mbrooks-yolomatic-issue-99-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unexpected session key");
@@ -299,14 +299,14 @@ describe("runWorkerRuntime", () => {
 					{
 						type: "launch_config",
 						protocolVersion: 99,
-						sessionKey: "github-mbrooks-yeetomatic-issue-100-implementation",
+						sessionKey: "github-mbrooks-yolomatic-issue-100-implementation",
 						messageId: "launch-version",
 						payload: {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 100,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-100",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-100",
 								title: "Bad version",
 								body: "Body",
 							},
@@ -320,13 +320,13 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-100",
-				sessionKey: "github-mbrooks-yeetomatic-issue-100-implementation",
+				sessionKey: "github-mbrooks-yolomatic-issue-100-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Unsupported protocol version");
 	});
 
-	it("aborts execution when Yeetomatic sends stop", async () => {
+	it("aborts execution when Yolomatic sends stop", async () => {
 		const results: Array<ReturnType<typeof createWorkerMessage>> = [];
 
 		executeWithOverride.mockImplementation(async (_state, _prompt, signal, onSessionCreated) => {
@@ -348,12 +348,12 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "github-mbrooks-yeetomatic-issue-55-implementation", "launch-stop", {
+						createWorkerMessage("launch_config", "github-mbrooks-yolomatic-issue-55-implementation", "launch-stop", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 55,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-55",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-55",
 								title: "Stop worker",
 								body: "Body",
 							},
@@ -367,7 +367,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "github-mbrooks-yeetomatic-issue-55-implementation", "control-stop", {
+							createWorkerMessage("control", "github-mbrooks-yolomatic-issue-55-implementation", "control-stop", {
 								action: "stop",
 							}),
 						);
@@ -378,7 +378,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-55",
-			sessionKey: "github-mbrooks-yeetomatic-issue-55-implementation",
+			sessionKey: "github-mbrooks-yolomatic-issue-55-implementation",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -408,12 +408,12 @@ describe("runWorkerRuntime", () => {
 				if (message.type === "hello") {
 					await sendWorkerWebSocketMessage(
 						server as never,
-						createWorkerMessage("launch_config", "github-mbrooks-yeetomatic-issue-56-implementation", "launch-steer", {
+						createWorkerMessage("launch_config", "github-mbrooks-yolomatic-issue-56-implementation", "launch-steer", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 56,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 								title: "Steer too early",
 								body: "Body",
 							},
@@ -427,7 +427,7 @@ describe("runWorkerRuntime", () => {
 					setTimeout(() => {
 						void sendWorkerWebSocketMessage(
 							server as never,
-							createWorkerMessage("control", "github-mbrooks-yeetomatic-issue-56-implementation", "control-steer", {
+							createWorkerMessage("control", "github-mbrooks-yolomatic-issue-56-implementation", "control-steer", {
 								action: "steer",
 								message: "too soon",
 							}),
@@ -442,7 +442,7 @@ describe("runWorkerRuntime", () => {
 
 		await runWorkerRuntime({
 			wsUrl: "ws://worker.test/session-56",
-			sessionKey: "github-mbrooks-yeetomatic-issue-56-implementation",
+			sessionKey: "github-mbrooks-yolomatic-issue-56-implementation",
 			soulPath: "/tmp/SOUL.md",
 		});
 
@@ -468,23 +468,23 @@ describe("runWorkerRuntime", () => {
 		await expect(
 			runWorkerRuntime({
 				wsUrl: "ws://worker.test/session-57",
-				sessionKey: "github-mbrooks-yeetomatic-issue-57-implementation",
+				sessionKey: "github-mbrooks-yolomatic-issue-57-implementation",
 				soulPath: "/tmp/SOUL.md",
 			}),
 		).rejects.toThrow("Worker RPC connection closed before launch config arrived");
 	});
 
 	it("routes gateway tool calls to the control plane and resolves the tool_response", async () => {
-		const sessionKey = "github-mbrooks-yeetomatic-issue-77-implementation";
+		const sessionKey = "github-mbrooks-yolomatic-issue-77-implementation";
 		const seenToolRequests: string[] = [];
 
 		executeWithOverride.mockImplementation(async () => {
 			const data = await callGitHubGateway("get_authenticated_user", {});
-			expect(data).toEqual({ login: "yeetomatic-bot" });
+			expect(data).toEqual({ login: "yolomatic-bot" });
 			return {
 				status: "complete",
 				summary: "done",
-				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+				rawResponse: "YOLO_STATUS: complete\ndone",
 			};
 		});
 
@@ -497,9 +497,9 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("launch_config", sessionKey, "launch-gw", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 77,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-77",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-77",
 								title: "Gateway round trip",
 								body: "Body",
 							},
@@ -515,7 +515,7 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("tool_response", sessionKey, "resp-gw", {
 							requestMessageId: message.messageId,
 							ok: true,
-							data: { login: "yeetomatic-bot" },
+							data: { login: "yolomatic-bot" },
 						}),
 					);
 				}
@@ -532,7 +532,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("surfaces gateway scope errors from the control plane as thrown errors", async () => {
-		const sessionKey = "github-mbrooks-yeetomatic-issue-78-implementation";
+		const sessionKey = "github-mbrooks-yolomatic-issue-78-implementation";
 
 		executeWithOverride.mockImplementation(async () => {
 			await expect(callGitHubGateway("fetch_pr", { pr_number: 999 })).rejects.toThrow(
@@ -541,7 +541,7 @@ describe("runWorkerRuntime", () => {
 			return {
 				status: "complete",
 				summary: "done",
-				rawResponse: "YEETOMATIC_STATUS: complete\ndone",
+				rawResponse: "YOLO_STATUS: complete\ndone",
 			};
 		});
 
@@ -554,9 +554,9 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("launch_config", sessionKey, "launch-scope", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 78,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-78",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-78",
 								title: "Scope error",
 								body: "Body",
 							},
@@ -593,21 +593,21 @@ describe("runWorkerRuntime", () => {
 		});
 	});
 
-	it("runs yeetstrap.sh before constructing the executor when the script is present", async () => {
-		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-init-"));
+	it("runs yolostrap.sh before constructing the executor when the script is present", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worker-init-"));
 		const markerPath = path.join(workspacePath, "init-marker.txt");
 		await writeFile(
-			path.join(workspacePath, "yeetstrap.sh"),
+			path.join(workspacePath, "yolostrap.sh"),
 			`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
 		);
-		const sessionKey = "github-mbrooks-yeetomatic-issue-801-implementation";
+		const sessionKey = "github-mbrooks-yolomatic-issue-801-implementation";
 		let executorConstructed = false;
 
 		executeWithOverride.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
 			executorConstructed = true;
 			onSessionCreated?.(mockSession);
 			expect(markerPath).not.toBe("");
-			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+			return { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" };
 		});
 
 		wsTestHarness.setConnectionHandler(({ server }) => {
@@ -619,7 +619,7 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", sessionKey, "launch-init", {
 						session: {
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 801,
 							workspacePath,
 							title: "Init runs",
@@ -644,15 +644,15 @@ describe("runWorkerRuntime", () => {
 		}
 	});
 
-	it("skips the init step and proceeds to the executor when yeetstrap.sh is absent", async () => {
-		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-noinit-"));
-		const sessionKey = "github-mbrooks-yeetomatic-issue-802-implementation";
+	it("skips the init step and proceeds to the executor when yolostrap.sh is absent", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worker-noinit-"));
+		const sessionKey = "github-mbrooks-yolomatic-issue-802-implementation";
 		let executorConstructed = false;
 
 		executeWithOverride.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
 			executorConstructed = true;
 			onSessionCreated?.(mockSession);
-			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+			return { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" };
 		});
 
 		wsTestHarness.setConnectionHandler(({ server }) => {
@@ -664,7 +664,7 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", sessionKey, "launch-noinit", {
 						session: {
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 802,
 							workspacePath,
 							title: "No init",
@@ -688,19 +688,19 @@ describe("runWorkerRuntime", () => {
 		}
 	});
 
-	it("aborts the runtime with a worker error when yeetstrap.sh exits non-zero", async () => {
-		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-badinit-"));
+	it("aborts the runtime with a worker error when yolostrap.sh exits non-zero", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worker-badinit-"));
 		await writeFile(
-			path.join(workspacePath, "yeetstrap.sh"),
+			path.join(workspacePath, "yolostrap.sh"),
 			"#!/usr/bin/env bash\nset -euo pipefail\necho 'nope' >&2\nexit 7\n",
 		);
-		const sessionKey = "github-mbrooks-yeetomatic-issue-803-implementation";
+		const sessionKey = "github-mbrooks-yolomatic-issue-803-implementation";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 		let executorConstructed = false;
 
 		executeWithOverride.mockImplementation(async () => {
 			executorConstructed = true;
-			return { status: "complete", summary: "done", rawResponse: "YEETOMATIC_STATUS: complete\ndone" };
+			return { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" };
 		});
 
 		wsTestHarness.setConnectionHandler(({ server }) => {
@@ -713,7 +713,7 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", sessionKey, "launch-bad", {
 						session: {
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 803,
 							workspacePath,
 							title: "Bad init",
@@ -743,7 +743,7 @@ describe("runWorkerRuntime", () => {
 	});
 
 	it("forwards refinement LLM logs under the refinement session key", async () => {
-		const sessionKey = "github-mbrooks-yeetomatic-issue-200-refinement";
+		const sessionKey = "github-mbrooks-yolomatic-issue-200-refinement";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 		let capturedState: { kind?: string; owner: string; repo: string; issueNumber: number } | undefined;
 
@@ -788,9 +788,9 @@ describe("runWorkerRuntime", () => {
 						createWorkerMessage("launch_config", sessionKey, "launch-refinement", {
 							session: {
 								owner: "mbrooks",
-								repo: "yeetomatic",
+								repo: "yolomatic",
 								issueNumber: 200,
-								workspacePath: "/workspaces/mbrooks-yeetomatic/.worktrees/issue-200",
+								workspacePath: "/workspaces/mbrooks-yolomatic/.worktrees/issue-200",
 								title: "Refine me",
 								body: "Body",
 								kind: "refinement",
@@ -827,14 +827,14 @@ describe("runWorkerRuntime", () => {
 		expect(logEntries.some((event) => event.entry.details?.type === "tool_execution_start")).toBe(true);
 	});
 
-	it("skips the init step on issue-refinement launches even when yeetstrap.sh is present", async () => {
-		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-worker-refinement-skip-"));
+	it("skips the init step on issue-refinement launches even when yolostrap.sh is present", async () => {
+		const workspacePath = await mkdtemp(path.join(os.tmpdir(), "yolomatic-worker-refinement-skip-"));
 		const markerPath = path.join(workspacePath, "init-marker.txt");
 		await writeFile(
-			path.join(workspacePath, "yeetstrap.sh"),
+			path.join(workspacePath, "yolostrap.sh"),
 			`#!/usr/bin/env bash\nset -euo pipefail\nprintf 'ran' > "${markerPath}"\n`,
 		);
-		const sessionKey = "github-mbrooks-yeetomatic-issue-201-refinement";
+		const sessionKey = "github-mbrooks-yolomatic-issue-201-refinement";
 		const seenMessages: Array<ReturnType<typeof createWorkerMessage>> = [];
 
 		executeRefinement.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
@@ -856,7 +856,7 @@ describe("runWorkerRuntime", () => {
 					createWorkerMessage("launch_config", sessionKey, "launch-refinement-skip", {
 						session: {
 							owner: "mbrooks",
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							issueNumber: 201,
 							workspacePath,
 							title: "Refine without init",

@@ -306,7 +306,7 @@ export function generateCommitMessage(
 		}
 	}
 
-	const prefixStr = prefix ? `${prefix}:` : "Yeetomatic:";
+	const prefixStr = prefix ? `${prefix}:` : "Yolomatic:";
 	const prefixLen = prefixStr.length + 1;
 
 	const trimmedSummary = stripMarkdown(summary ?? "").trim();

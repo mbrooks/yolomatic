@@ -38,12 +38,12 @@ interface WizardState {
 	error: string | null;
 }
 
-const STORAGE_KEY = "yeetomatic-onboarding-wizard";
+const STORAGE_KEY = "yolomatic-onboarding-wizard";
 const TOTAL_STEPS = 5;
 
 /** The only supported LLM provider today; structured for future extension. */
 export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama"];
-export const DEFAULT_OLLAMA_CONTAINER_NAME = "yeetomatic-ollama";
+export const DEFAULT_OLLAMA_CONTAINER_NAME = "yolomatic-ollama";
 
 export const EVENT_MODE_OPTIONS: readonly GithubEventMode[] = ["webhook", "polling", "both"];
 export const MIN_POLL_INTERVAL_MS = 1000;
@@ -486,7 +486,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 				<div className="onboarding-card">
 					<h2>Setup Complete</h2>
 					<p className="onboarding-subtitle">
-						Your settings have been saved and Yeetomatic is loading them now.
+						Your settings have been saved and Yolomatic is loading them now.
 					</p>
 				</div>
 			</div>
@@ -497,7 +497,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 		<div className="onboarding-screen">
 			<div className="onboarding-card">
 				<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-					<h1>Welcome to Yeetomatic</h1>
+					<h1>Welcome to Yolomatic</h1>
 					<span style={{ color: "var(--muted)", fontSize: "0.875rem" }}>Step {state.step} of {TOTAL_STEPS}</span>
 				</div>
 				<div
@@ -666,11 +666,11 @@ function getStepSubtitle(step: number): string {
 		case 2:
 			return "Connect your GitHub account with a Personal Access Token.";
 		case 3:
-			return "Choose how Yeetomatic receives GitHub events by default.";
+			return "Choose how Yolomatic receives GitHub events by default.";
 		case 4:
 			return "Configure the AI / LLM provider, Ollama container, and model.";
 		case 5:
-			return "Initialize workspaces for the repositories you want Yeetomatic to manage.";
+			return "Initialize workspaces for the repositories you want Yolomatic to manage.";
 		default:
 			return "";
 	}
@@ -859,7 +859,7 @@ function StepThreeEventMode({
 						</option>
 					))}
 				</select>
-				<span className="setting-description">Choose how Yeetomatic discovers GitHub events.</span>
+				<span className="setting-description">Choose how Yolomatic discovers GitHub events.</span>
 				<span className="setting-description">These are the default settings for all projects. Each project can override them later.</span>
 			</div>
 
@@ -942,7 +942,7 @@ function StepThreeEventMode({
 					<li>Go to your repository on GitHub.</li>
 					<li>Click <strong>Settings</strong> then <strong>Webhooks</strong>.</li>
 					<li>Click <strong>Add webhook</strong>.</li>
-					<li>Set <strong>Payload URL</strong> to your Yeetomatic webhook endpoint.</li>
+					<li>Set <strong>Payload URL</strong> to your Yolomatic webhook endpoint.</li>
 					<li>Paste the secret above into <strong>Secret</strong>.</li>
 					<li>Select <strong>Let me select individual events</strong> and enable <strong>Issues</strong> and <strong>Issue comments</strong>.</li>
 					<li>Click <strong>Add webhook</strong>.</li>
@@ -993,7 +993,7 @@ function StepFourAiLlm({
 						/>
 						<span className="setting-description">
 							Name of the Ollama Docker container the control plane shells into to
-							check sign-in status. Defaults to yeetomatic-ollama.
+							check sign-in status. Defaults to yolomatic-ollama.
 						</span>
 					</div>
 

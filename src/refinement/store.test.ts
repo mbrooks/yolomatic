@@ -20,7 +20,7 @@ describe("RefinementStore", () => {
 	it("creates and retrieves an attempt", () => {
 		const attempt = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			requester: "admin",
 			originalTitle: "Title",
@@ -43,7 +43,7 @@ describe("RefinementStore", () => {
 	it("updates an attempt", () => {
 		const attempt = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 2,
 			requester: "admin",
 			originalTitle: "Title",
@@ -63,16 +63,16 @@ describe("RefinementStore", () => {
 	});
 
 	it("records and retrieves instruction comments", () => {
-		store.recordInstructionComment("mbrooks", "yeetomatic", 3, 12345);
-		const record = store.getInstructionComment("mbrooks", "yeetomatic", 3);
+		store.recordInstructionComment("mbrooks", "yolomatic", 3, 12345);
+		const record = store.getInstructionComment("mbrooks", "yolomatic", 3);
 		expect(record).not.toBeNull();
 		expect(record!.commentId).toBe(12345);
 	});
 
 	it("overwrites instruction comments for the same issue", () => {
-		store.recordInstructionComment("mbrooks", "yeetomatic", 4, 1);
-		store.recordInstructionComment("mbrooks", "yeetomatic", 4, 2);
-		const record = store.getInstructionComment("mbrooks", "yeetomatic", 4);
+		store.recordInstructionComment("mbrooks", "yolomatic", 4, 1);
+		store.recordInstructionComment("mbrooks", "yolomatic", 4, 2);
+		const record = store.getInstructionComment("mbrooks", "yolomatic", 4);
 		expect(record!.commentId).toBe(2);
 	});
 
@@ -82,7 +82,7 @@ describe("RefinementStore", () => {
 			vi.setSystemTime(new Date("2026-08-01T12:00:00.000Z"));
 			store.createAttempt({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 5,
 				requester: "admin",
 				originalTitle: "A",
@@ -94,7 +94,7 @@ describe("RefinementStore", () => {
 			vi.setSystemTime(new Date("2026-08-01T12:00:00.001Z"));
 			store.createAttempt({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 5,
 				requester: "admin",
 				originalTitle: "B",
@@ -104,7 +104,7 @@ describe("RefinementStore", () => {
 				state: "failed",
 			});
 
-			const attempts = store.listAttemptsByIssue("mbrooks", "yeetomatic", 5);
+			const attempts = store.listAttemptsByIssue("mbrooks", "yolomatic", 5);
 			expect(attempts).toHaveLength(2);
 			expect(attempts[0]!.state).toBe("failed");
 		} finally {
@@ -115,7 +115,7 @@ describe("RefinementStore", () => {
 	it("looks up attempt by delivery id", () => {
 		const attempt = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 6,
 			requester: "admin",
 			originalTitle: "T",
@@ -142,7 +142,7 @@ describe("RefinementStore", () => {
 	it("ignores disallowed update keys", () => {
 		const attempt = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 7,
 			requester: "admin",
 			originalTitle: "T",
@@ -159,7 +159,7 @@ describe("RefinementStore", () => {
 	it("round-trips a steering prompt through createAttempt and getLatestAttempt", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 8,
 			requester: "admin",
 			originalTitle: "T",
@@ -171,7 +171,7 @@ describe("RefinementStore", () => {
 		});
 		expect(created.steeringPrompt).toBe("Focus on rollback");
 
-		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 8);
+		const latest = store.getLatestAttempt("mbrooks", "yolomatic", 8);
 		expect(latest).not.toBeNull();
 		expect(latest!.steeringPrompt).toBe("Focus on rollback");
 
@@ -182,7 +182,7 @@ describe("RefinementStore", () => {
 	it("round-trips a proposedTitle through createAttempt, updateAttempt, and reads", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 20,
 			requester: "admin",
 			originalTitle: "T",
@@ -194,7 +194,7 @@ describe("RefinementStore", () => {
 		});
 		expect(created.proposedTitle).toBe("Clearer Title");
 
-		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 20);
+		const latest = store.getLatestAttempt("mbrooks", "yolomatic", 20);
 		expect(latest).not.toBeNull();
 		expect(latest!.proposedTitle).toBe("Clearer Title");
 
@@ -205,7 +205,7 @@ describe("RefinementStore", () => {
 	it("updates a proposedTitle via updateAttempt", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 21,
 			requester: "admin",
 			originalTitle: "T",
@@ -229,7 +229,7 @@ describe("RefinementStore", () => {
 	it("defaults proposedTitle to undefined when not supplied", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 22,
 			requester: "admin",
 			originalTitle: "T",
@@ -239,13 +239,13 @@ describe("RefinementStore", () => {
 			state: "running",
 		});
 		expect(created.proposedTitle).toBeUndefined();
-		expect(store.getLatestAttempt("mbrooks", "yeetomatic", 22)!.proposedTitle).toBeUndefined();
+		expect(store.getLatestAttempt("mbrooks", "yolomatic", 22)!.proposedTitle).toBeUndefined();
 	});
 
 	it("defaults steeringPrompt to undefined when not supplied", () => {
 		const created = store.createAttempt({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 9,
 			requester: "admin",
 			originalTitle: "T",
@@ -255,7 +255,7 @@ describe("RefinementStore", () => {
 			state: "running",
 		});
 		expect(created.steeringPrompt).toBeUndefined();
-		const latest = store.getLatestAttempt("mbrooks", "yeetomatic", 9);
+		const latest = store.getLatestAttempt("mbrooks", "yolomatic", 9);
 		expect(latest!.steeringPrompt).toBeUndefined();
 	});
 

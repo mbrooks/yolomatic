@@ -3,10 +3,10 @@ set -eu
 
 # Named volumes retain ownership across image upgrades. Repair state created by
 # older root-running releases before dropping privileges for the control plane.
-mkdir -p /app/sessions /app/workspaces /app/memory /app/runtime /home/yeetomatic/.pi/agent
-chown -R yeetomatic:yeetomatic /app/sessions /app/workspaces /app/memory /app/runtime /home/yeetomatic/.pi/agent
+mkdir -p /app/sessions /app/workspaces /app/memory /app/runtime /home/yolomatic/.pi/agent
+chown -R yolomatic:yolomatic /app/sessions /app/workspaces /app/memory /app/runtime /home/yolomatic/.pi/agent
 
-# Grant the non-root `yeetomatic` runtime user access to the host Docker socket
+# Grant the non-root `yolomatic` runtime user access to the host Docker socket
 # mounted at /var/run/docker.sock. The owning group of the mounted socket is
 # platform-dependent: on a standard Linux host it is the `docker` group
 # (commonly GID 999, also supplied via the DOCKER_GID env var / group_add), but
@@ -33,9 +33,9 @@ if [ -S "$DOCKER_SOCKET" ]; then
 			groupadd -g "$SOCKET_GID" "$SOCKET_GROUP"
 		fi
 	fi
-	if ! id -nG yeetomatic | tr ' ' '\n' | grep -qx "$SOCKET_GROUP"; then
-		usermod -aG "$SOCKET_GROUP" yeetomatic
+	if ! id -nG yolomatic | tr ' ' '\n' | grep -qx "$SOCKET_GROUP"; then
+		usermod -aG "$SOCKET_GROUP" yolomatic
 	fi
 fi
 
-exec runuser -u yeetomatic -- "$@"
+exec runuser -u yolomatic -- "$@"

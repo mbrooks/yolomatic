@@ -3,7 +3,7 @@ import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService, IssueComment } from "../../ports/github-service.js";
 import type { GitHubEventSource } from "../../github-events/model.js";
-import { commentTriggersFeedback, hasYeetomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
+import { commentTriggersFeedback, hasYolomaticVisibleLabel, isStopCommand, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
 import type { PriorDiscussionComment } from "../../executor/index.js";
 import { formatPriorDiscussion } from "../../executor/index.js";
 import {
@@ -126,7 +126,7 @@ export class HandleIssueComment {
 				issueNumber,
 			);
 			if (result === "not-admin") {
-				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /yeetomatic stop from non-admin\n`);
+				process.stdout.write(`[webhook] issue_comment ignored for ${repo}#${issueNumber}: /yolomatic stop from non-admin\n`);
 			} else {
 				process.stdout.write(`[webhook] issue_comment stop command for ${repo}#${issueNumber} from admin\n`);
 			}
@@ -145,7 +145,7 @@ export class HandleIssueComment {
 		if (guard.isMentioned) {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: mentioned\n`);
 		} else if (guard.isFeedbackCommand) {
-			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: /yeetomatic feedback command\n`);
+			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}: /yolomatic feedback command\n`);
 		} else {
 			process.stdout.write(`[webhook] issue_comment accepted for ${repo}#${issueNumber}\n`);
 		}
@@ -153,10 +153,10 @@ export class HandleIssueComment {
 		// Auto-label on mention so future comments carry the routing-marker label.
 		// The label is no longer part of the comment gate; this only refreshes the
 		// routing marker.
-		const hasYeetomaticLabel = hasYeetomaticVisibleLabel(payload.issue.labels);
-		if (guard.isMentioned && !hasYeetomaticLabel) {
-			await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic"]);
-			process.stdout.write(`[webhook] added yeetomatic label to ${owner}/${repo}#${issueNumber}\n`);
+		const hasYolomaticLabel = hasYolomaticVisibleLabel(payload.issue.labels);
+		if (guard.isMentioned && !hasYolomaticLabel) {
+			await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic"]);
+			process.stdout.write(`[webhook] added yolomatic label to ${owner}/${repo}#${issueNumber}\n`);
 		}
 
 		// Gather prior non-trigger comments as background context for the
@@ -164,7 +164,7 @@ export class HandleIssueComment {
 		// alone when the read fails or returns nothing.
 		const priorComments = await this.gatherPriorContext(owner, repo, issueNumber, payload.comment);
 
-		// If Yeetomatic is actively executing, steer the comment (with prior
+		// If Yolomatic is actively executing, steer the comment (with prior
 		// context) instead of starting a new run.
 		if (this.deps.tasks.isActive(key)) {
 			const steered = await this.deps.tasks.steer(key, composeSteerMessage(payload.comment.body, priorComments));
@@ -174,7 +174,7 @@ export class HandleIssueComment {
 				return;
 			}
 			process.stdout.write(`[webhook] could not steer comment for ${key}\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, "Yeetomatic is busy. Comment could not be steered.");
+			await this.deps.github.postComment(owner, repo, issueNumber, "Yolomatic is busy. Comment could not be steered.");
 			return;
 		}
 
@@ -205,7 +205,7 @@ export class HandleIssueComment {
 		const session = prepared.session;
 		if (session.status === "paused") {
 			process.stdout.write(`[webhook] comment ignored: ${key} is paused\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Yeetomatic is paused on this issue. It will resume when unpaused."));
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Yolomatic is paused on this issue. It will resume when unpaused."));
 			return;
 		}
 
@@ -265,9 +265,9 @@ export function composeSteerMessage(triggerBody: string, priorComments: PriorDis
  *
  * A comment is included when it:
  * - is not the triggering comment itself (by id when available),
- * - was authored by someone other than the configured Yeetomatic account,
+ * - was authored by someone other than the configured Yolomatic account,
  * - does not itself trigger feedback (no mention of the configured account or
- *   `@yeetomatic`, and no `/yeetomatic feedback` command), and
+ *   `@yolomatic`, and no `/yolomatic feedback` command), and
  * - is older than the triggering comment (by `created_at`, falling back to
  *   comment `id` ordering when timestamps tie or are unavailable).
  *

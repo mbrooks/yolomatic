@@ -54,16 +54,16 @@ describe("ExecuteSessionReporter", () => {
 	it("posts generic failure comment for non-rate-limit errors", async () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
-		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yeetomatic", new Error("something blew up"), "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yolomatic", new Error("something blew up"), "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("**Yeetomatic failed.**"),
+			expect.stringContaining("**Yolomatic failed.**"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("Full trace"),
 		);
@@ -72,10 +72,10 @@ describe("ExecuteSessionReporter", () => {
 	it("posts generic failure comment when error is not an Error instance", async () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
-		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yeetomatic", "plain string error", "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yolomatic", "plain string error", "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("Error: plain string error"),
 		);
@@ -86,10 +86,10 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error("boom");
 		error.stack = "x".repeat(4000);
-		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yeetomatic", error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yolomatic", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("... (truncated)"),
 		);
@@ -100,12 +100,12 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error("no stack");
 		delete (error as Error & { stack?: string }).stack;
-		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yeetomatic", error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yolomatic", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("**Yeetomatic failed.**"),
+			expect.stringContaining("**Yolomatic failed.**"),
 		);
 	});
 
@@ -113,22 +113,22 @@ describe("ExecuteSessionReporter", () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const error = new Error('429 "you (aubiematt) have reached your weekly usage limit..."');
-		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yeetomatic", error, "Processing issue");
+		await reporter.postFailureComment({ kind: "issue", number: 1 }, "mbrooks", "yolomatic", error, "Processing issue");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("**Build failed**"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("Yeetomatic encountered a 429 rate-limit error from Ollama"),
+			expect.stringContaining("Yolomatic encountered a 429 rate-limit error from Ollama"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.not.stringContaining("Full trace"),
 		);
@@ -140,15 +140,15 @@ describe("ExecuteSessionReporter", () => {
 		await reporter.postFailureComment(
 			{ kind: "pull_request", number: 99 },
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			new Error("review failed"),
 			"Processing PR review",
 		);
 		expect(deps.github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			expect.stringContaining("**Yeetomatic failed.**"),
+			expect.stringContaining("**Yolomatic failed.**"),
 		);
 	});
 
@@ -157,14 +157,14 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		await reporter.handleExecutionResult({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			sessionIssueNumber: 1,
 			target: { kind: "issue", number: 1 },
 			result: { status: "waiting-feedback", summary: "Need more detail", rawResponse: "" },
 			context: "Processing issue",
 			state: {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				title: "Issue",
 				body: "Body",
@@ -175,11 +175,11 @@ describe("ExecuteSessionReporter", () => {
 				seeded: true,
 			},
 		});
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "waiting-feedback");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-feedback-required"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "waiting-feedback");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-feedback-required"]);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("Need clarification:"),
 		);
@@ -190,14 +190,14 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		await reporter.handleExecutionResult({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			sessionIssueNumber: 1,
 			target: { kind: "pull_request", number: 99 },
 			result: { status: "complete", summary: "Fixed the bug.", rawResponse: "" },
 			context: "Processing PR review",
 			state: {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				title: "Issue",
 				body: "Body",
@@ -207,14 +207,14 @@ describe("ExecuteSessionReporter", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				labels: ["bug"],
-				branch: "yeetomatic/issue-1",
+				branch: "yolomatic/issue-1",
 			},
 		});
-		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "yeetomatic/issue-1", "fix: Fix the bug");
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "complete");
+		expect(deps.workspaces.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "yolomatic/issue-1", "fix: Fix the bug");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "complete");
 		expect(deps.github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			expect.stringContaining("iteration complete"),
 		);
@@ -225,14 +225,14 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		await reporter.handleExecutionResult({
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			sessionIssueNumber: 1,
 			target: { kind: "pull_request", number: 99 },
 			result: { status: "failed", summary: "plain failure", rawResponse: "" },
 			context: "Processing PR review",
 			state: {
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 				title: "Issue",
 				body: "Body",
@@ -243,12 +243,12 @@ describe("ExecuteSessionReporter", () => {
 				seeded: true,
 			},
 		});
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed");
 		expect(deps.github.postPRComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
-			expect.stringContaining("**Yeetomatic failed.**"),
+			expect.stringContaining("**Yolomatic failed.**"),
 		);
 	});
 
@@ -258,19 +258,19 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			workspacePath: "/tmp/ws",
 		} as import("../../session/store.js").SessionState;
-		await reporter.handleDeliveryFailure("mbrooks", "yeetomatic", 1, state, new Error("push failed"));
+		await reporter.handleDeliveryFailure("mbrooks", "yolomatic", 1, state, new Error("push failed"));
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("Yeetomatic delivery failed."),
+			expect.stringContaining("Yolomatic delivery failed."),
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-working", "yolomatic-delivery-failed"]);
 	});
 
 	it("posts delivery failure comment when error is not an Error instance and workspace listing succeeds", async () => {
@@ -279,18 +279,18 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			workspacePath: process.cwd(),
 		} as import("../../session/store.js").SessionState;
-		await reporter.handleDeliveryFailure("mbrooks", "yeetomatic", 1, state, "plain string error");
+		await reporter.handleDeliveryFailure("mbrooks", "yolomatic", 1, state, "plain string error");
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("Yeetomatic delivery failed."),
+			expect.stringContaining("Yolomatic delivery failed."),
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed");
 	});
 
 	it("posts delivery failure comment when error stack is missing", async () => {
@@ -299,18 +299,18 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			workspacePath: "/tmp/ws",
 		} as import("../../session/store.js").SessionState;
 		const error = new Error("no stack");
 		delete (error as Error & { stack?: string }).stack;
-		await reporter.handleDeliveryFailure("mbrooks", "yeetomatic", 1, state, error);
+		await reporter.handleDeliveryFailure("mbrooks", "yolomatic", 1, state, error);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("Yeetomatic delivery failed."),
+			expect.stringContaining("Yolomatic delivery failed."),
 		);
 	});
 
@@ -320,16 +320,16 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			workspacePath: "/tmp/ws",
 		} as import("../../session/store.js").SessionState;
 		const error = new Error("long stack");
 		error.stack = "x".repeat(4000);
-		await reporter.handleDeliveryFailure("mbrooks", "yeetomatic", 1, state, error);
+		await reporter.handleDeliveryFailure("mbrooks", "yolomatic", 1, state, error);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			expect.stringContaining("... (truncated)"),
 		);
@@ -343,25 +343,25 @@ describe("ExecuteSessionReporter", () => {
 		const reporter = new ExecuteSessionReporter(deps as never);
 		const state = {
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			workspacePath: "/tmp/ws",
 		} as import("../../session/store.js").SessionState;
 		await reporter.handleDeliveryFailure(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			state,
 			new Error("refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml`"),
 		);
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			expect.stringContaining("Yeetomatic delivery failed."),
+			expect.stringContaining("Yolomatic delivery failed."),
 		);
-		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed");
 		expect(deps.github.fileSelfReport).toHaveBeenCalled();
-		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ["yeetomatic-working", "yeetomatic-delivery-failed"]);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-working", "yolomatic-delivery-failed"]);
 	});
 });

@@ -1,6 +1,6 @@
 # Workspaces
 
-Yeetomatic manages repository code in isolated per-repo workspaces.
+Yolomatic manages repository code in isolated per-repo workspaces.
 
 ## Directory Structure
 
@@ -17,7 +17,7 @@ Example:
 
 ```text
 /workspaces/
-  mbrooks-yeetomatic/
+  mbrooks-yolomatic/
   mbrooks-casebot/
   mbrooks-case/
 ```
@@ -35,28 +35,28 @@ Required environment variables:
 - `GITHUB_TOKEN`
 - `WORKSPACES_DIR`
 
-Yeetomatic creates `WORKSPACES_DIR` if it does not exist.
+Yolomatic creates `WORKSPACES_DIR` if it does not exist.
 
 ## Branching
 
-Yeetomatic does not work directly on `main`.
+Yolomatic does not work directly on `main`.
 
 Branch rules:
 - Base branch defaults to `main` unless `DEFAULT_BRANCH` is set
-- Issue work happens on `yeetomatic/issue-{number}`
+- Issue work happens on `yolomatic/issue-{number}`
 - Existing repositories are refreshed before branch creation
 
-## How Yeetomatic Uses Workspaces
+## How Yolomatic Uses Workspaces
 
 When an issue is picked up:
 
-1. Yeetomatic computes the workspace key as `{owner}-{repo}`.
-2. Yeetomatic clones the repo into `WORKSPACES_DIR/{owner}-{repo}` if needed.
-3. If the workspace already exists, Yeetomatic fetches latest remote refs and updates the requested base branch.
-4. Yeetomatic creates or resets the issue branch `yeetomatic/issue-{number}`.
-5. Yeetomatic maps the issue to `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`.
-6. Yeetomatic launches pi-agent with `cwd` set to that workspace and persists session state across webhook events.
+1. Yolomatic computes the workspace key as `{owner}-{repo}`.
+2. Yolomatic clones the repo into `WORKSPACES_DIR/{owner}-{repo}` if needed.
+3. If the workspace already exists, Yolomatic fetches latest remote refs and updates the requested base branch.
+4. Yolomatic creates or resets the issue branch `yolomatic/issue-{number}`.
+5. Yolomatic maps the issue to `SESSIONS_DIR/github-{owner}-{repo}/issue-{number}.jsonl`.
+6. Yolomatic launches pi-agent with `cwd` set to that workspace and persists session state across webhook events.
 
 ## Isolation
 
-Each repository gets its own directory and session metadata points to exactly one workspace. Yeetomatic should only read and write within the workspace associated with the active issue session.
+Each repository gets its own directory and session metadata points to exactly one workspace. Yolomatic should only read and write within the workspace associated with the active issue session.

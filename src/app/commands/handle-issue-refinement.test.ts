@@ -10,7 +10,7 @@ import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import { sessionStorageKey, type SessionKind, type SessionState } from "../../session/store.js";
 
-const REFINEMENT_SESSION_KEY = sessionStorageKey("mbrooks", "yeetomatic", 1, "refinement");
+const REFINEMENT_SESSION_KEY = sessionStorageKey("mbrooks", "yolomatic", 1, "refinement");
 
 describe("HandleIssueRefinement", () => {
 	let tmpDir: string;
@@ -40,7 +40,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -64,7 +64,7 @@ describe("HandleIssueRefinement", () => {
 				assignees: [],
 				user: { login: "human" },
 			},
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "human" },
 			...overrides,
 		};
@@ -83,8 +83,8 @@ describe("HandleIssueRefinement", () => {
 				assignees: [],
 				user: { login: "human" },
 			},
-			comment: { id: 100, body: "/yeetomatic issue-refinement", user: { login: "admin" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { id: 100, body: "/yolomatic issue-refinement", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "admin" },
 			...overrides,
 		};
@@ -92,8 +92,8 @@ describe("HandleIssueRefinement", () => {
 
 	it("posts instructions for an eligible opened issue", async () => {
 		await handler.postInstructions(createInstructionPayload() as never);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("yeetomatic-bot", undefined));
-		const record = store.getInstructionComment("mbrooks", "yeetomatic", 1);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, buildNewIssueComment("yolomatic-bot", undefined));
+		const record = store.getInstructionComment("mbrooks", "yolomatic", 1);
 		expect(record).not.toBeNull();
 		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(true);
@@ -109,20 +109,20 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
 			issueAdminLinkInCommentsEnabled: true,
-			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+			adminBaseUrl: "http://host:6767/yolomatic/admin",
 		});
 		await handler.postInstructions(createInstructionPayload() as never);
-		const expectedUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
+		const expectedUrl = "http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/issues/1";
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			buildNewIssueComment("yeetomatic-bot", expectedUrl),
+			buildNewIssueComment("yolomatic-bot", expectedUrl),
 		);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain(`Track status: ${expectedUrl}`);
 	});
@@ -140,7 +140,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -154,14 +154,14 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.postInstructions(createInstructionPayload({ issue: { number: 10, user: { login: "human" } } }) as never);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain(
-			"Track status: http://host:6767/old/admin#/repos/mbrooks/yeetomatic/issues/10",
+			"Track status: http://host:6767/old/admin#/repos/mbrooks/yolomatic/issues/10",
 		);
 
 		// Change admin_base_url in the SettingsStore without reconstructing the handler.
 		settingsStore.set("admin_base_url", "http://host:6767/new/admin");
 		await handler.postInstructions(createInstructionPayload({ issue: { number: 11, user: { login: "human" } } }) as never);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[1][3]).toContain(
-			"Track status: http://host:6767/new/admin#/repos/mbrooks/yeetomatic/issues/11",
+			"Track status: http://host:6767/new/admin#/repos/mbrooks/yolomatic/issues/11",
 		);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[1][3]).not.toContain(
 			"http://host:6767/old/admin",
@@ -176,11 +176,11 @@ describe("HandleIssueRefinement", () => {
 		settingsStore.set("issue_admin_link_in_comments_enabled", "true");
 		await handler.postInstructions(createInstructionPayload({ issue: { number: 13, user: { login: "human" } } }) as never);
 		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[3][3]).toContain(
-			"Track status: http://host:6767/new/admin#/repos/mbrooks/yeetomatic/issues/13",
+			"Track status: http://host:6767/new/admin#/repos/mbrooks/yolomatic/issues/13",
 		);
 	});
 
-	it("interpolates the configured Yeetomatic username in the new-issue comment", async () => {
+	it("interpolates the configured Yolomatic username in the new-issue comment", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
 			sessions: sessions as never,
@@ -190,24 +190,24 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "custom-yeet-bot",
+			githubUsername: "custom-yolo-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
 		});
 		await handler.postInstructions(createInstructionPayload() as never);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("custom-yeet-bot", undefined));
-		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain("custom-yeet-bot");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, buildNewIssueComment("custom-yolo-bot", undefined));
+		expect((github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3]).toContain("custom-yolo-bot");
 	});
 
-	it("includes the /yeetomatic feedback command in the new-issue comment", async () => {
+	it("includes the /yolomatic feedback command in the new-issue comment", async () => {
 		await handler.postInstructions(createInstructionPayload() as never);
 		const posted = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3];
-		expect(posted).toContain("/yeetomatic feedback");
+		expect(posted).toContain("/yolomatic feedback");
 		expect(posted).toContain("steer");
 		// Ordering: feedback is documented between assign and issue-refinement.
-		expect(posted.indexOf("/yeetomatic feedback")).toBeLessThan(posted.indexOf("/yeetomatic issue-refinement"));
-		expect(posted.indexOf("Assign the issue")).toBeLessThan(posted.indexOf("/yeetomatic feedback"));
+		expect(posted.indexOf("/yolomatic feedback")).toBeLessThan(posted.indexOf("/yolomatic issue-refinement"));
+		expect(posted.indexOf("Assign the issue")).toBeLessThan(posted.indexOf("/yolomatic feedback"));
 	});
 
 	it("does not post the automatic comment when issueNewCommentEnabled is false", async () => {
@@ -220,7 +220,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -228,7 +228,7 @@ describe("HandleIssueRefinement", () => {
 		});
 		await handler.postInstructions(createInstructionPayload() as never);
 		expect(github.postComment).not.toHaveBeenCalled();
-		expect(store.getInstructionComment("mbrooks", "yeetomatic", 1)).toBeNull();
+		expect(store.getInstructionComment("mbrooks", "yolomatic", 1)).toBeNull();
 		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(false);
 	});
@@ -243,7 +243,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -259,7 +259,7 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(createCommandPayload() as never);
 
 		expect(executor.executeRefinement).toHaveBeenCalled();
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
 	});
 
 	it("appends an admin status link to refinement status comments when enabled", async () => {
@@ -272,12 +272,12 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
 			issueAdminLinkInCommentsEnabled: true,
-			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+			adminBaseUrl: "http://host:6767/yolomatic/admin",
 		});
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		executor.executeRefinement.mockResolvedValue({
@@ -288,8 +288,8 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		const expectedIssueUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/issues/1";
-		const expectedSessionUrl = "http://host:6767/yeetomatic/admin#/repos/mbrooks/yeetomatic/1/refinement";
+		const expectedIssueUrl = "http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/issues/1";
+		const expectedSessionUrl = "http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/1/refinement";
 		const startingCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith(ISSUE_REFINEMENT_STARTING_COMMENT))!;
 		expect(startingCall[3]).toContain(`Track status: ${expectedSessionUrl}`);
 		expect(startingCall[3]).not.toContain(expectedIssueUrl);
@@ -308,12 +308,12 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
 			issueAdminLinkInCommentsEnabled: false,
-			adminBaseUrl: "http://host:6767/yeetomatic/admin",
+			adminBaseUrl: "http://host:6767/yolomatic/admin",
 		});
 		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
 		executor.executeRefinement.mockResolvedValue({
@@ -336,7 +336,7 @@ describe("HandleIssueRefinement", () => {
 	});
 
 	it("does not post instructions for issues opened by the bot", async () => {
-		await handler.postInstructions(createInstructionPayload({ issue: { user: { login: "yeetomatic-bot" } } }) as never);
+		await handler.postInstructions(createInstructionPayload({ issue: { user: { login: "yolomatic-bot" } } }) as never);
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
 
@@ -350,16 +350,16 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		expect(workspaces.createRefinementWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1);
+		expect(workspaces.createRefinementWorktree).toHaveBeenCalledWith("mbrooks", "yolomatic", 1);
 		expect(executor.executeRefinement).toHaveBeenCalled();
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue refined at the request of @admin. The issue body now contains the Proposed Task. No implementation session was started.",
 		);
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt).not.toBeNull();
 		expect(attempt!.state).toBe("applied");
 	});
@@ -386,16 +386,16 @@ describe("HandleIssueRefinement", () => {
 		const implementation: SessionState = {
 			kind: "implementation",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			title: "Implementation",
 			body: "Original implementation body",
 			status: "waiting-feedback",
 			sessionPath: "/tmp/implementation.jsonl",
 			workspacePath: "/tmp/implementation",
-			branch: "yeetomatic/issue-1",
+			branch: "yolomatic/issue-1",
 			prNumber: 99,
-			prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			lastActivity: "2026-07-31T00:00:00.000Z",
 			seeded: true,
 		};
@@ -404,8 +404,8 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		expect(await sessions.get("mbrooks", "yeetomatic", 1, "implementation")).toEqual(implementation);
-		expect(await sessions.get("mbrooks", "yeetomatic", 1, "refinement")).toMatchObject({
+		expect(await sessions.get("mbrooks", "yolomatic", 1, "implementation")).toEqual(implementation);
+		expect(await sessions.get("mbrooks", "yolomatic", 1, "refinement")).toMatchObject({
 			kind: "refinement",
 			status: "complete",
 		});
@@ -436,7 +436,7 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "user" },
-				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
+				comment: { id: 101, body: "/yolomatic issue-refinement", user: { login: "user" } },
 			}) as never,
 		);
 		const logs = getSessionLogs(REFINEMENT_SESSION_KEY);
@@ -477,12 +477,12 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "user" },
-				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
+				comment: { id: 101, body: "/yolomatic issue-refinement", user: { login: "user" } },
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
-		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "user");
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository collaborators can run issue refinement.");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yolomatic", "user");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Only repository collaborators can run issue refinement.");
 	});
 
 	it("allows refinement from a repository owner with admin permission", async () => {
@@ -497,16 +497,16 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "repo-owner" },
-				comment: { id: 105, body: "/yeetomatic issue-refinement", user: { login: "repo-owner" } },
+				comment: { id: 105, body: "/yolomatic issue-refinement", user: { login: "repo-owner" } },
 			}) as never,
 		);
 
-		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "repo-owner");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yolomatic", "repo-owner");
 		expect(executor.executeRefinement).toHaveBeenCalled();
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue refined at the request of @repo-owner. The issue body now contains the Proposed Task. No implementation session was started.",
 		);
@@ -525,13 +525,13 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "contributor" },
-				comment: { id: 106, body: "/yeetomatic issue-refinement", user: { login: "contributor" } },
+				comment: { id: 106, body: "/yolomatic issue-refinement", user: { login: "contributor" } },
 			}) as never,
 		);
 
-		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "contributor");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yolomatic", "contributor");
 		expect(executor.executeRefinement).toHaveBeenCalled();
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
 	});
 
 	it("rejects refinement from a non-collaborator who is not the admin username", async () => {
@@ -539,12 +539,12 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "outsider" },
-				comment: { id: 107, body: "/yeetomatic issue-refinement", user: { login: "outsider" } },
+				comment: { id: 107, body: "/yolomatic issue-refinement", user: { login: "outsider" } },
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
-		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yeetomatic", "outsider");
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Only repository collaborators can run issue refinement.");
+		expect(github.isCollaborator).toHaveBeenCalledWith("mbrooks", "yolomatic", "outsider");
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Only repository collaborators can run issue refinement.");
 	});
 
 	it("authorizes the configured admin username even when isCollaborator returns false", async () => {
@@ -560,7 +560,7 @@ describe("HandleIssueRefinement", () => {
 
 		expect(github.isCollaborator).not.toHaveBeenCalled();
 		expect(executor.executeRefinement).toHaveBeenCalled();
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
 	});
 
 	it("posts a starting comment immediately when refinement begins", async () => {
@@ -577,29 +577,29 @@ describe("HandleIssueRefinement", () => {
 		expect(startCallCount[0]).toBeGreaterThanOrEqual(1);
 		const calls = github.postComment.mock.calls as unknown as Array<[string, string, number, string]>;
 		expect(calls[0][3]).toBe(ISSUE_REFINEMENT_STARTING_COMMENT);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
 	});
 
 	it("does not post a starting comment when the task key is already claimed", async () => {
 		tasks.register.mockReturnValue(null as never);
 		await handler.execute(createCommandPayload() as never);
-		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
+		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
 	});
 
 	it("does not post a starting comment for non-admin users", async () => {
 		await handler.execute(
 			createCommandPayload({
 				sender: { login: "user" },
-				comment: { id: 101, body: "/yeetomatic issue-refinement", user: { login: "user" } },
+				comment: { id: 101, body: "/yolomatic issue-refinement", user: { login: "user" } },
 			}) as never,
 		);
-		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
+		expect(github.postComment).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ISSUE_REFINEMENT_STARTING_COMMENT);
 	});
 
 	it("ignores comments that do not start with the refinement command", async () => {
 		await handler.execute(
 			createCommandPayload({
-				comment: { id: 102, body: "Please run /yeetomatic issue-refinement", user: { login: "admin" } },
+				comment: { id: 102, body: "Please run /yolomatic issue-refinement", user: { login: "admin" } },
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
@@ -615,13 +615,13 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(
 			createCommandPayload({
-				comment: { id: 108, body: "/yeetomatic issue-refinement Focus on rollback", user: { login: "admin" } },
+				comment: { id: 108, body: "/yolomatic issue-refinement Focus on rollback", user: { login: "admin" } },
 			}) as never,
 			"Focus on rollback",
 		);
 
 		expect(executor.executeRefinement).toHaveBeenCalledWith(expect.anything(), undefined, "Focus on rollback");
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt).not.toBeNull();
 		expect(attempt!.steeringPrompt).toBe("Focus on rollback");
 	});
@@ -636,7 +636,7 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(
 			createCommandPayload({
-				comment: { id: 109, body: "/yeetomatic issue-refinement add criteria", user: { login: "admin" } },
+				comment: { id: 109, body: "/yolomatic issue-refinement add criteria", user: { login: "admin" } },
 			}) as never,
 			"add criteria",
 		);
@@ -653,9 +653,9 @@ describe("HandleIssueRefinement", () => {
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			"Yeetomatic is currently working on this issue. Refinement cannot overlap with implementation.",
+			"Yolomatic is currently working on this issue. Refinement cannot overlap with implementation.",
 		);
 	});
 
@@ -663,7 +663,7 @@ describe("HandleIssueRefinement", () => {
 		await sessions.save({
 			kind: "implementation",
 			owner: "mbrooks",
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			issueNumber: 1,
 			title: "Test",
 			body: "Body",
@@ -691,7 +691,7 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(createCommandPayload() as never);
 
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("stale");
 		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue closed during refinement" });
 	});
@@ -709,7 +709,7 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(createCommandPayload() as never);
 
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("stale");
 		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue body changed during refinement" });
 	});
@@ -734,7 +734,7 @@ describe("HandleIssueRefinement", () => {
 			expect.stringContaining("Skill instructions"),
 			"",
 		);
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Skill-refined body");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Skill-refined body");
 	});
 
 	it("ignores command when repository is not managed", async () => {
@@ -747,7 +747,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => false,
 			refinementEnabled: true,
@@ -766,7 +766,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: false,
@@ -781,9 +781,9 @@ describe("HandleIssueRefinement", () => {
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
-			"Yeetomatic is currently active on this issue. Refinement cannot overlap with implementation.",
+			"Yolomatic is currently active on this issue. Refinement cannot overlap with implementation.",
 		);
 	});
 
@@ -796,7 +796,7 @@ describe("HandleIssueRefinement", () => {
 		});
 		await handler.execute(createCommandPayload() as never);
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("failed");
 	});
 
@@ -811,15 +811,15 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
-		expect(github.updateIssueTitle).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Clearer Title");
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
+		expect(github.updateIssueTitle).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Clearer Title");
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue refined at the request of @admin. The issue title and body now contain the Proposed Task. No implementation session was started.",
 		);
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("applied");
 		expect(attempt!.proposedTitle).toBe("Clearer Title");
 	});
@@ -837,7 +837,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.updateIssueTitle).not.toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue refined at the request of @admin. The issue body now contains the Proposed Task. No implementation session was started.",
 		);
@@ -871,7 +871,7 @@ describe("HandleIssueRefinement", () => {
 		expect(github.updateIssueTitle).not.toHaveBeenCalled();
 		expect(github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"Issue refined at the request of @admin. The issue body now contains the Proposed Task. No implementation session was started.",
 		);
@@ -892,7 +892,7 @@ describe("HandleIssueRefinement", () => {
 
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
 		expect(github.updateIssueTitle).not.toHaveBeenCalled();
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("stale");
 		expect(attempt!.failureReason).toBe("issue title changed during refinement");
 		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "issue title changed during refinement" });
@@ -911,7 +911,7 @@ describe("HandleIssueRefinement", () => {
 
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
 		expect(github.updateIssueTitle).not.toHaveBeenCalled();
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("failed");
 		expect(attempt!.failureReason).toBe("proposed title exceeds GitHub size limit");
 	});
@@ -929,7 +929,7 @@ describe("HandleIssueRefinement", () => {
 
 		await handler.execute(createCommandPayload() as never);
 
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.proposedTitle).toBe("Clearer Title");
 		expect(attempt!.state).toBe("stale");
 	});
@@ -939,8 +939,8 @@ describe("HandleIssueRefinement", () => {
 		executor.executeRefinement.mockRejectedValue(new Error("worker crashed"));
 		await handler.execute(createCommandPayload() as never);
 		expect(github.updateIssueBody).not.toHaveBeenCalled();
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refinement failed: worker crashed");
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refinement failed: worker crashed");
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt!.state).toBe("failed");
 		expect(await sessions.get()).toMatchObject({ status: "failed", staleReason: "worker crashed" });
 	});
@@ -952,7 +952,7 @@ describe("HandleIssueRefinement", () => {
 
 	it("ignores comments from the bot account", async () => {
 		await handler.execute(
-			createCommandPayload({ comment: { id: 103, body: "/yeetomatic issue-refinement", user: { login: "yeetomatic-bot" } } }) as never,
+			createCommandPayload({ comment: { id: 103, body: "/yolomatic issue-refinement", user: { login: "yolomatic-bot" } } }) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
 	});
@@ -960,7 +960,7 @@ describe("HandleIssueRefinement", () => {
 	it("ignores comments from bot-typed users", async () => {
 		await handler.execute(
 			createCommandPayload({
-				comment: { id: 104, body: "/yeetomatic issue-refinement", user: { login: "some-bot", type: "Bot" } },
+				comment: { id: 104, body: "/yolomatic issue-refinement", user: { login: "some-bot", type: "Bot" } },
 			}) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
@@ -968,7 +968,7 @@ describe("HandleIssueRefinement", () => {
 
 	it("ignores refinement commands on pull requests", async () => {
 		await handler.execute(
-			createCommandPayload({ issue: { pull_request: { url: "https://api.github.com/repos/mbrooks/yeetomatic/pulls/1" } } }) as never,
+			createCommandPayload({ issue: { pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/1" } } }) as never,
 		);
 		expect(executor.executeRefinement).not.toHaveBeenCalled();
 	});
@@ -993,7 +993,7 @@ describe("HandleIssueRefinement", () => {
 			executor: executor as unknown as DockerWorkerExecutor,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: false,
@@ -1004,7 +1004,7 @@ describe("HandleIssueRefinement", () => {
 
 	it("does not post instructions for issues assigned to the bot", async () => {
 		await handler.postInstructions(
-			createInstructionPayload({ issue: { assignees: [{ login: "yeetomatic-bot" }] } }) as never,
+			createInstructionPayload({ issue: { assignees: [{ login: "yolomatic-bot" }] } }) as never,
 		);
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
@@ -1021,7 +1021,7 @@ describe("HandleIssueRefinement", () => {
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -1043,7 +1043,7 @@ describe("HandleIssueRefinement", () => {
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -1065,14 +1065,14 @@ describe("HandleIssueRefinement", () => {
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
 		});
 		const issue = { ...createInstructionPayload().issue, created_at: "2026-08-02T00:00:00.000Z" };
 		await handler.postInstructions(createInstructionPayload({ source: "polling", issue }) as never);
-		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, buildNewIssueComment("yeetomatic-bot", undefined));
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, buildNewIssueComment("yolomatic-bot", undefined));
 	});
 
 	it("ignores the polling baseline for webhook source events", async () => {
@@ -1087,7 +1087,7 @@ describe("HandleIssueRefinement", () => {
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			isRepoManaged: () => true,
 			refinementEnabled: true,
@@ -1108,21 +1108,21 @@ describe("HandleIssueRefinement", () => {
 		const applied = handler.isAppliedBodyEdit({
 			source: "polling",
 			issue: { number: 1, body: "Refined body" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		expect(applied).toBe(true);
 
 		const mismatch = handler.isAppliedBodyEdit({
 			source: "polling",
 			issue: { number: 1, body: "Different body" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		expect(mismatch).toBe(false);
 
 		const webhook = handler.isAppliedBodyEdit({
 			source: "webhook",
 			issue: { number: 1, body: "Refined body" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		expect(webhook).toBe(false);
 	});
@@ -1138,14 +1138,14 @@ describe("HandleIssueRefinement", () => {
 		await handler.execute(
 			createCommandPayload({
 				source: "polling",
-				comment: { id: 110, body: "/yeetomatic issue-refinement Focus on polling", user: { login: "admin" } },
+				comment: { id: 110, body: "/yolomatic issue-refinement Focus on polling", user: { login: "admin" } },
 			}) as never,
 			"Focus on polling",
 		);
 
 		expect(executor.executeRefinement).toHaveBeenCalledWith(expect.anything(), undefined, "Focus on polling");
-		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "Refined body");
-		const attempt = store.getLatestAttempt("mbrooks", "yeetomatic", 1);
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Refined body");
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1);
 		expect(attempt).not.toBeNull();
 		expect(attempt!.state).toBe("applied");
 		expect(attempt!.steeringPrompt).toBe("Focus on polling");

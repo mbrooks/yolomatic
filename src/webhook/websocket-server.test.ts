@@ -141,7 +141,7 @@ describe("createAdminWebSocketServer", () => {
 		const onboardingServer = new FakeHttpServer();
 		createAdminWebSocketServer(onboardingServer as never, { isAuthorized: () => true });
 		const onboardingSocket = new FakeUpgradeSocket();
-		onboardingServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
+		onboardingServer.upgradeHandler?.({ url: "/yolomatic/admin/ws", headers: {} }, onboardingSocket, Buffer.alloc(0));
 		expect(onboardingSocket.writes).toEqual([]);
 		expect(onboardingSocket.destroyed).toBe(false);
 
@@ -151,14 +151,14 @@ describe("createAdminWebSocketServer", () => {
 		});
 
 		const rejectedSocket = new FakeUpgradeSocket();
-		protectedServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
+		protectedServer.upgradeHandler?.({ url: "/yolomatic/admin/ws", headers: {} }, rejectedSocket, Buffer.alloc(0));
 		expect(rejectedSocket.writes).toEqual(["HTTP/1.1 401 Unauthorized\r\n\r\n"]);
 		expect(rejectedSocket.destroyed).toBe(true);
 
 		const acceptedSocket = new FakeUpgradeSocket();
 		protectedServer.upgradeHandler?.(
 			{
-				url: "/yeetomatic/admin/ws",
+				url: "/yolomatic/admin/ws",
 				headers: {
 					authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
 				},
@@ -187,7 +187,7 @@ describe("createAdminWebSocketServer", () => {
 		expect(matchingSocket.destroyed).toBe(false);
 
 		const legacySocket = new FakeUpgradeSocket();
-		httpServer.upgradeHandler?.({ url: "/yeetomatic/admin/ws", headers: {} }, legacySocket, Buffer.alloc(0));
+		httpServer.upgradeHandler?.({ url: "/yolomatic/admin/ws", headers: {} }, legacySocket, Buffer.alloc(0));
 		expect(legacySocket.writes).toEqual([]);
 		expect(legacySocket.destroyed).toBe(false);
 	});
@@ -200,7 +200,7 @@ describe("createAdminWebSocketServer", () => {
 		});
 
 		const socket = new FakeUpgradeSocket();
-		httpServer.upgradeHandler?.({ url: "/yeetomatic-worker/ws?token=abc", headers: {} }, socket, Buffer.alloc(0));
+		httpServer.upgradeHandler?.({ url: "/yolomatic-worker/ws?token=abc", headers: {} }, socket, Buffer.alloc(0));
 		expect(socket.writes).toEqual([]);
 		expect(socket.destroyed).toBe(false);
 	});
@@ -216,11 +216,11 @@ describe("createAdminWebSocketServer", () => {
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
-		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" });
+		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation" });
 		socket.emitMessage({ type: "subscribe-status" });
 		await Promise.resolve();
 
-		server.broadcastLog("github-mbrooks-yeetomatic-issue-1-implementation", {
+		server.broadcastLog("github-mbrooks-yolomatic-issue-1-implementation", {
 			timestamp: "2025-01-01T00:00:00Z",
 			level: "info",
 			message: "hello",
@@ -232,7 +232,7 @@ describe("createAdminWebSocketServer", () => {
 				{ type: "status", data: { agent: "online" } },
 				{
 					type: "log-entry",
-					sessionKey: "github-mbrooks-yeetomatic-issue-1-implementation",
+					sessionKey: "github-mbrooks-yolomatic-issue-1-implementation",
 					entry: {
 						timestamp: "2025-01-01T00:00:00Z",
 						level: "info",
@@ -250,9 +250,9 @@ describe("createAdminWebSocketServer", () => {
 		const socket = new FakeSocket();
 		(connectionHandler as (ws: FakeSocket) => void)(socket);
 
-		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" });
-		socket.emitMessage({ type: "unsubscribe-log", owner: "mbrooks", repo: "yeetomatic", issueNumber: 1, kind: "implementation" });
-		server.broadcastLog("github-mbrooks-yeetomatic-issue-1-implementation", {
+		socket.emitMessage({ type: "subscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation" });
+		socket.emitMessage({ type: "unsubscribe-log", owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation" });
+		server.broadcastLog("github-mbrooks-yolomatic-issue-1-implementation", {
 			timestamp: "2025-01-01T00:00:00Z",
 			level: "info",
 			message: "hidden",

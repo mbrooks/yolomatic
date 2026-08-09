@@ -10,13 +10,13 @@ import {
 function session(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		issueNumber: 56,
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		owner: "mbrooks",
 		title: "Title",
 		body: "Body",
 		status: "complete",
-		sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-56.jsonl",
-		workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-56",
+		sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+		workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 		lastActivity: new Date().toISOString(),
 		seeded: true,
 		...overrides,
@@ -24,29 +24,29 @@ function session(overrides: Partial<SessionState> = {}): SessionState {
 }
 
 describe("PR session invariants", () => {
-	it("extracts issue numbers from Yeetomatic branches", () => {
-		expect(extractIssueNumberFromBranch("yeetomatic/issue-56")).toBe(56);
+	it("extracts issue numbers from Yolomatic branches", () => {
+		expect(extractIssueNumberFromBranch("yolomatic/issue-56")).toBe(56);
 		expect(extractIssueNumberFromBranch("feature/other")).toBeNull();
-		expect(expectedBranchForIssue(56)).toBe("yeetomatic/issue-56");
+		expect(expectedBranchForIssue(56)).toBe("yolomatic/issue-56");
 	});
 
 	it("accepts matching session, PR number, and head branch", () => {
-		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "yeetomatic/issue-56")).toBeNull();
+		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "yolomatic/issue-56")).toBeNull();
 	});
 
-	it("rejects non-Yeetomatic head branches", () => {
-		expect(validatePRSessionMapping(session(), 99, "feature/other")).toContain("not a Yeetomatic issue branch");
+	it("rejects non-Yolomatic head branches", () => {
+		expect(validatePRSessionMapping(session(), 99, "feature/other")).toContain("not a Yolomatic issue branch");
 	});
 
 	it("accepts non-issue branches when the PR is already associated with the session", () => {
-		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "yeetomatic/custom-branch-123")).toBeNull();
+		expect(validatePRSessionMapping(session({ prNumber: 99 }), 99, "yolomatic/custom-branch-123")).toBeNull();
 	});
 
 	it("rejects a head branch for a different issue", () => {
-		expect(validatePRSessionMapping(session(), 99, "yeetomatic/issue-57")).toContain("issue #57");
+		expect(validatePRSessionMapping(session(), 99, "yolomatic/issue-57")).toContain("issue #57");
 	});
 
 	it("rejects a session already associated with another PR", () => {
-		expect(validatePRSessionMapping(session({ prNumber: 100 }), 99, "yeetomatic/issue-56")).toContain("PR #100");
+		expect(validatePRSessionMapping(session({ prNumber: 100 }), 99, "yolomatic/issue-56")).toContain("PR #100");
 	});
 });

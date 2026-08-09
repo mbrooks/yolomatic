@@ -21,7 +21,7 @@ import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 // Shared admin account + session cookie used by the admin-route tests. The
 // old Basic Auth path is gone, so tests mint a real signed session cookie via
 // AdminSessionAuth.login and send it as a Cookie header instead.
-const userDbPath = join(tmpdir(), "yeetomatic-server-routes-users.sqlite");
+const userDbPath = join(tmpdir(), "yolomatic-server-routes-users.sqlite");
 if (existsSync(userDbPath)) rmSync(userDbPath);
 const userStore = new UserStore(userDbPath);
 userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
@@ -163,12 +163,12 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 99,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title,
 				body,
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-99.jsonl",
 				workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
@@ -179,13 +179,13 @@ describe("GitHubIssueHandlers", () => {
 					? null
 					: {
 							issueNumber: 99,
-							repo: "yeetomatic",
+							repo: "yolomatic",
 							owner: "mbrooks",
 							title: "Fallback title",
 							body: "Fallback body",
 							status: "pending" as const,
-							sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
-							workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
+							sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-99.jsonl",
+							workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
 							lastActivity: new Date().toISOString(),
 							seeded: false,
 						};
@@ -199,13 +199,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 99,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Fallback title",
 				body: "Fallback body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-99.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-99.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -215,10 +215,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
-				branch: "yeetomatic/issue-99",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
+				branch: "yolomatic/issue-99",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 99,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -231,7 +231,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
-				rawResponse: "YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
+				rawResponse: "YOLO_STATUS: waiting-feedback\nNeed clarification.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -239,7 +239,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -249,31 +249,31 @@ describe("GitHubIssueHandlers", () => {
 			action: "created",
 			issue: {
 				number: 99,
-				labels: [{ name: "yeetomatic-working" }],
-				assignees: [{ login: "yeetomatic-bot" }],
+				labels: [{ name: "yolomatic-working" }],
+				assignees: [{ login: "yolomatic-bot" }],
 				title: "Test issue",
 				body: "Test body",
 			},
-			comment: { body: "@yeetomatic-bot What is the status?", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			comment: { body: "@yolomatic-bot What is the status?", user: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "mbrooks" },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 99);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
 		expect(sessionManager.createSession).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			99,
 			"Test issue",
 			"Test body",
-			"/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-99",
+			"/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
 			"implementation",
-			["yeetomatic-working"],
+			["yolomatic-working"],
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 	});
 
-	it("resumes a session for any Yeetomatic label and pushes branch on complete", async () => {
+	it("resumes a session for any Yolomatic label and pushes branch on complete", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -281,20 +281,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -307,13 +307,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 42,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -323,10 +323,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
-				branch: "yeetomatic/issue-42",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
+				branch: "yolomatic/issue-42",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -339,7 +339,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -347,58 +347,58 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// Should resume on yeetomatic-feedback-required
+		// Should resume on yolomatic-feedback-required
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Here is the missing detail", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic-feedback-required" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Here is the missing detail", user: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Yolomatic: Done");
 
-		// Should add yeetomatic-pr-created on complete, not yeetomatic-complete
+		// Should add yolomatic-pr-created on complete, not yolomatic-complete
 		const addLabelsCalls = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
 		const lastAddLabels = addLabelsCalls[addLabelsCalls.length - 1];
-		expect(lastAddLabels?.[0]?.labels).toContain("yeetomatic-pr-created");
+		expect(lastAddLabels?.[0]?.labels).toContain("yolomatic-pr-created");
 
 		// Should create a PR via the GitHub API
 		expect(octokit.pulls.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "yeetomatic",
-				title: "Yeetomatic: Title",
+				repo: "yolomatic",
+				title: "Yolomatic: Title",
 				body: expect.stringContaining("Fixes #42"),
-				head: "yeetomatic/issue-42",
+				head: "yolomatic/issue-42",
 				base: "main",
 			}),
 		);
 
-		// Should resume on yeetomatic-pr-created too
+		// Should resume on yolomatic-pr-created too
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Can you also add tests?", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic-pr-created" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Can you also add tests?", user: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Should ignore non-Yeetomatic labels
+		// Should ignore non-Yolomatic labels
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "yeetomatic-bot" }] },
+			issue: { number: 42, labels: [{ name: "bug" }], assignees: [{ login: "yolomatic-bot" }] },
 			comment: { body: "Just chatting", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -407,20 +407,20 @@ describe("GitHubIssueHandlers", () => {
 		// Should ignore bot comments
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "LGTM", user: { login: "yeetomatic-bot", type: "Bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
+			issue: { number: 42, labels: [{ name: "yolomatic-pr-created" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "LGTM", user: { login: "yolomatic-bot", type: "Bot" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Should ignore comments on issues not assigned to Yeetomatic
+		// Should ignore comments on issues not assigned to Yolomatic
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-pr-created" }], assignees: [{ login: "someone-else" }] },
+			issue: { number: 42, labels: [{ name: "yolomatic-pr-created" }], assignees: [{ login: "someone-else" }] },
 			comment: { body: "Help", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -435,20 +435,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -461,13 +461,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 42,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-42.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-42.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -477,10 +477,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-42",
-				branch: "yeetomatic/issue-42",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
+				branch: "yolomatic/issue-42",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 42,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -493,7 +493,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -501,7 +501,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -509,22 +509,22 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Proceed", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 42, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Proceed", user: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
-		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "Yeetomatic: Done");
+		expect(workspaceManager.commitAndPush).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "Yolomatic: Done");
 		expect(octokit.pulls.create).not.toHaveBeenCalled();
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 42, "complete");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, "complete");
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
 				body: expect.stringContaining("No code changes were necessary."),
 			}),
 		);
 		expect(octokit.issues.addLabels).not.toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-pr-created"] }),
+			expect.objectContaining({ labels: ["yolomatic-pr-created"] }),
 		);
 	});
 
@@ -536,7 +536,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		let storedSession: any = null;
@@ -544,13 +544,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -570,13 +570,13 @@ describe("GitHubIssueHandlers", () => {
 				}
 				return {
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -587,10 +587,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -603,7 +603,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -611,7 +611,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -620,15 +620,15 @@ describe("GitHubIssueHandlers", () => {
 		// Simulate an opened event immediately followed by an assigned event
 		const openedPromise = handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
 		const assignedPromise = handlers.handleIssueEvent({
 			action: "assigned",
-			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "yeetomatic-bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 1, title: "Test", body: "Body", assignee: { login: "yolomatic-bot" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -639,7 +639,7 @@ describe("GitHubIssueHandlers", () => {
 		// Should comment for pickup and completion (2 total, not 4)
 		expect(octokit.issues.createComment).toHaveBeenCalledTimes(2);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Picked up by Yeetomatic. Working on it..." }),
+			expect.objectContaining({ body: "Picked up by Yolomatic. Working on it..." }),
 		);
 	});
 
@@ -682,7 +682,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -691,9 +691,9 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore issue events from self
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
 		});
 
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
@@ -701,16 +701,16 @@ describe("GitHubIssueHandlers", () => {
 		// Ignore comment events from self
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 42, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Update", user: { login: "yeetomatic-bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
-			sender: { login: "yeetomatic-bot" },
+			issue: { number: 42, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "Update", user: { login: "yolomatic-bot" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "yolomatic-bot" },
 		});
 
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("only works on issues assigned to Yeetomatic", async () => {
+	it("only works on issues assigned to Yolomatic", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -718,7 +718,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		const createdIssues = new Set<number>();
@@ -727,13 +727,13 @@ describe("GitHubIssueHandlers", () => {
 				createdIssues.add(issueNumber);
 				return {
 					issueNumber,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: `/tmp/sessions/github-mbrooks-yeetomatic/issue-${issueNumber}.jsonl`,
-					workspacePath: `/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-${issueNumber}`,
+					sessionPath: `/tmp/sessions/github-mbrooks-yolomatic/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-${issueNumber}`,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -742,13 +742,13 @@ describe("GitHubIssueHandlers", () => {
 				if (!createdIssues.has(issueNumber)) return null;
 				return {
 					issueNumber,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: `/tmp/sessions/github-mbrooks-yeetomatic/issue-${issueNumber}.jsonl`,
-					workspacePath: `/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-${issueNumber}`,
+					sessionPath: `/tmp/sessions/github-mbrooks-yolomatic/issue-${issueNumber}.jsonl`,
+					workspacePath: `/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-${issueNumber}`,
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -762,13 +762,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -778,10 +778,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -794,7 +794,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -802,36 +802,36 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// Ignore opened issues not assigned to Yeetomatic
+		// Ignore opened issues not assigned to Yolomatic
 		await handlers.handleIssueEvent({
 			action: "opened",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).not.toHaveBeenCalled();
 
-		// Process opened issues already assigned to Yeetomatic
+		// Process opened issues already assigned to Yolomatic
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(1);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 
-		// Process assignment to Yeetomatic
+		// Process assignment to Yolomatic
 		await handlers.handleIssueEvent({
 			action: "assigned",
-			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "yeetomatic-bot" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 2, title: "Test 2", body: "Body", assignee: { login: "yolomatic-bot" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
@@ -841,27 +841,27 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "assigned",
 			issue: { number: 3, title: "Test 3", body: "Body", assignee: { login: "other-user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 		expect(sessionManager.createSession).toHaveBeenCalledTimes(2);
 		expect(executor.execute).toHaveBeenCalledTimes(2);
 
-		// Pause work when Yeetomatic is unassigned
+		// Pause work when Yolomatic is unassigned
 		await handlers.handleIssueEvent({
 			action: "unassigned",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "pending");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "pending");
 		expect(octokit.issues.removeLabel).toHaveBeenCalled();
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
-			expect.objectContaining({ body: "Yeetomatic unassigned. Pausing work." }),
+			expect.objectContaining({ body: "Yolomatic unassigned. Pausing work." }),
 		);
 	});
 
-	it("processes comments that @mention the bot even without a yeetomatic label", async () => {
+	it("processes comments that @mention the bot even without a yolomatic label", async () => {
 		const octokit = {
 			issues: {
 				addLabels: vi.fn(async () => ({})),
@@ -873,13 +873,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 7,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
+				sessionPath: "/tmp/sessions/yolomatic-issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -892,13 +892,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
 				issueNumber: 7,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/yeetomatic-issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
+				sessionPath: "/tmp/sessions/yolomatic-issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -908,10 +908,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
-				branch: "yeetomatic/issue-7",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-7",
+				branch: "yolomatic/issue-7",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 7,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -924,7 +924,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
-				rawResponse: "YEETOMATIC_STATUS: waiting-feedback\nNeed clarification.",
+				rawResponse: "YOLO_STATUS: waiting-feedback\nNeed clarification.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -932,41 +932,41 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		// No yeetomatic labels, but @mention should allow processing
+		// No yolomatic labels, but @mention should allow processing
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 7, labels: [], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "Hey @yeetomatic-bot can you help?", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 7, labels: [], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "Hey @yolomatic-bot can you help?", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(1);
 
-		// Should auto-add the yeetomatic label once
+		// Should auto-add the yolomatic label once
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic"] }),
+			expect.objectContaining({ labels: ["yolomatic"] }),
 		);
 
-		// Second comment still requires an explicit trigger (mention or /yeetomatic feedback); the label alone is no longer sufficient
+		// Second comment still requires an explicit trigger (mention or /yolomatic feedback); the label alone is no longer sufficient
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 7, labels: [{ name: "yeetomatic-working" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Thanks!", user: { login: "user" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 7, labels: [{ name: "yolomatic-working" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Thanks!", user: { login: "user" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 		});
 
 		expect(executor.execute).toHaveBeenCalledTimes(2);
-		// Should NOT add yeetomatic label again because hasYeetomaticLabel is true
-		const yeetomaticAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
-		expect(yeetomaticAdds.filter((call) => call[0].labels.includes("yeetomatic"))).toHaveLength(1);
+		// Should NOT add yolomatic label again because hasYolomaticLabel is true
+		const yolomaticAdds = (octokit.issues.addLabels.mock.calls as unknown) as Array<[{ labels: string[] }]>;
+		expect(yolomaticAdds.filter((call) => call[0].labels.includes("yolomatic"))).toHaveLength(1);
 	});
 
 	it("posts failure comment when execution throws", async () => {
@@ -977,7 +977,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		let storedSession: any = null;
@@ -985,13 +985,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -1011,13 +1011,13 @@ describe("GitHubIssueHandlers", () => {
 				}
 				return {
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Title",
 					body: "Body",
 					status,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				};
@@ -1028,10 +1028,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1050,7 +1050,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1059,15 +1059,15 @@ describe("GitHubIssueHandlers", () => {
 		await expect(
 			handlers.handleIssueEvent({
 				action: "opened",
-				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "other-user" },
 			}),
 		).rejects.toThrow("Boom");
 
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: expect.stringContaining("Yeetomatic failed"),
+				body: expect.stringContaining("Yolomatic failed"),
 			}),
 		);
 	});
@@ -1084,13 +1084,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1103,13 +1103,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1131,7 +1131,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1140,7 +1140,7 @@ describe("GitHubIssueHandlers", () => {
 		await handlers.handleIssueEvent({
 			action: "unassigned",
 			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1159,13 +1159,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1188,7 +1188,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1198,7 +1198,7 @@ describe("GitHubIssueHandlers", () => {
 			handlers.handleIssueEvent({
 				action: "unassigned",
 				issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "other-user" }] },
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "other-user" },
 			}),
 		).rejects.toThrow();
@@ -1210,31 +1210,31 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/999" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/issues/999" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title,
 				body,
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
 				workspacePath,
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "T",
 				body: "B",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1247,13 +1247,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "T",
 				body: "B",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1261,10 +1261,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1279,7 +1279,7 @@ describe("GitHubIssueHandlers", () => {
 			toolHistory: [],
 			fatalError: { category: "disk_full" as const, message: "ENOSPC", toolName: "bash" },
 			systemEvidence: {
-				whoami: "yeetomatic",
+				whoami: "yolomatic",
 				pwd: "/tmp",
 				workspacePath: "/tmp/ws",
 				lsWorkspace: "total 0",
@@ -1303,7 +1303,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1316,9 +1316,9 @@ describe("GitHubIssueHandlers", () => {
 					number: 1,
 					title: "Test",
 					body: "Body",
-					assignees: [{ login: "yeetomatic-bot" }],
+					assignees: [{ login: "yolomatic-bot" }],
 				},
-				repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
 			}),
 		).resolves.toBeUndefined();
@@ -1326,20 +1326,20 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "yeetomatic",
-				title: expect.stringContaining("Yeetomatic self-report"),
-				labels: ["yeetomatic-self-report", "bug"],
+				repo: "yolomatic",
+				title: expect.stringContaining("Yolomatic self-report"),
+				labels: ["yolomatic-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issue_number: 1,
 				body: expect.stringContaining("fatal system error"),
 			}),
 		);
-		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yeetomatic", 1, "failed");
+		expect(sessionManager.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "failed");
 	});
 
 	it("files a self-report when commit and push delivery fails", async () => {
@@ -1348,10 +1348,10 @@ describe("GitHubIssueHandlers", () => {
 				addLabels: vi.fn(async () => ({})),
 				removeLabel: vi.fn().mockResolvedValue({}),
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/issues/1000" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/issues/1000" } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
@@ -1405,7 +1405,7 @@ describe("GitHubIssueHandlers", () => {
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
 				repo: "teamhub-case",
 				issueNumber: 1,
@@ -1422,7 +1422,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1430,7 +1430,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: true,
 			octokit: octokit as never,
@@ -1443,7 +1443,7 @@ describe("GitHubIssueHandlers", () => {
 					number: 1,
 					title: "Test",
 					body: "Body",
-					assignees: [{ login: "yeetomatic-bot" }],
+					assignees: [{ login: "yolomatic-bot" }],
 				},
 				repository: { name: "teamhub-case", owner: { login: "mbrooks" } },
 				sender: { login: "human" },
@@ -1453,10 +1453,10 @@ describe("GitHubIssueHandlers", () => {
 		expect(octokit.issues.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				owner: "mbrooks",
-				repo: "yeetomatic",
-				title: expect.stringContaining("Yeetomatic self-report"),
+				repo: "yolomatic",
+				title: expect.stringContaining("Yolomatic self-report"),
 				body: expect.stringContaining("Author identity unknown"),
-				labels: ["yeetomatic-self-report", "bug"],
+				labels: ["yolomatic-self-report", "bug"],
 			}),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
@@ -1464,7 +1464,7 @@ describe("GitHubIssueHandlers", () => {
 				owner: "mbrooks",
 				repo: "teamhub-case",
 				issue_number: 1,
-				body: expect.stringContaining("Yeetomatic delivery failed"),
+				body: expect.stringContaining("Yolomatic delivery failed"),
 			}),
 		);
 		expect(sessionManager.updateStatus).not.toHaveBeenCalledWith("mbrooks", "teamhub-case", 1, "complete");
@@ -1483,13 +1483,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			createSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1508,10 +1508,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1536,7 +1536,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1545,8 +1545,8 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleIssueEvent({
 			action: "opened",
-			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yeetomatic-bot" }] },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 1, title: "Test", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1556,7 +1556,7 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"pending",
 			expect.objectContaining({ resumeOnBoot: true }),
@@ -1572,20 +1572,20 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 			pulls: {
-				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yeetomatic/pull/1" } })),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
 		const sessionManager = {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1598,13 +1598,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1614,10 +1614,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1630,7 +1630,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1638,17 +1638,17 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yolomatic", 1);
 
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "Yeetomatic was restarted while working on this issue. Resuming work...",
+				body: "Yolomatic was restarted while working on this issue. Resuming work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1666,13 +1666,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "pending" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 				resumeOnBoot: true,
@@ -1686,13 +1686,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -1703,10 +1703,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1719,7 +1719,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1727,20 +1727,20 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yolomatic", 1);
 
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-working"] }),
+			expect.objectContaining({ labels: ["yolomatic-working"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "Yeetomatic was restarted while queued. Picking up work...",
+				body: "Yolomatic was restarted while queued. Picking up work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1761,13 +1761,13 @@ describe("GitHubIssueHandlers", () => {
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				resumeOnBoot: true,
@@ -1782,13 +1782,13 @@ describe("GitHubIssueHandlers", () => {
 			},
 			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1799,10 +1799,10 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const workspaceManager = {
 			createOrGetWorktree: vi.fn(async () => ({
-				path: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
-				branch: "yeetomatic/issue-1",
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				branch: "yolomatic/issue-1",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				issueNumber: 1,
 			})),
 			syncWorktree: vi.fn(async () => undefined),
@@ -1815,7 +1815,7 @@ describe("GitHubIssueHandlers", () => {
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
-				rawResponse: "YEETOMATIC_STATUS: complete\nDone.",
+				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
 		};
 		const handlers = new GitHubIssueHandlers({
@@ -1823,23 +1823,23 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yolomatic", 1);
 
 		expect(octokit.issues.removeLabel).toHaveBeenCalledWith(
-			expect.objectContaining({ name: "yeetomatic-feedback-required" }),
+			expect.objectContaining({ name: "yolomatic-feedback-required" }),
 		);
 		expect(octokit.issues.addLabels).toHaveBeenCalledWith(
-			expect.objectContaining({ labels: ["yeetomatic-working"] }),
+			expect.objectContaining({ labels: ["yolomatic-working"] }),
 		);
 		expect(octokit.issues.createComment).toHaveBeenCalledWith(
 			expect.objectContaining({
-				body: "Yeetomatic was restarted with queued feedback. Resuming work...",
+				body: "Yolomatic was restarted with queued feedback. Resuming work...",
 			}),
 		);
 		expect(executor.execute).toHaveBeenCalledTimes(1);
@@ -1852,7 +1852,7 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				status: "complete" as const,
 				lastActivity: new Date().toISOString(),
@@ -1876,13 +1876,13 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
 		});
 
-		await handlers.resumeInterruptedSession("mbrooks", "yeetomatic", 1);
+		await handlers.resumeInterruptedSession("mbrooks", "yolomatic", 1);
 		expect(executor.execute).not.toHaveBeenCalled();
 		expect(octokit.issues.createComment).not.toHaveBeenCalled();
 	});
@@ -1898,13 +1898,13 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "waiting-feedback" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
@@ -1942,7 +1942,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -1951,9 +1951,9 @@ describe("GitHubIssueHandlers", () => {
 
 		await handlers.handleCommentEvent({
 			action: "created",
-			issue: { number: 1, labels: [{ name: "yeetomatic-feedback-required" }], assignees: [{ login: "yeetomatic-bot" }] },
-			comment: { body: "@yeetomatic-bot Proceed", user: { login: "mbrooks" } },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			issue: { number: 1, labels: [{ name: "yolomatic-feedback-required" }], assignees: [{ login: "yolomatic-bot" }] },
+			comment: { body: "@yolomatic-bot Proceed", user: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "other-user" },
 		});
 
@@ -1963,10 +1963,10 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"waiting-feedback",
-			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["@yeetomatic-bot Proceed"] }),
+			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["@yolomatic-bot Proceed"] }),
 			"implementation",
 		);
 	});
@@ -1981,7 +1981,7 @@ describe("GitHubIssueHandlers", () => {
 			pulls: {
 				get: vi.fn(async () => ({
 					data: {
-						head: { ref: "yeetomatic/issue-1" },
+						head: { ref: "yolomatic/issue-1" },
 						state: "open",
 						merged: false,
 					},
@@ -1992,17 +1992,17 @@ describe("GitHubIssueHandlers", () => {
 		const sessionManager = {
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Title",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				prNumber: 99,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/99",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			})),
 			get(owner: string, repo: string, issueNumber: number) {
 				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
@@ -2039,7 +2039,7 @@ describe("GitHubIssueHandlers", () => {
 			workspaceManager: workspaceManager as never,
 			executor: executor as never,
 			githubToken: "token",
-			githubUsername: "yeetomatic-bot",
+			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
 			selfReportEnabled: false,
 			octokit: octokit as never,
@@ -2050,11 +2050,11 @@ describe("GitHubIssueHandlers", () => {
 			action: "submitted",
 			pull_request: {
 				number: 99,
-				head: { ref: "yeetomatic/issue-1" },
+				head: { ref: "yolomatic/issue-1" },
 				state: "open",
 				merged: false,
 			},
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 			sender: { login: "user" },
 			review: { id: 101, body: "LGTM but needs tests", state: "CHANGES_REQUESTED", user: { login: "user" } },
 		});
@@ -2065,7 +2065,7 @@ describe("GitHubIssueHandlers", () => {
 		);
 		expect(sessionManager.updateStatus).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			1,
 			"complete",
 			expect.objectContaining({ resumeOnBoot: true, queuedComments: ["LGTM but needs tests"] }),
@@ -2130,7 +2130,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "opened",
 			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2152,7 +2152,7 @@ describe("createWebhookServer", () => {
 			expect.objectContaining({
 				type: "issue",
 				owner: "mbrooks",
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				payload: expect.objectContaining({ action: "opened" }),
 			}),
 		);
@@ -2174,7 +2174,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "opened",
 			issue: { number: 1, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2258,7 +2258,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "created",
 			comment: { id: 2, created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2295,7 +2295,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "submitted",
 			review: { id: 3, submitted_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 
@@ -2349,13 +2349,13 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns 200 for /yeetomatic/admin when credentials are not configured", async () => {
+	it("returns 200 for /yolomatic/admin when credentials are not configured", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore());
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
+		const response = await makeRequest(port, { method: "GET", path: "/yolomatic/admin" });
 		expect(response.statusCode).toBe(200);
 
 		server.close();
@@ -2396,7 +2396,7 @@ describe("createWebhookServer", () => {
 			method: "GET",
 			path: "/api/status",
 			headers: {
-				Cookie: "yeetomatic_admin_session=invalid",
+				Cookie: "yolomatic_admin_session=invalid",
 			},
 		});
 		expect(response.statusCode).toBe(401);
@@ -2405,12 +2405,12 @@ describe("createWebhookServer", () => {
 		server.close();
 	});
 
-	it("returns HTML for /yeetomatic/admin with valid credentials", async () => {
+	it("returns HTML for /yolomatic/admin with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yolomatic-admin-"));
 		await writeFile(
 			join(adminAssetsDir, "index.html"),
-			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div><script type="module" src="/yeetomatic/admin/assets/main.js"></script></body></html>',
+			'<!doctype html><html><head><title>Yolomatic Admin</title></head><body><div id="root"></div><script type="module" src="/yolomatic/admin/assets/main.js"></script></body></html>',
 		);
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -2419,25 +2419,25 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/yeetomatic/admin",
+				path: "/yolomatic/admin",
 				headers: {
 					Cookie: validCookie,
 				},
 			});
 			expect(response.statusCode).toBe(200);
 			expect(response.headers["content-type"]).toContain("text/html");
-			expect(response.body).toContain("Yeetomatic Admin");
+			expect(response.body).toContain("Yolomatic Admin");
 			expect(response.body).toContain('id="root"');
-			expect(response.body).toContain("/yeetomatic/admin/assets/main.js");
+			expect(response.body).toContain("/yolomatic/admin/assets/main.js");
 		} finally {
 			server.close();
 			await rm(adminAssetsDir, { force: true, recursive: true });
 		}
 	});
 
-	it("serves /yeetomatic/admin bundled assets with valid credentials", async () => {
+	it("serves /yolomatic/admin bundled assets with valid credentials", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yolomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
@@ -2447,7 +2447,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/yeetomatic/admin/assets/main.js",
+				path: "/yolomatic/admin/assets/main.js",
 				headers: {
 					Cookie: validCookie,
 				},
@@ -2461,9 +2461,9 @@ describe("createWebhookServer", () => {
 		}
 	});
 
-	it("serves /yeetomatic/admin bundled assets without a session (login screen)", async () => {
+	it("serves /yolomatic/admin bundled assets without a session (login screen)", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yolomatic-admin-"));
 		await mkdir(join(adminAssetsDir, "assets"));
 		await writeFile(join(adminAssetsDir, "assets", "main.js"), "console.log('admin');");
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, userStore, sessionAuth });
@@ -2471,7 +2471,7 @@ describe("createWebhookServer", () => {
 		const port = (server.address() as { port: number }).port;
 
 		try {
-			const response = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin/assets/main.js" });
+			const response = await makeRequest(port, { method: "GET", path: "/yolomatic/admin/assets/main.js" });
 			expect(response.statusCode).toBe(200);
 			expect(response.body).toContain("console.log");
 		} finally {
@@ -2488,13 +2488,13 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2519,7 +2519,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.agent).toBe("busy");
 		expect(body.sessions).toHaveLength(1);
-		expect(body.sessions[0].branch).toBe("yeetomatic/issue-1");
+		expect(body.sessions[0].branch).toBe("yolomatic/issue-1");
 		expect(body.sessions[0].risk).toEqual({
 			suspectedMisroute: false,
 			reasons: [],
@@ -2537,13 +2537,13 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 89,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
-					title: "Yeetomatic: Add stale session detection",
+					title: "Yolomatic: Add stale session detection",
 					body: "Fixes #86\n\nSummary",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-89.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-89",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-89.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-89",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2582,39 +2582,39 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "First",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: "2026-01-01T00:00:00.000Z",
 					createdAt: "2026-01-01T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Second",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 					lastActivity: "2026-01-02T00:00:00.000Z",
 					createdAt: "2026-01-03T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 3,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Third",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-3.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-3",
 					lastActivity: "2026-01-03T00:00:00.000Z",
 					createdAt: "2026-01-02T00:00:00.000Z",
 					seeded: false,
@@ -2654,25 +2654,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Old",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: "2026-01-01T00:00:00.000Z",
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "New",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 					lastActivity: "2026-01-03T00:00:00.000Z",
 					seeded: false,
 				},
@@ -2741,25 +2741,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "One",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Two",
 					body: "Body",
 					status: "complete" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -2796,7 +2796,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.repos).toHaveLength(2);
 		expect(body.repos[0]).toEqual({ owner: "mbrooks", repo: "case", sessionCount: 1, activeCount: 1, implementationSessionCount: 1, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
-		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "yeetomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
+		expect(body.repos[1]).toEqual({ owner: "mbrooks", repo: "yolomatic", sessionCount: 2, activeCount: 1, implementationSessionCount: 2, implementationActiveCount: 1, refinementSessionCount: 0, refinementActiveCount: 0, lastActivity: expect.any(String) });
 
 		server.close();
 	});
@@ -2838,7 +2838,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "cancel" }));
 		expect(response.statusCode).toBe(503);
 
@@ -2849,13 +2849,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -2881,7 +2881,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -2891,7 +2891,7 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.cancelled).toBe(true);
 		expect(body.wasActive).toBe(true);
-		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yolomatic#1");
 
 		server.close();
 	});
@@ -2900,13 +2900,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -2932,7 +2932,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/2/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -2965,7 +2965,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -2981,13 +2981,13 @@ describe("createWebhookServer", () => {
 	it("marks a session failed via POST /api/sessions/:owner/:repo/:issueNumber/commands", async () => {
 		const session = {
 			issueNumber: 89,
-			repo: "yeetomatic",
+			repo: "yolomatic",
 			owner: "mbrooks",
-			title: "Yeetomatic: Add stale session detection",
+			title: "Yolomatic: Add stale session detection",
 			body: "Fixes #86\n\nSummary",
 			status: "complete" as const,
-			sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-89.jsonl",
-			workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-89",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-89.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-89",
 			lastActivity: new Date().toISOString(),
 			seeded: false,
 		};
@@ -3008,7 +3008,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/89/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/89/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3031,13 +3031,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 3,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-3",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3061,7 +3061,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/3/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3071,8 +3071,8 @@ describe("createWebhookServer", () => {
 		const body = JSON.parse(response.body);
 		expect(body.deleted).toBe(true);
 		expect(body.message).toBe("Session and workspace deleted.");
-		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3);
-		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "yeetomatic", 3, "implementation");
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yolomatic", 3);
+		expect(mockStore.delete).toHaveBeenCalledWith("mbrooks", "yolomatic", 3, "implementation");
 
 		server.close();
 	});
@@ -3081,13 +3081,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 4,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-4.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-4",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-4.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-4",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3107,7 +3107,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/4/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/4/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3140,7 +3140,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3161,7 +3161,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "delete" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3176,7 +3176,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "pause" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3187,13 +3187,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3212,7 +3212,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3231,13 +3231,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "paused" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3256,7 +3256,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/2/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3274,13 +3274,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 3,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-3.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-3",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-3.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-3",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3299,7 +3299,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/3/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/3/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3331,7 +3331,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3352,7 +3352,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "resume" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3363,13 +3363,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "paused" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3388,7 +3388,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3407,13 +3407,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 2,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3432,7 +3432,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/2/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/2/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3464,7 +3464,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3485,7 +3485,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/commands",
 		}, JSON.stringify({ command: "restart" }));
 		expect(response.statusCode).toBe(503);
 
@@ -3496,18 +3496,18 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 5,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "failed" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-5.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-5",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-5.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-5",
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 				summary: "Boom",
 				prNumber: 7,
-				prUrl: "https://github.com/mbrooks/yeetomatic/pull/7",
+				prUrl: "https://github.com/mbrooks/yolomatic/pull/7",
 				iterationCount: 2,
 			})),
 			set: vi.fn(async (state: import("../session/store.js").SessionState) => state),
@@ -3539,7 +3539,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/5/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/5/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3550,7 +3550,7 @@ describe("createWebhookServer", () => {
 		expect(body.restarted).toBe(true);
 		expect(body.dispatched).toBe(true);
 		expect(body.status).toBe("pending");
-		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yeetomatic", 5);
+		expect(workspaceManager.removeWorktree).toHaveBeenCalledWith("mbrooks", "yolomatic", 5);
 		expect(mockStore.set).toHaveBeenCalled();
 		const setCall = ((mockStore.set as unknown as ReturnType<typeof vi.fn>).mock.calls as unknown) as Array<[import("../session/store.js").SessionState]>;
 		const updatedState = setCall[0][0];
@@ -3562,7 +3562,7 @@ describe("createWebhookServer", () => {
 		expect(updatedState.iterationCount).toBeUndefined();
 		expect(updatedState.restartCount).toBe(1);
 		expect(updatedState.restartedFrom).toBe("failed");
-		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 5);
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 5);
 
 		server.close();
 	});
@@ -3571,13 +3571,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 6,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "cancelled" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-6.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-6",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-6.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-6",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3610,7 +3610,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/6/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/6/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3621,7 +3621,7 @@ describe("createWebhookServer", () => {
 		expect(body.restarted).toBe(true);
 		expect(body.dispatched).toBe(true);
 		expect(body.status).toBe("pending");
-		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yeetomatic", 6);
+		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 6);
 
 		server.close();
 	});
@@ -3630,13 +3630,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 7,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "complete" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-7.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-7",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-7.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-7",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3655,7 +3655,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/7/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/7/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3673,13 +3673,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 8,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
-				sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-8.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-8",
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-8.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-8",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3698,7 +3698,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/8/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/8/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3730,7 +3730,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "POST",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/commands",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/commands",
 			headers: {
 				Cookie: validCookie,
 				"Content-Type": "application/json",
@@ -3751,7 +3751,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 		});
 		expect(response.statusCode).toBe(503);
 
@@ -3764,7 +3764,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log" });
+		const response = await makeRequest(port, { method: "GET", path: "/api/sessions/mbrooks/yolomatic/1/implementation/log" });
 		expect(response.statusCode).toBe(401);
 		expect(JSON.parse(response.body).error).toBe("Unauthorized");
 
@@ -3789,7 +3789,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/999/implementation/log",
+			path: "/api/sessions/mbrooks/yolomatic/999/implementation/log",
 			headers: {
 				Cookie: validCookie,
 			},
@@ -3803,19 +3803,19 @@ describe("createWebhookServer", () => {
 
 	it("returns log lines when log file exists", async () => {
 		_resetSessionLogs();
-		recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "prompt" });
-		recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "response" });
+		recordSessionLog("github-mbrooks-yolomatic-issue-1-implementation", { level: "info", message: "prompt" });
+		recordSessionLog("github-mbrooks-yolomatic-issue-1-implementation", { level: "info", message: "response" });
 
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3835,7 +3835,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+				path: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 				headers: {
 					Cookie: validCookie,
 				},
@@ -3856,13 +3856,13 @@ describe("createWebhookServer", () => {
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/nonexistent/path/issue-1.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3881,7 +3881,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+			path: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 			headers: {
 				Cookie: validCookie,
 			},
@@ -3897,19 +3897,19 @@ describe("createWebhookServer", () => {
 	it("truncates log when it exceeds 10,000 lines", async () => {
 		_resetSessionLogs();
 		for (let i = 0; i < 5_001; i++) {
-			recordSessionLog("github-mbrooks-yeetomatic-issue-1-implementation", { level: "info", message: "line " + i });
+			recordSessionLog("github-mbrooks-yolomatic-issue-1-implementation", { level: "info", message: "line " + i });
 		}
 
 		const mockStore = {
 			get: vi.fn(async () => ({
 				issueNumber: 1,
-				repo: "yeetomatic",
+				repo: "yolomatic",
 				owner: "mbrooks",
 				title: "Test",
 				body: "Body",
 				status: "working" as const,
 				sessionPath: "/tmp/session.jsonl",
-				workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
@@ -3929,7 +3929,7 @@ describe("createWebhookServer", () => {
 		try {
 			const response = await makeRequest(port, {
 				method: "GET",
-				path: "/api/sessions/mbrooks/yeetomatic/1/implementation/log",
+				path: "/api/sessions/mbrooks/yolomatic/1/implementation/log",
 				headers: {
 					Cookie: validCookie,
 				},
@@ -3952,7 +3952,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/api/sessions/mbrooks/yeetomatic/abc/implementation/log",
+			path: "/api/sessions/mbrooks/yolomatic/abc/implementation/log",
 			headers: {
 				Cookie: validCookie,
 			},
@@ -3972,25 +3972,25 @@ describe("createWebhookServer", () => {
 			getAll: vi.fn(async () => [
 				{
 					issueNumber: 1,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "working" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-1.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-1",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
 				{
 					issueNumber: 2,
-					repo: "yeetomatic",
+					repo: "yolomatic",
 					owner: "mbrooks",
 					title: "Test",
 					body: "Body",
 					status: "pending" as const,
-					sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-2.jsonl",
-					workspacePath: "/tmp/workspaces/mbrooks-yeetomatic/.worktrees/issue-2",
+					sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-2.jsonl",
+					workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-2",
 					lastActivity: new Date().toISOString(),
 					seeded: false,
 				},
@@ -4134,7 +4134,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -4157,7 +4157,7 @@ describe("createWebhookServer", () => {
 
 		const response = await makeRequest(port, {
 			method: "GET",
-			path: "/yeetomatic/admin",
+			path: "/yolomatic/admin",
 			headers: {
 				Cookie: validCookie,
 			},
@@ -4165,7 +4165,7 @@ describe("createWebhookServer", () => {
 
 		expect(response.statusCode).toBe(200);
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`, {
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`, {
 			headers: {
 				Cookie: validCookie,
 			},
@@ -4186,7 +4186,7 @@ describe("createWebhookServer", () => {
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
-		const client = new WebSocket(`ws://127.0.0.1:${port}/yeetomatic/admin/ws`);
+		const client = new WebSocket(`ws://127.0.0.1:${port}/yolomatic/admin/ws`);
 
 		await new Promise<void>((resolve, reject) => {
 			client.once("open", resolve);
@@ -4199,23 +4199,23 @@ describe("createWebhookServer", () => {
 
 	it("serves the admin UI and websocket under a custom configured admin path", async () => {
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
-		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yeetomatic-admin-custom-"));
+		const adminAssetsDir = await mkdtemp(join(tmpdir(), "yolomatic-admin-custom-"));
 		await writeFile(
 			join(adminAssetsDir, "index.html"),
-			'<!doctype html><html><head><title>Yeetomatic Admin</title></head><body><div id="root"></div></body></html>',
+			'<!doctype html><html><head><title>Yolomatic Admin</title></head><body><div id="root"></div></body></html>',
 		);
 		const server = createWebhookServer("secret", handlers, makeMockSessionStore(), undefined, undefined, undefined, undefined, { adminAssetsDir, adminPath: "/custom/admin", adminDefaultPage: "#/repos" });
 		await new Promise<void>((resolve) => server.listen(0, resolve));
 		const port = (server.address() as { port: number }).port;
 
 		try {
-			const legacyResponse = await makeRequest(port, { method: "GET", path: "/yeetomatic/admin" });
+			const legacyResponse = await makeRequest(port, { method: "GET", path: "/yolomatic/admin" });
 			expect(legacyResponse.statusCode).toBe(404);
 
 			const customResponse = await makeRequest(port, { method: "GET", path: "/custom/admin" });
 			expect(customResponse.statusCode).toBe(200);
-			expect(customResponse.body).toContain('window.__YEETOMATIC_ADMIN_PATH__ = "/custom/admin"');
-			expect(customResponse.body).toContain('window.__YEETOMATIC_ADMIN_DEFAULT_PAGE__ = "#/repos"');
+			expect(customResponse.body).toContain('window.__YOLO_ADMIN_PATH__ = "/custom/admin"');
+			expect(customResponse.body).toContain('window.__YOLO_ADMIN_DEFAULT_PAGE__ = "#/repos"');
 
 			const client = new WebSocket(`ws://127.0.0.1:${port}/custom/admin/ws`);
 			await new Promise<void>((resolve, reject) => {
@@ -4238,7 +4238,7 @@ describe("createWebhookServer", () => {
 		const payload = JSON.stringify({
 			action: "created",
 			comment: { id: 4, body: "hello", created_at: "2026-06-28T00:00:00.000Z" },
-			repository: { name: "yeetomatic", owner: { login: "mbrooks" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
 		});
 		const signature = `sha256=${createHmac("sha256", "secret").update(payload).digest("hex")}`;
 

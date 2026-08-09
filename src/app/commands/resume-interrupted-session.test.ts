@@ -21,10 +21,10 @@ vi.mock("./execute-session.js", () => ({
 function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 	return {
 		owner: "mbrooks",
-		repo: "yeetomatic",
+		repo: "yolomatic",
 		issueNumber: 7,
 		status: "working",
-		sessionPath: "/tmp/sessions/github-mbrooks-yeetomatic/issue-7.jsonl",
+		sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-7.jsonl",
 		workspacePath: "/tmp/ws",
 		lastActivity: new Date(0).toISOString(),
 		seeded: false,
@@ -57,7 +57,7 @@ describe("ResumeInterruptedSession", () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.github.postComment).not.toHaveBeenCalled();
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("no session for"));
@@ -70,7 +70,7 @@ describe("ResumeInterruptedSession", () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.github.postComment).not.toHaveBeenCalled();
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("terminal status"));
@@ -83,7 +83,7 @@ describe("ResumeInterruptedSession", () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.sessions.updateStatus).not.toHaveBeenCalled();
 		expect(deps.github.postComment).not.toHaveBeenCalled();
@@ -95,13 +95,13 @@ describe("ResumeInterruptedSession", () => {
 		const deps = makeDeps(makeSession({ status: "working" }));
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.github.postComment).toHaveBeenCalledWith(
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			7,
-			"Yeetomatic was restarted while working on this issue. Resuming work...",
+			"Yolomatic was restarted while working on this issue. Resuming work...",
 		);
 	});
 
@@ -110,14 +110,14 @@ describe("ResumeInterruptedSession", () => {
 		const { markIssueWorking } = await import("./workflow-helpers.js");
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(markIssueWorking).toHaveBeenCalledWith(
 			deps.github,
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			7,
-			"Yeetomatic was restarted while queued. Picking up work...",
+			"Yolomatic was restarted while queued. Picking up work...",
 		);
 	});
 
@@ -126,14 +126,14 @@ describe("ResumeInterruptedSession", () => {
 		const { markIssueWorking } = await import("./workflow-helpers.js");
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(markIssueWorking).toHaveBeenCalledWith(
 			deps.github,
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			7,
-			"Yeetomatic was restarted with queued feedback. Resuming work...",
+			"Yolomatic was restarted with queued feedback. Resuming work...",
 		);
 	});
 
@@ -142,14 +142,14 @@ describe("ResumeInterruptedSession", () => {
 		const { markIssueWorking } = await import("./workflow-helpers.js");
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(markIssueWorking).toHaveBeenCalledWith(
 			deps.github,
 			"mbrooks",
-			"yeetomatic",
+			"yolomatic",
 			7,
-			"Yeetomatic was restarted. Resuming work...",
+			"Yolomatic was restarted. Resuming work...",
 		);
 	});
 
@@ -158,7 +158,7 @@ describe("ResumeInterruptedSession", () => {
 		const deps = makeDeps(session);
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.sessions.save).toHaveBeenCalledTimes(1);
 		const saved = vi.mocked(deps.sessions.save).mock.calls[0][0] as SessionState;
@@ -171,7 +171,7 @@ describe("ResumeInterruptedSession", () => {
 		const deps = makeDeps(session);
 
 		const command = new ResumeInterruptedSession(deps);
-		await command.execute("mbrooks", "yeetomatic", 7);
+		await command.execute("mbrooks", "yolomatic", 7);
 
 		expect(deps.sessions.save).not.toHaveBeenCalled();
 	});

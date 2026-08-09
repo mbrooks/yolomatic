@@ -160,7 +160,7 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 			repo,
 			path: "README.md",
 			message: "Initial commit",
-			content: Buffer.from(`# ${repo}\n\nAuto-initialized by Yeetomatic.\n`).toString("base64"),
+			content: Buffer.from(`# ${repo}\n\nAuto-initialized by Yolomatic.\n`).toString("base64"),
 			branch,
 		});
 	}

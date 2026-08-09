@@ -52,7 +52,7 @@ describe("RefinementPanel", () => {
 			],
 		});
 
-		render(<RefinementPanel owner="mbrooks" repo="yeetomatic" issueNumber={1} />);
+		render(<RefinementPanel owner="mbrooks" repo="yolomatic" issueNumber={1} />);
 
 		await waitFor(() => expect(mockFetchRefinementAttempts).toHaveBeenCalled());
 		await waitFor(() => expect(screen.getByText("applied")).toBeDefined());
@@ -67,7 +67,7 @@ describe("RefinementPanel", () => {
 		mockFetchRefinementAttempts.mockResolvedValue({ attempts: [] });
 		mockFetchRefinementLog.mockResolvedValue({ available: false, logs: [] });
 
-		render(<RefinementPanel owner="mbrooks" repo="yeetomatic" issueNumber={2} />);
+		render(<RefinementPanel owner="mbrooks" repo="yolomatic" issueNumber={2} />);
 
 		await waitFor(() =>
 			expect(screen.getByText("No refinement activity for this issue.")).toBeDefined(),
@@ -90,7 +90,7 @@ describe("RefinementPanel", () => {
 		});
 		mockFetchRefinementLog.mockResolvedValue({ available: true, logs: [] });
 
-		render(<RefinementPanel owner="mbrooks" repo="yeetomatic" issueNumber={3} />);
+		render(<RefinementPanel owner="mbrooks" repo="yolomatic" issueNumber={3} />);
 
 		await waitFor(() => expect(screen.getByText("failed")).toBeDefined());
 		expect(screen.getByText("worker crashed")).toBeDefined();

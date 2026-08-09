@@ -42,7 +42,7 @@ function createRequest(headers: http.IncomingHttpHeaders): http.IncomingMessage 
 }
 
 async function tmpUserStore(): Promise<UserStore> {
-	const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-admin-auth-"));
+	const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-admin-auth-"));
 	const store = new UserStore(path.join(dir, "users.sqlite"));
 	store.createSync({ fullName: "Admin", username: "admin", password: "secret" });
 	return store;
@@ -247,7 +247,7 @@ describe("AdminSessionAuth", () => {
 		});
 
 		it("allows a password containing a colon", async () => {
-			const dir = await mkdtemp(path.join(os.tmpdir(), "yeetomatic-admin-auth-"));
+			const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-admin-auth-"));
 			const store = new UserStore(path.join(dir, "users.sqlite"));
 			store.createSync({ fullName: "Admin", username: "admin", password: "pa:ss:word" });
 			const auth = new AdminSessionAuth(store);

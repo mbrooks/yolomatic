@@ -1,22 +1,26 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/yeetomatic-logo-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/yeetomatic-logo-light.png">
-    <img src="assets/yeetomatic-logo-light.png" alt="Yeetomatic logo" width="280">
+    <img src="assets/yolomatic-logo.png" alt="Yolomatic logo" width="280">
   </picture>
 
-  <h1>Yeetomatic</h1>
+  <h1>Yolomatic</h1>
   <p><strong>Task Automation &amp; Response System</strong></p>
 </div>
 
-Yeetomatic is a self-hosted coding agent that turns GitHub issues into pull requests with isolated execution and protected credentials.
+Yolomatic is a self-hosted coding agent that turns GitHub issues into pull requests using isolated execution and protected credentials.
 
-Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launches a disposable coding-agent worker, and carries the task through design, implementation, feedback, and PR delivery.
+Assign an issue to Yolomatic, and it creates an isolated Git worktree, launches a disposable coding-agent worker, and carries the task from design and implementation through feedback and pull request delivery.
+
+## Why use Yolomatic?
+
+Yolomatic is intentionally not a full-blown orchestration platform. Instead, it uses GitHub issues as a lightweight, flexible work queue.
+
+For larger projects, use Claude Code or Codex to break the work into smaller, focused issues. Yolomatic can then implement each issue and deliver the resulting pull request.
 
 ## Features
 
-- **Issue refinement** — project collaborators can run `/yeetomatic issue-refinement` to launch a disposable worker that investigates a new issue and replaces its body with a more complete Proposed Task, without starting implementation.
-- **Issue-to-PR automation** — creates a `yeetomatic/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
+- **Issue refinement** — project collaborators can run `/yolomatic issue-refinement` to launch a disposable worker that investigates a new issue and replaces its body with a more complete Proposed Task, without starting implementation.
+- **Issue-to-PR automation** — creates a `yolomatic/issue-{number}` branch, commits the result, pushes it, and opens a linked pull request.
 - **GitHub-native collaboration** — responds to issue updates, comments, PR reviews, and inline review comments.
 - **Multi-repository support** — manages each repository, worktree, and issue session independently.
 - **Admin dashboard** — configure repositories and models, start and control sessions, manage skills, and inspect live logs.
@@ -29,18 +33,18 @@ Assign an issue to Yeetomatic and Yeetomatic creates an isolated worktree, launc
 ### Requirements
 
 - Docker Engine or Docker Desktop with Docker Compose (not currently compatible with Kubernetes but PRs welcome!)
-- A GitHub personal access token that can read and modify the repositories Yeetomatic will manage
+- A GitHub personal access token that can read and modify the repositories Yolomatic will manage
 
-### Start Yeetomatic
+### Start Yolomatic
 
 ```bash
-git clone https://github.com/mbrooks/yeetomatic.git
-cd yeetomatic
+git clone https://github.com/mbrooks/yolomatic.git
+cd yolomatic
 cp .env.example .env
 docker compose up --build -d
 ```
 
-Open [http://127.0.0.1:6767/yeetomatic/admin](http://127.0.0.1:6767/yeetomatic/admin) and complete the setup wizard. It will:
+Open [http://127.0.0.1:6767/yolomatic/admin](http://127.0.0.1:6767/yolomatic/admin) and complete the setup wizard. It will:
 
 1. Create the master admin account (full name, username, and password). Additional admin users can be added later from the dashboard.
 2. Verify your GitHub token.
@@ -51,16 +55,16 @@ Open [http://127.0.0.1:6767/yeetomatic/admin](http://127.0.0.1:6767/yeetomatic/a
 Follow the logs with:
 
 ```bash
-docker compose logs -f yeetomatic
+docker compose logs -f yolomatic
 ```
 
-Stop Yeetomatic with:
+Stop Yolomatic with:
 
 ```bash
 docker compose down
 ```
 
-Yeetomatic persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
+Yolomatic persists its settings, sessions, workspaces, agent configuration, and runtime data in Docker volumes.
 
 To rerun the onboarding wizard without deleting existing settings, open
 **Settings**, click **Rerun On-Boarding** button, and confirm
@@ -69,21 +73,21 @@ the action.
 To force the wizard to run from the command line instead:
 
 ```bash
-docker compose exec -T yeetomatic npm run onboarding:reset
+docker compose exec -T yolomatic npm run onboarding:reset
 ```
 
-Refresh `/yeetomatic/admin` after the command completes. Restart Yeetomatic as well if you
+Refresh `/yolomatic/admin` after the command completes. Restart Yolomatic as well if you
 want it to start in onboarding-only mode:
 
 ```bash
-docker compose restart yeetomatic
+docker compose restart yolomatic
 ```
 
 To dump every effective configuration value using the same
-database-over-environment-over-default precedence as Yeetomatic:
+database-over-environment-over-default precedence as Yolomatic:
 
 ```bash
-docker compose exec -T yeetomatic npm run config:dump
+docker compose exec -T yolomatic npm run config:dump
 ```
 
 The output includes all values, including tokens, passwords, and webhook
@@ -91,7 +95,7 @@ secrets. Treat it as secret material.
 
 ## Connect GitHub
 
-Yeetomatic can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
+Yolomatic can receive repository activity by webhook, polling, or both. Choose the global mode under **Settings → GitHub Integration**, or override it for an individual repository.
 
 ### Webhook
 
@@ -106,44 +110,44 @@ For local testing, a tunnel such as `ngrok http 6767` can provide the public URL
 
 ### Polling
 
-Select `polling` if Yeetomatic cannot receive a public webhook. No public URL is required. The default polling interval is 60 seconds.
+Select `polling` if Yolomatic cannot receive a public webhook. No public URL is required. The default polling interval is 60 seconds.
 
 ## Usage
 
 1. Add a repository in the setup wizard or the **Repositories** screen.
 2. Open an issue with a clear description and acceptance criteria.
-3. Assign the issue to the GitHub account connected to Yeetomatic, or choose **Start Session** from the issue in the admin dashboard.
+3. Assign the issue to the GitHub account connected to Yolomatic, or choose **Start Session** from the issue in the admin dashboard.
 4. Follow progress in GitHub or inspect the live session log in the dashboard.
-5. Add an issue comment that tags the configured Yeetomatic account (or contains the `/yeetomatic feedback` command) to steer active work, or update the issue description. Yeetomatic keeps the same issue session and worktree. Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.
+5. Add an issue comment that tags the configured Yolomatic account (or contains the `/yolomatic feedback` command) to steer active work, or update the issue description. Yolomatic keeps the same issue session and worktree. Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.
 6. Review the pull request. Actionable review comments trigger another implementation pass and are pushed to the same branch.
 
-Yeetomatic uses workflow labels and GitHub comments to show its current state:
+Yolomatic uses workflow labels and GitHub comments to show its current state:
 
 | Label | Meaning |
 | --- | --- |
-| `yeetomatic-working` | The issue is being processed. |
-| `yeetomatic-feedback-required` | Yeetomatic needs more information. |
-| `yeetomatic-pr-created` | The implementation has been pushed and a PR is ready. |
-| `yeetomatic-failed` | The agent run failed. |
-| `yeetomatic-cancelled` | The session was stopped. |
+| `yolomatic-working` | The issue is being processed. |
+| `yolomatic-feedback-required` | Yolomatic needs more information. |
+| `yolomatic-pr-created` | The implementation has been pushed and a PR is ready. |
+| `yolomatic-failed` | The agent run failed. |
+| `yolomatic-cancelled` | The session was stopped. |
 
 The configured admin GitHub user can stop an issue from GitHub by commenting:
 
 ```text
-/yeetomatic stop
+/yolomatic stop
 ```
 
 ## Issue Refinement
 
-An authorized maintainer can ask Yeetomatic to investigate a newly opened issue and replace its body with a more complete Proposed Task. When an eligible issue is opened, Yeetomatic posts a static comment explaining the command. To start refinement, comment exactly:
+An authorized maintainer can ask Yolomatic to investigate a newly opened issue and replace its body with a more complete Proposed Task. When an eligible issue is opened, Yolomatic posts a static comment explaining the command. To start refinement, comment exactly:
 
 ```text
-/yeetomatic issue-refinement
+/yolomatic issue-refinement
 ```
 
-Refinement launches the same disposable Docker worker used for implementation, but in a temporary worktree. The worker may inspect the repository, make experimental edits, run the application and tests, and use the network. When it succeeds, Yeetomatic automatically replaces the issue body with the returned Proposed Task; the title, implementation session, and PR workflow remain untouched. The original body and refinement provenance are stored in the refinement history for audit and recovery.
+Refinement launches the same disposable Docker worker used for implementation, but in a temporary worktree. The worker may inspect the repository, make experimental edits, run the application and tests, and use the network. When it succeeds, Yolomatic automatically replaces the issue body with the returned Proposed Task; the title, implementation session, and PR workflow remain untouched. The original body and refinement provenance are stored in the refinement history for audit and recovery.
 
-Refinement behavior can be customized by adding `.pi/skills/issue-refinement/SKILL.md` to the target repository. If the skill is missing, Yeetomatic falls back to built-in prompt defaults. A present skill that cannot be read or executed produces a failed refinement attempt rather than silently switching instructions.
+Refinement behavior can be customized by adding `.pi/skills/issue-refinement/SKILL.md` to the target repository. If the skill is missing, Yolomatic falls back to built-in prompt defaults. A present skill that cannot be read or executed produces a failed refinement attempt rather than silently switching instructions.
 
 Refinement and implementation cannot overlap on the same issue, and refinement never commits, pushes, or opens a pull request.
 
@@ -151,9 +155,9 @@ Sessions can also be paused, resumed, restarted, archived, or deleted from the a
 
 ## How It Works
 
-Yeetomatic is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to Yeetomatic over a WebSocket session.
+Yolomatic is the control plane: it receives GitHub events, manages repositories and session state, and performs GitHub delivery. Each agent run happens in a separate, disposable worker container that edits the shared issue worktree and streams its activity back to Yolomatic over a WebSocket session.
 
-The diagram below shows the high-level request and event flow. The **Yeetomatic control plane** owns everything deterministic — event intake, session and workspace state, delivery — while **worker execution** is isolated in a disposable container with no GitHub credentials and no Docker socket access.
+The diagram below shows the high-level request and event flow. The **Yolomatic control plane** owns everything deterministic — event intake, session and workspace state, delivery — while **worker execution** is isolated in a disposable container with no GitHub credentials and no Docker socket access.
 
 ```mermaid
 flowchart TD
@@ -163,7 +167,7 @@ flowchart TD
         GH["GitHub repository"]
     end
 
-    subgraph ControlPlane["Yeetomatic control plane — yeetomatic container"]
+    subgraph ControlPlane["Yolomatic control plane — yolomatic container"]
         direction TB
         WebUI["Admin dashboard<br/>port 6767"]
         Webhook["Webhook endpoint<br/>/webhook"]
@@ -230,7 +234,7 @@ npm run dev:admin    # run the admin UI with Vite
 npm test             # run unit tests
 ```
 
-Running agent sessions still requires Docker because Yeetomatic executes coding work in worker containers.
+Running agent sessions still requires Docker because Yolomatic executes coding work in worker containers.
 
 ## Operations
 
@@ -239,4 +243,4 @@ Running agent sessions still requires Docker because Yeetomatic executes coding 
 - [MIGRATIONS.md](MIGRATIONS.md) — SQLite migration management
 - [CHANGELOG.md](CHANGELOG.md) — release changes
 
-Yeetomatic writes application and agent logs to standard output. In Docker, use `docker compose logs` rather than looking for log files.
+Yolomatic writes application and agent logs to standard output. In Docker, use `docker compose logs` rather than looking for log files.

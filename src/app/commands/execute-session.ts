@@ -151,8 +151,8 @@ export class ExecuteSession {
 					process.stdout.write(`[execute] execution aborted for ${key}\n`);
 					await this.deps.sessions.cancelSession(owner, repo, issueNumber);
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-					await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-cancelled"]);
-					await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Task cancelled by admin. Yeetomatic is idle."));
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-cancelled"]);
+					await this.deps.github.postComment(owner, repo, issueNumber, this.withLink(owner, repo, issueNumber, "Task cancelled by admin. Yolomatic is idle."));
 					return;
 				}
 
@@ -162,21 +162,21 @@ export class ExecuteSession {
 						owner,
 						repo,
 						issueNumber,
-						this.withLink(owner, repo, issueNumber, `⛔ Yeetomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/yeetomatic\`: ${issueUrl}`),
+						this.withLink(owner, repo, issueNumber, `⛔ Yolomatic stopped due to a fatal system error. A bug report has been filed in \`mbrooks/yolomatic\`: ${issueUrl}`),
 					);
 					await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed");
 					await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-					await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-failed"]);
+					await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-failed"]);
 					process.stdout.write(`[execute] fatal system error self-reported for ${repo}#${issueNumber}: ${issueUrl}\n`);
 					return;
 				}
 
-				if (process.env.YEETOMATIC_SELF_EVOLUTION_ENABLED === "true") {
+				if (process.env.YOLO_SELF_EVOLUTION_ENABLED === "true") {
 					try {
 						const engine = new SelfEvolutionEngine({
 							github: this.deps.github,
 							repoPath: process.cwd(),
-							selfReportRepo: { owner: "mbrooks", repo: "yeetomatic" },
+							selfReportRepo: { owner: "mbrooks", repo: "yolomatic" },
 						});
 						await engine.handleError(error as Error);
 					} catch (seError) {
@@ -291,7 +291,7 @@ export class ExecuteSession {
 
 		if (state.prNumber === undefined) {
 			return this.formatSyncError(
-				`Branch yeetomatic/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
+				`Branch yolomatic/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
 			);
 		}
 
@@ -315,7 +315,7 @@ export class ExecuteSession {
 			"Control-plane workspace sync failed for this session.",
 			message,
 			"",
-			"Yeetomatic will not launch a worker on a stale or credential-bearing workspace.",
+			"Yolomatic will not launch a worker on a stale or credential-bearing workspace.",
 		].join("\n");
 	}
 
@@ -324,13 +324,13 @@ export class ExecuteSession {
 		process.stdout.write(`[execute] execution blocked for ${key}: ${message}\n`);
 		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: message });
 		await removeWorkflowLabels(this.deps.github, owner, repo, issueNumber);
-		await this.deps.github.addLabels(owner, repo, issueNumber, ["yeetomatic-failed"]);
+		await this.deps.github.addLabels(owner, repo, issueNumber, ["yolomatic-failed"]);
 		await this.deps.github.postComment(
 			owner,
 			repo,
 			issueNumber,
 			this.withLink(owner, repo, issueNumber, [
-				"**Yeetomatic stopped before execution.**",
+				"**Yolomatic stopped before execution.**",
 				"",
 				message,
 				"",
@@ -353,6 +353,6 @@ export class ExecuteSession {
 	private async fileSelfReport(error: FatalSystemError): Promise<string> {
 		const body = SelfMonitor.formatBugReportBody(error.evidence);
 		const title = SelfMonitor.getIssueTitle(error.evidence);
-		return this.deps.github.fileSelfReport(title, body, ["yeetomatic-self-report", "bug"]);
+		return this.deps.github.fileSelfReport(title, body, ["yolomatic-self-report", "bug"]);
 	}
 }

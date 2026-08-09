@@ -20,26 +20,26 @@ describe("createWebhookServerDeps", () => {
 		const fallbackTaskController = deps.taskController;
 		const fallbackWorkspaceService = (deps.cleanupCommand as any).workspaces;
 
-		expect(fallbackTaskController.cancel("mbrooks/yeetomatic#1")).toBe(false);
-		expect(fallbackTaskController.isActive("mbrooks/yeetomatic#1")).toBe(false);
-		await expect(fallbackTaskController.steer("mbrooks/yeetomatic#1", "comment")).resolves.toBe(false);
-		expect(fallbackTaskController.register("mbrooks/yeetomatic#1", vi.fn())).not.toBeNull();
-		expect(fallbackTaskController.unregister("mbrooks/yeetomatic#1")).toBeUndefined();
+		expect(fallbackTaskController.cancel("mbrooks/yolomatic#1")).toBe(false);
+		expect(fallbackTaskController.isActive("mbrooks/yolomatic#1")).toBe(false);
+		await expect(fallbackTaskController.steer("mbrooks/yolomatic#1", "comment")).resolves.toBe(false);
+		expect(fallbackTaskController.register("mbrooks/yolomatic#1", vi.fn())).not.toBeNull();
+		expect(fallbackTaskController.unregister("mbrooks/yolomatic#1")).toBeUndefined();
 		expect(fallbackTaskController.isDraining()).toBe(false);
 		expect(fallbackTaskController.setDraining(true)).toBeUndefined();
 
-		await expect(fallbackWorkspaceService.createOrGetWorktree("mbrooks", "yeetomatic", 1)).resolves.toEqual({
+		await expect(fallbackWorkspaceService.createOrGetWorktree("mbrooks", "yolomatic", 1)).resolves.toEqual({
 			path: "",
 			branch: "",
 		});
-		await expect(fallbackWorkspaceService.syncWorktree("mbrooks", "yeetomatic", 1)).resolves.toBeUndefined();
-		await expect(fallbackWorkspaceService.removeWorktree("mbrooks", "yeetomatic", 1)).resolves.toBeUndefined();
-		await expect(fallbackWorkspaceService.commitAndPush("mbrooks", "yeetomatic", 1, "msg")).resolves.toBe(false);
+		await expect(fallbackWorkspaceService.syncWorktree("mbrooks", "yolomatic", 1)).resolves.toBeUndefined();
+		await expect(fallbackWorkspaceService.removeWorktree("mbrooks", "yolomatic", 1)).resolves.toBeUndefined();
+		await expect(fallbackWorkspaceService.commitAndPush("mbrooks", "yolomatic", 1, "msg")).resolves.toBe(false);
 		await expect(fallbackWorkspaceService.commitAndPushPath("/tmp/ws", "branch", "msg", "main")).resolves.toBe(false);
 		await expect(fallbackWorkspaceService.hasChanges("/tmp/ws", true)).resolves.toBe(false);
-		expect(fallbackWorkspaceService.getWorktreePath("mbrooks", "yeetomatic", 1)).toBe("");
-		await expect(fallbackWorkspaceService.getGitStatus("mbrooks", "yeetomatic", 1)).resolves.toBe("");
-		await expect(fallbackWorkspaceService.getGitDiff("mbrooks", "yeetomatic", 1)).resolves.toBe("");
+		expect(fallbackWorkspaceService.getWorktreePath("mbrooks", "yolomatic", 1)).toBe("");
+		await expect(fallbackWorkspaceService.getGitStatus("mbrooks", "yolomatic", 1)).resolves.toBe("");
+		await expect(fallbackWorkspaceService.getGitDiff("mbrooks", "yolomatic", 1)).resolves.toBe("");
 
 		const status = await deps.getAdminStatus.execute();
 		expect(status.success).toBe(true);
@@ -60,7 +60,7 @@ describe("createWebhookServerDeps", () => {
 			setDraining: vi.fn(),
 		};
 		const workspaceManager = {
-			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yeetomatic/issue-1" })),
+			createOrGetWorktree: vi.fn(async () => ({ path: "/tmp/ws", branch: "yolomatic/issue-1" })),
 			removeWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			commitAndPushPath: vi.fn(async () => true),
@@ -75,13 +75,13 @@ describe("createWebhookServerDeps", () => {
 		const githubService = { postComment: vi.fn() };
 		const settingsStore = {
 			get: vi.fn((key: string) => {
-				if (key === "github_username") return "yeetomatic-bot";
+				if (key === "github_username") return "yolomatic-bot";
 				if (key === "default_branch") return "main";
 				if (key === "self_report_enabled") return "true";
 				return undefined;
 			}),
 			getString: vi.fn((key: string, defaultValue?: string) => {
-				if (key === "github_username") return "yeetomatic-bot";
+				if (key === "github_username") return "yolomatic-bot";
 				if (key === "default_branch") return "main";
 				return defaultValue ?? "";
 			}),
@@ -111,19 +111,19 @@ describe("createWebhookServerDeps", () => {
 		await expect(wrappedWorkspaceService.commitAndPushPath("/tmp/ws", "branch", "msg", "main")).resolves.toBe(true);
 		expect(workspaceManager.commitAndPushPath).toHaveBeenCalledWith("/tmp/ws", "branch", "msg", "main");
 
-		expect(deps.taskController.cancel("mbrooks/yeetomatic#1")).toBe(true);
-		expect(deps.taskController.isActive("mbrooks/yeetomatic#1")).toBe(true);
-		await expect(deps.taskController.steer("mbrooks/yeetomatic#1", "comment")).resolves.toBe(true);
-		deps.taskController.register("mbrooks/yeetomatic#1", vi.fn());
-		deps.taskController.unregister("mbrooks/yeetomatic#1");
+		expect(deps.taskController.cancel("mbrooks/yolomatic#1")).toBe(true);
+		expect(deps.taskController.isActive("mbrooks/yolomatic#1")).toBe(true);
+		await expect(deps.taskController.steer("mbrooks/yolomatic#1", "comment")).resolves.toBe(true);
+		deps.taskController.register("mbrooks/yolomatic#1", vi.fn());
+		deps.taskController.unregister("mbrooks/yolomatic#1");
 		expect(deps.taskController.isDraining()).toBe(true);
 		deps.taskController.setDraining(false);
 
-		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
-		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
-		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yeetomatic#1", "comment");
-		expect(taskController.register).toHaveBeenCalledWith("mbrooks/yeetomatic#1", expect.any(Function));
-		expect(taskController.unregister).toHaveBeenCalledWith("mbrooks/yeetomatic#1");
+		expect(taskController.cancel).toHaveBeenCalledWith("mbrooks/yolomatic#1");
+		expect(taskController.isActive).toHaveBeenCalledWith("mbrooks/yolomatic#1");
+		expect(taskController.steer).toHaveBeenCalledWith("mbrooks/yolomatic#1", "comment");
+		expect(taskController.register).toHaveBeenCalledWith("mbrooks/yolomatic#1", expect.any(Function));
+		expect(taskController.unregister).toHaveBeenCalledWith("mbrooks/yolomatic#1");
 		expect(taskController.isDraining).toHaveBeenCalled();
 		expect(taskController.setDraining).toHaveBeenCalledWith(false);
 
@@ -132,7 +132,7 @@ describe("createWebhookServerDeps", () => {
 		expect(staleDetector.detectStaleSessions).toHaveBeenCalled();
 		expect(deps.githubService).toBe(githubService);
 		expect(deps.adminAssetsDir).toBe("/tmp/admin-assets");
-		expect(deps.adminPath).toBe("/yeetomatic/admin");
+		expect(deps.adminPath).toBe("/yolomatic/admin");
 		expect(deps.adminDefaultPage).toBe("#/dashboard");
 		expect(deps.settingsStore).toBe(settingsStore);
 		expect(deps.startIssueSession).toBe(prebuiltStartIssueSession);

@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { sendJson, sendText } from "./response-helpers.js";
 import { verifyPassword, type User, type UserStore } from "../../users/store.js";
 
-export const SESSION_COOKIE_NAME = "yeetomatic_admin_session";
+export const SESSION_COOKIE_NAME = "yolomatic_admin_session";
 export const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 export interface SessionPayload {
@@ -108,7 +108,7 @@ function parseSessionToken(token: string): SessionPayload | null {
 /**
  * Admin session authentication backed by the `users` table.
  *
- * The session cookie (`yeetomatic_admin_session`) is a signed token whose
+ * The session cookie (`yolomatic_admin_session`) is a signed token whose
  * payload carries `userId` and `expiresAt`, signed with an HMAC keyed by the
  * user's current password hash. This lets the server distinguish multiple
  * admin users and invalidates outstanding sessions when a password is reset
