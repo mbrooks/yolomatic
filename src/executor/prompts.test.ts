@@ -226,6 +226,39 @@ describe("buildIssueRefinementPrompt", () => {
 		expect(prompt).toContain("built-in");
 	});
 
+	it("keeps the authoritative human-facing task concise and behavior-focused", () => {
+		const state = {
+			issueNumber: 9,
+			owner: "mbrooks",
+			repo: "yolomatic",
+			workspacePath: "/tmp/ws",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state);
+		expect(prompt).toContain("authoritative human-facing task at the top");
+		expect(prompt).toContain("250–500 words");
+		expect(prompt).toContain("observable behavior and outcomes");
+		expect(prompt).not.toContain("more complete Proposed Task");
+	});
+
+	it("puts non-binding implementation guidance in a collapsed block at the bottom", () => {
+		const state = {
+			issueNumber: 9,
+			owner: "mbrooks",
+			repo: "yolomatic",
+			workspacePath: "/tmp/ws",
+			title: "T",
+			body: "B",
+		} as never;
+		const prompt = buildIssueRefinementPrompt(state);
+		expect(prompt).toContain("<details>");
+		expect(prompt).toContain("<summary>Implementation notes for agents</summary>");
+		expect(prompt).toContain("non-binding guidance");
+		expect(prompt).toContain("Verify them against the current repository");
+		expect(prompt).toContain("Do not put an investigation transcript");
+	});
+
 	describe("steering prompt", () => {
 		const state = {
 			issueNumber: 10,
