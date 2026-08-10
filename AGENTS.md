@@ -4,16 +4,6 @@
 
 Read `SOUL.md` before doing anything else.
 
-## Workspaces
-
-Repositories live in lowercase `~/workspaces/{owner}-{repo}/` directories.
-
-Before accessing repository files:
-
-1. Read `WORKSPACES.md`.
-2. Create or clone the workspace if needed.
-3. Perform all file operations within that workspace.
-
 ## Changes Under `src/`
 
 Follow strict test-driven development:
