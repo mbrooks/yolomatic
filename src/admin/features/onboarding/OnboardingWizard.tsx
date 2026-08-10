@@ -942,9 +942,10 @@ function StepThreeEventMode({
 					<li>Go to your repository on GitHub.</li>
 					<li>Click <strong>Settings</strong> then <strong>Webhooks</strong>.</li>
 					<li>Click <strong>Add webhook</strong>.</li>
-					<li>Set <strong>Payload URL</strong> to your Yolomatic webhook endpoint.</li>
+					<li>Set <strong>Payload URL</strong> to your Yolomatic webhook endpoint. Example: `https://your-host.example/webhook`</li>
+					<li>Set <strong>Content Type:</strong>`application/json`</li>
 					<li>Paste the secret above into <strong>Secret</strong>.</li>
-					<li>Select <strong>Let me select individual events</strong> and enable <strong>Issues</strong> and <strong>Issue comments</strong>.</li>
+					<li>Select <strong>Let me select individual events</strong> and enable <strong>Issues</strong>, <strong>Issue Comments</strong>, <strong>Pull Request Reviews</strong>, and <strong>Pull Request Review Comments</strong>.</li>
 					<li>Click <strong>Add webhook</strong>.</li>
 				</ol>
 			</Modal>

@@ -11,6 +11,34 @@ Yolomatic is a self-hosted coding agent that turns GitHub issues into pull reque
 
 Assign an issue to Yolomatic, and it creates an isolated Git worktree, launches a disposable coding-agent worker, and carries the task from design and implementation through feedback and pull request delivery.
 
+## Overview
+
+Yolomatic provides a self-hosted control plane for delegating GitHub issues to coding agents. The admin app brings setup, repository management, session controls, and live execution logs into one place, while GitHub remains the source of truth for issues, feedback, and pull requests.
+
+### Dashboard
+
+See agent availability, active work, repository counts, and recent issue and refinement activity at a glance.
+
+<p align="center">
+  <img src="assets/screenshots/yolomatic-dashboard.png" alt="Yolomatic admin dashboard showing agent status, active work, quick links, and recent activity">
+</p>
+
+### Active sessions
+
+Follow an agent's work as it happens, inspect its live log, and pause, stop, complete, archive, or clean up a session from the repository workspace.
+
+<p align="center">
+  <img src="assets/screenshots/yolomatic-show-active-session.png" alt="Yolomatic active session view showing session history, controls, and a live agent log">
+</p>
+
+### Guided onboarding
+
+The setup wizard walks administrators through account creation, GitHub authentication, model configuration, and repository initialization.
+
+<p align="center">
+  <img src="assets/screenshots/yolomatic-onboarding-wizard.png" alt="Yolomatic onboarding wizard prompting for GitHub credentials">
+</p>
+
 ## Why use Yolomatic?
 
 Yolomatic is a good fit when you want to delegate coding tasks without introducing a complex orchestration platform. It also lets you run coding agents in "yolo mode" (dangerously skip permissions) safely on a dedicated server, without needing to run them on your desktop.
@@ -237,6 +265,10 @@ npm test             # run unit tests
 ```
 
 Running agent sessions still requires Docker because Yolomatic executes coding work in worker containers.
+
+## License
+
+Yolomatic is licensed under the [GNU Affero General Public License v3.0 only](LICENSE).
 
 ## Operations
 
