@@ -88,7 +88,7 @@ describe("RepositoryStore", () => {
 			fullName: "mbrooks/yolomatic",
 		});
 		expect(await store.get("mbrooks", "yolomatic")).not.toBeNull();
-		const updated = await store.upsert({ owner: "MBROOKS", repo: "YOLO", githubEventMode: "both" });
+		const updated = await store.upsert({ owner: "MBROOKS", repo: "YOLOMATIC", githubEventMode: "both" });
 		expect(updated.owner).toBe("Mbrooks");
 		expect(updated.githubEventMode).toBe("both");
 		expect(await store.list()).toHaveLength(1);

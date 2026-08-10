@@ -549,7 +549,7 @@ describe("isFeedbackCommand", () => {
 
 	it("is case-insensitive", () => {
 		expect(isFeedbackCommand("/Yolomatic FEEDBACK")).toBe(true);
-		expect(isFeedbackCommand("/YOLO Feedback")).toBe(true);
+		expect(isFeedbackCommand("/YOLOMATIC Feedback")).toBe(true);
 	});
 
 	it("strips leading and trailing whitespace before matching", () => {
@@ -620,6 +620,6 @@ describe("commentTriggersFeedback", () => {
 	});
 
 	it("is case-insensitive for @yolomatic", () => {
-		expect(commentTriggersFeedback("HEY @YOLO", "mbrooks")).toBe(true);
+		expect(commentTriggersFeedback("HEY @YOLOMATIC", "mbrooks")).toBe(true);
 	});
 });
