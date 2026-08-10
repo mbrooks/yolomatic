@@ -44,6 +44,7 @@ describe("createYolomaticModelRegistry", () => {
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const mockRegistry = { registerProvider: vi.fn() };
 		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
 		createYolomaticModelRegistry(mockAuthStorage as never);
 
@@ -52,6 +53,7 @@ describe("createYolomaticModelRegistry", () => {
 			expect.objectContaining({
 				baseUrl: OPENAI_PROVIDER_BASE_URL,
 				api: "openai-responses",
+				apiKey: "sk-test-openai-key",
 				models: expect.arrayContaining([
 					expect.objectContaining({ id: "gpt-5.2", api: "openai-responses" }),
 					expect.objectContaining({ id: "gpt-5.2-codex", api: "openai-responses" }),

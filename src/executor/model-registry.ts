@@ -133,6 +133,7 @@ export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelReg
 	registry.registerProvider(OPENAI_PROVIDER_ID, {
 		baseUrl: OPENAI_PROVIDER_BASE_URL,
 		api: "openai-responses",
+		apiKey: process.env.OPENAI_API_KEY,
 		models: OPENAI_MODELS,
 	});
 
