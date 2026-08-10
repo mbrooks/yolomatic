@@ -23,8 +23,6 @@ import type { RefinementStore } from "../refinement/store.js";
 import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { ExecutionService } from "../ports/execution-service.js";
 import { DefaultOllamaSignInService } from "../ollama/signin-status.js";
-import { OpenAICodexAuthService } from "../openai/codex-auth.js";
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
 import type { UserStore } from "../users/store.js";
 import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
@@ -106,6 +104,5 @@ export function createWebhookServerDeps(
 		adminPath,
 		adminDefaultPage,
 		ollamaSignInService: settingsStore ? new DefaultOllamaSignInService(settingsStore) : undefined,
-		openaiCodexAuthService: new OpenAICodexAuthService({ authStorage: AuthStorage.create() }),
 	};
 }

@@ -8,7 +8,6 @@ import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
-import { OpenAICodexSignInPanel } from "./OpenAICodexSignInPanel.js";
 import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
@@ -23,7 +22,7 @@ const SERVER_SETTINGS_SECTIONS = [
 
 const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
-	pi_agent_provider: ["ollama", "openai", "openai-codex"],
+	pi_agent_provider: ["ollama", "openai"],
 };
 
 export function SettingsScreen({
@@ -112,15 +111,21 @@ export function SettingsScreen({
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
-	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
-		? []
-		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
 	const effectiveProvider =
 		(edited.pi_agent_provider !== undefined ? String(edited.pi_agent_provider) : piAgentProviderSetting?.value) ??
 		(piAgentProviderSetting?.default !== undefined ? String(piAgentProviderSetting.default) : "");
 	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
-	const showOpenAICodexPanel = tab === "ai-llm" && effectiveProvider === "openai-codex";
+	const showOpenAiApiKey = tab === "ai-llm" && effectiveProvider === "openai";
+	// The openai_api_key field is only relevant for the openai provider, so hide
+	// it whenever another provider (e.g. ollama) is selected.
+	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
+		? []
+		: settings.filter((setting) =>
+			categories.has(setting.category) &&
+			setting.key !== "onboarding_complete" &&
+			!(setting.key === "openai_api_key" && !showOpenAiApiKey),
+		);
 	const ollamaContainerSetting = settings?.find((setting) => setting.key === "ollama_container_name");
 	const ollamaContainerName = String(
 		(edited.ollama_container_name !== undefined
@@ -204,7 +209,6 @@ export function SettingsScreen({
 						/>
 					)}
 
-					{showOpenAICodexPanel && <OpenAICodexSignInPanel />}
 
 					<div className="settings-actions">
 						<button

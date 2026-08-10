@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AdminRouterDeps } from "./admin-router-shared.js";
 import { handleOllamaRoutes } from "./admin-routes/ollama-routes.js";
 import { handleOnboardingRoutes } from "./admin-routes/onboarding-routes.js";
-import { handleOpenAICodexRoutes } from "./admin-routes/openai-codex-routes.js";
 import { handleRefinementRoutes } from "./admin-routes/refinement-routes.js";
 import { handleRepoRoutes } from "./admin-routes/repo-routes.js";
 import { handleSessionRoutes } from "./admin-routes/session-routes.js";
@@ -32,7 +31,6 @@ export async function handleAdminRoute(
 		(await handleRepoRoutes(request, response, deps, pathname)) ||
 		(await handleSettingsRoutes(request, response, deps, pathname)) ||
 		(await handleOllamaRoutes(request, response, deps, pathname)) ||
-		(await handleOpenAICodexRoutes(request, response, deps, pathname)) ||
 		(await handleSkillRoutes(request, response, deps, pathname))
 	);
 }

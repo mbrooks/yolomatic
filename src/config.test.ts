@@ -43,8 +43,6 @@ describe("getConfig", () => {
 		delete process.env.YOLO_WORKER_CONTROL_BASE_URL;
 		delete process.env.YOLO_WORKER_DOCKER_NETWORK_MODE;
 		delete process.env.OPENAI_API_KEY;
-		delete process.env.YOLO_WORKER_PI_AUTH_MOUNT_SOURCE;
-		delete process.env.YOLO_WORKER_PI_AUTH_DIR;
 	});
 
 	afterEach(() => {
@@ -74,8 +72,6 @@ describe("getConfig", () => {
 		expect(config.workerControlBaseUrl).toBe("http://host.docker.internal:6767");
 		expect(config.workerDockerNetworkMode).toBeUndefined();
 		expect(config.openaiApiKey).toBe("");
-		expect(config.workerPiAuthMountSource).toBe("yolomatic_pi");
-		expect(config.workerPiAuthDir).toBe("/home/yolomatic/.pi/agent");
 	});
 
 	it("reads optional environment variables", () => {
@@ -109,8 +105,6 @@ describe("getConfig", () => {
 		process.env.YOLO_WORKER_CONTROL_BASE_URL = "http://worker-control.internal:9999";
 		process.env.YOLO_WORKER_DOCKER_NETWORK_MODE = "container:yolomatic";
 		process.env.OPENAI_API_KEY = "sk-test-key";
-		process.env.YOLO_WORKER_PI_AUTH_MOUNT_SOURCE = "custom-pi-volume";
-		process.env.YOLO_WORKER_PI_AUTH_DIR = "/custom/pi/agent";
 
 		const config = getConfig(createStore());
 		expect(config.port).toBe(8080);
@@ -128,8 +122,6 @@ describe("getConfig", () => {
 		expect(config.workerControlBaseUrl).toBe("http://worker-control.internal:9999");
 		expect(config.workerDockerNetworkMode).toBe("container:yolomatic");
 		expect(config.openaiApiKey).toBe("sk-test-key");
-		expect(config.workerPiAuthMountSource).toBe("custom-pi-volume");
-		expect(config.workerPiAuthDir).toBe("/custom/pi/agent");
 	});
 
 	it("falls back to webhook mode for unknown GitHub event modes", () => {

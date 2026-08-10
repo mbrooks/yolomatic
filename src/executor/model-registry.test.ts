@@ -3,9 +3,7 @@ import {
 	createYolomaticModelRegistry,
 	resolveOllamaBaseUrl,
 	OPENAI_PROVIDER_BASE_URL,
-	OPENAI_CODEX_PROVIDER_BASE_URL,
 	OPENAI_PROVIDER_ID,
-	OPENAI_CODEX_PROVIDER_ID,
 } from "./model-registry.js";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
@@ -63,29 +61,7 @@ describe("createYolomaticModelRegistry", () => {
 		);
 	});
 
-	it("registers the openai-codex provider against the ChatGPT backend", () => {
-		const mockAuthStorage = {};
-		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
-		const mockRegistry = { registerProvider: vi.fn() };
-		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
-
-		createYolomaticModelRegistry(mockAuthStorage as never);
-
-		expect(mockRegistry.registerProvider).toHaveBeenCalledWith(
-			OPENAI_CODEX_PROVIDER_ID,
-			expect.objectContaining({
-				baseUrl: OPENAI_CODEX_PROVIDER_BASE_URL,
-				api: "openai-codex-responses",
-				models: expect.arrayContaining([
-					expect.objectContaining({ id: "gpt-5.2", api: "openai-codex-responses" }),
-					expect.objectContaining({ id: "gpt-5.3-codex", api: "openai-codex-responses" }),
-					expect.objectContaining({ id: "gpt-5.4", api: "openai-codex-responses" }),
-				]),
-			}),
-		);
-	});
-
-	it("registers all three providers in order (ollama, openai, openai-codex)", () => {
+	it("registers both providers in order (ollama, openai)", () => {
 		const mockAuthStorage = {};
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const registerProvider = vi.fn();
@@ -94,7 +70,7 @@ describe("createYolomaticModelRegistry", () => {
 		createYolomaticModelRegistry(mockAuthStorage as never);
 
 		const registeredNames = registerProvider.mock.calls.map((call) => call[0]);
-		expect(registeredNames).toEqual(["ollama", OPENAI_PROVIDER_ID, OPENAI_CODEX_PROVIDER_ID]);
+		expect(registeredNames).toEqual(["ollama", OPENAI_PROVIDER_ID]);
 	});
 });
 

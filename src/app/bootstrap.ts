@@ -135,8 +135,6 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workerDockerNetworkMode: config.workerDockerNetworkMode,
 		workerRpcServer,
 		workerOllamaHost: config.workerOllamaHost,
-		workerPiAuthMountSource: config.workerPiAuthMountSource,
-		workerPiAuthDir: config.workerPiAuthDir,
 		soulPath: config.soulPath,
 		githubGateway,
 	});

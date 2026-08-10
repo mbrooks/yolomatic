@@ -162,20 +162,6 @@ describe("settings/model", () => {
       expect(apiKey?.type).toBe("string");
     });
 
-    it("defines the worker pi auth volume and dir settings with defaults", () => {
-      const mount = getSettingDefinition("worker_pi_auth_mount_source");
-      expect(mount).toBeDefined();
-      expect(mount?.default).toBe("yolomatic_pi");
-      expect(mount?.envVar).toBe("YOLO_WORKER_PI_AUTH_MOUNT_SOURCE");
-      expect(mount?.category).toBe("agent-behavior");
-
-      const dir = getSettingDefinition("worker_pi_auth_dir");
-      expect(dir).toBeDefined();
-      expect(dir?.default).toBe("/home/yolomatic/.pi/agent");
-      expect(dir?.envVar).toBe("YOLO_WORKER_PI_AUTH_DIR");
-      expect(dir?.category).toBe("agent-behavior");
-    });
-
     it("exposes a configurable ollama_container_name setting defaulting to yolomatic-ollama", () => {
       const container = getSettingDefinition("ollama_container_name");
       expect(container).toBeDefined();

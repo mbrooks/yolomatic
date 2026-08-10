@@ -65,11 +65,6 @@ function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 				message: "not signed in",
 			})),
 		},
-		openaiCodexAuthService: {
-			getSignInStatus: vi.fn(() => ({ signedIn: false, message: "Not signed in with ChatGPT." })),
-			beginLogin: vi.fn(async () => ({ authUrl: "https://auth.openai.com/authorize?state=test" })),
-			logout: vi.fn(),
-		},
 		userStore: {
 			hasAnySync: () => onboardingHasUsers,
 			firstSync: () =>
@@ -1289,7 +1284,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(store.get("onboarding_complete")).toBe("true");
 			});
 
-		it("accepts pi_agent_provider openai-codex and omits openai_api_key when not supplied", async () => {
+		it("rejects pi_agent_provider openai-codex (no longer supported)", async () => {
 			const store = await tmpStore();
 			const req = mockRequest({
 				url: "/api/onboarding",
@@ -1311,11 +1306,11 @@ describe("handleOnboardingRoutes", () => {
 			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
 
 			expect(handled).toBe(true);
-			expect(res.statusCode).toBe(200);
-			expect(store.get("pi_agent_provider")).toBe("openai-codex");
-			expect(store.get("pi_agent_model")).toBe("gpt-5.2");
-			expect(store.get("openai_api_key")).toBeUndefined();
-			expect(store.get("onboarding_complete")).toBe("true");
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("pi_agent_provider must be one of");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+			expect(store.get("pi_agent_provider")).toBeUndefined();
 			});
 
 		it("preserves a stored openai_api_key when the wizard submits an empty value", async () => {
@@ -1379,72 +1374,7 @@ describe("handleOnboardingRoutes", () => {
 			});
 	});
 
-	describe("GET /api/onboarding/openai-codex-* (ChatGPT OAuth)", () => {
-	it("returns the current sign-in status without requiring auth", async () => {
-		const store = await tmpStore();
-		const deps = makeDeps(store);
-		((deps as { openaiCodexAuthService?: unknown }).openaiCodexAuthService as {
-			getSignInStatus: ReturnType<typeof vi.fn>;
-		}).getSignInStatus = vi.fn(() => ({ signedIn: true, account: "chatgpt-user", message: "Signed in with ChatGPT." }));
-		const req = mockRequest({ url: "/api/onboarding/openai-codex-status", method: "GET" });
-		const res = mockResponse();
-
-		const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/openai-codex-status");
-
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.signedIn).toBe(true);
-		expect(body.account).toBe("chatgpt-user");
-	});
-
-	it("begins a ChatGPT login and returns the authorization URL", async () => {
-		const store = await tmpStore();
-		const deps = makeDeps(store);
-		const beginLogin = vi.fn(async () => ({ authUrl: "https://auth.openai.com/authorize?state=abc" }));
-		((deps as { openaiCodexAuthService?: unknown }).openaiCodexAuthService as { beginLogin: typeof beginLogin }).beginLogin = beginLogin;
-		const req = mockRequest({ url: "/api/onboarding/openai-codex-login", method: "POST" });
-		const res = mockResponse();
-
-		const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/openai-codex-login");
-
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		const body = JSON.parse(String(res.body));
-		expect(body.authUrl).toBe("https://auth.openai.com/authorize?state=abc");
-		expect(beginLogin).toHaveBeenCalledTimes(1);
-	});
-
-	it("logs out of ChatGPT and reports success", async () => {
-		const store = await tmpStore();
-		const deps = makeDeps(store);
-		const logout = vi.fn();
-		((deps as { openaiCodexAuthService?: unknown }).openaiCodexAuthService as { logout: typeof logout }).logout = logout;
-		const req = mockRequest({ url: "/api/onboarding/openai-codex-logout", method: "POST" });
-		const res = mockResponse();
-
-		const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/openai-codex-logout");
-
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(200);
-		expect(logout).toHaveBeenCalledTimes(1);
-	});
-
-	it("returns 500 when openaiCodexAuthService is missing", async () => {
-		const store = await tmpStore();
-		const deps = makeDeps(store);
-		delete (deps as { openaiCodexAuthService?: unknown }).openaiCodexAuthService;
-		const req = mockRequest({ url: "/api/onboarding/openai-codex-status", method: "GET" });
-		const res = mockResponse();
-
-		const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/openai-codex-status");
-
-		expect(handled).toBe(true);
-		expect(res.statusCode).toBe(500);
-		const body = JSON.parse(String(res.body));
-		expect(body.error).toContain("OpenAI Codex auth service not configured");
-	});
-});
+	
 
 describe("GET /yolomatic/admin", () => {
 		it("returns HTML", async () => {

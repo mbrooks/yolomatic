@@ -34,8 +34,6 @@ vi.mock("../config.js", () => ({
 		workerControlBaseUrl: "http://host.docker.internal:6767",
 		workerDockerNetworkMode: undefined,
 		workerOllamaHost: undefined,
-		workerPiAuthMountSource: "yolomatic_pi",
-		workerPiAuthDir: "/home/yolomatic/.pi/agent",
 		openaiApiKey: "sk-test",
 	})),
 	isBootstrapComplete: vi.fn(() => true),

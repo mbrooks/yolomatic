@@ -11,15 +11,9 @@ import {
 	type OnboardingConfig,
 	type OnboardingSecretField,
 } from "../../api/onboarding.js";
-import {
-	fetchOnboardingOpenAICodexStatus,
-	beginOnboardingOpenAICodexLogin,
-	logoutOnboardingOpenAICodex,
-} from "../../api/openai-codex.js";
 import { Modal } from "../../components/Modal.js";
 import { RepoManager, type ManagedRepo } from "../repos/RepoManager.js";
 import { OllamaSignInPanel } from "../settings/OllamaSignInPanel.js";
-import { OpenAICodexSignInPanel } from "../settings/OpenAICodexSignInPanel.js";
 
 export type GithubEventMode = "webhook" | "polling" | "both";
 
@@ -49,7 +43,7 @@ interface WizardState {
 const STORAGE_KEY = "yolomatic-onboarding-wizard";
 const TOTAL_STEPS = 5;
 
-export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama", "openai", "openai-codex"];
+export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama", "openai"];
 export const DEFAULT_OLLAMA_CONTAINER_NAME = "yolomatic-ollama";
 
 export const EVENT_MODE_OPTIONS: readonly GithubEventMode[] = ["webhook", "polling", "both"];
@@ -976,7 +970,6 @@ function StepFourAiLlm({
 	const provider = state.piAgentProvider.trim();
 	const isOllama = provider === "ollama";
 	const isOpenAi = provider === "openai";
-	const isOpenAiCodex = provider === "openai-codex";
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -992,8 +985,7 @@ function StepFourAiLlm({
 				</select>
 				<span className="setting-description">
 					Select the LLM provider worker containers use. Ollama runs locally;
-					openai uses an OpenAI platform API key; openai-codex uses a
-					ChatGPT Plus/Pro subscription via OAuth.
+					openai uses an OpenAI platform API key.
 				</span>
 			</div>
 
@@ -1042,14 +1034,6 @@ function StepFourAiLlm({
 							: "OpenAI platform API key. Required for the openai provider; forwarded to worker containers as OPENAI_API_KEY."}
 					</span>
 				</div>
-			)}
-
-			{isOpenAiCodex && (
-				<OpenAICodexSignInPanel
-					fetchStatus={fetchOnboardingOpenAICodexStatus}
-					beginLogin={beginOnboardingOpenAICodexLogin}
-					logout={logoutOnboardingOpenAICodex}
-				/>
 			)}
 
 			<div className="form-group">

@@ -25,19 +25,6 @@ function emptyConfig(): OnboardingConfig {
 	};
 }
 
-vi.mock("../../api/openai-codex.js", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("../../api/openai-codex.js")>();
-	return {
-		...actual,
-		fetchOnboardingOpenAICodexStatus: vi.fn(async () => ({ signedIn: false, message: "Not signed in with ChatGPT." })),
-		beginOnboardingOpenAICodexLogin: vi.fn(async () => ({ authUrl: "https://auth.openai.com/authorize?state=test" })),
-		logoutOnboardingOpenAICodex: vi.fn(async () => ({ success: true })),
-		fetchOpenAICodexStatus: vi.fn(async () => ({ signedIn: false, message: "Not signed in with ChatGPT." })),
-		beginOpenAICodexLogin: vi.fn(async () => ({ authUrl: "https://auth.openai.com/authorize?state=test" })),
-		logoutOpenAICodex: vi.fn(async () => ({ success: true })),
-	};
-});
-
 vi.mock("../../api/onboarding.js", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../../api/onboarding.js")>();
 	return {
@@ -97,13 +84,11 @@ describe("isAiLlmStepValid", () => {
 	it("requires a model for every provider", () => {
 		expect(isAiLlmStepValid("ollama", "", "yolomatic-ollama")).toBe(false);
 		expect(isAiLlmStepValid("openai", "", "")).toBe(false);
-		expect(isAiLlmStepValid("openai-codex", "", "")).toBe(false);
 	});
 
 	it("requires the container name only for the ollama provider", () => {
 		expect(isAiLlmStepValid("ollama", "kimi-k2.7-code:cloud", "")).toBe(false);
 		expect(isAiLlmStepValid("openai", "gpt-5.2-codex", "")).toBe(true);
-		expect(isAiLlmStepValid("openai-codex", "gpt-5.2", "")).toBe(true);
 		expect(isAiLlmStepValid("ollama", "kimi-k2.7-code:cloud", "yolomatic-ollama")).toBe(true);
 	});
 });
@@ -1021,7 +1006,7 @@ describe("OnboardingWizard", () => {
 
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
 			const providerSelect = screen.getByLabelText("LLM Provider") as HTMLSelectElement;
-			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama", "openai", "openai-codex"]);
+			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama", "openai"]);
 			expect(providerSelect.value).toBe("ollama");
 			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("yolomatic-ollama");
 			expect(screen.queryByText("Ollama sign-in status")).not.toBeNull();
@@ -1209,32 +1194,6 @@ describe("OnboardingWizard", () => {
 			const keyInput = screen.getByLabelText("OpenAI API Key") as HTMLInputElement;
 			expect(keyInput.value).toBe("");
 			expect(keyInput.placeholder).toContain("Leave unchanged");
-			});
-
-		it("renders the ChatGPT OAuth panel and no Ollama fields when provider is openai-codex", async () => {
-			const onboarding = await import("../../api/onboarding.js");
-			const config = emptyConfig();
-			config.pi_agent_provider = "openai-codex";
-			config.pi_agent_model = "gpt-5.2";
-			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
-			render(<OnboardingWizard />);
-			await advanceThroughGitHubIntegration();
-			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
-			await waitFor(() => {
-				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
-			});
-			fireEvent.click(screen.getByText("Next"));
-
-			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
-			expect((screen.getByLabelText("LLM Provider") as HTMLSelectElement).value).toBe("openai-codex");
-			expect(screen.queryByText("ChatGPT (Codex) sign-in status")).not.toBeNull();
-			expect(screen.queryByRole("button", { name: /Sign in with ChatGPT/u })).not.toBeNull();
-			// No OpenAI API key field and no Ollama UI.
-			expect(screen.queryByLabelText("OpenAI API Key")).toBeNull();
-			expect(screen.queryByLabelText("Ollama Container Name")).toBeNull();
-			expect(screen.queryByText("Ollama sign-in status")).toBeNull();
-			// Model required for all providers; container name not required for codex.
-			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 			});
 
 		it("disables Next when the model field is empty for the openai provider", async () => {

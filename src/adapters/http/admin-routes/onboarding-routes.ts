@@ -44,7 +44,7 @@ export const ONBOARDING_CONFIG_KEYS = [
 ] as const;
 
 /** LLM provider values accepted by the onboarding submission handler. */
-export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama", "openai", "openai-codex"];
+export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama", "openai"];
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
@@ -348,38 +348,6 @@ const registry = new AdminRouteRegistry()
 			);
 			const result = await ollamaSignInService.checkSignInStatus({ containerName });
 			return { status: 200, body: result };
-		},
-	})
-	.route({
-		method: "GET",
-		pattern: /^\/api\/onboarding\/openai-codex-status$/u,
-		auth: false,
-		requiresDeps: ["openaiCodexAuthService"],
-		handler: async (ctx) => {
-			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
-			return { status: 200, body: openaiCodexAuthService.getSignInStatus() };
-		},
-	})
-	.route({
-		method: "POST",
-		pattern: /^\/api\/onboarding\/openai-codex-login$/u,
-		auth: false,
-		requiresDeps: ["openaiCodexAuthService"],
-		handler: async (ctx) => {
-			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
-			const result = await openaiCodexAuthService.beginLogin();
-			return { status: 200, body: { authUrl: result.authUrl } };
-		},
-	})
-	.route({
-		method: "POST",
-		pattern: /^\/api\/onboarding\/openai-codex-logout$/u,
-		auth: false,
-		requiresDeps: ["openaiCodexAuthService"],
-		handler: async (ctx) => {
-			const { openaiCodexAuthService } = getRequiredDeps(ctx.deps, ["openaiCodexAuthService"]);
-			openaiCodexAuthService.logout();
-			return { status: 200, body: { success: true } };
 		},
 	})
 	.route<Record<string, string>>({
