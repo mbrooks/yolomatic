@@ -1,14 +1,15 @@
 /**
- * Skill optimization module.
+ * Skill management module.
  *
- * Implements a validation-feedback optimization loop for Pi agent skills,
- * inspired by the SkillOpt paper. Core components:
- *
- * - SkillMetricsCollector: discovers skills and computes per-skill rollout scores
- * - SkillOptimizer: runs the optimization iteration, generates prompts, and applies bounded edits
- * - Types: shared interfaces for skills, metrics, edits, and results
+ * Exposes the active server-skill, repository-skill, and merge behavior used
+ * by runtime workflows. The dormant skill-optimization subsystem
+ * (`SkillOptimizer`, `SkillMetricsCollector`, and their optimizer-only types)
+ * is intentionally not exported here; see `index.test.ts` for the
+ * module-boundary guardrail that keeps it that way.
  */
 
-export * from "./types.js";
-export { SkillMetricsCollector } from "./skill-metrics.js";
-export { SkillOptimizer } from "./skill-optimizer.js";
+export { SkillStore } from "./store.js";
+export { RepoSkillService, parseSkillFile, buildSkillFile } from "./repo-skill-service.js";
+export type { CommandRunner, RepoSkillServiceConfig } from "./repo-skill-service.js";
+export { mergeRepoAndServerSkills } from "./merge-skills.js";
+export type { ServerSkill, RepoSkill, SkillFormData, ParsedSkillFile } from "./model.js";
