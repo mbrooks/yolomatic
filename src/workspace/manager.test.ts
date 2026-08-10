@@ -84,6 +84,11 @@ describe("WorkspaceManager", () => {
 		const bareRepoPath = path.join(root, "mbrooks-yolomatic");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
+				if (args.includes("origin/yolomatic/issue-42")) {
+					const error = new Error("not found") as Error & { code?: number };
+					error.code = 1;
+					throw error;
+				}
 				return { stdout: "abcd1234\n", stderr: "" };
 			}
 			if (args[0] === "show-ref") {
@@ -212,6 +217,11 @@ describe("WorkspaceManager", () => {
 		let worktreeCreated = false;
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
+				if (args.includes("origin/yolomatic/issue-42")) {
+					const error = new Error("not found") as Error & { code?: number };
+					error.code = 1;
+					throw error;
+				}
 				return { stdout: "abcd1234\n", stderr: "" };
 			}
 			if (args[0] === "show-ref") {
@@ -264,6 +274,11 @@ describe("WorkspaceManager", () => {
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "rev-parse") {
+				if (args.includes("origin/yolomatic/issue-42")) {
+					const error = new Error("not found") as Error & { code?: number };
+					error.code = 1;
+					throw error;
+				}
 				return { stdout: "abcd1234\n", stderr: "" };
 			}
 			if (args[0] === "show-ref") {
@@ -688,6 +703,11 @@ describe("WorkspaceManager", () => {
 		const worktreePath = path.join(bareRepoPath, ".worktrees", "issue-42");
 		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
 			if (args[0] === "show-ref") {
+				const error = new Error("not found") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "rev-parse" && args.includes("origin/yolomatic/issue-42")) {
 				const error = new Error("not found") as Error & { code?: number };
 				error.code = 1;
 				throw error;

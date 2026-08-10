@@ -271,8 +271,6 @@ export class SessionManager implements SessionRepository {
 			...existing,
 			status: "pending",
 			summary: undefined,
-			prUrl: undefined,
-			prNumber: undefined,
 			seeded: false,
 			iterationCount: undefined,
 			restartCount: (existing.restartCount ?? 0) + 1,

@@ -14,6 +14,7 @@ import { WorktreeBranchDivergedError } from "../../workspace/errors.js";
 import { issueSessionKey, removeWorkflowLabels } from "./workflow-helpers.js";
 import { ExecuteSessionDelivery } from "./execute-session-delivery.js";
 import { ExecuteSessionReporter } from "./execute-session-reporter.js";
+import { PRRecovery } from "./pr-recovery.js";
 import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
 export interface ExecuteSessionDeps {
@@ -36,6 +37,7 @@ export interface ExecuteSessionDeps {
 export class ExecuteSession {
 	private readonly reporter: ExecuteSessionReporter;
 	private readonly delivery: ExecuteSessionDelivery;
+	private readonly recovery: PRRecovery;
 
 	constructor(private readonly deps: ExecuteSessionDeps) {
 		this.reporter = new ExecuteSessionReporter({
@@ -61,6 +63,11 @@ export class ExecuteSession {
 			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
 			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		});
+		this.recovery = new PRRecovery({ github: deps.github, sessions: deps.sessions });
+	}
+
+	private resolveDefaultBranch(owner: string, repo: string): string {
+		return this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 	}
 
 	async run(state: SessionState, comment?: string, priorComments?: PriorDiscussionComment[]): Promise<void> {
@@ -289,14 +296,19 @@ export class ExecuteSession {
 			return this.formatSyncError(firstError);
 		}
 
-		if (state.prNumber === undefined) {
+		// The branch diverged from origin. Reconcile the durable PR association:
+		// reuse a preserved, validated PR or discover exactly one open PR with the
+		// deterministic issue head/base before updating the branch.
+		const defaultBranch = this.resolveDefaultBranch(owner, repo);
+		const recovery = await this.recovery.recover(state, defaultBranch);
+		if (!recovery.ok) {
 			return this.formatSyncError(
-				`Branch yolomatic/issue-${issueNumber} diverged from origin and no PR is associated with this session.`,
+				`Branch yolomatic/issue-${issueNumber} diverged from origin and PR recovery failed: ${recovery.reason}`,
 			);
 		}
 
 		try {
-			await this.deps.github.updatePullRequestBranch(owner, repo, state.prNumber);
+			await this.deps.github.updatePullRequestBranch(owner, repo, recovery.pr.number);
 		} catch (error) {
 			return this.formatSyncError(
 				error instanceof Error ? error.message : String(error),

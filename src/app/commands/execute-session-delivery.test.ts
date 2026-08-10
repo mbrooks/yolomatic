@@ -64,6 +64,7 @@ function makeDeps(overrides?: {
 			? vi.fn(overrides.getPullRequest)
 			: vi.fn(async () => ({
 				head: { ref: "yolomatic/issue-1", sha: "sha" },
+				base: { ref: "main" },
 				state: "open",
 				merged: false,
 				mergeable: true,
@@ -718,6 +719,113 @@ describe("ExecuteSessionDelivery", () => {
 			"yolomatic",
 			1,
 			expect.stringContaining("Ready for review."),
+		);
+	});
+
+	it("reuses an existing PR after an ambiguous createPullRequest error without duplicating it", async () => {
+		const createCalls: unknown[] = [];
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async (...args) => {
+				createCalls.push(args);
+				throw new Error("Not Found - https://docs.github.com/rest");
+			}),
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" },
+		]);
+
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(createCalls).toHaveLength(1);
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, 42, "https://github.com/mbrooks/yolomatic/pull/42");
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			1,
+			expect.stringContaining("PR already exists: https://github.com/mbrooks/yolomatic/pull/42"),
+		);
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-pr-created"]);
+	});
+
+	it("does not reuse an ambiguous multiple-PR match and fails delivery instead", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => {
+				throw new Error("Not Found - https://docs.github.com/rest");
+			}),
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>).mockResolvedValue([
+			{ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" },
+			{ number: 43, html_url: "https://github.com/mbrooks/yolomatic/pull/43" },
+		]);
+
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.sessions.associatePR).not.toHaveBeenCalled();
+		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			1,
+			state,
+			expect.any(Error),
+		);
+	});
+
+	it("preserves the PR association when the ready-for-review transition fails after creation", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" })),
+			getPullRequest: vi.fn(async () => ({
+				head: { ref: "yolomatic/issue-1", sha: "sha" },
+				base: { ref: "main" },
+				state: "open",
+				merged: false,
+				mergeable: true,
+				mergeableState: "clean",
+				draft: true,
+			})),
+		});
+		(deps.github.markPullRequestReadyForReview as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+			throw new Error("Not Found - https://docs.github.com/rest");
+		}) as never;
+
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		// The PR association must survive the ready-for-review failure so a
+		// restart can recover it instead of losing it.
+		expect(deps.sessions.associatePR).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, 42, "https://github.com/mbrooks/yolomatic/pull/42");
+		expect(deps.reporter.handleDeliveryFailure).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			1,
+			state,
+			expect.any(Error),
 		);
 	});
 });
