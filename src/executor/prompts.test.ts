@@ -181,6 +181,8 @@ describe("buildIssueRefinementPrompt", () => {
 		expect(prompt).toContain("Original body");
 		expect(prompt).toContain("proposedTaskBody");
 		expect(prompt).toContain("Do NOT commit");
+		expect(prompt).toContain("Each non-optional field must be a JSON string");
+		expect(prompt).toContain("Return raw JSON without Markdown code fences");
 	});
 
 	it("lists proposedTitle as an optional field in the JSON contract", () => {

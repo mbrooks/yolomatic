@@ -43,6 +43,22 @@ export interface RefinementResult {
 	proposedTitle?: string;
 }
 
+function normalizeRefinementInvestigation(value: unknown): string | null {
+	if (typeof value === "string") {
+		return value.length > 0 ? value : null;
+	}
+
+	if (Array.isArray(value)) {
+		if (value.length === 0) return null;
+	} else if (value && typeof value === "object") {
+		if (Object.keys(value).length === 0) return null;
+	} else {
+		return null;
+	}
+
+	return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+}
+
 function parseRefinementJson(candidate: string): RefinementResult | null {
 	const trimmed = candidate.trim();
 	if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
@@ -51,16 +67,17 @@ function parseRefinementJson(candidate: string): RefinementResult | null {
 
 	try {
 		const parsed = JSON.parse(trimmed);
+		const investigation = normalizeRefinementInvestigation(parsed.investigation);
 		if (
 			typeof parsed.proposedTaskBody === "string" &&
 			parsed.proposedTaskBody.length > 0 &&
 			typeof parsed.summary === "string" &&
-			typeof parsed.investigation === "string"
+			investigation
 		) {
 			const result: RefinementResult = {
 				proposedTaskBody: parsed.proposedTaskBody,
 				summary: parsed.summary,
-				investigation: parsed.investigation,
+				investigation,
 			};
 			const proposedTitle =
 				typeof parsed.proposedTitle === "string" ? parsed.proposedTitle.trim() : "";

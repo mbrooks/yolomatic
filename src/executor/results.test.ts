@@ -244,6 +244,30 @@ describe("parseRefinementResult", () => {
 		expect(result!.proposedTaskBody).toBe("Body");
 	});
 
+	it("normalizes a structured investigation from a raw JSON refinement result", () => {
+		const investigation = {
+			files: ["src/executor/results.ts"],
+			commands: ["npm test -- src/executor/results.test.ts"],
+			observations: ["The parser requires an investigation string."],
+		};
+		const result = parseRefinementResult(
+			JSON.stringify({ proposedTaskBody: "Body", summary: "S", investigation }),
+		);
+
+		expect(result).not.toBeNull();
+		expect(result!.investigation).toBe(`\`\`\`json\n${JSON.stringify(investigation, null, 2)}\n\`\`\``);
+	});
+
+	it("normalizes a structured investigation from a fenced JSON refinement result", () => {
+		const investigation = ["Read the parser.", "Ran the focused test."];
+		const raw = "```json\n" + JSON.stringify({ proposedTaskBody: "Body", summary: "S", investigation }) + "\n```";
+
+		const result = parseRefinementResult(raw);
+
+		expect(result).not.toBeNull();
+		expect(result!.investigation).toBe(`\`\`\`json\n${JSON.stringify(investigation, null, 2)}\n\`\`\``);
+	});
+
 	it("extracts a fenced JSON refinement result surrounded by commentary", () => {
 		const raw = [
 			"I now have a complete picture. Here is my refined task body.",
@@ -279,6 +303,14 @@ describe("parseRefinementResult", () => {
 
 	it("returns null for JSON missing required fields", () => {
 		expect(parseRefinementResult(JSON.stringify({ summary: "only summary" }))).toBeNull();
+	});
+
+	it("returns null for empty structured investigations", () => {
+		for (const investigation of [{}, []]) {
+			expect(
+				parseRefinementResult(JSON.stringify({ proposedTaskBody: "Body", summary: "S", investigation })),
+			).toBeNull();
+		}
 	});
 
 	it("parses a proposedTitle when supplied as a non-empty string", () => {
