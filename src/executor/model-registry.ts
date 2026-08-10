@@ -130,11 +130,15 @@ export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelReg
 		],
 	});
 
-	registry.registerProvider(OPENAI_PROVIDER_ID, {
-		baseUrl: OPENAI_PROVIDER_BASE_URL,
-		api: "openai-responses",
-		models: OPENAI_MODELS,
-	});
+	const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+	if (openaiApiKey) {
+		registry.registerProvider(OPENAI_PROVIDER_ID, {
+			baseUrl: OPENAI_PROVIDER_BASE_URL,
+			api: "openai-responses",
+			apiKey: openaiApiKey,
+			models: OPENAI_MODELS,
+		});
+	}
 
 	return registry;
 }

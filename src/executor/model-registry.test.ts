@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	createYolomaticModelRegistry,
 	resolveOllamaBaseUrl,
@@ -18,6 +18,10 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 describe("createYolomaticModelRegistry", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it("creates an in-memory registry with the ollama provider", () => {
 		const mockAuthStorage = {};
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
@@ -44,6 +48,7 @@ describe("createYolomaticModelRegistry", () => {
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const mockRegistry = { registerProvider: vi.fn() };
 		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
 		createYolomaticModelRegistry(mockAuthStorage as never);
 
@@ -52,6 +57,7 @@ describe("createYolomaticModelRegistry", () => {
 			expect.objectContaining({
 				baseUrl: OPENAI_PROVIDER_BASE_URL,
 				api: "openai-responses",
+				apiKey: "sk-test-openai-key",
 				models: expect.arrayContaining([
 					expect.objectContaining({ id: "gpt-5.2", api: "openai-responses" }),
 					expect.objectContaining({ id: "gpt-5.2-codex", api: "openai-responses" }),
@@ -61,11 +67,22 @@ describe("createYolomaticModelRegistry", () => {
 		);
 	});
 
+	it("registers only ollama when no OpenAI API key is configured", () => {
+		const mockRegistry = { registerProvider: vi.fn() };
+		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		vi.stubEnv("OPENAI_API_KEY", "");
+
+		createYolomaticModelRegistry({} as never);
+
+		expect(mockRegistry.registerProvider.mock.calls.map(([provider]) => provider)).toEqual(["ollama"]);
+	});
+
 	it("registers both providers in order (ollama, openai)", () => {
 		const mockAuthStorage = {};
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const registerProvider = vi.fn();
 		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue({ registerProvider });
+		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
 		createYolomaticModelRegistry(mockAuthStorage as never);
 
