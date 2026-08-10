@@ -149,6 +149,17 @@ describe("settings/model", () => {
       expect(provider?.default).toBe("ollama");
       expect(provider?.envVar).toBe("PI_AGENT_PROVIDER");
       expect(provider?.category).toBe("ai-llm");
+      expect(provider?.description).not.toContain("The only supported provider");
+    });
+
+    it("defines the sensitive openai_api_key setting in the ai-llm category", () => {
+      const apiKey = getSettingDefinition("openai_api_key");
+      expect(apiKey).toBeDefined();
+      expect(apiKey?.envVar).toBe("OPENAI_API_KEY");
+      expect(apiKey?.category).toBe("ai-llm");
+      expect(apiKey?.sensitive).toBe(true);
+      expect(apiKey?.requiresRestart).toBe(true);
+      expect(apiKey?.type).toBe("string");
     });
 
     it("exposes a configurable ollama_container_name setting defaulting to yolomatic-ollama", () => {

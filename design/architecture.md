@@ -98,7 +98,6 @@ The worker gets:
 - a fresh writable container filesystem per execution
 - only the explicitly forwarded model/session environment variables
 - a session-specific WebSocket URL for the control-plane connection
-
 The worker does not get:
 
 - GitHub credentials
@@ -114,6 +113,15 @@ Important caveat:
 
 - if any repository inside `WORKSPACES_DIR` contains its own `.env` or other secret-bearing files, the worker can read them because the full workspace tree is mounted read-write
 - this design therefore assumes secrets are kept out of workspace checkouts
+
+#### OpenAI API key delivery
+
+Yolomatic supports the OpenAI platform API provider (`pi_agent_provider=openai`):
+the operator supplies an `OPENAI_API_KEY`. The control plane syncs it to
+`process.env.OPENAI_API_KEY` and `DockerWorkerExecutor.buildDockerRunArgs`
+forwards it into worker containers as `-e OPENAI_API_KEY=...`, the same way
+`OLLAMA_HOST` is forwarded. The ChatGPT Plus/Pro Codex OAuth provider is no
+longer supported.
 
 ## Filesystem Layout
 

@@ -197,6 +197,17 @@ const MOCK_SETTINGS = [
 		category: "ai-llm",
 	},
 	{
+		key: "openai_api_key",
+		value: "",
+		description: "OpenAI platform API key. Required when pi_agent_provider is openai.",
+		type: "string",
+		default: undefined,
+		requiresRestart: true,
+		sensitive: true,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
 		key: "admin_base_url",
 		value: "http://host:6767/yolomatic/admin",
 		description: "Absolute public base URL of the admin UI.",
@@ -579,13 +590,13 @@ describe("SettingsScreen", () => {
 		expect(baseBlock![0]).toContain("background: var(--surface)");
 	});
 
-	it("renders pi_agent_provider as a dropdown whose only option is ollama", async () => {
+	it("renders pi_agent_provider as a dropdown offering ollama and openai", async () => {
 		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "ok" });
 		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
 
 		const provider = await screen.findByRole("combobox", { name: /pi_agent_provider/ }) as HTMLSelectElement;
 		expect(provider.tagName).toBe("SELECT");
-		expect(Array.from(provider.options, (option) => option.value)).toEqual(["ollama"]);
+		expect(Array.from(provider.options, (option) => option.value)).toEqual(["ollama", "openai"]);
 	});
 
 	it("does not render the Ollama status panel when the provider is not ollama", async () => {
@@ -603,6 +614,52 @@ describe("SettingsScreen", () => {
 		});
 		expect(screen.queryByText("Ollama sign-in status")).toBeNull();
 		expect(globalThis.fetch).not.toHaveBeenCalledWith("/api/ollama/signin", expect.anything());
+	});
+
+	it("hides the openai_api_key field when the provider is ollama", async () => {
+		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "ok" });
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByRole("combobox", { name: /pi_agent_provider/ })).not.toBeNull();
+		});
+		expect(screen.queryByText("openai_api_key")).toBeNull();
+		expect(screen.queryByLabelText(/openai_api_key/)).toBeNull();
+	});
+
+	it("hides the ollama_container_name field when the provider is openai", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: aiLlmSettingsWithProvider("openai") }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("openai_api_key")).not.toBeNull();
+		});
+		expect(screen.queryByText("ollama_container_name")).toBeNull();
+		expect(screen.queryByLabelText(/ollama_container_name/)).toBeNull();
+	});
+
+	it("shows the openai_api_key field when the provider is openai", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: aiLlmSettingsWithProvider("openai") }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("openai_api_key")).not.toBeNull();
+		});
+		expect((screen.getByRole("combobox", { name: /pi_agent_provider/ }) as HTMLSelectElement).value).toBe("openai");
+		// Ollama-only UI is hidden when openai is selected.
+		expect(screen.queryByText("Ollama sign-in status")).toBeNull();
 	});
 
 	it("renders the Ollama status panel for a signed-in account", async () => {

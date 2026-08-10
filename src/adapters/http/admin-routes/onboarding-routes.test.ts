@@ -594,11 +594,12 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.github_poll_interval_ms).toBe("15000");
 		});
 
-		it("exposes the AI / LLM settings (provider, model, container) for rerun pre-population", async () => {
+		it("exposes the AI / LLM settings (provider, model, container, openai key) for rerun pre-population", async () => {
 			const store = await tmpStore();
 			store.set("pi_agent_provider", "ollama");
 			store.set("pi_agent_model", "kimi-k2.7-code:cloud");
 			store.set("ollama_container_name", "custom-ollama");
+			store.set("openai_api_key", "sk-secret");
 			const req = mockRequest({ url: "/api/onboarding/config", method: "GET" });
 			const res = mockResponse();
 
@@ -610,6 +611,8 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.pi_agent_provider).toBe("ollama");
 			expect(body.pi_agent_model).toBe("kimi-k2.7-code:cloud");
 			expect(body.ollama_container_name).toBe("custom-ollama");
+			expect(body.openai_api_key).toEqual({ configured: true });
+			expect(String(res.body)).not.toContain("sk-secret");
 		});
 
 		it("reports configured secrets as configured without exposing the value", async () => {
@@ -1236,7 +1239,7 @@ describe("handleOnboardingRoutes", () => {
 					admin_username: "admin",
 					admin_password: "pass",
 					github_event_mode: "webhook",
-					pi_agent_provider: "openai",
+						pi_agent_provider: "anthropic",
 				}),
 			});
 			const res = mockResponse();
@@ -1249,6 +1252,93 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.error).toContain("pi_agent_provider must be one of");
 			expect(store.get("onboarding_complete")).toBeUndefined();
 			expect(store.get("pi_agent_provider")).toBeUndefined();
+			});
+
+		it("accepts pi_agent_provider openai and persists openai_api_key", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "openai",
+					pi_agent_model: "gpt-5.2-codex",
+					openai_api_key: "sk-onboarding",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("pi_agent_provider")).toBe("openai");
+			expect(store.get("pi_agent_model")).toBe("gpt-5.2-codex");
+			expect(store.get("openai_api_key")).toBe("sk-onboarding");
+			expect(store.get("onboarding_complete")).toBe("true");
+			});
+
+		it("rejects pi_agent_provider openai-codex (no longer supported)", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "openai-codex",
+					pi_agent_model: "gpt-5.2",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toContain("pi_agent_provider must be one of");
+			expect(store.get("onboarding_complete")).toBeUndefined();
+			expect(store.get("pi_agent_provider")).toBeUndefined();
+			});
+
+		it("preserves a stored openai_api_key when the wizard submits an empty value", async () => {
+			const store = await tmpStore();
+			store.set("openai_api_key", "sk-stored");
+			const req = mockRequest({
+				url: "/api/onboarding",
+				method: "POST",
+				body: JSON.stringify({
+					github_token: "tok",
+					github_username: "user",
+					webhook_secret: "shh",
+					admin_full_name: "Admin User",
+					admin_username: "admin",
+					admin_password: "pass",
+					github_event_mode: "webhook",
+					pi_agent_provider: "openai",
+					pi_agent_model: "gpt-5.2-codex",
+					openai_api_key: "",
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(store.get("openai_api_key")).toBe("sk-stored");
 			});
 
 		it("omits empty AI / LLM fields rather than overwriting stored values", async () => {
@@ -1284,7 +1374,9 @@ describe("handleOnboardingRoutes", () => {
 			});
 	});
 
-	describe("GET /yolomatic/admin", () => {
+	
+
+describe("GET /yolomatic/admin", () => {
 		it("returns HTML", async () => {
 			const req = mockRequest({ url: "/yolomatic/admin", method: "GET" });
 			const res = mockResponse();

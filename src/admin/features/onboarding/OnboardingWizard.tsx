@@ -34,6 +34,8 @@ interface WizardState {
 	piAgentProvider: string;
 	piAgentModel: string;
 	ollamaContainerName: string;
+	openaiApiKey: string;
+	openaiApiKeyProtected: boolean;
 	repositories: ManagedRepo[];
 	error: string | null;
 }
@@ -41,8 +43,7 @@ interface WizardState {
 const STORAGE_KEY = "yolomatic-onboarding-wizard";
 const TOTAL_STEPS = 5;
 
-/** The only supported LLM provider today; structured for future extension. */
-export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama"];
+export const LLM_PROVIDER_OPTIONS: readonly string[] = ["ollama", "openai"];
 export const DEFAULT_OLLAMA_CONTAINER_NAME = "yolomatic-ollama";
 
 export const EVENT_MODE_OPTIONS: readonly GithubEventMode[] = ["webhook", "polling", "both"];
@@ -174,6 +175,8 @@ function getDefaultState(): WizardState {
 		piAgentProvider: "ollama",
 		piAgentModel: "",
 		ollamaContainerName: DEFAULT_OLLAMA_CONTAINER_NAME,
+		openaiApiKey: "",
+		openaiApiKeyProtected: false,
 		repositories: [],
 		error: null,
 	};
@@ -236,6 +239,9 @@ function applyConfig(state: WizardState, config: OnboardingConfig): void {
 	if (isSecretField(config.webhook_secret) && config.webhook_secret.configured) {
 		state.webhookSecretProtected = true;
 	}
+	if (isSecretField(config.openai_api_key) && config.openai_api_key.configured) {
+		state.openaiApiKeyProtected = true;
+	}
 	const provider = config.pi_agent_provider;
 	if (typeof provider === "string" && provider.trim()) {
 		state.piAgentProvider = provider.trim();
@@ -257,6 +263,7 @@ function mergeStoredState(base: WizardState, stored: WizardState): WizardState {
 	if (stored.adminPassword && stored.adminPassword.length > 0) merged.adminPasswordProtected = false;
 	if (stored.githubToken && stored.githubToken.length > 0) merged.githubTokenProtected = false;
 	if (stored.webhookSecret && stored.webhookSecret.length > 0) merged.webhookSecretProtected = false;
+	if (stored.openaiApiKey && stored.openaiApiKey.length > 0) merged.openaiApiKeyProtected = false;
 	return merged;
 }
 
@@ -432,6 +439,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			onboardingBody.pi_agent_provider = state.piAgentProvider.trim();
 			onboardingBody.pi_agent_model = state.piAgentModel.trim();
 			onboardingBody.ollama_container_name = state.ollamaContainerName.trim();
+			onboardingBody.openai_api_key = state.openaiApiKey.trim();
 			await submitOnboarding(onboardingBody);
 
 			localStorage.removeItem(STORAGE_KEY);
@@ -960,7 +968,9 @@ function StepFourAiLlm({
 	state: WizardState;
 	updateField: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
 }): React.ReactElement {
-	const isOllama = state.piAgentProvider.trim() === "ollama";
+	const provider = state.piAgentProvider.trim();
+	const isOllama = provider === "ollama";
+	const isOpenAi = provider === "openai";
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -975,8 +985,8 @@ function StepFourAiLlm({
 					))}
 				</select>
 				<span className="setting-description">
-					The only supported provider today is Ollama. Additional providers may be
-					added here in the future.
+					Select the LLM provider worker containers use. Ollama runs locally;
+					openai uses an OpenAI platform API key.
 				</span>
 			</div>
 
@@ -1005,6 +1015,28 @@ function StepFourAiLlm({
 				</>
 			)}
 
+			{isOpenAi && (
+				<div className="form-group">
+					<label htmlFor="openai_api_key">OpenAI API Key</label>
+					<input
+						id="openai_api_key"
+						type="password"
+						value={state.openaiApiKey}
+						onChange={(e) => {
+							updateField("openaiApiKey", e.target.value);
+							if (state.openaiApiKeyProtected) updateField("openaiApiKeyProtected", false);
+						}}
+						placeholder={state.openaiApiKeyProtected ? "Leave unchanged (configured)" : "sk-..."}
+						required
+					/>
+					<span className="setting-description">
+						{state.openaiApiKeyProtected
+							? "An OpenAI API key is already configured. Leave the field blank to keep it, or enter a new one to replace it."
+							: "OpenAI platform API key. Required for the openai provider; forwarded to worker containers as OPENAI_API_KEY."}
+					</span>
+				</div>
+			)}
+
 			<div className="form-group">
 				<label htmlFor="pi_agent_model">LLM Model</label>
 				<input
@@ -1012,7 +1044,7 @@ function StepFourAiLlm({
 					type="text"
 					value={state.piAgentModel}
 					onChange={(e) => updateField("piAgentModel", e.target.value)}
-					placeholder="e.g. kimi-k2.7-code:cloud"
+					placeholder="e.g. kimi-k2.7-code:cloud or gpt-5.2-codex"
 					required
 				/>
 				<span className="setting-description">

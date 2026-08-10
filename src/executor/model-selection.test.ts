@@ -94,4 +94,21 @@ describe("resolveConfiguredModel", () => {
 
 		expect(model).toEqual({ provider: "ollama", id: "kimi-k2.7-code:cloud" });
 	});
+
+	it("resolves an openai model given PI_AGENT_PROVIDER=openai", () => {
+		const registry = createRegistry([
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
+			{ provider: "openai", id: "gpt-5.2" },
+			{ provider: "openai", id: "gpt-5.2-codex" },
+		]);
+
+		const model = resolveConfiguredModel(
+			registry,
+			undefined,
+			{ PI_AGENT_PROVIDER: "openai", PI_AGENT_MODEL: "gpt-5.2-codex" },
+		);
+
+		expect(model).toEqual({ provider: "openai", id: "gpt-5.2-codex" });
+	});
+
 });

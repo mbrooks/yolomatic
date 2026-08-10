@@ -22,7 +22,7 @@ const SERVER_SETTINGS_SECTIONS = [
 
 const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
-	pi_agent_provider: ["ollama"],
+	pi_agent_provider: ["ollama", "openai"],
 };
 
 export function SettingsScreen({
@@ -111,14 +111,24 @@ export function SettingsScreen({
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
-	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
-		? []
-		: settings.filter((setting) => categories.has(setting.category) && setting.key !== "onboarding_complete");
 	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
 	const effectiveProvider =
 		(edited.pi_agent_provider !== undefined ? String(edited.pi_agent_provider) : piAgentProviderSetting?.value) ??
 		(piAgentProviderSetting?.default !== undefined ? String(piAgentProviderSetting.default) : "");
 	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
+	const showOpenAiApiKey = tab === "ai-llm" && effectiveProvider === "openai";
+	const showOllamaContainerName = tab === "ai-llm" && effectiveProvider === "ollama";
+	// Provider-specific fields are only relevant for their provider, so hide
+	// them whenever another provider is selected (e.g. hide ollama_container_name
+	// when openai is selected, and hide openai_api_key when ollama is selected).
+	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
+		? []
+		: settings.filter((setting) =>
+			categories.has(setting.category) &&
+			setting.key !== "onboarding_complete" &&
+			!(setting.key === "openai_api_key" && !showOpenAiApiKey) &&
+			!(setting.key === "ollama_container_name" && !showOllamaContainerName),
+		);
 	const ollamaContainerSetting = settings?.find((setting) => setting.key === "ollama_container_name");
 	const ollamaContainerName = String(
 		(edited.ollama_container_name !== undefined
@@ -201,6 +211,7 @@ export function SettingsScreen({
 							containerName={ollamaContainerName}
 						/>
 					)}
+
 
 					<div className="settings-actions">
 						<button

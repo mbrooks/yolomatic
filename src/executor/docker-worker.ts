@@ -53,6 +53,8 @@ export interface DockerWorkerExecutorOptions {
 	workerDockerNetworkMode?: string;
 	workerRpcServer: WorkerRpcServer;
 	workerOllamaHost?: string;
+	/** Optional OpenAI platform API key forwarded to workers as OPENAI_API_KEY. */
+	workerOpenAiApiKey?: string;
 	soulPath: string;
 	/** Scoped GitHub gateway used to serve worker tool_request calls. */
 	githubGateway?: WorkerGitHubGateway;
@@ -622,6 +624,11 @@ export class DockerWorkerExecutor implements ExecutionService {
 			args.push("-e", `OLLAMA_HOST=${ollamaHost}`);
 		}
 
+		const openaiApiKey = this.resolveWorkerOpenAiApiKey();
+		if (openaiApiKey) {
+			args.push("-e", `OPENAI_API_KEY=${openaiApiKey}`);
+		}
+
 		args.push(
 			"-e",
 			"YOLO_SESSION_KEY",
@@ -753,6 +760,17 @@ export class DockerWorkerExecutor implements ExecutionService {
 		}
 
 		return raw;
+	}
+
+	/**
+	 * Resolves the OpenAI API key to forward into worker containers. An
+	 * explicit option takes precedence; otherwise the control plane's
+	 * `OPENAI_API_KEY` env var (synced from settings) is forwarded.
+	 */
+	resolveWorkerOpenAiApiKey(): string | undefined {
+		const explicit = this.options.workerOpenAiApiKey?.trim();
+		if (explicit) return explicit;
+		return process.env.OPENAI_API_KEY?.trim() || undefined;
 	}
 
 	private async ensureWorkerImage(): Promise<void> {

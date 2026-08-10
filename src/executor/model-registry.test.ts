@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createYolomaticModelRegistry, resolveOllamaBaseUrl } from "./model-registry.js";
+import {
+	createYolomaticModelRegistry,
+	resolveOllamaBaseUrl,
+	OPENAI_PROVIDER_BASE_URL,
+	OPENAI_PROVIDER_ID,
+} from "./model-registry.js";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	AuthStorage: { create: vi.fn(() => ({})) },
@@ -13,7 +18,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 describe("createYolomaticModelRegistry", () => {
-	it("creates an in-memory registry with ollama provider", () => {
+	it("creates an in-memory registry with the ollama provider", () => {
 		const mockAuthStorage = {};
 		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
 		const mockRegistry = { registerProvider: vi.fn() };
@@ -32,6 +37,40 @@ describe("createYolomaticModelRegistry", () => {
 			]),
 		}));
 		expect(registry).toBe(mockRegistry);
+	});
+
+	it("registers the openai provider against the platform API", () => {
+		const mockAuthStorage = {};
+		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
+		const mockRegistry = { registerProvider: vi.fn() };
+		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+
+		createYolomaticModelRegistry(mockAuthStorage as never);
+
+		expect(mockRegistry.registerProvider).toHaveBeenCalledWith(
+			OPENAI_PROVIDER_ID,
+			expect.objectContaining({
+				baseUrl: OPENAI_PROVIDER_BASE_URL,
+				api: "openai-responses",
+				models: expect.arrayContaining([
+					expect.objectContaining({ id: "gpt-5.2", api: "openai-responses" }),
+					expect.objectContaining({ id: "gpt-5.2-codex", api: "openai-responses" }),
+					expect.objectContaining({ id: "gpt-5.1-codex", api: "openai-responses" }),
+				]),
+			}),
+		);
+	});
+
+	it("registers both providers in order (ollama, openai)", () => {
+		const mockAuthStorage = {};
+		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
+		const registerProvider = vi.fn();
+		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue({ registerProvider });
+
+		createYolomaticModelRegistry(mockAuthStorage as never);
+
+		const registeredNames = registerProvider.mock.calls.map((call) => call[0]);
+		expect(registeredNames).toEqual(["ollama", OPENAI_PROVIDER_ID]);
 	});
 });
 

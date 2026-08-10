@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 
-import { OnboardingWizard, buildInitialState } from "./OnboardingWizard.js";
+import { OnboardingWizard, buildInitialState, isAiLlmStepValid } from "./OnboardingWizard.js";
 import type { OnboardingConfig } from "../../api/onboarding.js";
 
 function mockOkResponse(data: unknown): Response {
@@ -75,6 +75,23 @@ async function advanceThroughAiLlmStep(model = "test-model"): Promise<void> {
 	fireEvent.click(screen.getByText("Next"));
 	await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
 }
+
+describe("isAiLlmStepValid", () => {
+	it("requires a provider", () => {
+		expect(isAiLlmStepValid("", "kimi-k2.7-code:cloud", "yolomatic-ollama")).toBe(false);
+	});
+
+	it("requires a model for every provider", () => {
+		expect(isAiLlmStepValid("ollama", "", "yolomatic-ollama")).toBe(false);
+		expect(isAiLlmStepValid("openai", "", "")).toBe(false);
+	});
+
+	it("requires the container name only for the ollama provider", () => {
+		expect(isAiLlmStepValid("ollama", "kimi-k2.7-code:cloud", "")).toBe(false);
+		expect(isAiLlmStepValid("openai", "gpt-5.2-codex", "")).toBe(true);
+		expect(isAiLlmStepValid("ollama", "kimi-k2.7-code:cloud", "yolomatic-ollama")).toBe(true);
+	});
+});
 
 describe("OnboardingWizard", () => {
 	let fetchSpy: any;
@@ -989,7 +1006,7 @@ describe("OnboardingWizard", () => {
 
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
 			const providerSelect = screen.getByLabelText("LLM Provider") as HTMLSelectElement;
-			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama"]);
+			expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(["ollama", "openai"]);
 			expect(providerSelect.value).toBe("ollama");
 			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("yolomatic-ollama");
 			expect(screen.queryByText("Ollama sign-in status")).not.toBeNull();
@@ -1132,6 +1149,68 @@ describe("OnboardingWizard", () => {
 			// Mounting the step triggers the panel's mount-time status check.
 			await waitFor(() => expect(onboarding.fetchOnboardingOllamaSignInStatus).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Signed in as")).not.toBeNull();
+			});
+
+		it("renders an OpenAI API key field and no Ollama fields when provider is openai", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.pi_agent_provider = "openai";
+			config.pi_agent_model = "gpt-5.2-codex";
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			expect((screen.getByLabelText("LLM Provider") as HTMLSelectElement).value).toBe("openai");
+			expect(screen.queryByLabelText("OpenAI API Key")).not.toBeNull();
+			// Ollama-specific UI is hidden for the openai provider.
+			expect(screen.queryByLabelText("Ollama Container Name")).toBeNull();
+			expect(screen.queryByText("Ollama sign-in status")).toBeNull();
+			expect((screen.getByLabelText("LLM Model") as HTMLInputElement).value).toBe("gpt-5.2-codex");
+			// Next is enabled because model is set and container name is not required for openai.
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+			});
+
+		it("marks a configured OpenAI API key as protected and leaves the field blank", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.pi_agent_provider = "openai";
+			config.openai_api_key = { configured: true };
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			const keyInput = screen.getByLabelText("OpenAI API Key") as HTMLInputElement;
+			expect(keyInput.value).toBe("");
+			expect(keyInput.placeholder).toContain("Leave unchanged");
+			});
+
+		it("disables Next when the model field is empty for the openai provider", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			const config = emptyConfig();
+			config.pi_agent_provider = "openai";
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
 			});
 	});
 });

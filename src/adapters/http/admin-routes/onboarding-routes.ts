@@ -40,14 +40,16 @@ export const ONBOARDING_CONFIG_KEYS = [
 	"pi_agent_provider",
 	"pi_agent_model",
 	"ollama_container_name",
+	"openai_api_key",
 ] as const;
 
 /** LLM provider values accepted by the onboarding submission handler. */
-export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama"];
+export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama", "openai"];
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
 	"webhook_secret",
+	"openai_api_key",
 ]);
 
 export interface OnboardingConfigField {
@@ -432,6 +434,10 @@ const registry = new AdminRouteRegistry()
 			const containerValue = body.ollama_container_name?.trim();
 			if (containerValue) {
 				settingsStore.set("ollama_container_name", containerValue);
+			}
+			const openaiApiKey = resolveSecret("openai_api_key");
+			if (openaiApiKey) {
+				settingsStore.set("openai_api_key", openaiApiKey);
 			}
 			settingsStore.set(ONBOARDING_COMPLETE_SETTING, "true");
 			const storedMissing = getMissingOnboardingSettings({

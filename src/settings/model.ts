@@ -291,11 +291,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 	{
 		key: "pi_agent_provider",
 		type: "string",
-		description: "LLM provider used by worker containers. The only supported provider is ollama; additional providers may be added here in the future.",
+		description: "LLM provider used by worker containers. Supported providers: ollama, openai (OpenAI platform API key).",
 		default: "ollama",
 		requiresRestart: false,
 		sensitive: false,
 		envVar: "PI_AGENT_PROVIDER",
+		category: "ai-llm",
+	},
+	{
+		key: "openai_api_key",
+		type: "string",
+		description: "OpenAI platform API key. Required when pi_agent_provider is openai. Forwarded to worker containers as OPENAI_API_KEY.",
+		requiresRestart: true,
+		sensitive: true,
+		envVar: "OPENAI_API_KEY",
 		category: "ai-llm",
 	},
 	{
