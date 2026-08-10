@@ -1,4 +1,5 @@
-import { type AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ModelLookup, ModelReference } from "./model-selection.js";
 
 /** Base URL for the OpenAI platform API (pay-as-you-go API key access). */
 export const OPENAI_PROVIDER_BASE_URL = "https://api.openai.com/v1";
@@ -21,6 +22,16 @@ interface RegisteredProviderModel {
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	contextWindow: number;
 	maxTokens: number;
+}
+
+/**
+ * Yolomatic's model registry wraps pi's `ModelRuntime` and exposes the small
+ * `ModelLookup` surface used by `resolveConfiguredModel`. The underlying
+ * runtime is exposed so `createAgentSession` can receive the canonical model/auth
+ * runtime it expects in newer pi versions.
+ */
+export interface YolomaticModelRegistry extends ModelLookup<ModelReference> {
+	runtime: ModelRuntime;
 }
 
 function resolveOllamaBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
@@ -93,10 +104,10 @@ const OPENAI_MODELS: RegisteredProviderModel[] = [
  * API provider (`openai`, API-key access). OAuth-based ChatGPT Codex access
  * is no longer supported.
  */
-export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelRegistry {
-	const registry = ModelRegistry.inMemory(authStorage);
+export async function createYolomaticModelRegistry(): Promise<YolomaticModelRegistry> {
+	const runtime = await ModelRuntime.create({ refreshOnCreate: false });
 
-	registry.registerProvider("ollama", {
+	runtime.registerProvider("ollama", {
 		baseUrl: resolveOllamaBaseUrl(),
 		api: "openai-completions",
 		apiKey: "ollama",
@@ -132,7 +143,7 @@ export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelReg
 
 	const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
 	if (openaiApiKey) {
-		registry.registerProvider(OPENAI_PROVIDER_ID, {
+		runtime.registerProvider(OPENAI_PROVIDER_ID, {
 			baseUrl: OPENAI_PROVIDER_BASE_URL,
 			api: "openai-responses",
 			apiKey: openaiApiKey,
@@ -140,7 +151,17 @@ export function createYolomaticModelRegistry(authStorage: AuthStorage): ModelReg
 		});
 	}
 
-	return registry;
+	return {
+		runtime,
+		find(provider, modelId) {
+			const model = runtime.getModel(provider, modelId);
+			if (!model) return undefined;
+			return { provider: model.provider, id: model.id };
+		},
+		getAll() {
+			return runtime.getModels().map((model) => ({ provider: model.provider, id: model.id }));
+		},
+	};
 }
 
 export { resolveOllamaBaseUrl };

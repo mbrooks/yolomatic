@@ -452,7 +452,7 @@ describe("HandleIssueEvent", () => {
 				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
-		});
+		}) as any;
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
@@ -483,7 +483,7 @@ describe("HandleIssueEvent", () => {
 				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
-		});
+		}) as any;
 		deps.adminBaseUrl = "http://host:6767/yolomatic/admin";
 		deps.issueAdminLinkInCommentsEnabled = true;
 		const handler = new HandleIssueEvent(deps as any);
@@ -517,7 +517,7 @@ describe("HandleIssueEvent", () => {
 				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				labels: [],
 			};
-		});
+		}) as any;
 		deps.adminBaseUrl = "http://host:6767/yolomatic/admin";
 		deps.issueAdminLinkInCommentsEnabled = false;
 		const handler = new HandleIssueEvent(deps as any);

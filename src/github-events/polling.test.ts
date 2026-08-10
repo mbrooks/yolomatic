@@ -736,7 +736,7 @@ describe("tickGitHubPolling", () => {
 			created_at: "2026-06-01T12:10:00.000Z",
 			updated_at: "2026-06-01T12:10:00.000Z",
 		};
-		github.listIssuesUpdatedSince = vi.fn(async () => [newIssue]);
+		github.listIssuesUpdatedSince = vi.fn(async () => [newIssue]) as any;
 		const secondDispatch = vi.fn(async (_event: unknown) => {});
 		const secondTickNow = new Date("2026-06-01T12:15:00.000Z");
 

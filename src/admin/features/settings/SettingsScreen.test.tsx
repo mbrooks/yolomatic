@@ -263,6 +263,14 @@ function aiLlmSettingsWithProvider(provider: string) {
 }
 
 describe("SettingsScreen", () => {
+	beforeEach(() => {
+		Object.defineProperty(window, "confirm", {
+			value: vi.fn(() => true),
+			writable: true,
+			configurable: true,
+		});
+	});
+
 	afterEach(() => {
 		vi.restoreAllMocks();
 		window.location.hash = "";

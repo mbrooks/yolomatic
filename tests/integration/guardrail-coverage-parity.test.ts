@@ -47,6 +47,7 @@ describe("guardrail classification parity", () => {
 		"src/domain/session/model.ts",
 		"src/admin/api/issues.ts",
 		"src/adapters/http/admin-router.ts",
+		"src/admin/css-modules.d.ts",
 	];
 
 	it("classifies every representative path identically", () => {

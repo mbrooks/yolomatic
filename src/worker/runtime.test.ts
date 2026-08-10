@@ -161,10 +161,12 @@ const mockSession = {
 };
 
 vi.mock("../executor/index.js", () => ({
-	PiAgentExecutor: vi.fn(() => ({
-		executeWithOverride,
-		executeRefinement,
-	})),
+	PiAgentExecutor: vi.fn(function () {
+		return {
+			executeWithOverride,
+			executeRefinement,
+		};
+	}),
 }));
 
 import { PiAgentExecutor } from "../executor/index.js";

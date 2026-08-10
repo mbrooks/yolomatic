@@ -31,6 +31,14 @@ function mockListUsers(users: unknown[] = [USER_FIXTURE]) {
 }
 
 describe("UsersScreen", () => {
+	beforeEach(() => {
+		Object.defineProperty(window, "confirm", {
+			value: vi.fn(() => true),
+			writable: true,
+			configurable: true,
+		});
+	});
+
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});

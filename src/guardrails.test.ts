@@ -12,6 +12,7 @@ import {
 	getDefaultChangedFiles,
 	getExpectedTestFile,
 	getFileCoverage,
+	isDeclarationFile,
 	isGuardrailSourceFile,
 	MINIMUM_COVERAGE,
 	parseChangedFiles,
@@ -85,6 +86,11 @@ describe("isGuardrailSourceFile", () => {
 	it("returns false for third-party setup / wiring files", () => {
 		expect(isGuardrailSourceFile("src/adapters/github/octokit.ts")).toBe(false);
 	});
+
+	it("returns false for TypeScript declaration files", () => {
+		expect(isGuardrailSourceFile("src/admin/css-modules.d.ts")).toBe(false);
+		expect(isGuardrailSourceFile("src/foo/bar.d.ts")).toBe(false);
+	});
 });
 
 describe("getChangedSourceFiles", () => {
@@ -106,7 +112,7 @@ describe("getChangedSourceFiles", () => {
 		]);
 	});
 
-	it("filters out styling, type-export, configuration, and third-party-setup files", () => {
+	it("filters out styling, type-export, configuration, third-party-setup, and declaration files", () => {
 		const result = getChangedSourceFiles([
 			"src/session/manager.ts",
 			"src/admin/components/Modal.tsx",
@@ -115,6 +121,7 @@ describe("getChangedSourceFiles", () => {
 			"src/workspace/config.ts",
 			"src/adapters/github/octokit.ts",
 			"src/foo/bar.config.ts",
+			"src/admin/css-modules.d.ts",
 		]);
 		expect(result).toEqual(["src/session/manager.ts"]);
 	});
@@ -231,6 +238,7 @@ describe("runGuardrail", () => {
 			"src/adapters/github/octokit.ts",
 			"src/skills/types.ts",
 			"src/admin/components/Modal.tsx",
+			"src/admin/css-modules.d.ts",
 		]);
 		expect(result.ok).toBe(true);
 		expect(result.checkedFiles).toEqual([]);

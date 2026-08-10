@@ -7,52 +7,61 @@ import {
 } from "./model-registry.js";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
-	AuthStorage: { create: vi.fn(() => ({})) },
-	ModelRegistry: {
-		inMemory: vi.fn(() => ({
-			registerProvider: vi.fn(),
-		})),
+	ModelRuntime: {
+		create: vi.fn(),
 	},
 }));
 
-import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+
+function mockRuntime() {
+	return {
+		registerProvider: vi.fn(),
+		getModel: vi.fn(),
+		getModels: vi.fn(() => [] as Array<{ provider: string; id: string }>),
+	};
+}
+
+function stubRuntime(mock: ReturnType<typeof mockRuntime>) {
+	(ModelRuntime.create as ReturnType<typeof vi.fn>).mockResolvedValue(mock);
+}
 
 describe("createYolomaticModelRegistry", () => {
 	afterEach(() => {
 		vi.unstubAllEnvs();
+		vi.restoreAllMocks();
 	});
 
-	it("creates an in-memory registry with the ollama provider", () => {
-		const mockAuthStorage = {};
-		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
-		const mockRegistry = { registerProvider: vi.fn() };
-		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+	it("creates a runtime-backed registry with the ollama provider", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
 
-		const registry = createYolomaticModelRegistry(mockAuthStorage as never);
+		const registry = await createYolomaticModelRegistry();
 
-		expect(ModelRegistry.inMemory).toHaveBeenCalledWith(mockAuthStorage);
-		expect(mockRegistry.registerProvider).toHaveBeenCalledWith("ollama", expect.objectContaining({
-			baseUrl: "http://127.0.0.1:11434/v1",
-			api: "openai-completions",
-			apiKey: "ollama",
-			models: expect.arrayContaining([
-				expect.objectContaining({ id: "kimi-k2.7-code:cloud" }),
-				expect.objectContaining({ id: "glm-5.2:cloud" }),
-			]),
-		}));
-		expect(registry).toBe(mockRegistry);
+		expect(ModelRuntime.create).toHaveBeenCalledWith(expect.objectContaining({ refreshOnCreate: false }));
+		expect(mock.registerProvider).toHaveBeenCalledWith(
+			"ollama",
+			expect.objectContaining({
+				baseUrl: "http://127.0.0.1:11434/v1",
+				api: "openai-completions",
+				apiKey: "ollama",
+				models: expect.arrayContaining([
+					expect.objectContaining({ id: "kimi-k2.7-code:cloud" }),
+					expect.objectContaining({ id: "glm-5.2:cloud" }),
+				]),
+			}),
+		);
+		expect(registry.runtime).toBe(mock);
 	});
 
-	it("registers the openai provider against the platform API", () => {
-		const mockAuthStorage = {};
-		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
-		const mockRegistry = { registerProvider: vi.fn() };
-		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+	it("registers the openai provider against the platform API", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
 		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
-		createYolomaticModelRegistry(mockAuthStorage as never);
+		await createYolomaticModelRegistry();
 
-		expect(mockRegistry.registerProvider).toHaveBeenCalledWith(
+		expect(mock.registerProvider).toHaveBeenCalledWith(
 			OPENAI_PROVIDER_ID,
 			expect.objectContaining({
 				baseUrl: OPENAI_PROVIDER_BASE_URL,
@@ -67,27 +76,46 @@ describe("createYolomaticModelRegistry", () => {
 		);
 	});
 
-	it("registers only ollama when no OpenAI API key is configured", () => {
-		const mockRegistry = { registerProvider: vi.fn() };
-		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+	it("registers only ollama when no OpenAI API key is configured", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
 		vi.stubEnv("OPENAI_API_KEY", "");
 
-		createYolomaticModelRegistry({} as never);
+		await createYolomaticModelRegistry();
 
-		expect(mockRegistry.registerProvider.mock.calls.map(([provider]) => provider)).toEqual(["ollama"]);
+		expect(mock.registerProvider.mock.calls.map(([provider]) => provider)).toEqual(["ollama"]);
 	});
 
-	it("registers both providers in order (ollama, openai)", () => {
-		const mockAuthStorage = {};
-		(AuthStorage.create as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthStorage);
-		const registerProvider = vi.fn();
-		(ModelRegistry.inMemory as ReturnType<typeof vi.fn>).mockReturnValue({ registerProvider });
+	it("registers both providers in order (ollama, openai)", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
 		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
-		createYolomaticModelRegistry(mockAuthStorage as never);
+		await createYolomaticModelRegistry();
 
-		const registeredNames = registerProvider.mock.calls.map((call) => call[0]);
+		const registeredNames = mock.registerProvider.mock.calls.map((call) => call[0]);
 		expect(registeredNames).toEqual(["ollama", OPENAI_PROVIDER_ID]);
+	});
+
+	it("exposes a lookup that maps runtime models to provider/id references", async () => {
+		const mock = mockRuntime();
+		mock.getModels.mockReturnValue([
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
+			{ provider: "openai", id: "gpt-5.2" },
+		]);
+		mock.getModel.mockImplementation((provider: string, id: string) =>
+			mock.getModels().find((m: { provider: string; id: string }) => m.provider === provider && m.id === id),
+		);
+		stubRuntime(mock);
+
+		const registry = await createYolomaticModelRegistry();
+
+		expect(registry.getAll()).toEqual([
+			{ provider: "ollama", id: "kimi-k2.7-code:cloud" },
+			{ provider: "openai", id: "gpt-5.2" },
+		]);
+		expect(registry.find("openai", "gpt-5.2")).toEqual({ provider: "openai", id: "gpt-5.2" });
+		expect(registry.find("openai", "missing")).toBeUndefined();
 	});
 });
 

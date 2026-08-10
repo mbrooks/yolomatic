@@ -5,6 +5,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true
   },
-  "include": ["src/admin/**/*.ts", "src/admin/**/*.tsx"],
+  "include": ["src/admin/**/*.ts", "src/admin/**/*.tsx", "src/admin/**/*.d.ts"],
   "exclude": ["src/admin/**/*.test.ts", "src/admin/**/*.test.tsx"]
 }

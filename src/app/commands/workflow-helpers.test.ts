@@ -791,7 +791,7 @@ describe("workflow helpers", () => {
 					sessions: sessions as never,
 					tasks: tasks as never,
 					adminGithubUsername: overrides?.adminGithubUsername,
-					prReview: overrides?.prReview,
+					prReview: overrides?.prReview as any,
 				},
 				github,
 				sessions,
