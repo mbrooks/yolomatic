@@ -117,14 +117,17 @@ export function SettingsScreen({
 		(piAgentProviderSetting?.default !== undefined ? String(piAgentProviderSetting.default) : "");
 	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
 	const showOpenAiApiKey = tab === "ai-llm" && effectiveProvider === "openai";
-	// The openai_api_key field is only relevant for the openai provider, so hide
-	// it whenever another provider (e.g. ollama) is selected.
+	const showOllamaContainerName = tab === "ai-llm" && effectiveProvider === "ollama";
+	// Provider-specific fields are only relevant for their provider, so hide
+	// them whenever another provider is selected (e.g. hide ollama_container_name
+	// when openai is selected, and hide openai_api_key when ollama is selected).
 	const filteredSettings = tab === "skills" || tab === "invitations" || tab === "repositories" || tab === "users"
 		? []
 		: settings.filter((setting) =>
 			categories.has(setting.category) &&
 			setting.key !== "onboarding_complete" &&
-			!(setting.key === "openai_api_key" && !showOpenAiApiKey),
+			!(setting.key === "openai_api_key" && !showOpenAiApiKey) &&
+			!(setting.key === "ollama_container_name" && !showOllamaContainerName),
 		);
 	const ollamaContainerSetting = settings?.find((setting) => setting.key === "ollama_container_name");
 	const ollamaContainerName = String(

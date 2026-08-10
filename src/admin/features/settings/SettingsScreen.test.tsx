@@ -627,6 +627,23 @@ describe("SettingsScreen", () => {
 		expect(screen.queryByLabelText(/openai_api_key/)).toBeNull();
 	});
 
+	it("hides the ollama_container_name field when the provider is openai", async () => {
+		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+			const url = typeof input === "string" ? input : input.url;
+			if (url === "/api/settings") {
+				return Promise.resolve(jsonResponse({ settings: aiLlmSettingsWithProvider("openai") }));
+			}
+			return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+		});
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		await waitFor(() => {
+			expect(screen.getByText("openai_api_key")).not.toBeNull();
+		});
+		expect(screen.queryByText("ollama_container_name")).toBeNull();
+		expect(screen.queryByLabelText(/ollama_container_name/)).toBeNull();
+	});
+
 	it("shows the openai_api_key field when the provider is openai", async () => {
 		vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
 			const url = typeof input === "string" ? input : input.url;
