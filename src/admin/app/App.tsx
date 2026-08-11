@@ -110,6 +110,14 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 		[route],
 	);
 
+	const handleDeselectSession = useCallback(() => {
+		if (route.screen === "repo") {
+			navigate({ screen: "repo", owner: route.owner, repo: route.repo, tab: route.tab ?? "sessions" });
+		} else if (route.screen === "working") {
+			navigate({ screen: "working" });
+		}
+	}, [route]);
+
 	const handleSelectTab = useCallback(
 		(tab: "sessions" | "skills" | "issues" | "settings") => {
 			if (route.screen === "repo") {
@@ -175,6 +183,7 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 						onSelectRepos={handleSelectReposList}
 						onSelectTab={handleSelectTab}
 						onSelectSettings={handleSelectSettings}
+						onDeselectSession={handleDeselectSession}
 						onRerunOnboarding={onRerunOnboarding}
 					/>
 			)}
@@ -243,6 +252,7 @@ function AppContent({
 	onSelectRepos,
 	onSelectTab,
 	onSelectSettings,
+	onDeselectSession,
 	onRerunOnboarding,
 }: {
 	route: Route;
@@ -262,6 +272,7 @@ function AppContent({
 	onSelectRepos: () => void;
 	onSelectTab: (tab: "sessions" | "skills" | "issues" | "settings") => void;
 	onSelectSettings: () => void;
+	onDeselectSession: () => void;
 	onRerunOnboarding?: () => void;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
@@ -299,6 +310,7 @@ function AppContent({
 				onMutate={onMutate}
 				breadcrumbLabel="Active Tasks"
 				onBack={onBack}
+				onDeselect={onDeselectSession}
 				emptyMessage="No active tasks."
 			/>
 		);
@@ -328,6 +340,7 @@ function AppContent({
 					emptyMessage="No sessions for this repository."
 					activeTab={route.tab ?? "sessions"}
 					onSelectTab={onSelectTab}
+					onDeselect={onDeselectSession}
 				/>
 			);
 		}
