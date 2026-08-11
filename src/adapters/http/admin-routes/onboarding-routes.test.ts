@@ -1376,6 +1376,127 @@ describe("handleOnboardingRoutes", () => {
 
 	
 
+	describe("GET /api/onboarding/llm/models", () => {
+		function providerResponse(data: unknown): Response {
+			return new Response(JSON.stringify(data), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		}
+
+		it("returns OpenAI models using a submitted API key", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				providerResponse({ data: [{ id: "gpt-4" }, { id: "gpt-3.5" }] }),
+			);
+			const store = await tmpStore();
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=openai&apiKey=sk-wizard", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.models).toEqual(["gpt-3.5", "gpt-4"]);
+			expect(body.error).toBeUndefined();
+			expect(fetchSpy).toHaveBeenCalledWith(
+				"https://api.openai.com/v1/models",
+				expect.objectContaining({ headers: { Authorization: "Bearer sk-wizard" } }),
+			);
+			expect(String(res.body)).not.toContain("sk-wizard");
+		});
+
+		it("falls back to the stored OpenAI API key when no apiKey is submitted", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				providerResponse({ data: [{ id: "gpt-4" }] }),
+			);
+			const store = await tmpStore();
+			store.set("openai_api_key", "sk-stored");
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=openai", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(fetchSpy).toHaveBeenCalledWith(
+				"https://api.openai.com/v1/models",
+				expect.objectContaining({ headers: { Authorization: "Bearer sk-stored" } }),
+			);
+			expect(String(res.body)).not.toContain("sk-stored");
+		});
+
+		it("returns a placeholder error when the OpenAI API key is not available", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=openai", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.models).toEqual([]);
+			expect(body.error).toBe("Enter an OpenAI API key to load models");
+		});
+
+		it("returns Ollama model names", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				providerResponse({ models: [{ name: "llama2" }, { name: "mistral" }] }),
+			);
+			const store = await tmpStore();
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=ollama", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.models).toEqual(["llama2", "mistral"]);
+			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+		});
+
+		it("does not require admin authentication", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(providerResponse({ models: [] }));
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			delete (deps as { sessionAuth?: unknown }).sessionAuth;
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=ollama", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(fetchSpy).toHaveBeenCalled();
+		});
+
+		it("returns 400 for an unsupported provider", async () => {
+			const store = await tmpStore();
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=anthropic", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(store), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			expect(JSON.parse(String(res.body)).error).toContain("Unsupported LLM provider");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=openai", method: "GET" });
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, makeDeps(), "/api/onboarding/llm/models");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			expect(JSON.parse(String(res.body)).error).toContain("Settings store not configured");
+		});
+	});
+
+
 describe("GET /yolomatic/admin", () => {
 		it("returns HTML", async () => {
 			const req = mockRequest({ url: "/yolomatic/admin", method: "GET" });

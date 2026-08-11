@@ -173,4 +173,134 @@ describe("handleSettingsRoutes", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(400);
 	});
+
+	describe("GET /api/llm/models", () => {
+		function providerResponse(data: unknown): Response {
+			return new Response(JSON.stringify(data), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		}
+
+		it("returns sorted OpenAI model ids using the stored API key", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				providerResponse({ data: [{ id: "gpt-4" }, { id: "gpt-3.5" }] }),
+			);
+			const res = response();
+			const deps = makeDeps({
+				settingsStore: {
+					getAllViews: vi.fn(() => ({})),
+					setTyped: vi.fn(),
+					getString: vi.fn((key: string, defaultValue: string) => defaultValue),
+					get: vi.fn((key: string) => (key === "openai_api_key" ? "sk-stored" : undefined)),
+				},
+			});
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=openai"),
+				res,
+				deps,
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(res.body);
+			expect(body.models).toEqual(["gpt-3.5", "gpt-4"]);
+			expect(body.error).toBeUndefined();
+			expect(fetchSpy).toHaveBeenCalledWith(
+				"https://api.openai.com/v1/models",
+				expect.objectContaining({ headers: { Authorization: "Bearer sk-stored" } }),
+			);
+			expect(String(res.body)).not.toContain("sk-stored");
+		});
+
+		it("returns a placeholder error when the OpenAI API key is missing", async () => {
+			const res = response();
+			const deps = makeDeps({
+				settingsStore: {
+					getAllViews: vi.fn(() => ({})),
+					setTyped: vi.fn(),
+					getString: vi.fn((key: string, defaultValue: string) => defaultValue),
+					get: vi.fn(() => undefined),
+				},
+			});
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=openai"),
+				res,
+				deps,
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(res.body);
+			expect(body.models).toEqual([]);
+			expect(body.error).toBe("Enter an OpenAI API key to load models");
+		});
+
+		it("returns sorted Ollama model names", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				providerResponse({ models: [{ name: "llama2" }, { name: "mistral" }] }),
+			);
+			const res = response();
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=ollama"),
+				res,
+				makeDeps(),
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(res.body);
+			expect(body.models).toEqual(["llama2", "mistral"]);
+			expect(body.error).toBeUndefined();
+			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+		});
+
+		it("returns a graceful error when Ollama is unreachable", async () => {
+			vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("connection refused"));
+			const res = response();
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=ollama"),
+				res,
+				makeDeps(),
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(res.body);
+			expect(body.models).toEqual([]);
+			expect(body.error).toContain("Ollama is not reachable");
+		});
+
+		it("returns 400 for an unsupported provider", async () => {
+			const res = response();
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=anthropic"),
+				res,
+				makeDeps(),
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			expect(JSON.parse(res.body).error).toContain("Unsupported LLM provider");
+		});
+
+		it("returns 500 when settingsStore is missing", async () => {
+			const res = response();
+			const handled = await handleSettingsRoutes(
+				request("/api/llm/models?provider=openai"),
+				res,
+				{ sessionAuth: { requireAdminJson: () => true, requireAdminText: () => true, isAdminAuthorized: () => true, hasUsers: () => true } as never } as any,
+				"/api/llm/models",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(500);
+			expect(JSON.parse(res.body).error).toContain("Settings store not configured");
+		});
+	});
 });

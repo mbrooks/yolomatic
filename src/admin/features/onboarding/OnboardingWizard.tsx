@@ -7,6 +7,7 @@ import {
 	initializeWorkspaces,
 	fetchOnboardingConfig,
 	fetchOnboardingOllamaSignInStatus,
+	fetchOnboardingLlmModels,
 	isSecretField,
 	type OnboardingConfig,
 	type OnboardingSecretField,
@@ -14,6 +15,7 @@ import {
 import { Modal } from "../../components/Modal.js";
 import { RepoManager, type ManagedRepo } from "../repos/RepoManager.js";
 import { OllamaSignInPanel } from "../settings/OllamaSignInPanel.js";
+import { LlmModelSelect } from "../settings/LlmModelSelect.js";
 
 export type GithubEventMode = "webhook" | "polling" | "both";
 
@@ -1038,14 +1040,14 @@ function StepFourAiLlm({
 			)}
 
 			<div className="form-group">
-				<label htmlFor="pi_agent_model">LLM Model</label>
-				<input
-					id="pi_agent_model"
-					type="text"
+				<LlmModelSelect
+					provider={state.piAgentProvider}
 					value={state.piAgentModel}
-					onChange={(e) => updateField("piAgentModel", e.target.value)}
-					placeholder="e.g. kimi-k2.7-code:cloud or gpt-5.2-codex"
-					required
+					onChange={(val) => updateField("piAgentModel", val)}
+					fetcher={fetchOnboardingLlmModels}
+					apiKey={isOpenAi ? state.openaiApiKey.trim() : undefined}
+					id="pi_agent_model"
+					label="LLM Model"
 				/>
 				<span className="setting-description">
 					The model identifier worker containers use when invoking the LLM. This

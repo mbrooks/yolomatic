@@ -8,6 +8,8 @@ import {
 	initializeWorkspaces,
 	submitOnboarding,
 	fetchOnboardingOllamaSignInStatus,
+	fetchOnboardingLlmModels,
+	isSecretField,
 } from "./onboarding.js";
 
 function mockOkResponse(data: unknown): Response {
@@ -28,6 +30,24 @@ describe("onboarding API", () => {
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
+	});
+
+	describe("isSecretField", () => {
+		it("returns true for an object with { configured }", () => {
+			expect(isSecretField({ configured: true })).toBe(true);
+			expect(isSecretField({ configured: false })).toBe(true);
+		});
+
+		it("returns false for plain strings", () => {
+			expect(isSecretField("")).toBe(false);
+			expect(isSecretField("token")).toBe(false);
+		});
+
+		it("returns false for invalid shapes", () => {
+			expect(isSecretField(null as any)).toBe(false);
+			expect(isSecretField({} as any)).toBe(false);
+			expect(isSecretField({ configured: "yes" } as any)).toBe(false);
+		});
 	});
 
 	describe("fetchOnboardingStatus", () => {
@@ -178,7 +198,7 @@ describe("onboarding API", () => {
 			const result = await fetchOnboardingOllamaSignInStatus();
 			expect(result.signedIn).toBe(false);
 			expect(result.signInUrl).toBe("https://ollama.com/connect?name=x&key=y");
-			});
+		});
 
 		it("throws when the response is not ok", async () => {
 			fetchSpy.mockImplementation(async () => {
@@ -188,6 +208,23 @@ describe("onboarding API", () => {
 				});
 			});
 			await expect(fetchOnboardingOllamaSignInStatus()).rejects.toThrow("HTTP 500");
+		});
+	});
+
+	describe("fetchOnboardingLlmModels", () => {
+		it("GETs /api/onboarding/llm/models for the requested provider", async () => {
+			fetchSpy.mockImplementation(async () => mockOkResponse({ models: ["gpt-4"] }));
+			const result = await fetchOnboardingLlmModels("openai");
+			expect(result.models).toEqual(["gpt-4"]);
+			const calls = fetchSpy.mock.calls as [string, RequestInit | undefined][];
+			expect(calls[0][0]).toBe("/api/onboarding/llm/models?provider=openai");
+		});
+
+		it("includes the submitted API key in the query string", async () => {
+			fetchSpy.mockImplementation(async () => mockOkResponse({ models: ["gpt-4"] }));
+			await fetchOnboardingLlmModels("openai", "sk-wizard");
+			const calls = fetchSpy.mock.calls as [string, RequestInit | undefined][];
+			expect(calls[0][0]).toBe("/api/onboarding/llm/models?provider=openai&apiKey=sk-wizard");
 		});
 	});
 });

@@ -14,6 +14,11 @@ import {
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
+import {
+	fetchOpenAiModels,
+	fetchOllamaModels,
+	resolveOllamaHost,
+} from "../../../llm/fetch-models.js";
 import type { User } from "../../../users/store.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
@@ -202,6 +207,26 @@ function applyMasterAdmin(
 }
 
 const registry = new AdminRouteRegistry()
+	.route({
+		method: "GET",
+		pattern: /^\/api\/onboarding\/llm\/models$/u,
+		auth: false,
+		requiresDeps: ["settingsStore"],
+		handler: async (ctx) => {
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
+			const requestUrl = new URL(ctx.request.url ?? "/", "http://localhost");
+			const provider = requestUrl.searchParams.get("provider") ?? "";
+			if (provider === "openai") {
+				const apiKey = requestUrl.searchParams.get("apiKey") ?? settingsStore.get("openai_api_key") ?? "";
+				return { status: 200, body: await fetchOpenAiModels(apiKey) };
+			}
+			if (provider === "ollama") {
+				return { status: 200, body: await fetchOllamaModels(resolveOllamaHost()) };
+			}
+			sendJson(ctx.response, 400, { error: `Unsupported LLM provider: ${provider}` });
+			return;
+		},
+	})
 	.route({
 		method: "GET",
 		pattern: /^\/api\/onboarding\/status$/u,
