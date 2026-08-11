@@ -76,6 +76,52 @@ describe("admin table layouts", () => {
 	});
 });
 
+describe("settings screen layout", () => {
+	it("lets the settings screen scroll the full page instead of clipping content", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = rule(css, ".settings-screen");
+
+		expect(body).toContain("overflow-y: auto");
+		expect(body).toContain("min-height: 0");
+		expect(body).not.toContain("overflow: hidden");
+	});
+
+	it("removes the fixed-height inner scroll pane from the settings list", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = rule(css, ".settings-list");
+
+		expect(body).not.toContain("overflow-y: auto");
+		expect(body).not.toContain("flex: 1");
+		expect(body).toContain("background: var(--surface)");
+		expect(body).toContain("border: 1px solid var(--border)");
+	});
+
+	it("keeps the save actions in the natural document flow", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = rule(css, ".settings-actions");
+
+		expect(body).toContain("flex-shrink: 0");
+		expect(body).not.toContain("position: fixed");
+		expect(body).not.toContain("position: absolute");
+	});
+
+	it("wraps settings tabs on narrow screens so they stay reachable", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".repo-tabs");
+
+		expect(body).toContain("flex-wrap: wrap");
+	});
+
+	it("keeps setting-row inputs and selects inside the narrow viewport", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const blocks = mediaBlocks(css, "768px");
+		const settingsBlock = blocks.find((block) => block.includes(".setting-row input") && block.includes(".setting-row select"));
+		expect(settingsBlock).toBeDefined();
+		expect(settingsBlock!).toContain("max-width: 100%");
+		expect(settingsBlock!).toContain("width: 100%");
+	});
+});
+
 describe("admin mobile layouts", () => {
 	it("shows the session list full-height on mobile when no session is selected", async () => {
 		const css = await readFile(stylesPath, "utf-8");
