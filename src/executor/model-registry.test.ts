@@ -63,17 +63,24 @@ describe("createYolomaticModelRegistry", () => {
 
 		expect(mock.registerProvider).toHaveBeenCalledWith(
 			OPENAI_PROVIDER_ID,
-			expect.objectContaining({
-				baseUrl: OPENAI_PROVIDER_BASE_URL,
-				api: "openai-responses",
+		expect.objectContaining({
+			baseUrl: OPENAI_PROVIDER_BASE_URL,
+			api: "openai-responses",
 				apiKey: "sk-test-openai-key",
 				models: expect.arrayContaining([
-					expect.objectContaining({ id: "gpt-5.2", api: "openai-responses" }),
 					expect.objectContaining({ id: "gpt-5.2-codex", api: "openai-responses" }),
 					expect.objectContaining({ id: "gpt-5.1-codex", api: "openai-responses" }),
 				]),
 			}),
 		);
+		const openAiModels = mock.registerProvider.mock.calls.find(([provider]) => provider === OPENAI_PROVIDER_ID)?.[1].models;
+		expect(openAiModels).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ id: "gpt-5.2-codex" }),
+				expect.objectContaining({ id: "gpt-5.1-codex" }),
+			]),
+		);
+		expect(openAiModels).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "gpt-5.2" })]));
 	});
 
 	it("registers only ollama when no OpenAI API key is configured", async () => {

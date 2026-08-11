@@ -182,9 +182,9 @@ describe("handleSettingsRoutes", () => {
 			});
 		}
 
-		it("returns sorted OpenAI model ids using the stored API key", async () => {
+		it("returns supported Codex model ids using the stored API key", async () => {
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-				providerResponse({ data: [{ id: "gpt-4" }, { id: "gpt-3.5" }] }),
+				providerResponse({ data: [{ id: "gpt-5.2-codex" }, { id: "gpt-4" }, { id: "gpt-5.1-codex" }] }),
 			);
 			const res = response();
 			const deps = makeDeps({
@@ -205,7 +205,7 @@ describe("handleSettingsRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(res.body);
-			expect(body.models).toEqual(["gpt-3.5", "gpt-4"]);
+			expect(body.models).toEqual(["gpt-5.1-codex", "gpt-5.2-codex"]);
 			expect(body.error).toBeUndefined();
 			expect(fetchSpy).toHaveBeenCalledWith(
 				"https://api.openai.com/v1/models",
