@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { PRReviewPayload } from "./handle-pr-review.js";
 import {
 	issueSessionKey,
 	markIssueWorking,
@@ -791,7 +792,7 @@ describe("workflow helpers", () => {
 					sessions: sessions as never,
 					tasks: tasks as never,
 					adminGithubUsername: overrides?.adminGithubUsername,
-					prReview: overrides?.prReview as any,
+					prReview: overrides?.prReview as { execute: (payload: PRReviewPayload) => Promise<void> } | undefined,
 				},
 				github,
 				sessions,
