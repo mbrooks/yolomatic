@@ -3,6 +3,8 @@
  * providers. These functions keep provider credentials (the OpenAI API key)
  * on the control plane; callers only receive sanitized model id/name lists.
  */
+import { isSupportedOpenAiCodexModel } from "./openai-codex-models.js";
+
 
 export const PRIVATE_MODEL_VALUE = "private";
 
@@ -92,7 +94,7 @@ export async function fetchOpenAiModels(
 		const body = (await response.json()) as OpenAiModelsResponse;
 		const ids = (body.data ?? [])
 			.map((model) => model.id)
-			.filter((id): id is string => typeof id === "string" && id.length > 0)
+			.filter((id): id is string => typeof id === "string" && isSupportedOpenAiCodexModel(id))
 			.sort((a, b) => a.localeCompare(b));
 		return { models: ids };
 	} catch (error) {
