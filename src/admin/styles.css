@@ -1903,3 +1903,50 @@ a:hover {
 	font-size: 0.8rem;
 	margin: 0.25rem 0 0;
 }
+
+/* Mobile session list/detail toggle.
+   Only applies to the session workspace so the issues split-pane layout
+   stays unchanged. */
+.session-back {
+	display: none;
+}
+
+@media (max-width: 768px) {
+	.session-workspace .list-pane {
+		display: flex;
+		flex: 1 1 auto;
+		max-height: none;
+		max-width: 100%;
+	}
+
+	.session-workspace.has-selected .list-pane {
+		display: none;
+	}
+
+	.session-workspace .detail-pane {
+		display: none;
+	}
+
+	.session-workspace.has-selected .detail-pane {
+		display: block;
+		flex: 1;
+		max-height: none;
+	}
+
+	.session-back {
+		align-items: center;
+		background: none;
+		border: none;
+		color: var(--blue);
+		cursor: pointer;
+		display: inline-flex;
+		font-size: 0.875rem;
+		gap: 0.25rem;
+		margin-bottom: 0.75rem;
+		padding: 0;
+	}
+
+	.session-back:hover {
+		text-decoration: underline;
+	}
+}

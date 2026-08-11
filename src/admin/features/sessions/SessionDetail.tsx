@@ -10,10 +10,12 @@ export function SessionDetail({
 	selected,
 	onMutate,
 	activeTab,
+	onDeselect,
 }: {
 	selected: Session | null;
 	onMutate: () => void;
 	activeTab?: "sessions" | "skills" | "issues" | "settings";
+	onDeselect?: () => void;
 }): React.ReactElement {
 	const [paused, setPaused] = useState(false);
 	const logState = useSessionLog(selected, paused);
@@ -28,6 +30,11 @@ export function SessionDetail({
 
 	return (
 		<div className="detail-pane">
+			{onDeselect ? (
+				<button type="button" className="session-back" onClick={onDeselect}>
+					← Back to sessions
+				</button>
+			) : null}
 			<IssueSummaryBlock session={selected} />
 			<div className="detail-title">
 				{selected.owner}/{selected.repo}#{selected.issueNumber}

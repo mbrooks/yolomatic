@@ -77,6 +77,52 @@ describe("admin table layouts", () => {
 });
 
 describe("admin mobile layouts", () => {
+	it("shows the session list full-height on mobile when no session is selected", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".session-workspace .list-pane");
+
+		expect(body).toContain("display: flex");
+		expect(body).toContain("max-height: none");
+	});
+
+	it("hides the session list on mobile when a session is selected", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".session-workspace.has-selected .list-pane");
+
+		expect(body).toContain("display: none");
+	});
+
+	it("hides the session detail pane on mobile when no session is selected", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".session-workspace .detail-pane");
+
+		expect(body).toContain("display: none");
+	});
+
+	it("shows the session detail pane full-height on mobile when a session is selected", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".session-workspace.has-selected .detail-pane");
+
+		expect(body).toContain("display: block");
+		expect(body).toContain("flex: 1");
+		expect(body).toContain("max-height: none");
+	});
+
+	it("hides the session back button outside the mobile breakpoint", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = rule(css, ".session-back");
+
+		expect(body).toContain("display: none");
+	});
+
+	it("shows the session back button inside the mobile breakpoint", async () => {
+		const css = await readFile(stylesPath, "utf-8");
+		const body = ruleInMedia(css, "768px", ".session-back");
+
+		expect(body).not.toContain("display: none");
+		expect(body).toContain("cursor: pointer");
+	});
+
 	it("styles the signed-in user label via the header-user class", async () => {
 		const css = await readFile(stylesPath, "utf-8");
 		const body = rule(css, ".header-user");
