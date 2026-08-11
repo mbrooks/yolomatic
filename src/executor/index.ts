@@ -1,6 +1,5 @@
 import {
 	AgentSession,
-	AuthStorage,
 	createAgentSession,
 	DefaultResourceLoader,
 	getAgentDir,
@@ -149,10 +148,12 @@ export class PiAgentExecutor implements ExecutionService {
 		});
 		await loader.reload();
 
-		const authStorage = AuthStorage.create();
-		const modelRegistry = createYolomaticModelRegistry(authStorage);
+		const modelRegistry = await createYolomaticModelRegistry();
 		const configuredModelOverride = this.getModelConfig();
-		const configuredModel = resolveConfiguredModel(modelRegistry, configuredModelOverride);
+		const configuredModelRef = resolveConfiguredModel(modelRegistry, configuredModelOverride);
+		const configuredModel = configuredModelRef
+			? modelRegistry.runtime.getModel(configuredModelRef.provider, configuredModelRef.id)
+			: undefined;
 		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();
 		if (configuredModelName && !configuredModel) {
 			process.stderr.write(
@@ -180,8 +181,7 @@ export class PiAgentExecutor implements ExecutionService {
 			cwd: state.workspacePath,
 			sessionManager: piSessionManager,
 			resourceLoader: loader,
-			authStorage,
-			modelRegistry,
+			modelRuntime: modelRegistry.runtime,
 			model: configuredModel,
 		});
 		onSessionCreated?.({

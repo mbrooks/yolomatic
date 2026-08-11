@@ -9,8 +9,12 @@ const verifySignature = vi.fn(() => true);
 const createWebhookServerDeps = vi.fn();
 const createAdminWebSocketServer = vi.fn();
 const onSessionLogEvent = vi.fn();
-const CleanupOldSessions = vi.fn();
-const SessionStoreRepositoryAdapter = vi.fn();
+const CleanupOldSessions = vi.fn(function () {
+	return {};
+});
+const SessionStoreRepositoryAdapter = vi.fn(function () {
+	return {};
+});
 
 function makeHandlers() {
 	return {
@@ -422,7 +426,9 @@ describe("createWebhookServer", () => {
 describe("cleanupOldSessions", () => {
 	it("constructs a CleanupOldSessions command and delegates to it", async () => {
 		const execute = vi.fn(async () => ({ deleted: 2, failed: 1 }));
-		CleanupOldSessions.mockImplementation(() => ({ execute }));
+		CleanupOldSessions.mockImplementation(function () {
+			return { execute };
+		});
 		const { cleanupOldSessions } = await import("./server.js");
 		await expect(cleanupOldSessions({} as never, undefined, 30)).resolves.toEqual({
 			deleted: 2,

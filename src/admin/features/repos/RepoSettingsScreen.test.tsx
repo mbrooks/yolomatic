@@ -18,6 +18,11 @@ function jsonResponse(body: unknown) {
 describe("RepoSettingsScreen", () => {
 	beforeEach(() => {
 		fetchSpy.mockReset();
+		Object.defineProperty(window, "confirm", {
+			value: vi.fn(() => true),
+			writable: true,
+			configurable: true,
+		});
 		fetchSpy.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input);
 			if (url === "/api/repos/mbrooks/yolomatic/settings" && (!init || init.method === undefined)) {

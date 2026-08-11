@@ -46,37 +46,47 @@ const sessionStoreMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../session/store.js", () => ({
-	SessionStore: vi.fn(() => sessionStoreMock),
+	SessionStore: vi.fn(function () {
+		return sessionStoreMock;
+	}),
 }));
 
 vi.mock("../session/manager.js", () => ({
-	SessionManager: vi.fn(() => ({
-		getSessionKey: vi.fn(),
-		getSessionPath: vi.fn(),
-		createSession: vi.fn(),
-		getSession: vi.fn(),
-		resumeSession: vi.fn(),
-		updateStatus: vi.fn(),
-		markSeeded: vi.fn(),
-		markFailed: vi.fn(),
-	})),
+	SessionManager: vi.fn(function () {
+		return {
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			createSession: vi.fn(),
+			getSession: vi.fn(),
+			resumeSession: vi.fn(),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			markFailed: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("../workspace/manager.js", () => ({
-	WorkspaceManager: vi.fn(() => ({
-		createOrGetWorktree: vi.fn(),
-		commitAndPush: vi.fn(async () => true),
-		commitAndPushPath: vi.fn(async () => true),
-		removeWorktree: vi.fn(),
-	})),
+	WorkspaceManager: vi.fn(function () {
+		return {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("../executor/docker-worker.js", () => ({
-	DockerWorkerExecutor: vi.fn(() => ({ execute: vi.fn() })),
+	DockerWorkerExecutor: vi.fn(function () {
+		return { execute: vi.fn() };
+	}),
 }));
 
 vi.mock("../worker/rpc-server.js", () => ({
-	WorkerRpcServer: vi.fn(() => ({ attach: vi.fn(), close: vi.fn(async () => undefined) })),
+	WorkerRpcServer: vi.fn(function () {
+		return { attach: vi.fn(), close: vi.fn(async () => undefined) };
+	}),
 }));
 
 vi.mock("../github-events/polling.js", () => ({
@@ -84,11 +94,13 @@ vi.mock("../github-events/polling.js", () => ({
 }));
 
 vi.mock("../webhook/handlers.js", () => ({
-	GitHubIssueHandlers: vi.fn(() => ({
-		handleGitHubEvent: vi.fn(),
-		isInFlight: vi.fn(() => false),
-		resumeInterruptedSession: vi.fn(),
-	})),
+	GitHubIssueHandlers: vi.fn(function () {
+		return {
+			handleGitHubEvent: vi.fn(),
+			isInFlight: vi.fn(() => false),
+			resumeInterruptedSession: vi.fn(),
+		};
+	}),
 }));
 
 const serverMockFns = vi.hoisted(() => ({
@@ -105,17 +117,23 @@ const serverMockFns = vi.hoisted(() => ({
 vi.mock("../webhook/server.js", () => serverMockFns);
 
 vi.mock("../session/stale-detector.js", () => ({
-	StaleSessionDetector: vi.fn(() => ({
-		detectStaleSessions: vi.fn(async () => []),
-	})),
+	StaleSessionDetector: vi.fn(function () {
+		return {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+	}),
 }));
 
 vi.mock("../skills/store.js", () => ({
-	SkillStore: vi.fn(() => ({})),
+	SkillStore: vi.fn(function () {
+		return {};
+	}),
 }));
 
 vi.mock("../skills/repo-skill-service.js", () => ({
-	RepoSkillService: vi.fn(() => ({})),
+	RepoSkillService: vi.fn(function () {
+		return {};
+	}),
 }));
 
 import { buildRuntimeGraph, noOpHandlers, startRuntime, syncConfigToEnv } from "./bootstrap.js";
@@ -347,8 +365,8 @@ describe("startRuntime", () => {
 
 	it("runs stale detection and marks very old sessions as failed", async () => {
 		vi.mocked(StaleSessionDetector).mockImplementationOnce(
-			() =>
-				({
+			function () {
+				return {
 					detectStaleSessions: vi.fn(async () => [
 						{
 							isStale: true,
@@ -365,15 +383,17 @@ describe("startRuntime", () => {
 							},
 						},
 					]),
-				}) as never,
+				};
+			},
 		);
 		const { SessionManager } = await import("../session/manager.js");
 		const mockMarkFailed = vi.fn();
 		vi.mocked(SessionManager).mockImplementationOnce(
-			() =>
-				({
+			function () {
+				return {
 					markFailed: mockMarkFailed,
-				}) as never,
+				};
+			},
 		);
 		await startRuntime(baseConfig, makeDeps());
 		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "interrupted_or_abandoned");
@@ -381,12 +401,13 @@ describe("startRuntime", () => {
 
 	it("swallows stale detection errors", async () => {
 		vi.mocked(StaleSessionDetector).mockImplementationOnce(
-			() =>
-				({
+			function () {
+				return {
 					detectStaleSessions: vi.fn(async () => {
 						throw new Error("stale error");
 					}),
-				}) as never,
+				};
+			},
 		);
 		await expect(startRuntime(baseConfig, makeDeps())).resolves.toBeDefined();
 	});

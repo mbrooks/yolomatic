@@ -32,6 +32,7 @@ const TYPE_EXPORT_PATTERN = /(^|\/)types\.ts$/u;
 const STYLING_PATTERN = /(^|\/)((styles|style|.*\.styles|.*\.style)\.ts|.*\.tsx)$/u;
 const CONFIG_PATTERN = /(^|\/)(config|.*\.config)\.ts$/u;
 const THIRD_PARTY_SETUP_PATTERN = /(^|\/)octokit\.ts$/u;
+const DECLARATION_FILE_PATTERN = /\.d\.ts$/u;
 
 function isTestFile(file) {
 	return TEST_FILE_PATTERN.test(file);
@@ -53,6 +54,10 @@ function isThirdPartySetupFile(file) {
 	return THIRD_PARTY_SETUP_PATTERN.test(file);
 }
 
+function isDeclarationFile(file) {
+	return DECLARATION_FILE_PATTERN.test(file);
+}
+
 function parseChangedFiles(value) {
 	const lines = value.split("\n").map((line) => line.trim()).filter(Boolean);
 	return [...new Set(lines)];
@@ -66,6 +71,7 @@ function isGuardrailSourceFile(file) {
 	if (isStylingFile(file)) return false;
 	if (isConfigurationFile(file)) return false;
 	if (isThirdPartySetupFile(file)) return false;
+	if (isDeclarationFile(file)) return false;
 	return true;
 }
 

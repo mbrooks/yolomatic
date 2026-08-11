@@ -37,6 +37,10 @@ const CONFIG_PATTERN = /(^|\/)(config|.*\.config)\.ts$/u;
 // set stays deterministic and reviewable.
 const THIRD_PARTY_SETUP_PATTERN = /(^|\/)octokit\.ts$/u;
 
+// TypeScript declaration files: ambient type declarations with no runtime
+// code. These are excluded from coverage and test-file requirements.
+const DECLARATION_FILE_PATTERN = /\.d\.ts$/u;
+
 export function isTestFile(file: string): boolean {
 	return TEST_FILE_PATTERN.test(file);
 }
@@ -55,6 +59,10 @@ export function isConfigurationFile(file: string): boolean {
 
 export function isThirdPartySetupFile(file: string): boolean {
 	return THIRD_PARTY_SETUP_PATTERN.test(file);
+}
+
+export function isDeclarationFile(file: string): boolean {
+	return DECLARATION_FILE_PATTERN.test(file);
 }
 
 export interface CoverageEntry {
@@ -88,6 +96,7 @@ export function isGuardrailSourceFile(file: string): boolean {
 	if (isStylingFile(file)) return false;
 	if (isConfigurationFile(file)) return false;
 	if (isThirdPartySetupFile(file)) return false;
+	if (isDeclarationFile(file)) return false;
 	return true;
 }
 

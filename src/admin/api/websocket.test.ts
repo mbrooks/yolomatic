@@ -55,11 +55,11 @@ describe("webSocketManager", () => {
 	beforeEach(() => {
 		originalWebSocket = globalThis.WebSocket as typeof WebSocket;
 		sockets = [];
-		globalThis.WebSocket = vi.fn((url: string) => {
+		globalThis.WebSocket = function (url: string) {
 			const socket = new MockWebSocket(url);
 			sockets.push(socket);
 			return socket;
-		}) as unknown as typeof WebSocket;
+		} as unknown as typeof WebSocket;
 		(globalThis.WebSocket as unknown as Record<string, number>).CONNECTING = MockWebSocket.CONNECTING;
 		(globalThis.WebSocket as unknown as Record<string, number>).OPEN = MockWebSocket.OPEN;
 		(globalThis.WebSocket as unknown as Record<string, number>).CLOSING = MockWebSocket.CLOSING;

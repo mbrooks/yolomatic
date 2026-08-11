@@ -40,12 +40,14 @@ vi.mock("./config.js", () => ({
 }));
 
 vi.mock("./settings/store.js", () => ({
-	SettingsStore: vi.fn(() => ({
-		get: vi.fn(() => undefined),
-		seedFromEnv: vi.fn(),
-		applyDefaults: vi.fn(),
-		onChange: vi.fn(() => () => {}),
-	})),
+	SettingsStore: vi.fn(function () {
+		return {
+			get: vi.fn(() => undefined),
+			seedFromEnv: vi.fn(),
+			applyDefaults: vi.fn(),
+			onChange: vi.fn(() => () => {}),
+		};
+	}),
 }));
 
 const repositoryStoreMock = vi.hoisted(() => ({
@@ -62,7 +64,9 @@ const repositoryStoreMock = vi.hoisted(() => ({
 }));
 
 vi.mock("./repos/repository-store.js", () => ({
-	RepositoryStore: vi.fn(() => repositoryStoreMock),
+	RepositoryStore: vi.fn(function () {
+		return repositoryStoreMock;
+	}),
 }));
 
 const userStoreMock = vi.hoisted(() => ({
@@ -75,59 +79,71 @@ const userStoreMock = vi.hoisted(() => ({
 }));
 
 vi.mock("./users/store.js", () => ({
-	UserStore: vi.fn(() => userStoreMock),
+	UserStore: vi.fn(function () {
+		return userStoreMock;
+	}),
 }));
 
 
 vi.mock("./session/store.js", () => ({
-	SessionStore: vi.fn(() => ({
-		get: vi.fn(),
-		set: vi.fn(),
-		getAll: vi.fn(async () => []),
-		exists: vi.fn(async () => false),
-		delete: vi.fn(async () => {}),
-		archive: vi.fn(async () => {}),
-		migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-		getSessionPath: vi.fn(() => "/tmp/session.jsonl"),
-		getStatePath: vi.fn(() => "/tmp/state.json"),
-		getArchivePath: vi.fn(() => "/tmp/archive.json"),
-		getSessionArchivePath: vi.fn(() => "/tmp/archive.jsonl"),
-		getSessionKey: vi.fn((owner, repo, n) => `github-${owner}-${repo}-issue-${n}`),
-	})),
+	SessionStore: vi.fn(function () {
+		return {
+			get: vi.fn(),
+			set: vi.fn(),
+			getAll: vi.fn(async () => []),
+			exists: vi.fn(async () => false),
+			delete: vi.fn(async () => {}),
+			archive: vi.fn(async () => {}),
+			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			getSessionPath: vi.fn(() => "/tmp/session.jsonl"),
+			getStatePath: vi.fn(() => "/tmp/state.json"),
+			getArchivePath: vi.fn(() => "/tmp/archive.json"),
+			getSessionArchivePath: vi.fn(() => "/tmp/archive.jsonl"),
+			getSessionKey: vi.fn((owner, repo, n) => `github-${owner}-${repo}-issue-${n}`),
+		};
+	}),
 }));
 
 vi.mock("./logging/session-log-store.js", () => ({
-	SessionLogStore: vi.fn(() => ({})),
+	SessionLogStore: vi.fn(function () {
+		return {};
+	}),
 	configureSessionLogPersistence: vi.fn(),
 	loadPersistedSessionLogs: vi.fn(),
 }));
 
 vi.mock("./session/manager.js", () => ({
-	SessionManager: vi.fn(() => ({
-		getSessionKey: vi.fn(),
-		getSessionPath: vi.fn(),
-		createSession: vi.fn(),
-		getSession: vi.fn(),
-		resumeSession: vi.fn(),
-		updateStatus: vi.fn(),
-		markSeeded: vi.fn(),
-		markFailed: vi.fn(),
-	})),
+	SessionManager: vi.fn(function () {
+		return {
+			getSessionKey: vi.fn(),
+			getSessionPath: vi.fn(),
+			createSession: vi.fn(),
+			getSession: vi.fn(),
+			resumeSession: vi.fn(),
+			updateStatus: vi.fn(),
+			markSeeded: vi.fn(),
+			markFailed: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("./workspace/manager.js", () => ({
-	WorkspaceManager: vi.fn(() => ({
-		createOrGetWorktree: vi.fn(),
-		commitAndPush: vi.fn(async () => true),
-		commitAndPushPath: vi.fn(async () => true),
-		removeWorktree: vi.fn(),
-	})),
+	WorkspaceManager: vi.fn(function () {
+		return {
+			createOrGetWorktree: vi.fn(),
+			commitAndPush: vi.fn(async () => true),
+			commitAndPushPath: vi.fn(async () => true),
+			removeWorktree: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("./executor/docker-worker.js", () => ({
-	DockerWorkerExecutor: vi.fn(() => ({
-		execute: vi.fn(),
-	})),
+	DockerWorkerExecutor: vi.fn(function () {
+		return {
+			execute: vi.fn(),
+		};
+	}),
 }));
 
 
@@ -136,11 +152,13 @@ vi.mock("./github-events/polling.js", () => ({
 }));
 
 vi.mock("./webhook/handlers.js", () => ({
-	GitHubIssueHandlers: vi.fn(() => ({
-		handleGitHubEvent: vi.fn(),
-		isInFlight: vi.fn(() => false),
-		resumeInterruptedSession: vi.fn(),
-	})),
+	GitHubIssueHandlers: vi.fn(function () {
+		return {
+			handleGitHubEvent: vi.fn(),
+			isInFlight: vi.fn(() => false),
+			resumeInterruptedSession: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("./webhook/server.js", () => ({
@@ -158,17 +176,23 @@ vi.mock("./webhook/server.js", () => ({
 }));
 
 vi.mock("./session/stale-detector.js", () => ({
-	StaleSessionDetector: vi.fn(() => ({
-		detectStaleSessions: vi.fn(async () => []),
-	})),
+	StaleSessionDetector: vi.fn(function () {
+		return {
+			detectStaleSessions: vi.fn(async () => []),
+		};
+	}),
 }));
 
 vi.mock("./skills/store.js", () => ({
-	SkillStore: vi.fn(() => ({})),
+	SkillStore: vi.fn(function () {
+		return {};
+	}),
 }));
 
 vi.mock("./skills/repo-skill-service.js", () => ({
-	RepoSkillService: vi.fn(() => ({})),
+	RepoSkillService: vi.fn(function () {
+		return {};
+	}),
 }));
 
 import { createWebhookServer } from "./webhook/server.js";
@@ -189,11 +213,13 @@ describe("main", () => {
 		repositoryStoreMock.list.mockResolvedValue([]);
 		repositoryStoreMock.listForPolling.mockResolvedValue([]);
 		repositoryStoreMock.get.mockResolvedValue(null);
-		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-			handleGitHubEvent: vi.fn(),
-			isInFlight: vi.fn(() => false),
-			resumeInterruptedSession: vi.fn(),
-		}));
+		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				handleGitHubEvent: vi.fn(),
+				isInFlight: vi.fn(() => false),
+				resumeInterruptedSession: vi.fn(),
+			};
+		});
 	});
 
 	it("enters onboarding mode when bootstrap incomplete", async () => {
@@ -415,12 +441,14 @@ describe("main", () => {
 				seeded: false,
 			},
 		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-			get: vi.fn(),
-			set: vi.fn(),
-			getAll: mockGetAll,
-			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-		}));
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: mockGetAll,
+				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			};
+		});
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
@@ -442,12 +470,14 @@ describe("main", () => {
 				resumeOnBoot: true,
 			},
 		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-			get: vi.fn(),
-			set: vi.fn(),
-			getAll: mockGetAll,
-			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-		}));
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: mockGetAll,
+				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			};
+		});
 		await main();
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
 		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
@@ -455,37 +485,43 @@ describe("main", () => {
 	});
 
 	it("runs stale session detection on startup", async () => {
-		vi.mocked(StaleSessionDetector).mockImplementation(() => ({
-			detectStaleSessions: vi.fn(async () => [
-				{
-					isStale: true,
-					ageMs: 99999999,
-					session: {
-						owner: "mbrooks",
-						repo: "yolomatic",
-						issueNumber: 99,
-						status: "working",
-						staleDetectedAt: null,
-						lastActivity: new Date().toISOString(),
-						workspacePath: "/tmp/ws",
-						createdAt: new Date().toISOString(),
+		vi.mocked(StaleSessionDetector).mockImplementation(function () {
+			return {
+				detectStaleSessions: vi.fn(async () => [
+					{
+						isStale: true,
+						ageMs: 99999999,
+						session: {
+							owner: "mbrooks",
+							repo: "yolomatic",
+							issueNumber: 99,
+							status: "working",
+							staleDetectedAt: null,
+							lastActivity: new Date().toISOString(),
+							workspacePath: "/tmp/ws",
+							createdAt: new Date().toISOString(),
+						},
 					},
-				},
-			]),
-		} as never));
+				]),
+			};
+		});
 		const { SessionManager } = await import("./session/manager.js");
 		const mockMarkFailed = vi.fn();
-		vi.mocked(SessionManager).mockImplementation(() => ({
-			markFailed: mockMarkFailed,
-		} as never));
+		vi.mocked(SessionManager).mockImplementation(function () {
+			return {
+				markFailed: mockMarkFailed,
+			};
+		});
 		await main();
 		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "interrupted_or_abandoned");
 	});
 
 	it("handles stale detection errors gracefully", async () => {
-		vi.mocked(StaleSessionDetector).mockImplementation(() => ({
-			detectStaleSessions: vi.fn(async () => { throw new Error("stale error"); }),
-		} as never));
+		vi.mocked(StaleSessionDetector).mockImplementation(function () {
+			return {
+				detectStaleSessions: vi.fn(async () => { throw new Error("stale error"); }),
+			};
+		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
 	});
@@ -504,17 +540,21 @@ describe("main", () => {
 				seeded: false,
 			},
 		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-			get: vi.fn(),
-			set: vi.fn(),
-			getAll: mockGetAll,
-			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-		}));
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: mockGetAll,
+				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			};
+		});
 		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
-		mockFn.mockImplementation(() => ({
-			resumeInterruptedSession: vi.fn(async () => { throw new Error("resume error"); }),
-			isInFlight: vi.fn(() => false),
-		}));
+		mockFn.mockImplementation(function () {
+			return {
+				resumeInterruptedSession: vi.fn(async () => { throw new Error("resume error"); }),
+				isInFlight: vi.fn(() => false),
+			};
+		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
 	});
@@ -565,12 +605,14 @@ describe("main", () => {
 	});
 
 	it("handles resume outer catch error", async () => {
-		(SessionStore as any).mockImplementation(() => ({
-			get: vi.fn(),
-			set: vi.fn(),
-			getAll: vi.fn(async () => { throw new Error("resume outer"); }),
-			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-		}));
+		(SessionStore as any).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: vi.fn(async () => { throw new Error("resume outer"); }),
+				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			};
+		});
 		await main();
 		expect(createWebhookServer).toHaveBeenCalled();
 	});

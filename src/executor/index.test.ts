@@ -5,26 +5,33 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
-	AuthStorage: { create: vi.fn() },
 	createAgentSession: vi.fn(),
-	DefaultResourceLoader: vi.fn(() => ({ reload: vi.fn() })),
+	DefaultResourceLoader: vi.fn(function () {
+		return { reload: vi.fn() };
+	}),
 	getAgentDir: vi.fn(() => "/agent"),
 	SessionManager: { open: vi.fn() },
 }));
 
 vi.mock("./model-registry.js", () => ({
-	createYolomaticModelRegistry: vi.fn(),
+	createYolomaticModelRegistry: vi.fn(async () => ({
+		runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+		find: vi.fn(),
+		getAll: vi.fn(() => []),
+	})),
 }));
 
 vi.mock("../logging/llm-logger.js", () => ({
-	LlmLogger: vi.fn(() => ({
-		logPrompt: vi.fn(),
-		logThought: vi.fn(),
-		logToolCall: vi.fn(),
-		logToolResult: vi.fn(),
-		logResponse: vi.fn(),
-		logError: vi.fn(),
-	})),
+	LlmLogger: vi.fn(function () {
+		return {
+			logPrompt: vi.fn(),
+			logThought: vi.fn(),
+			logToolCall: vi.fn(),
+			logToolResult: vi.fn(),
+			logResponse: vi.fn(),
+			logError: vi.fn(),
+		};
+	}),
 }));
 
 vi.mock("../logging/session-log-store.js", () => ({
@@ -67,7 +74,15 @@ describe("PiAgentExecutor", () => {
 
 	function mockRegistry(models: Array<{ provider: string; id: string }> = []) {
 		return {
-			find: vi.fn((provider: string, modelId: string) => models.find((model) => model.provider === provider && model.id === modelId)),
+			runtime: {
+				getModel: vi.fn((provider: string, modelId: string) =>
+					models.find((model) => model.provider === provider && model.id === modelId),
+				),
+				getModels: vi.fn(() => models),
+			},
+			find: vi.fn((provider: string, modelId: string) =>
+				models.find((model) => model.provider === provider && model.id === modelId),
+			),
 			getAll: vi.fn(() => models),
 		};
 	}
@@ -158,7 +173,7 @@ describe("PiAgentExecutor", () => {
 
 	it("configures the trusted worker extension on the resource loader", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		mockSuccessfulSession();
 		const trustedExtensionPath = "/app/.pi/extensions/github-issues.ts";
 		const executor = new PiAgentExecutor({ soulPath, trustedExtensionPath });
@@ -197,7 +212,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -256,7 +271,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -311,7 +326,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -362,7 +377,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -388,7 +403,7 @@ describe("PiAgentExecutor", () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
 		const soulPath = path.join(dir, "SOUL.md");
 		await writeFile(soulPath, "SOUL content", "utf-8");
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		mockSuccessfulSession();
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -431,7 +446,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -476,7 +491,7 @@ describe("PiAgentExecutor", () => {
 			getAll: vi.fn(() => []),
 		};
 
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry);
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry);
 		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
 
 		const executor = new PiAgentExecutor({ soulPath });
@@ -503,7 +518,7 @@ describe("PiAgentExecutor", () => {
 	it("uses an override prompt and passes the configured model into Pi", async () => {
 		const soulPath = await makeSoulPath();
 		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry([configuredModel]));
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry([configuredModel]));
 		const { mockSession } = mockSuccessfulSession();
 		const onSessionCreated = vi.fn();
 
@@ -523,7 +538,7 @@ describe("PiAgentExecutor", () => {
 
 	it("builds feedback and PR review prompts for continued sessions", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const feedbackSession = mockSuccessfulSession().mockSession;
 		const executor = new PiAgentExecutor({ soulPath });
 
@@ -537,7 +552,7 @@ describe("PiAgentExecutor", () => {
 
 	it("warns when the configured model cannot be resolved", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		mockSuccessfulSession();
 		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
@@ -552,7 +567,7 @@ describe("PiAgentExecutor", () => {
 
 	it("logs non-rate assistant errors without overriding the parsed result", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -572,7 +587,7 @@ describe("PiAgentExecutor", () => {
 
 	it("logs assistant error stop reasons without a message", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -592,7 +607,7 @@ describe("PiAgentExecutor", () => {
 
 	it("marks execution-environment blocker responses as failed", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const unsubscribe = vi.fn();
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
@@ -616,7 +631,7 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a correction prompt when the first response has a valid marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"YOLO_STATUS: complete\nDone.",
 		]);
@@ -630,7 +645,7 @@ describe("PiAgentExecutor", () => {
 
 	it("issues one correction prompt and returns complete when the first response lacks a marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Done. Summary: fixed the bug.\nStatus: complete",
 			"YOLO_STATUS: complete\nFixed the parser bug.",
@@ -648,7 +663,7 @@ describe("PiAgentExecutor", () => {
 
 	it("treats an unsupported marker as invalid and corrects once", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"YOLO_STATUS: done\nAll done.",
 			"YOLO_STATUS: complete\nDone.",
@@ -663,7 +678,7 @@ describe("PiAgentExecutor", () => {
 
 	it("returns working when the corrected response is a valid working marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Still going.",
 			"YOLO_STATUS: working\nStill going.",
@@ -678,7 +693,7 @@ describe("PiAgentExecutor", () => {
 
 	it("returns waiting-feedback when the corrected response is valid waiting-feedback", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"I have a question.",
 			"YOLO_STATUS: waiting-feedback\nNeed clarification.",
@@ -694,7 +709,7 @@ describe("PiAgentExecutor", () => {
 
 	it("fails after one correction when the corrected response still lacks a marker", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession([
 			"Done. Summary: fixed.",
 			"I am done now. No status line.",
@@ -710,7 +725,7 @@ describe("PiAgentExecutor", () => {
 
 	it("fails when the correction prompt itself throws", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const { mockSession } = mockSequentialSession(
 			["Done."],
 			(callIndex) => {
@@ -731,7 +746,7 @@ describe("PiAgentExecutor", () => {
 
 	it("returns cancelled when abort fires during status correction", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const controller = new AbortController();
 		const { mockSession } = mockSequentialSession(
 			["Done.", "YOLO_STATUS: complete\nFixed."],
@@ -749,7 +764,7 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a status-correction prompt when abort is set before the correction branch", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const controller = new AbortController();
 		const { mockSession } = mockSequentialSession(
 			["Done. No status marker here."],
@@ -771,7 +786,7 @@ describe("PiAgentExecutor", () => {
 
 	it("does not issue a status correction for refinement executions", async () => {
 		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockReturnValue(mockRegistry());
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
 		const refinementJson = JSON.stringify({
 			proposedTaskBody: "## Summary\nRefined.",
 			summary: "Clarified.",
