@@ -1,6 +1,11 @@
 import { apiGet, apiPost } from "./client.js";
 import type { OllamaSignInStatus } from "./ollama.js";
 
+export interface LlmModelListResult {
+	models: string[];
+	error?: string;
+}
+
 export interface OnboardingStatus {
 	complete: boolean;
 	missing: string[];
@@ -91,4 +96,15 @@ export type { OllamaSignInStatus };
  */
 export function fetchOnboardingOllamaSignInStatus(): Promise<OllamaSignInStatus> {
 	return apiGet<OllamaSignInStatus>("/api/onboarding/ollama-signin");
+}
+
+export function fetchOnboardingLlmModels(
+	provider: "openai" | "ollama",
+	apiKey?: string,
+): Promise<LlmModelListResult> {
+	const params = new URLSearchParams({ provider });
+	if (apiKey) {
+		params.set("apiKey", apiKey);
+	}
+	return apiGet<LlmModelListResult>(`/api/onboarding/llm/models?${params.toString()}`);
 }

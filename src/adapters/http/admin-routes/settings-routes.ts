@@ -6,8 +6,32 @@ import {
 	getRequiredDeps,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
+import {
+	fetchOpenAiModels,
+	fetchOllamaModels,
+	resolveOllamaHost,
+} from "../../../llm/fetch-models.js";
 
 const registry = new AdminRouteRegistry()
+	.route({
+		method: "GET",
+		pattern: /^\/api\/llm\/models$/u,
+		requiresDeps: ["settingsStore"],
+		handler: async (ctx) => {
+			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
+			const requestUrl = new URL(ctx.request.url ?? "/", "http://localhost");
+			const provider = requestUrl.searchParams.get("provider") ?? "";
+			if (provider === "openai") {
+				const apiKey = settingsStore.get("openai_api_key") ?? "";
+				return { status: 200, body: await fetchOpenAiModels(apiKey) };
+			}
+			if (provider === "ollama") {
+				return { status: 200, body: await fetchOllamaModels(resolveOllamaHost()) };
+			}
+			sendJson(ctx.response, 400, { error: `Unsupported LLM provider: ${provider}` });
+			return;
+		},
+	})
 	.route({
 		method: "GET",
 		pattern: /^\/api\/settings$/u,

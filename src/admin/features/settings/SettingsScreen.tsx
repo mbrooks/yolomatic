@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { fetchSettings, updateSettings } from "../../api/settings.js";
+import { fetchLlmModels, fetchSettings, updateSettings } from "../../api/settings.js";
 import { fetchOllamaSignInStatus, type OllamaSignInStatus } from "../../api/ollama.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
@@ -8,6 +8,7 @@ import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
+import { LlmModelSelect, type LlmModelFetcher } from "./LlmModelSelect.js";
 import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 
@@ -66,6 +67,8 @@ export function SettingsScreen({
 		setChangedKeys((prev) => new Set(prev).add(key));
 	}, []);
 
+	const llmModelFetcher = useCallback<LlmModelFetcher>((provider) => fetchLlmModels(provider), []);
+
 	const handleSave = useCallback(async () => {
 		if (changedKeys.size === 0) return;
 		setSaving(true);
@@ -112,9 +115,11 @@ export function SettingsScreen({
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
 	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
-	const effectiveProvider =
-		(edited.pi_agent_provider !== undefined ? String(edited.pi_agent_provider) : piAgentProviderSetting?.value) ??
-		(piAgentProviderSetting?.default !== undefined ? String(piAgentProviderSetting.default) : "");
+	const effectiveProviderValue =
+		edited.pi_agent_provider !== undefined
+			? edited.pi_agent_provider
+			: piAgentProviderSetting?.value ?? piAgentProviderSetting?.default ?? "";
+	const effectiveProvider = String(effectiveProviderValue);
 	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
 	const showOpenAiApiKey = tab === "ai-llm" && effectiveProvider === "openai";
 	const showOllamaContainerName = tab === "ai-llm" && effectiveProvider === "ollama";
@@ -194,6 +199,8 @@ export function SettingsScreen({
 									edited={edited}
 									changedKeys={changedKeys}
 									onChange={handleChange}
+									llmProvider={effectiveProvider}
+									llmModelFetcher={llmModelFetcher}
 								/>
 							))
 						) : (
@@ -202,6 +209,8 @@ export function SettingsScreen({
 								edited={edited}
 								changedKeys={changedKeys}
 								onChange={handleChange}
+								llmProvider={effectiveProvider}
+								llmModelFetcher={llmModelFetcher}
 							/>
 						)}
 					</div>
@@ -235,17 +244,28 @@ function SettingsSection({
 	edited,
 	changedKeys,
 	onChange,
+	llmProvider,
+	llmModelFetcher,
 }: {
 	title: string;
 	settings: SettingView[];
 	edited: Record<string, string | number | boolean>;
 	changedKeys: Set<string>;
 	onChange: (key: string, value: string | number | boolean) => void;
+	llmProvider?: string;
+	llmModelFetcher?: LlmModelFetcher;
 }): React.ReactElement {
 	return (
 		<section className="settings-section">
 			<h3 className="settings-section-title">{title}</h3>
-			<SettingsRows settings={settings} edited={edited} changedKeys={changedKeys} onChange={onChange} />
+			<SettingsRows
+				settings={settings}
+				edited={edited}
+				changedKeys={changedKeys}
+				onChange={onChange}
+				llmProvider={llmProvider}
+				llmModelFetcher={llmModelFetcher}
+			/>
 		</section>
 	);
 }
@@ -255,11 +275,15 @@ function SettingsRows({
 	edited,
 	changedKeys,
 	onChange,
+	llmProvider,
+	llmModelFetcher,
 }: {
 	settings: SettingView[];
 	edited: Record<string, string | number | boolean>;
 	changedKeys: Set<string>;
 	onChange: (key: string, value: string | number | boolean) => void;
+	llmProvider?: string;
+	llmModelFetcher?: LlmModelFetcher;
 }): React.ReactElement {
 	return (
 		<>
@@ -269,6 +293,8 @@ function SettingsRows({
 					setting={setting}
 					editedValue={changedKeys.has(setting.key) ? edited[setting.key] : undefined}
 					onChange={onChange}
+					llmProvider={llmProvider}
+					llmModelFetcher={llmModelFetcher}
 				/>
 			))}
 		</>
@@ -328,14 +354,20 @@ function SettingRow({
 	setting,
 	editedValue,
 	onChange,
+	llmProvider,
+	llmModelFetcher,
 }: {
 	setting: SettingView;
 	editedValue: string | number | boolean | undefined;
 	onChange: (key: string, value: string | number | boolean) => void;
+	llmProvider?: string;
+	llmModelFetcher?: LlmModelFetcher;
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
 	const options = SETTING_OPTIONS[setting.key];
+	const showLlmModelSelect =
+		setting.key === "pi_agent_model" && llmProvider !== undefined && llmModelFetcher !== undefined;
 
 	return (
 		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}`}>
@@ -345,7 +377,17 @@ function SettingRow({
 				{setting.sensitive && <span className="sensitive-badge">sensitive</span>}
 			</label>
 			<p className="setting-description">{setting.description}</p>
-			{options ? (
+			{showLlmModelSelect ? (
+				<LlmModelSelect
+					provider={llmProvider!}
+					value={String(displayValue)}
+					onChange={(val) => onChange(setting.key, val)}
+					fetcher={llmModelFetcher!}
+					id={`setting-${setting.key}`}
+					label={setting.key}
+					hideLabel
+				/>
+			) : options ? (
 				<select
 					id={`setting-${setting.key}`}
 					value={String(displayValue)}

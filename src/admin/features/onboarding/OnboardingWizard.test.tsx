@@ -41,6 +41,7 @@ vi.mock("../../api/onboarding.js", async (importOriginal) => {
 			],
 		})),
 		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/yolomatic"] })),
+		fetchOnboardingLlmModels: vi.fn(async () => ({ models: ["test-model", "kimi-k2.7-code:cloud", "gpt-5.2-codex"] })),
 		submitOnboarding: vi.fn(async () => ({ success: true, activated: true, requiresRestart: [] })),
 	};
 });
@@ -71,7 +72,9 @@ async function advanceThroughGitHubIntegration(): Promise<void> {
  */
 async function advanceThroughAiLlmStep(model = "test-model"): Promise<void> {
 	await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
-	fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: model } });
+	const select = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+	await waitFor(() => expect(Array.from(select.options).some((o) => o.value === model)).toBe(true));
+	fireEvent.change(select, { target: { value: model } });
 	fireEvent.click(screen.getByText("Next"));
 	await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
 }
@@ -115,6 +118,9 @@ describe("OnboardingWizard", () => {
 				{ owner: "octocat", repo: "hello", fullName: "octocat/hello" },
 			],
 			configured: [],
+		}));
+		(onboarding.fetchOnboardingLlmModels as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
+			models: ["test-model", "kimi-k2.7-code:cloud", "gpt-5.2-codex"],
 		}));
 		fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
 			return mockOkResponse({ success: true });
@@ -1039,7 +1045,9 @@ describe("OnboardingWizard", () => {
 			fireEvent.click(screen.getByText("Next"));
 
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
-			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			const modelSelect = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+			await waitFor(() => expect(Array.from(modelSelect.options).some((o) => o.value === "kimi-k2.7-code:cloud")).toBe(true));
+			fireEvent.change(modelSelect, { target: { value: "kimi-k2.7-code:cloud" } });
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 			});
 
@@ -1053,7 +1061,9 @@ describe("OnboardingWizard", () => {
 			fireEvent.click(screen.getByText("Next"));
 
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
-			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			const modelSelect = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+			await waitFor(() => expect(Array.from(modelSelect.options).some((o) => o.value === "kimi-k2.7-code:cloud")).toBe(true));
+			fireEvent.change(modelSelect, { target: { value: "kimi-k2.7-code:cloud" } });
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 			fireEvent.change(screen.getByLabelText("Ollama Container Name"), { target: { value: "" } });
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
@@ -1073,7 +1083,9 @@ describe("OnboardingWizard", () => {
 			fireEvent.click(screen.getByText("Next"));
 
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
-			fireEvent.change(screen.getByLabelText("LLM Model"), { target: { value: "kimi-k2.7-code:cloud" } });
+			const modelSelect = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+			await waitFor(() => expect(Array.from(modelSelect.options).some((o) => o.value === "kimi-k2.7-code:cloud")).toBe(true));
+			fireEvent.change(modelSelect, { target: { value: "kimi-k2.7-code:cloud" } });
 			// Sign-in check failure surfaces as an error banner but does not disable Next.
 			await waitFor(() => expect(screen.queryByText("Could not reach the Ollama container.")).not.toBeNull());
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
@@ -1126,9 +1138,34 @@ describe("OnboardingWizard", () => {
 			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
 			expect((screen.getByLabelText("LLM Provider") as HTMLSelectElement).value).toBe("ollama");
 			expect((screen.getByLabelText("Ollama Container Name") as HTMLInputElement).value).toBe("custom-ollama");
-			expect((screen.getByLabelText("LLM Model") as HTMLInputElement).value).toBe("kimi-k2.7-code:cloud");
+			await waitFor(() => {
+				expect((screen.getByLabelText("LLM Model") as HTMLSelectElement).value).toBe("kimi-k2.7-code:cloud");
+			});
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 			});
+
+		it("selects private when the configured model is not in the provider list", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.fetchOnboardingLlmModels as ReturnType<typeof vi.fn>).mockResolvedValue({ models: ["llama2"] });
+			const config = emptyConfig();
+			config.pi_agent_provider = "ollama";
+			config.pi_agent_model = "custom-model";
+			(onboarding.fetchOnboardingConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			const select = (await screen.findByLabelText("LLM Model")) as HTMLSelectElement;
+			await waitFor(() => expect(select.value).toBe("private"));
+			const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+			expect(input.value).toBe("custom-model");
+		});
 
 		it("mounts the OllamaSignInPanel fresh on entry so it issues a status check", async () => {
 			const onboarding = await import("../../api/onboarding.js");
@@ -1171,7 +1208,9 @@ describe("OnboardingWizard", () => {
 			// Ollama-specific UI is hidden for the openai provider.
 			expect(screen.queryByLabelText("Ollama Container Name")).toBeNull();
 			expect(screen.queryByText("Ollama sign-in status")).toBeNull();
-			expect((screen.getByLabelText("LLM Model") as HTMLInputElement).value).toBe("gpt-5.2-codex");
+			await waitFor(() => {
+				expect((screen.getByLabelText("LLM Model") as HTMLSelectElement).value).toBe("gpt-5.2-codex");
+			});
 			// Next is enabled because model is set and container name is not required for openai.
 			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
 			});
