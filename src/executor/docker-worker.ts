@@ -114,9 +114,9 @@ export class DockerWorkerExecutor implements ExecutionService {
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
 	): Promise<ExecutionResult | RefinementResult> {
-		await this.ensureWorkerImage();
-
 		const sessionKey = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
+		await this.ensureWorkerImage(sessionKey);
+
 		const containerName = this.buildContainerName(state, prompt.kind);
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
 		await this.validateLaunch(state.workspacePath);
@@ -773,10 +773,15 @@ export class DockerWorkerExecutor implements ExecutionService {
 		return process.env.OPENAI_API_KEY?.trim() || undefined;
 	}
 
-	private async ensureWorkerImage(): Promise<void> {
+	private async ensureWorkerImage(sessionKey: string): Promise<void> {
 		if (!this.imageReady) {
 			// Rebuild once per control-plane process so deployments cannot reuse a
 			// worker image built from older source. Docker caches unchanged layers.
+			recordSessionLog(sessionKey, {
+				level: "info",
+				message: "Building worker container image; this may take a couple of minutes.",
+				details: { type: "worker_image_build", image: this.options.workerImage },
+			});
 			this.imageReady = execFileAsync(
 				"docker",
 				[
