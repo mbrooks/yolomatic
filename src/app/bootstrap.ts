@@ -267,6 +267,12 @@ export async function startRuntime(
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
 	});
 
+	// Prebuild the worker image asynchronously so the first session does not
+	// pay the Docker build cost before any agent work begins. The cached
+	// promise deduplicates against any concurrent session launch, and failures
+	// are swallowed so startup always succeeds.
+	void graph.executor.prebuildWorkerImage();
+
 	if (graph.pollingEnabled) {
 		startGitHubPolling({
 			github: graph.githubPolling,

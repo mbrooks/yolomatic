@@ -79,7 +79,7 @@ vi.mock("../workspace/manager.js", () => ({
 
 vi.mock("../executor/docker-worker.js", () => ({
 	DockerWorkerExecutor: vi.fn(function () {
-		return { execute: vi.fn() };
+		return { execute: vi.fn(), prebuildWorkerImage: vi.fn() };
 	}),
 }));
 
@@ -141,6 +141,7 @@ import { GitHubIssueHandlers } from "../webhook/handlers.js";
 import { getConfig } from "../config.js";
 import { startGitHubPolling } from "../github-events/polling.js";
 import { StaleSessionDetector } from "../session/stale-detector.js";
+import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 import type { AppConfig } from "../config.js";
 import type { RuntimeDeps } from "./bootstrap.js";
 
@@ -474,5 +475,25 @@ describe("startRuntime", () => {
 		const cleanupConfig = { ...baseConfig, cleanupRetentionDays: 7 };
 		await startRuntime(cleanupConfig, makeDeps());
 		expect(cleanupOldSessionsMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("prebuilds the worker image asynchronously during startup", async () => {
+		const deps = makeDeps();
+		const graph = await startRuntime(baseConfig, deps);
+		expect(graph.executor.prebuildWorkerImage).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not block startup when the worker image prebuild fails", async () => {
+		vi.mocked(DockerWorkerExecutor).mockImplementationOnce(
+			function () {
+				return {
+					execute: vi.fn(),
+					prebuildWorkerImage: vi.fn(async () => {
+						throw new Error("prebuild failed");
+					}),
+				} as never;
+			},
+		);
+		await expect(startRuntime(baseConfig, makeDeps())).resolves.toBeDefined();
 	});
 });
