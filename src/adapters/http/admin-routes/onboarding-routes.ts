@@ -14,11 +14,7 @@ import {
 import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
-import {
-	fetchOpenAiModels,
-	fetchOllamaModels,
-	resolveOllamaHost,
-} from "../../../llm/fetch-models.js";
+import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
 import type { User } from "../../../users/store.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
@@ -221,7 +217,7 @@ const registry = new AdminRouteRegistry()
 				return { status: 200, body: await fetchOpenAiModels(apiKey) };
 			}
 			if (provider === "ollama") {
-				return { status: 200, body: await fetchOllamaModels(resolveOllamaHost()) };
+				return { status: 200, body: await fetchOllamaModels() };
 			}
 			sendJson(ctx.response, 400, { error: `Unsupported LLM provider: ${provider}` });
 			return;

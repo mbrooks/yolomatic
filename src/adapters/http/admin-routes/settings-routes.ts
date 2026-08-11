@@ -6,11 +6,7 @@ import {
 	getRequiredDeps,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
-import {
-	fetchOpenAiModels,
-	fetchOllamaModels,
-	resolveOllamaHost,
-} from "../../../llm/fetch-models.js";
+import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
 
 const registry = new AdminRouteRegistry()
 	.route({
@@ -26,7 +22,7 @@ const registry = new AdminRouteRegistry()
 				return { status: 200, body: await fetchOpenAiModels(apiKey) };
 			}
 			if (provider === "ollama") {
-				return { status: 200, body: await fetchOllamaModels(resolveOllamaHost()) };
+				return { status: 200, body: await fetchOllamaModels() };
 			}
 			sendJson(ctx.response, 400, { error: `Unsupported LLM provider: ${provider}` });
 			return;
