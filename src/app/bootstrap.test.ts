@@ -485,13 +485,14 @@ describe("startRuntime", () => {
 
 	it("does not block startup when the worker image prebuild fails", async () => {
 		vi.mocked(DockerWorkerExecutor).mockImplementationOnce(
-			() =>
-				({
+			function () {
+				return {
 					execute: vi.fn(),
 					prebuildWorkerImage: vi.fn(async () => {
 						throw new Error("prebuild failed");
 					}),
-				}) as never,
+				} as never;
+			},
 		);
 		await expect(startRuntime(baseConfig, makeDeps())).resolves.toBeDefined();
 	});
