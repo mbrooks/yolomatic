@@ -16,6 +16,7 @@ export function SessionScreen({
 	emptyMessage,
 	activeTab,
 	onSelectTab,
+	onDeselect,
 }: {
 	sessions: Session[];
 	selected: Session | null;
@@ -26,6 +27,7 @@ export function SessionScreen({
 	emptyMessage: string;
 	activeTab?: "sessions" | "skills" | "issues" | "settings";
 	onSelectTab?: (tab: "sessions" | "skills" | "issues" | "settings") => void;
+	onDeselect?: () => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -39,9 +41,9 @@ export function SessionScreen({
 			{sessions.length === 0 ? (
 				<EmptyState message={emptyMessage} />
 			) : (
-				<div className="workspace">
+				<div className={`workspace session-workspace${selected ? " has-selected" : ""}`}>
 					<SessionListPane sessions={sessions} selected={selected} onSelect={onSelect} />
-					<SessionDetail selected={selected} onMutate={onMutate} activeTab={activeTab} />
+					<SessionDetail selected={selected} onMutate={onMutate} activeTab={activeTab} onDeselect={onDeselect} />
 				</div>
 			)}
 		</>
