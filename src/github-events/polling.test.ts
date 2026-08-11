@@ -14,6 +14,7 @@ import {
 	tickGitHubPolling,
 } from "./polling.js";
 import type { GitHubEventStateStore, GitHubPollSubject } from "./model.js";
+import type { GitHubPollingService } from "../ports/github-polling-service.js";
 
 function makeStore(last: string | null, subjects: GitHubPollSubject[] = []): GitHubEventStateStore {
 	return {
@@ -58,7 +59,7 @@ import type { AccessibleRepo } from "../ports/github-service.js";
 function makeGithub(overrides = {}) {
 	return {
 		listAccessibleRepositories: vi.fn(async () => [{ owner: "mbrooks", repo: "yolomatic", fullName: "mbrooks/yolomatic", visibility: "private" }] as AccessibleRepo[]),
-		listIssuesUpdatedSince: vi.fn(async () => []),
+		listIssuesUpdatedSince: vi.fn<GitHubPollingService["listIssuesUpdatedSince"]>(async () => []),
 		listIssueEventsSince: vi.fn(async () => []),
 		listIssueCommentsSince: vi.fn(async () => []),
 		listPullRequestsUpdatedSince: vi.fn(async () => []),
@@ -736,7 +737,7 @@ describe("tickGitHubPolling", () => {
 			created_at: "2026-06-01T12:10:00.000Z",
 			updated_at: "2026-06-01T12:10:00.000Z",
 		};
-		github.listIssuesUpdatedSince = vi.fn(async () => [newIssue]) as any;
+		github.listIssuesUpdatedSince = vi.fn<GitHubPollingService["listIssuesUpdatedSince"]>(async () => [newIssue]);
 		const secondDispatch = vi.fn(async (_event: unknown) => {});
 		const secondTickNow = new Date("2026-06-01T12:15:00.000Z");
 

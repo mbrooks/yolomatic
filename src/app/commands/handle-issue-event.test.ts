@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { HandleIssueEvent, type IssueEventPayload } from "./handle-issue-event.js";
+import type { SessionRepository } from "../../ports/session-repository.js";
 import { EmptyRepositoryError } from "../../workspace/errors.js";
 
 function createPayload(overrides?: Partial<IssueEventPayload>): IssueEventPayload {
@@ -27,7 +28,7 @@ function createDeps(overrides?: {
 	createSession?: ReturnType<typeof vi.fn>;
 }) {
 	const sessions = {
-		get: vi.fn(async () => null),
+		get: vi.fn<SessionRepository["get"]>(async () => null),
 		createSession: vi.fn(async () => ({
 			owner: "mbrooks",
 			repo: "yolomatic",
@@ -438,7 +439,7 @@ describe("HandleIssueEvent", () => {
 	it("auto-starts execution for accepted issues", async () => {
 		const deps = createDeps();
 		let getCallCount = 0;
-		deps.sessions.get = vi.fn(async () => {
+		deps.sessions.get = vi.fn<SessionRepository["get"]>(async () => {
 			getCallCount++;
 			if (getCallCount <= 2) return null;
 			return {
@@ -449,10 +450,12 @@ describe("HandleIssueEvent", () => {
 				seeded: true,
 				title: "Test issue",
 				body: "Issue body",
+				sessionPath: "/tmp/session.jsonl",
 				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
 				labels: [],
 			};
-		}) as any;
+		});
 		const handler = new HandleIssueEvent(deps as any);
 		const payload = createPayload();
 
