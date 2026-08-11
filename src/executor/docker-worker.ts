@@ -773,6 +773,27 @@ export class DockerWorkerExecutor implements ExecutionService {
 		return process.env.OPENAI_API_KEY?.trim() || undefined;
 	}
 
+	/**
+	 * Public startup hook that begins building the worker image eagerly.
+	 * The returned promise resolves when the build finishes, but callers should
+	 * generally fire it and forget it so startup is not blocked. If the build
+	 * fails, startup still succeeds and the first session will fall back to
+	 * building the image itself.
+	 */
+	async prebuildWorkerImage(): Promise<void> {
+		process.stdout.write("[startup] prebuilding worker image...\n");
+		try {
+			await this.ensureWorkerImage("[startup]");
+			process.stdout.write("[startup] worker image prebuilt successfully\n");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[startup] worker image prebuild failed: ${message}\n`);
+			// Clear the cached promise so the first session falls back to the
+			// same lazy build path used when no prebuild was attempted.
+			this.imageReady = undefined;
+		}
+	}
+
 	private async ensureWorkerImage(sessionKey: string): Promise<void> {
 		if (!this.imageReady) {
 			// Rebuild once per control-plane process so deployments cannot reuse a

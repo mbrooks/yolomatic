@@ -142,6 +142,7 @@ vi.mock("./executor/docker-worker.js", () => ({
 	DockerWorkerExecutor: vi.fn(function () {
 		return {
 			execute: vi.fn(),
+			prebuildWorkerImage: vi.fn(),
 		};
 	}),
 }));
@@ -203,6 +204,7 @@ import { SettingsStore } from "./settings/store.js";
 import { isBootstrapComplete, getConfig } from "./config.js";
 import { StaleSessionDetector } from "./session/stale-detector.js";
 import { startGitHubPolling } from "./github-events/polling.js";
+import { DockerWorkerExecutor } from "./executor/docker-worker.js";
 
 describe("main", () => {
 	beforeEach(() => {
@@ -689,6 +691,12 @@ describe("main", () => {
 		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
 		await options.onOnboardingComplete();
 		expect((createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+	});
+
+	it("does not prebuild the worker image in onboarding-only mode", async () => {
+		userStoreMock.hasAnySync.mockReturnValueOnce(false);
+		await main();
+		expect(DockerWorkerExecutor).not.toHaveBeenCalled();
 	});
 });
 

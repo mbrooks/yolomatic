@@ -1272,6 +1272,119 @@ describe("DockerWorkerExecutor", () => {
 			await harness.close();
 		}
 	});
+
+	it("prebuilds the worker image and logs startup messages", async () => {
+		const harness = await createHarness(700);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			await harness.executor.prebuildWorkerImage();
+			expect(execFileMock).toHaveBeenCalledWith(
+				"docker",
+				[
+					"build",
+					"--target",
+					"worker",
+					"--label",
+					"io.yolomatic.worker.transport=websocket-v1",
+					"-t",
+					"yolomatic-worker:latest",
+					harness.projectRoot,
+				],
+				expect.any(Object),
+				expect.any(Function),
+			);
+			expect(stdoutSpy).toHaveBeenCalledWith("[startup] prebuilding worker image...\n");
+			expect(stdoutSpy).toHaveBeenCalledWith("[startup] worker image prebuilt successfully\n");
+		} finally {
+			stdoutSpy.mockRestore();
+			await harness.close();
+		}
+	});
+
+	it("reuses the prebuilt image promise on the first session launch", async () => {
+		const harness = await createHarness(701);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, "ack-prebuild", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, "complete-prebuild", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "YOLO_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.prebuildWorkerImage();
+			execFileMock.mockClear();
+			await harness.executor.execute(makeSessionState(701, harness.workspacePath));
+			expect(execFileMock.mock.calls.filter((call) => call[1][0] === "build")).toHaveLength(0);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("recovers from a failed prebuild by rebuilding on the first session", async () => {
+		const harness = await createHarness(702);
+		execFileMock.mockImplementationOnce((_cmd, _args, _options, callback) =>
+			callback(new Error("prebuild failed"), "", ""),
+		);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, "ack-recover", { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, "complete-recover", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "YOLO_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await expect(harness.executor.prebuildWorkerImage()).resolves.toBeUndefined();
+			expect(stdoutSpy).toHaveBeenCalledWith(
+				"[startup] worker image prebuild failed: prebuild failed\n",
+			);
+			execFileMock.mockClear();
+			await harness.executor.execute(makeSessionState(702, harness.workspacePath));
+			expect(execFileMock.mock.calls.filter((call) => call[1][0] === "build")).toHaveLength(1);
+		} finally {
+			stdoutSpy.mockRestore();
+			await harness.close();
+		}
+	});
 });
 
 	describe("tool_request / tool_response gateway dispatch", () => {
