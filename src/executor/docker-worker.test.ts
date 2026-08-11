@@ -258,6 +258,167 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("logs an info-level build notice before the first image build", async () => {
+		const harness = await createHarness(480);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-480-implementation", "ack-build", {
+							ackMessageId: message.messageId,
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-480-implementation", "complete-build", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "YOLO_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.execute(makeSessionState(480, harness.workspacePath));
+
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"github-mbrooks-yolomatic-issue-480-implementation",
+				expect.objectContaining({
+					level: "info",
+					message: "Building worker container image; this may take a couple of minutes.",
+					details: { type: "worker_image_build", image: "yolomatic-worker:latest" },
+				}),
+			);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"github-mbrooks-yolomatic-issue-480-implementation",
+				expect.objectContaining({
+					message: "Launching worker container yolomatic-session-mbrooks-yolomatic-480",
+				}),
+			);
+			const buildNoticeIndex = recordSessionLogMock.mock.calls.findIndex(
+				(call) => call[1].message === "Building worker container image; this may take a couple of minutes.",
+			);
+			const launchIndex = recordSessionLogMock.mock.calls.findIndex(
+				(call) =>
+					call[1].message ===
+					"Launching worker container yolomatic-session-mbrooks-yolomatic-480",
+			);
+			expect(buildNoticeIndex).toBeGreaterThanOrEqual(0);
+			expect(buildNoticeIndex).toBeLessThan(launchIndex);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("does not log the build notice on subsequent launches using the cached image", async () => {
+		const harness = await createHarness(481);
+		const secondWorkspacePath = path.join(harness.projectRoot, "second-workspace");
+		await mkdir(secondWorkspacePath, { recursive: true });
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, "ack-second", {
+							ackMessageId: message.messageId,
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, "complete-second", {
+							result: {
+								status: "complete",
+								summary: "done",
+								rawResponse: "YOLO_STATUS: complete\ndone",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.execute(makeSessionState(481, harness.workspacePath));
+			recordSessionLogMock.mockClear();
+			execFileMock.mockClear();
+
+			await harness.executor.execute({ ...makeSessionState(482, secondWorkspacePath), issueNumber: 482 });
+
+			expect(
+				recordSessionLogMock.mock.calls.filter(
+					(call) => call[1].message === "Building worker container image; this may take a couple of minutes.",
+				),
+			).toHaveLength(0);
+			expect(
+				execFileMock.mock.calls.filter((call) => call[0] === "docker" && call[1][0] === "build"),
+			).toHaveLength(0);
+		} finally {
+			await rm(secondWorkspacePath, { recursive: true, force: true });
+			await harness.close();
+		}
+	});
+
+	it("logs the build notice under the refinement session key for the first refinement worker", async () => {
+		const harness = await createHarness(483);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		spawnMock.mockImplementation((_cmd, _args, options) => {
+			const child = makeChildProcess();
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", "github-mbrooks-yolomatic-issue-483-refinement", "ack-refine-build", {
+							ackMessageId: message.messageId,
+						}),
+					);
+					await connection.send(
+						createWorkerMessage("complete", "github-mbrooks-yolomatic-issue-483-refinement", "complete-refine-build", {
+							result: {
+								proposedTaskBody: "## Summary\nRefined.",
+								summary: "Better description.",
+								investigation: "Read the code.",
+							},
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.executeRefinement(makeSessionState(483, harness.workspacePath), undefined);
+			expect(recordSessionLogMock).toHaveBeenCalledWith(
+				"github-mbrooks-yolomatic-issue-483-refinement",
+				expect.objectContaining({
+					level: "info",
+					message: "Building worker container image; this may take a couple of minutes.",
+					details: { type: "worker_image_build", image: "yolomatic-worker:latest" },
+				}),
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("normalizes helper values, builds worker URLs, and rejects workspaces outside the mount root", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 
