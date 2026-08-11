@@ -19,10 +19,12 @@ interface OpenAiModelsResponse {
 	error?: { message?: string };
 }
 
-/** Ollama /api/tags payload shape. */
+/** Ollama website library /api/tags payload shape. */
 interface OllamaTagsResponse {
 	models?: Array<{ name?: string }>;
 }
+
+const OLLAMA_LIBRARY_TAGS_URL = "https://ollama.com/api/tags";
 
 function getFetch(fetchImpl?: typeof fetch): typeof fetch {
 	return fetchImpl ?? globalThis.fetch;
@@ -102,23 +104,22 @@ export async function fetchOpenAiModels(
 }
 
 /**
- * Fetches available model names from the Ollama `/api/tags` endpoint.
- * Returns an empty list with a descriptive error when Ollama is unreachable.
+ * Fetches available model names from the Ollama website library API.
+ *
+ * This intentionally does **not** talk to the local Ollama daemon because
+ * `/api/tags` on the daemon only lists already-installed models. The website
+ * API returns the broader catalog available for pulling.
  */
-export async function fetchOllamaModels(
-	host: string,
-	fetchImpl?: typeof fetch,
-): Promise<LlmModelListResult> {
-	const base = host.replace(/\/+$/u, "");
+export async function fetchOllamaModels(fetchImpl?: typeof fetch): Promise<LlmModelListResult> {
 	const fetchFn = getFetch(fetchImpl);
 
 	try {
-		const response = await fetchFn(`${base}/api/tags`);
+		const response = await fetchFn(OLLAMA_LIBRARY_TAGS_URL);
 
 		if (!response.ok) {
 			return {
 				models: [],
-				error: `Ollama is not reachable — cannot load models (HTTP ${response.status})`,
+				error: `Could not load Ollama models: Ollama library returned HTTP ${response.status}`,
 			};
 		}
 
@@ -130,6 +131,9 @@ export async function fetchOllamaModels(
 		return { models: names };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return { models: [], error: `Ollama is not reachable — cannot load models: ${message}` };
+		return {
+			models: [],
+			error: `Could not load Ollama models: ${message}`,
+		};
 	}
 }

@@ -1454,7 +1454,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
 			expect(body.models).toEqual(["llama2", "mistral"]);
-			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+			expect(fetchSpy).toHaveBeenCalledWith("https://ollama.com/api/tags");
 		});
 
 		it("does not require admin authentication", async () => {

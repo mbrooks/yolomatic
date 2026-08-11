@@ -255,7 +255,7 @@ describe("handleSettingsRoutes", () => {
 			const body = JSON.parse(res.body);
 			expect(body.models).toEqual(["llama2", "mistral"]);
 			expect(body.error).toBeUndefined();
-			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+			expect(fetchSpy).toHaveBeenCalledWith("https://ollama.com/api/tags");
 		});
 
 		it("returns a graceful error when Ollama is unreachable", async () => {
@@ -272,7 +272,7 @@ describe("handleSettingsRoutes", () => {
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(res.body);
 			expect(body.models).toEqual([]);
-			expect(body.error).toContain("Ollama is not reachable");
+			expect(body.error).toContain("Could not load Ollama models");
 		});
 
 		it("returns 400 for an unsupported provider", async () => {

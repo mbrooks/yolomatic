@@ -171,11 +171,11 @@ describe("fetchOllamaModels", () => {
 				}),
 			}),
 		);
-		const result = await fetchOllamaModels("http://host:11434", fetchImpl);
+		const result = await fetchOllamaModels(fetchImpl);
 
 		expect(result.models).toEqual(["llama2", "mistral"]);
 		expect(result.error).toBeUndefined();
-		expect(fetchImpl).toHaveBeenCalledWith("http://host:11434/api/tags");
+		expect(fetchImpl).toHaveBeenCalledWith("https://ollama.com/api/tags");
 	});
 
 	it("returns an empty list when the response models field is missing", async () => {
@@ -186,36 +186,36 @@ describe("fetchOllamaModels", () => {
 				json: async () => ({}),
 			}),
 		);
-		const result = await fetchOllamaModels("http://host:11434", fetchImpl);
+		const result = await fetchOllamaModels(fetchImpl);
 		expect(result.models).toEqual([]);
 		expect(result.error).toBeUndefined();
 	});
 
-	it("returns an empty list with an error when Ollama is unreachable", async () => {
+	it("returns an empty list with an error when the Ollama library is unreachable", async () => {
 		const fetchImpl = vi.fn(async () => {
 			throw new Error("fetch failed");
 		});
-		const result = await fetchOllamaModels("http://host:11434", fetchImpl);
+		const result = await fetchOllamaModels(fetchImpl);
 
 		expect(result.models).toEqual([]);
-		expect(result.error).toContain("Ollama is not reachable");
+		expect(result.error).toContain("Could not load Ollama models");
 	});
 
 	it("survives a thrown non-Error value", async () => {
 		const fetchImpl = vi.fn(async () => {
 			throw "boom";
 		});
-		const result = await fetchOllamaModels("http://host:11434", fetchImpl);
+		const result = await fetchOllamaModels(fetchImpl);
 		expect(result.models).toEqual([]);
 		expect(result.error).toContain("boom");
 	});
 
 	it("returns an empty list with an error on non-OK response", async () => {
 		const fetchImpl = vi.fn(async () => mockResponse({ ok: false, status: 503 }));
-		const result = await fetchOllamaModels("http://host:11434", fetchImpl);
+		const result = await fetchOllamaModels(fetchImpl);
 
 		expect(result.models).toEqual([]);
-		expect(result.error).toContain("Ollama is not reachable");
+		expect(result.error).toContain("Could not load Ollama models");
 		expect(result.error).toContain("503");
 	});
 });
