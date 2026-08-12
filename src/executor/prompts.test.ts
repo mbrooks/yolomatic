@@ -99,6 +99,32 @@ describe("buildStatusCorrectionPrompt", () => {
 		expect(prompt).toContain("must not be a new request for clarification");
 		expect(prompt).toContain("only the marker and a short summary");
 	});
+
+	it("tells the worker that missing git credentials or push failure is not a reason for waiting-feedback", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("git credentials");
+		expect(prompt).toContain("not a reason");
+		expect(prompt).toContain("waiting-feedback");
+	});
+
+	it("tells the worker to use complete when local work is finished even if push or PR is unavailable", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("complete");
+		expect(prompt).toContain("push");
+		expect(prompt).toContain("control plane owns delivery");
+	});
+
+	it("tells the worker to stop deliberating about credentials, git, or comments and just emit the marker", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("Do not deliberate");
+		expect(prompt).toContain("credentials");
+	});
+
+	it("forbids calling GitHub tools or running git commands during the correction", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("Do not call any GitHub tools");
+		expect(prompt).toContain("Do not run any git commands");
+	});
 });
 
 describe("buildPRReviewPrompt", () => {
