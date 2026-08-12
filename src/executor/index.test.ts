@@ -48,6 +48,7 @@ describe("PiAgentExecutor", () => {
 		delete process.env.PI_AGENT_MODEL;
 		delete process.env.PI_AGENT_PROVIDER;
 		vi.restoreAllMocks();
+		vi.clearAllMocks();
 	});
 
 	function makeState(issueNumber = 1) {

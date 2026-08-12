@@ -83,6 +83,22 @@ describe("buildStatusCorrectionPrompt", () => {
 		expect(prompt).toContain("Do not infer a status");
 		expect(prompt).toContain("Status: complete");
 	});
+
+	it("guides the worker to choose a status from its prior intent", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("if you believed the task was finished");
+		expect(prompt).toContain("YOLO_STATUS: complete");
+		expect(prompt).toContain("if you genuinely need a human answer");
+		expect(prompt).toContain("YOLO_STATUS: waiting-feedback");
+		expect(prompt).toContain("otherwise");
+		expect(prompt).toContain("YOLO_STATUS: working");
+	});
+
+	it("forbids defaulting to a clarification request", () => {
+		const prompt = buildStatusCorrectionPrompt();
+		expect(prompt).toContain("must not be a new request for clarification");
+		expect(prompt).toContain("only the marker and a short summary");
+	});
 });
 
 describe("buildPRReviewPrompt", () => {
