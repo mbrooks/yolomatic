@@ -97,11 +97,17 @@ export function buildStatusCorrectionPrompt(): string {
 		"",
 		"Choose the status from your prior intent:",
 		"- if you believed the task was finished, use `YOLO_STATUS: complete`.",
-		"- if you genuinely need a human answer, use `YOLO_STATUS: waiting-feedback`.",
+		"- if you genuinely need a human answer to proceed with the actual task itself, use `YOLO_STATUS: waiting-feedback`.",
 		"- otherwise, use `YOLO_STATUS: working`.",
+		"",
+		"Do not deliberate about git credentials, push failures, tokens, or posting comments. Just emit the marker and a short summary.",
+		"Missing git credentials, push failures, or the inability to open a pull request are not a reason to use `YOLO_STATUS: waiting-feedback`. The control plane owns delivery and will publish completed work itself.",
+		"If your local work is finished, use `YOLO_STATUS: complete` even when you cannot push, cannot open a PR, or have no credentials. Report the delivery blocker in the summary line only; do not change the status because of it.",
+		"`YOLO_STATUS: waiting-feedback` is only for when the actual task cannot proceed without a human answer (for example, ambiguous requirements or a decision only a maintainer can make).",
 		"",
 		"Your response must be only the marker and a short summary. It must not be a new request for clarification.",
 		"Do not repeat implementation work, do not modify any files, do not commit, do not push, and do not open a pull request.",
+		"Do not call any GitHub tools (including posting issue or PR comments) during this correction. Do not run any git commands during this correction.",
 		"The control plane owns delivery and will publish completed work itself.",
 	].join("\n");
 }
