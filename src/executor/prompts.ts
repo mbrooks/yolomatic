@@ -95,7 +95,12 @@ export function buildStatusCorrectionPrompt(): string {
 		"  YOLO_STATUS: complete",
 		"- Do not infer a status from prose such as \"Done\", a Markdown `Status: complete` bullet, or any other natural-language phrasing or formatting. Only the exact marker lines above are valid.",
 		"",
-		"Restate only your status and a short summary.",
+		"Choose the status from your prior intent:",
+		"- if you believed the task was finished, use `YOLO_STATUS: complete`.",
+		"- if you genuinely need a human answer, use `YOLO_STATUS: waiting-feedback`.",
+		"- otherwise, use `YOLO_STATUS: working`.",
+		"",
+		"Your response must be only the marker and a short summary. It must not be a new request for clarification.",
 		"Do not repeat implementation work, do not modify any files, do not commit, do not push, and do not open a pull request.",
 		"The control plane owns delivery and will publish completed work itself.",
 	].join("\n");
