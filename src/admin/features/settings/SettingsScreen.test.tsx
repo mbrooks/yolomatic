@@ -142,6 +142,17 @@ const MOCK_SETTINGS = [
 		category: "agent-behavior",
 	},
 	{
+		key: "default_worker_template",
+		value: "node",
+		description: "Default worker image used when a project has no override.",
+		type: "string",
+		default: "node",
+		requiresRestart: true,
+		sensitive: false,
+		updatedAt: "2026-08-11T00:00:00.000Z",
+		category: "agent-behavior",
+	},
+	{
 		key: "issue_new_comment_enabled",
 		value: true,
 		description: "Post an automatic comment on newly opened issues.",
@@ -325,6 +336,15 @@ describe("SettingsScreen", () => {
 			expect(screen.getByText("self_report_enabled")).not.toBeNull();
 		});
 		expect(screen.queryByText("github_token")).toBeNull();
+	});
+
+	it("renders the default worker template as an installed-template dropdown", async () => {
+		mockSettingsFetch();
+		render(<SettingsScreen onBack={vi.fn()} tab="agent-behavior" />);
+
+		const template = await screen.findByRole("combobox", { name: /default_worker_template/ }) as HTMLSelectElement;
+		expect(Array.from(template.options, (option) => option.value)).toEqual(["node", "php", "python", "rust"]);
+		expect(screen.getByRole("option", { name: "Node.js (workers/node.Dockerfile)" })).toBeDefined();
 	});
 
 	it("renders skills tab", async () => {

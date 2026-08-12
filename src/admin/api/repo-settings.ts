@@ -1,7 +1,7 @@
 import { apiGet } from "./client.js";
 
 export interface RepoSettingView {
-	key: "github_event_mode" | "default_branch";
+	key: "github_event_mode" | "default_branch" | "worker_template";
 	value: string;
 	default: string;
 	override: string | null;
@@ -9,6 +9,7 @@ export interface RepoSettingView {
 	requiresRestart: boolean;
 	description: string;
 	options?: string[];
+	optionLabels?: Record<string, string>;
 }
 
 export function fetchRepoSettings(owner: string, repo: string): Promise<{ settings: RepoSettingView[] }> {

@@ -18,6 +18,7 @@ export interface Repository {
 	visibility: RepositoryVisibility | null;
 	githubEventMode: RepoGitHubEventMode | null;
 	defaultBranch: string | null;
+	workerTemplate?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -29,6 +30,7 @@ export type RepositoryInput = {
 	visibility?: RepositoryVisibility | null;
 	githubEventMode?: RepoGitHubEventMode | null;
 	defaultBranch?: string | null;
+	workerTemplate?: string | null;
 };
 
 export function repoModeIncludesWebhook(mode: RepoGitHubEventMode): boolean {
@@ -59,6 +61,14 @@ export function resolveRepoDefaultBranch(
 	globalDefaultBranch: string,
 ): string {
 	return repository?.defaultBranch ?? globalDefaultBranch;
+}
+
+/** Resolve a repository's worker template, falling back to the server default. */
+export function resolveRepoWorkerTemplate(
+	repository: Pick<Repository, "workerTemplate"> | null | undefined,
+	defaultTemplate: string,
+): string {
+	return repository?.workerTemplate ?? defaultTemplate;
 }
 
 export function normalizeRepoGitHubEventMode(value: unknown): RepoGitHubEventMode | null {

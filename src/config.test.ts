@@ -72,6 +72,7 @@ describe("getConfig", () => {
 		expect(config.workerControlBaseUrl).toBe("http://host.docker.internal:6767");
 		expect(config.workerDockerNetworkMode).toBeUndefined();
 		expect(config.openaiApiKey).toBe("");
+		expect(config.defaultWorkerTemplate).toBe("node");
 	});
 
 	it("reads optional environment variables", () => {

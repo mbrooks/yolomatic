@@ -274,6 +274,16 @@ export const MIGRATIONS: Migration[] = [
 			`);
 		},
 	},
+	{
+		id: 13,
+		name: "add_repositories_worker_template",
+		up(db) {
+			const columns = db.prepare("PRAGMA table_info(repositories)").all() as Array<{ name: string }>;
+			if (!columns.some((column) => column.name === "worker_template")) {
+				db.exec("ALTER TABLE repositories ADD COLUMN worker_template TEXT");
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

@@ -137,11 +137,13 @@ describe("RepositoryStore", () => {
 			visibility: "internal",
 			githubEventMode: "both",
 			defaultBranch: "main",
+			workerTemplate: "python",
 		});
 		const found = await store.get("mbrooks", "yolomatic");
 		expect(found).toEqual(repo);
 		expect(found!.visibility).toBe("internal");
 		expect(found!.fullName).toBe("mbrooks/yolomatic");
+		expect(found!.workerTemplate).toBe("python");
 	});
 
 	it("throws when upserting without owner or repo", async () => {

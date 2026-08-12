@@ -242,13 +242,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "agent-behavior",
 	},
 	{
-		key: "worker_image",
+		key: "default_worker_template",
 		type: "string",
-		description: "Docker image tag used for disposable worker containers",
-		default: "yolomatic-worker:latest",
+		description: "Default installed worker image used when a project has no override",
+		default: "node",
 		requiresRestart: true,
 		sensitive: false,
-		envVar: "YOLO_WORKER_IMAGE",
+		envVar: "YOLO_DEFAULT_WORKER_TEMPLATE",
 		category: "agent-behavior",
 	},
 	{

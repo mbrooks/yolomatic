@@ -36,7 +36,7 @@ vi.mock("../logging/session-log-store.js", () => ({
 	recordSessionLog: recordSessionLogMock,
 }));
 
-import { DockerWorkerExecutor } from "./docker-worker.js";
+import { DockerWorkerExecutor, type DockerWorkerExecutorOptions } from "./docker-worker.js";
 
 describe("DockerWorkerExecutor", () => {
 	const currentWorkerTransport = "websocket-v1";
@@ -193,6 +193,40 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("builds the worker-only base and selected project template, then launches its image", async () => {
+		const harness = await createHarness(420, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+			resolveWorkerTemplate: () => "python",
+		});
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+
+		try {
+			const template = (harness.executor as any).resolveTemplate("mbrooks", "yolomatic");
+			expect(template).toMatchObject({ id: "python", image: "yolomatic-worker-python:latest" });
+			await (harness.executor as any).ensureWorkerImage(template, "test-session");
+
+			expect(execFileMock).toHaveBeenNthCalledWith(
+				1,
+				"docker",
+				["build", "--label", "io.yolomatic.worker.transport=websocket-v1", "-t", "yolomatic-worker-base:latest", "-f", `${harness.projectRoot}/workers/base-runtime.Dockerfile`, harness.projectRoot],
+				expect.any(Object),
+				expect.any(Function),
+			);
+			expect(execFileMock).toHaveBeenNthCalledWith(
+				2,
+				"docker",
+				["build", "--label", "io.yolomatic.worker.transport=websocket-v1", "-t", "yolomatic-worker-python:latest", "-f", `${harness.projectRoot}/workers/python.Dockerfile`, harness.projectRoot],
+				expect.any(Object),
+				expect.any(Function),
+			);
+			const args = await (harness.executor as any).buildDockerRunArgs("worker-python", template);
+			expect(args.at(-1)).toBe("yolomatic-worker-python:latest");
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("rebuilds an existing worker image instead of trusting its transport label", async () => {
 		const harness = await createHarness(424);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
@@ -296,7 +330,7 @@ describe("DockerWorkerExecutor", () => {
 				expect.objectContaining({
 					level: "info",
 					message: "Building worker container image; this may take a couple of minutes.",
-					details: { type: "worker_image_build", image: "yolomatic-worker:latest" },
+					details: { type: "worker_image_build", image: "yolomatic-worker:latest", template: "legacy" },
 				}),
 			);
 			expect(recordSessionLogMock).toHaveBeenCalledWith(
@@ -411,7 +445,7 @@ describe("DockerWorkerExecutor", () => {
 				expect.objectContaining({
 					level: "info",
 					message: "Building worker container image; this may take a couple of minutes.",
-					details: { type: "worker_image_build", image: "yolomatic-worker:latest" },
+					details: { type: "worker_image_build", image: "yolomatic-worker:latest", template: "legacy" },
 				}),
 			);
 		} finally {
@@ -1570,7 +1604,10 @@ describe("DockerWorkerExecutor", () => {
 	});
 
 
-async function createHarness(issueNumber: number): Promise<{
+async function createHarness(
+	issueNumber: number,
+	workerOptions: Partial<Pick<DockerWorkerExecutorOptions, "workerImage" | "defaultWorkerTemplate" | "resolveWorkerTemplate">> = {},
+): Promise<{
 	executor: DockerWorkerExecutor;
 	projectRoot: string;
 	workspacePath: string;
@@ -1587,6 +1624,7 @@ async function createHarness(issueNumber: number): Promise<{
 		projectRoot,
 		workspacesDir: workspacesRoot,
 		workerImage: "yolomatic-worker:latest",
+		...workerOptions,
 		workerWorkspaceMountSource: workspacesRoot,
 		workerControlBaseUrl: "http://control-plane.test",
 		workerDockerNetworkMode: undefined,

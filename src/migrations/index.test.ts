@@ -51,6 +51,15 @@ describe("migrations", () => {
 		db.close();
 	});
 
+	it("adds the nullable worker_template repository override", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(repositories)").all() as Array<{ name: string }>;
+		expect(columns.some((column) => column.name === "worker_template")).toBe(true);
+		db.close();
+	});
+
 	it("is idempotent on subsequent runs", () => {
 		const db = new DatabaseSync(dbPath);
 		runMigrations(db);

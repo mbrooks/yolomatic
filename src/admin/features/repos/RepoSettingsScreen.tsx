@@ -102,7 +102,7 @@ export function RepoSettingsScreen({
 			<div className="detail-pane">
 				<h2>Repository Settings</h2>
 				<p className="setting-description">Override the global defaults for this repository only.</p>
-				{pendingRestart ? <RestartBanner>A restart is required for event mode changes to take effect.</RestartBanner> : null}
+				{pendingRestart ? <RestartBanner>A restart is required for repository event-mode or worker-template changes to take effect.</RestartBanner> : null}
 				{error ? <div className="error-banner">{error}</div> : null}
 				<div className="settings-list">
 					{settings.map((setting) => {
@@ -123,7 +123,7 @@ export function RepoSettingsScreen({
 										<option value="">Use global default ({setting.default})</option>
 										{setting.options.map((option) => (
 											<option key={option} value={option}>
-												{option}
+												{setting.optionLabels?.[option] ?? option}
 											</option>
 										))}
 									</select>
