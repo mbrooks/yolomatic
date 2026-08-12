@@ -71,22 +71,26 @@ export function buildFeedbackPrompt(
 	priorComments: PriorDiscussionComment[] = [],
 ): string {
 	return [
-		"Human feedback received. Continue from the existing session context.",
+		"Human feedback received. Act on the feedback using the existing session context.",
 		"",
 		"Status protocol:",
-		"- First line must be exactly one of:",
+		"- The first line must be exactly one of:",
 		"  YOLO_STATUS: working",
 		"  YOLO_STATUS: waiting-feedback",
 		"  YOLO_STATUS: complete",
+		"- Use `working` while feedback-related work remains; use `complete` when the requested local work is finished.",
+		"- Use `waiting-feedback` only when a human answer is required to proceed. Include one concrete question after the marker.",
+		"- Do not commit, push, or open a pull request; the host process handles delivery.",
 		"",
 		...buildPriorDiscussionSection(priorComments),
+		"Feedback to act on:",
 		comment.trim(),
 	].join("\n");
 }
 
 export function buildStatusCorrectionPrompt(): string {
 	return [
-		"Your previous response was rejected because it did not contain a valid status marker.",
+		"Your previous response was rejected because it did not contain a valid status marker. This is a status-repair turn, not a work turn.",
 		"",
 		"Status protocol:",
 		"- The first line of your response must be exactly one of:",
@@ -94,21 +98,15 @@ export function buildStatusCorrectionPrompt(): string {
 		"  YOLO_STATUS: waiting-feedback",
 		"  YOLO_STATUS: complete",
 		"- Do not infer a status from prose such as \"Done\", a Markdown `Status: complete` bullet, or any other natural-language phrasing or formatting. Only the exact marker lines above are valid.",
+		"- Follow the marker with one short summary. For `waiting-feedback`, state one concrete question in that summary.",
 		"",
-		"Choose the status from your prior intent:",
-		"- if you believed the task was finished, use `YOLO_STATUS: complete`.",
-		"- if you genuinely need a human answer to proceed with the actual task itself, use `YOLO_STATUS: waiting-feedback`.",
-		"- otherwise, use `YOLO_STATUS: working`.",
+		"Choose the status from the actual state at the end of the preceding turn:",
+		"- Use `complete` when the requested local work is finished.",
+		"- Use `waiting-feedback` only when a human answer can unblock the actual task.",
+		"- Otherwise use `working`.",
 		"",
-		"Do not deliberate about git credentials, push failures, tokens, or posting comments. Just emit the marker and a short summary.",
-		"Missing git credentials, push failures, or the inability to open a pull request are not a reason to use `YOLO_STATUS: waiting-feedback`. The control plane owns delivery and will publish completed work itself.",
-		"If your local work is finished, use `YOLO_STATUS: complete` even when you cannot push, cannot open a PR, or have no credentials. Report the delivery blocker in the summary line only; do not change the status because of it.",
-		"`YOLO_STATUS: waiting-feedback` is only for when the actual task cannot proceed without a human answer (for example, ambiguous requirements or a decision only a maintainer can make).",
-		"",
-		"Your response must be only the marker and a short summary. It must not be a new request for clarification.",
-		"Do not repeat implementation work, do not modify any files, do not commit, do not push, and do not open a pull request.",
-		"Do not call any GitHub tools (including posting issue or PR comments) during this correction. Do not run any git commands during this correction.",
-		"The control plane owns delivery and will publish completed work itself.",
+		"Do not perform further implementation work or modify files. Do not run git or GitHub commands; the host process handles delivery.",
+		"Delivery constraints such as missing credentials, a failed push, or an unavailable pull request must not change a complete status to `waiting-feedback`.",
 	].join("\n");
 }
 
