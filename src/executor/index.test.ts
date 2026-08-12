@@ -536,18 +536,6 @@ describe("PiAgentExecutor", () => {
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});
 
-	it("rejects an unresolved OpenAI model before creating a Pi session", async () => {
-		const soulPath = await makeSoulPath();
-		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
-		const executor = new PiAgentExecutor({
-			soulPath,
-			modelConfig: { provider: "openai", model: "gpt-5.6-terra" },
-		});
-
-		await expect(executor.execute(makeState())).rejects.toThrow(/OpenAI API model gpt-5.6-terra.*Codex/i);
-		expect(createAgentSession).not.toHaveBeenCalled();
-	});
-
 	it("builds feedback and PR review prompts for continued sessions", async () => {
 		const soulPath = await makeSoulPath();
 		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());

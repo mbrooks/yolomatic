@@ -1384,9 +1384,9 @@ describe("handleOnboardingRoutes", () => {
 			});
 		}
 
-		it("returns supported Codex models using a submitted API key", async () => {
+		it("returns OpenAI models using a submitted API key", async () => {
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-				providerResponse({ data: [{ id: "gpt-5.2-codex" }, { id: "gpt-4" }, { id: "gpt-5.1-codex" }] }),
+				providerResponse({ data: [{ id: "gpt-4" }, { id: "gpt-3.5" }] }),
 			);
 			const store = await tmpStore();
 			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=openai&apiKey=sk-wizard", method: "GET" });
@@ -1397,7 +1397,7 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.models).toEqual(["gpt-5.1-codex", "gpt-5.2-codex"]);
+			expect(body.models).toEqual(["gpt-3.5", "gpt-4"]);
 			expect(body.error).toBeUndefined();
 			expect(fetchSpy).toHaveBeenCalledWith(
 				"https://api.openai.com/v1/models",
