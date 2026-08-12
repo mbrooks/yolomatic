@@ -155,14 +155,6 @@ export class PiAgentExecutor implements ExecutionService {
 			? modelRegistry.runtime.getModel(configuredModelRef.provider, configuredModelRef.id)
 			: undefined;
 		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();
-		const configuredProvider = configuredModelOverride?.provider?.trim() ?? process.env.PI_AGENT_PROVIDER?.trim();
-		const isOpenAiModelName = configuredModelName?.startsWith("openai/") ?? false;
-		if (configuredModelName && !configuredModel && (configuredProvider === "openai" || isOpenAiModelName)) {
-			throw new Error(
-				`Configured OpenAI API model ${configuredModelName} is not in the supported Codex catalog. ` +
-					"Choose a supported Codex API model instead; ChatGPT/Codex App OAuth and Pi default fallback are not supported.",
-			);
-		}
 		if (configuredModelName && !configuredModel) {
 			process.stderr.write(
 				`Warning: configured Pi model ${configuredModelName} did not resolve; falling back to Pi defaults.\n`,

@@ -84,24 +84,19 @@ describe("fetchOpenAiModels", () => {
 		expect(result.error).toContain("boom");
 	});
 
-	it("returns only sorted supported Codex model ids on success", async () => {
+	it("returns sorted model ids on success", async () => {
 		const fetchImpl = vi.fn(async () =>
 			mockResponse({
 				ok: true,
 				status: 200,
 				json: async () => ({
-					data: [
-						{ id: "gpt-5.2-codex" },
-						{ id: "gpt-4.1" },
-						{ id: "gpt-5.1-codex" },
-						{ id: "" },
-					],
+					data: [{ id: "gpt-4" }, { id: "gpt-3.5" }, { id: "" }],
 				}),
 			}),
 		);
 		const result = await fetchOpenAiModels("sk-test", fetchImpl);
 
-		expect(result.models).toEqual(["gpt-5.1-codex", "gpt-5.2-codex"]);
+		expect(result.models).toEqual(["gpt-3.5", "gpt-4"]);
 		expect(result.error).toBeUndefined();
 		expect(fetchImpl).toHaveBeenCalledWith("https://api.openai.com/v1/models", {
 			headers: { Authorization: "Bearer sk-test" },
@@ -113,11 +108,11 @@ describe("fetchOpenAiModels", () => {
 			mockResponse({
 				ok: true,
 				status: 200,
-				json: async () => ({ data: [{ id: "gpt-5.2-codex" }, { id: "gpt-4" }] }),
+				json: async () => ({ data: [{ id: "gpt-4" }] }),
 			}),
 		);
 		const result = await fetchOpenAiModels("sk-global");
-		expect(result.models).toEqual(["gpt-5.2-codex"]);
+		expect(result.models).toEqual(["gpt-4"]);
 		expect(fetchSpy).toHaveBeenCalledWith(
 			"https://api.openai.com/v1/models",
 			expect.objectContaining({ headers: { Authorization: "Bearer sk-global" } }),
