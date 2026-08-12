@@ -47,6 +47,22 @@ describe("RepoSettingsScreen", () => {
 							requiresRestart: false,
 							description: "branch desc",
 						},
+						{
+							key: "worker_template",
+							value: "python",
+							default: "node",
+							override: "python",
+							inherited: false,
+							requiresRestart: true,
+							description: "worker image",
+							options: ["node", "php", "python", "rust"],
+							optionLabels: {
+								node: "Node.js (workers/node.Dockerfile)",
+								php: "PHP (workers/php.Dockerfile)",
+								python: "Python (workers/python.Dockerfile)",
+								rust: "Rust (workers/rust.Dockerfile)",
+							},
+						},
 					],
 				});
 			}
@@ -71,6 +87,9 @@ describe("RepoSettingsScreen", () => {
 		});
 		expect(screen.getByDisplayValue("polling")).toBeDefined();
 		expect(screen.getByDisplayValue("master")).toBeDefined();
+		const template = screen.getByRole("combobox", { name: /worker_template/ }) as HTMLSelectElement;
+		expect(Array.from(template.options, (option) => option.value)).toContain("python");
+		expect(screen.getByRole("option", { name: "Python (workers/python.Dockerfile)" })).toBeDefined();
 	});
 
 	it("saves repo setting changes", async () => {
@@ -86,7 +105,7 @@ describe("RepoSettingsScreen", () => {
 				expect.objectContaining({ method: "PATCH" }),
 			);
 		});
-		expect(screen.getByText("A restart is required for event mode changes to take effect.")).toBeDefined();
+		expect(screen.getByText("A restart is required for repository event-mode or worker-template changes to take effect.")).toBeDefined();
 	});
 
 	it("removes the repository after confirmation and navigates to repos", async () => {

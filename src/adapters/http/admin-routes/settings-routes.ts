@@ -7,13 +7,14 @@ import {
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
 import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
+import { getWorkerTemplate } from "../../../worker/templates.js";
 
 const registry = new AdminRouteRegistry()
 	.route({
 		method: "GET",
 		pattern: /^\/api\/llm\/models$/u,
 		requiresDeps: ["settingsStore"],
-		handler: async (ctx) => {
+			handler: async (ctx) => {
 			const { settingsStore } = getRequiredDeps(ctx.deps, ["settingsStore"]);
 			const requestUrl = new URL(ctx.request.url ?? "/", "http://localhost");
 			const provider = requestUrl.searchParams.get("provider") ?? "";
@@ -49,6 +50,10 @@ const registry = new AdminRouteRegistry()
 			const requiresRestart: string[] = [];
 			const updated: string[] = [];
 			for (const [key, value] of Object.entries(body)) {
+				if (key === "default_worker_template" && (typeof value !== "string" || !getWorkerTemplate(value))) {
+					sendJson(ctx.response, 400, { error: "default_worker_template must be an installed worker template" });
+					return;
+				}
 				const definition = getSettingDefinition(key);
 				if (definition?.sensitive && value === "") {
 					continue;

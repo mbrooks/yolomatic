@@ -105,6 +105,22 @@ describe("handleSettingsRoutes", () => {
 		expect(body.requiresRestart).toContain("github_username");
 	});
 
+	it("rejects a default worker template that is not installed", async () => {
+		const res = response();
+		const deps = makeDeps();
+		const handled = await handleSettingsRoutes(
+			request("/api/settings", "PATCH", JSON.stringify({ default_worker_template: "shell" })),
+			res,
+			deps,
+			"/api/settings",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+		expect(JSON.parse(res.body).error).toBe("default_worker_template must be an installed worker template");
+		expect(deps.settingsStore.setTyped).not.toHaveBeenCalled();
+	});
+
 	it("lists pending GitHub invitations", async () => {
 		const res = response();
 		const deps = makeDeps({

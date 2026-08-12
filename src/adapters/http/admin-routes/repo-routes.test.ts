@@ -58,6 +58,7 @@ describe("handleRepoRoutes", () => {
 		getString: vi.fn((key: string, fallback?: string) => {
 			if (key === "github_event_mode") return "webhook";
 			if (key === "default_branch") return "main";
+			if (key === "default_worker_template") return "node";
 			return fallback ?? "";
 		}),
 		set: vi.fn(),
@@ -92,6 +93,7 @@ describe("handleRepoRoutes", () => {
 				visibility: input.visibility !== undefined ? input.visibility : existing?.visibility ?? null,
 				githubEventMode: input.githubEventMode !== undefined ? input.githubEventMode : existing?.githubEventMode ?? null,
 				defaultBranch: input.defaultBranch !== undefined ? input.defaultBranch : existing?.defaultBranch ?? null,
+				workerTemplate: input.workerTemplate !== undefined ? input.workerTemplate : existing?.workerTemplate ?? null,
 				createdAt: existing?.createdAt ?? "2026-01-01T00:00:00.000Z",
 				updatedAt: "2026-01-01T00:00:00.000Z",
 			};
@@ -283,6 +285,7 @@ describe("handleRepoRoutes", () => {
 			expect(body.settings).toEqual([
 				expect.objectContaining({ key: "github_event_mode", value: "polling", override: "polling" }),
 				expect.objectContaining({ key: "default_branch", value: "master", override: "master" }),
+				expect.objectContaining({ key: "worker_template", value: "node", override: null, inherited: true }),
 			]);
 		});
 
@@ -303,7 +306,43 @@ describe("handleRepoRoutes", () => {
 			expect(body.settings).toEqual([
 				expect.objectContaining({ key: "github_event_mode", value: "webhook", override: null, inherited: true }),
 				expect.objectContaining({ key: "default_branch", value: "main", override: null, inherited: true }),
+				expect.objectContaining({
+					key: "worker_template",
+					value: "node",
+					override: null,
+					inherited: true,
+					options: ["node", "php", "python", "rust"],
+					optionLabels: {
+						node: "Node.js (workers/node.Dockerfile)",
+						php: "PHP (workers/php.Dockerfile)",
+						python: "Python (workers/python.Dockerfile)",
+						rust: "Rust (workers/rust.Dockerfile)",
+					},
+				}),
 			]);
+		});
+
+		it("updates a project worker-template override and rejects unknown templates", async () => {
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const success = response();
+			await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "PATCH", JSON.stringify({ worker_template: "python" })),
+				success,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+			expect(success.statusCode).toBe(200);
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({ workerTemplate: "python" }));
+
+			const invalid = response();
+			await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "PATCH", JSON.stringify({ worker_template: "shell" })),
+				invalid,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+			expect(invalid.statusCode).toBe(400);
+			expect(JSON.parse(invalid.body).error).toBe("worker_template must be an installed worker template");
 		});
 
 		it("updates repo settings overrides", async () => {

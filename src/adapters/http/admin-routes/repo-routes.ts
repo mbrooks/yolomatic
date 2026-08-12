@@ -12,9 +12,10 @@ import {
 	type Repository,
 } from "../../../repos/repository.js";
 import { NotFoundError } from "../admin-router-shared.js";
+import { getWorkerTemplate, listWorkerTemplates } from "../../../worker/templates.js";
 
 interface RepoSettingView {
-	key: "github_event_mode" | "default_branch";
+	key: "github_event_mode" | "default_branch" | "worker_template";
 	value: string;
 	default: string;
 	override: string | null;
@@ -22,6 +23,7 @@ interface RepoSettingView {
 	requiresRestart: boolean;
 	description: string;
 	options?: string[];
+	optionLabels?: Record<string, string>;
 }
 
 function normalizeGlobalEventMode(raw: string): RepoGitHubEventMode {
@@ -37,6 +39,7 @@ function buildRepoSettingViews(
 ): RepoSettingView[] {
 	const globalEventMode = normalizeGlobalEventMode(deps.settingsStore!.getString("github_event_mode", "webhook"));
 	const globalDefaultBranch = deps.settingsStore!.getString("default_branch", "main");
+	const globalWorkerTemplate = deps.settingsStore!.getString("default_worker_template", "node");
 	return [
 		{
 			key: "github_event_mode",
@@ -56,6 +59,22 @@ function buildRepoSettingViews(
 			inherited: !configured?.defaultBranch,
 			requiresRestart: false,
 			description: "Override the base branch used for new worktrees, empty repo initialization, and pull requests.",
+		},
+		{
+			key: "worker_template",
+			value: configured?.workerTemplate ?? globalWorkerTemplate,
+			default: globalWorkerTemplate,
+			override: configured?.workerTemplate ?? null,
+			inherited: !configured?.workerTemplate,
+			requiresRestart: true,
+			description: "Choose an installed worker image for this project, or inherit the global default.",
+			options: listWorkerTemplates().map((template) => template.id),
+			optionLabels: Object.fromEntries(
+				listWorkerTemplates().map((template) => [
+					template.id,
+					`${template.label} (${template.dockerfile})`,
+				]),
+			),
 		},
 	];
 }
@@ -151,6 +170,7 @@ const registry = new AdminRouteRegistry()
 	.route<{
 		github_event_mode?: string;
 		default_branch?: string;
+		worker_template?: string;
 	}>({
 		method: "PATCH",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/settings$/u,
@@ -159,10 +179,11 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const { repositoryStore } = getRequiredDeps(ctx.deps, ["repositoryStore"]);
 			const [owner, repo] = ctx.params;
-			const body = ctx.body as { github_event_mode?: string; default_branch?: string };
+			const body = ctx.body as { github_event_mode?: string; default_branch?: string; worker_template?: string };
 			const existing = await repositoryStore.get(owner, repo);
 			let nextGithubEventMode = existing?.githubEventMode ?? null;
 			let nextDefaultBranch = existing?.defaultBranch ?? null;
+			let nextWorkerTemplate = existing?.workerTemplate ?? null;
 			const requiresRestart: string[] = [];
 
 			if ("github_event_mode" in body) {
@@ -182,6 +203,18 @@ const registry = new AdminRouteRegistry()
 				nextDefaultBranch = branch || null;
 			}
 
+			if ("worker_template" in body) {
+				const template = body.worker_template?.trim();
+				if (!template) {
+					nextWorkerTemplate = null;
+				} else if (getWorkerTemplate(template)) {
+					nextWorkerTemplate = template;
+					requiresRestart.push("worker_template");
+				} else {
+					throw new ValidationError("worker_template must be an installed worker template");
+				}
+			}
+
 			if (existing) {
 				await repositoryStore.upsert({
 					owner: existing.owner,
@@ -190,6 +223,7 @@ const registry = new AdminRouteRegistry()
 					visibility: existing.visibility,
 					githubEventMode: nextGithubEventMode,
 					defaultBranch: nextDefaultBranch,
+					workerTemplate: nextWorkerTemplate,
 				});
 			} else {
 				await repositoryStore.upsert({
@@ -197,9 +231,10 @@ const registry = new AdminRouteRegistry()
 					repo,
 					githubEventMode: nextGithubEventMode,
 					defaultBranch: nextDefaultBranch,
+					workerTemplate: nextWorkerTemplate,
 				});
 			}
-			return { status: 200, body: { updated: ["github_event_mode", "default_branch"], requiresRestart } };
+			return { status: 200, body: { updated: ["github_event_mode", "default_branch", "worker_template"], requiresRestart } };
 		},
 	})
 	.route({

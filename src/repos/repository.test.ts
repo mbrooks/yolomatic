@@ -6,6 +6,7 @@ import {
 	repoModeIncludesWebhook,
 	resolveRepoDefaultBranch,
 	resolveRepoGitHubEventMode,
+	resolveRepoWorkerTemplate,
 	type RepoGitHubEventMode,
 } from "./repository.js";
 
@@ -95,6 +96,17 @@ describe("repository helpers", () => {
 		it("falls back to the global default when no repository is provided", () => {
 			expect(resolveRepoDefaultBranch(null, "main")).toBe("main");
 			expect(resolveRepoDefaultBranch(undefined, "trunk")).toBe("trunk");
+		});
+	});
+
+	describe("resolveRepoWorkerTemplate", () => {
+		it("returns the per-repository template when configured", () => {
+			expect(resolveRepoWorkerTemplate({ workerTemplate: "python" }, "node")).toBe("python");
+		});
+
+		it("inherits the default template when the repository has no override", () => {
+			expect(resolveRepoWorkerTemplate({ workerTemplate: null }, "rust")).toBe("rust");
+			expect(resolveRepoWorkerTemplate(null, "php")).toBe("php");
 		});
 	});
 

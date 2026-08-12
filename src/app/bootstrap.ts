@@ -21,6 +21,7 @@ import {
 	repoModeIncludesWebhook,
 	resolveRepoDefaultBranch,
 	resolveRepoGitHubEventMode,
+	resolveRepoWorkerTemplate,
 	type RepoGitHubEventMode,
 	type Repository,
 } from "../repos/repository.js";
@@ -34,6 +35,7 @@ import { createStartIssueSession, type StartIssueSession } from "./commands/star
 import type { SettingsStore } from "../settings/store.js";
 import { UserStore } from "../users/store.js";
 import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
+import { DEFAULT_WORKER_TEMPLATE } from "../worker/templates.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -100,6 +102,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		resolveRepoDefaultBranch(findManaged(owner, repo), config.defaultBranch);
 	const resolveGitHubEventMode = (owner: string, repo: string) =>
 		resolveRepoGitHubEventMode(findManaged(owner, repo), config.githubEventMode);
+	const resolveWorkerTemplate = (owner: string, repo: string) =>
+		resolveRepoWorkerTemplate(findManaged(owner, repo), config.defaultWorkerTemplate ?? DEFAULT_WORKER_TEMPLATE);
 	// Admin-link settings advertise requiresRestart: false, so read them live
 	// from the SettingsStore at comment-post time instead of snapshotting the
 	// bootstrap-time config value. This lets operators toggle
@@ -129,7 +133,8 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,
-		workerImage: config.workerImage,
+		defaultWorkerTemplate: config.defaultWorkerTemplate ?? DEFAULT_WORKER_TEMPLATE,
+		resolveWorkerTemplate,
 		workerWorkspaceMountSource: config.workerWorkspaceMountSource,
 		workerControlBaseUrl: config.workerControlBaseUrl,
 		workerDockerNetworkMode: config.workerDockerNetworkMode,

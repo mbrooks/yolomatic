@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { SettingsStore } from "./settings/store.js";
+import { DEFAULT_WORKER_TEMPLATE, getWorkerTemplate } from "./worker/templates.js";
 
 export const DEFAULT_ADMIN_PATH = "/yolomatic/admin";
 export const DEFAULT_ADMIN_DEFAULT_PAGE = "#/dashboard";
@@ -56,7 +57,9 @@ export interface AppConfig {
 	logResponses: boolean;
 	githubEventMode: "webhook" | "polling" | "both";
 	githubPollIntervalMs: number;
-	workerImage: string;
+	/** @deprecated Worker images are selected by template. */
+	workerImage?: string;
+	defaultWorkerTemplate?: string;
 	workerWorkspaceMountSource: string;
 	workerControlBaseUrl: string;
 	workerDockerNetworkMode?: string;
@@ -109,7 +112,10 @@ export function getConfig(store: SettingsStore): AppConfig {
 		logResponses: store.getBoolean("log_responses", true),
 		githubEventMode,
 		githubPollIntervalMs: Math.max(1000, store.getNumber("github_poll_interval_ms", 60000)),
-		workerImage: store.get("worker_image") ?? "yolomatic-worker:latest",
+		defaultWorkerTemplate: (() => {
+			const requested = store.getString("default_worker_template", DEFAULT_WORKER_TEMPLATE);
+			return getWorkerTemplate(requested) ? requested : DEFAULT_WORKER_TEMPLATE;
+		})(),
 		workerWorkspaceMountSource: store.get("worker_workspace_mount_source") ?? path.resolve(store.getString("workspaces_dir", "./workspaces")),
 		workerControlBaseUrl: store.get("worker_control_base_url") ?? `http://host.docker.internal:${store.getNumber("port", 6767)}`,
 		workerDockerNetworkMode: store.get("worker_docker_network_mode") ?? undefined,

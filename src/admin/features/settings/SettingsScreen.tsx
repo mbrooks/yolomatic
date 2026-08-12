@@ -11,6 +11,7 @@ import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
 import { LlmModelSelect, type LlmModelFetcher } from "./LlmModelSelect.js";
 import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
+import { listWorkerTemplates } from "../../../worker/templates.js";
 
 export type SettingsTab = SettingsCategoryTab | "skills" | "invitations" | "users";
 
@@ -21,9 +22,18 @@ const SERVER_SETTINGS_SECTIONS = [
 	{ category: "logging", label: "Logging" },
 ] as const;
 
-const SETTING_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+interface SettingOption {
+	value: string;
+	label: string;
+}
+
+const SETTING_OPTIONS: Readonly<Record<string, readonly (string | SettingOption)[]>> = {
 	github_event_mode: ["webhook", "polling", "both"],
 	pi_agent_provider: ["ollama", "openai"],
+	default_worker_template: listWorkerTemplates().map((template) => ({
+		value: template.id,
+		label: `${template.label} (${template.dockerfile})`,
+	})),
 };
 
 export function SettingsScreen({
@@ -393,9 +403,11 @@ function SettingRow({
 					value={String(displayValue)}
 					onChange={(e) => onChange(setting.key, e.target.value)}
 				>
-					{options.map((option) => (
-						<option key={option} value={option}>{option}</option>
-					))}
+					{options.map((option) => {
+						const value = typeof option === "string" ? option : option.value;
+						const label = typeof option === "string" ? option : option.label;
+						return <option key={value} value={value}>{label}</option>;
+					})}
 				</select>
 			) : setting.type === "boolean" ? (
 				<select

@@ -21,6 +21,7 @@ function rowToRepository(row: Record<string, unknown>): Repository {
 			? null
 			: String(row.github_event_mode)) as RepoGitHubEventMode | null,
 		defaultBranch: row.default_branch == null ? null : String(row.default_branch),
+		workerTemplate: row.worker_template == null ? null : String(row.worker_template),
 		createdAt: String(row.created_at),
 		updatedAt: String(row.updated_at),
 	};
@@ -41,13 +42,14 @@ export class RepositoryStore {
 		runMigrations(this.db);
 
 		this.upsertStmt = this.db.prepare(
-			`INSERT INTO repositories (id, owner, repo, full_name, visibility, github_event_mode, default_branch, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO repositories (id, owner, repo, full_name, visibility, github_event_mode, default_branch, worker_template, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(owner, repo) DO UPDATE SET
 			 full_name=excluded.full_name,
 			 visibility=excluded.visibility,
 			 github_event_mode=excluded.github_event_mode,
 			 default_branch=excluded.default_branch,
+			 worker_template=excluded.worker_template,
 			 updated_at=excluded.updated_at`,
 		);
 		this.getStmt = this.db.prepare(
@@ -105,6 +107,7 @@ export class RepositoryStore {
 			input.visibility ?? null,
 			input.githubEventMode ?? null,
 			input.defaultBranch ?? null,
+			input.workerTemplate ?? null,
 			now,
 			now,
 		);

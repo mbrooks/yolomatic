@@ -24,6 +24,13 @@ import {
 } from "../worker/protocol.js";
 import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
 import type { WorkerGitHubGateway } from "../worker/github-gateway.js";
+import {
+	BASE_WORKER_DOCKERFILE,
+	BASE_WORKER_IMAGE,
+	DEFAULT_WORKER_TEMPLATE,
+	getWorkerTemplate,
+	type WorkerTemplate,
+} from "../worker/templates.js";
 
 const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.yolomatic.worker.transport";
@@ -47,7 +54,10 @@ async function execFileText(command: string, args: string[], cwd: string): Promi
 export interface DockerWorkerExecutorOptions {
 	projectRoot: string;
 	workspacesDir: string;
-	workerImage: string;
+	/** @deprecated Legacy image override retained for a rolling upgrade only. */
+	workerImage?: string;
+	defaultWorkerTemplate?: string;
+	resolveWorkerTemplate?: (owner: string, repo: string) => string;
 	workerWorkspaceMountSource: string;
 	workerControlBaseUrl: string;
 	workerDockerNetworkMode?: string;
@@ -61,7 +71,8 @@ export interface DockerWorkerExecutorOptions {
 }
 
 export class DockerWorkerExecutor implements ExecutionService {
-	private imageReady?: Promise<void>;
+	private readonly imageReady = new Map<string, Promise<void>>();
+	private baseImageReady?: Promise<void>;
 	private resolvedWorkerWorkspaceMountSource?: Promise<string>;
 
 	constructor(private readonly options: DockerWorkerExecutorOptions) {}
@@ -115,7 +126,8 @@ export class DockerWorkerExecutor implements ExecutionService {
 		onActivity?: () => void,
 	): Promise<ExecutionResult | RefinementResult> {
 		const sessionKey = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
-		await this.ensureWorkerImage(sessionKey);
+		const workerTemplate = this.resolveTemplate(state.owner, state.repo);
+		await this.ensureWorkerImage(workerTemplate, sessionKey);
 
 		const containerName = this.buildContainerName(state, prompt.kind);
 		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
@@ -129,6 +141,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 					sessionKey,
 					containerName,
 					workspacePathInWorker,
+					workerTemplate,
 					abortSignal,
 					onSessionCreated,
 					onActivity,
@@ -159,6 +172,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		sessionKey: string,
 		containerName: string,
 		workspacePathInWorker: string,
+		workerTemplate: WorkerTemplate,
 		abortSignal?: AbortSignal,
 		onSessionCreated?: (session: LiveExecutionSession) => void,
 		onActivity?: () => void,
@@ -169,7 +183,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		recordSessionLog(sessionKey, {
 			level: "info",
 			message: `Launching worker container ${containerName}`,
-			details: { type: "worker_launch", image: this.options.workerImage, containerName },
+			details: { type: "worker_launch", image: workerTemplate.image, template: workerTemplate.id, containerName },
 		});
 
 		let connection: WorkerRpcConnection | undefined;
@@ -218,7 +232,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			executionReject = reject;
 		});
 
-		const docker = spawn("docker", await this.buildDockerRunArgs(containerName), {
+		const docker = spawn("docker", await this.buildDockerRunArgs(containerName, workerTemplate), {
 			cwd: this.options.projectRoot,
 			env: {
 				...process.env,
@@ -581,7 +595,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 		);
 	}
 
-	private async buildDockerRunArgs(containerName: string): Promise<string[]> {
+	private async buildDockerRunArgs(containerName: string, workerTemplate = this.resolveTemplate()): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
 		const workerWorkspacesDir = this.getWorkerWorkspacesDir();
@@ -636,7 +650,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			"YOLO_SESSION_WS_URL",
 			"-e",
 			"YOLO_SOUL_PATH",
-			this.options.workerImage,
+			workerTemplate.image,
 		);
 
 		return args;
@@ -783,45 +797,74 @@ export class DockerWorkerExecutor implements ExecutionService {
 	async prebuildWorkerImage(): Promise<void> {
 		process.stdout.write("[startup] prebuilding worker image...\n");
 		try {
-			await this.ensureWorkerImage("[startup]");
+			await this.ensureWorkerImage(this.resolveTemplate(), "[startup]");
 			process.stdout.write("[startup] worker image prebuilt successfully\n");
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[startup] worker image prebuild failed: ${message}\n`);
 			// Clear the cached promise so the first session falls back to the
 			// same lazy build path used when no prebuild was attempted.
-			this.imageReady = undefined;
+			this.imageReady.clear();
+			this.baseImageReady = undefined;
 		}
 	}
 
-	private async ensureWorkerImage(sessionKey: string): Promise<void> {
-		if (!this.imageReady) {
+	private resolveTemplate(owner?: string, repo?: string): WorkerTemplate {
+		const id = owner && repo ? this.options.resolveWorkerTemplate?.(owner, repo) : undefined;
+		const requested = id ?? this.options.defaultWorkerTemplate;
+		const template = requested ? getWorkerTemplate(requested) : undefined;
+		if (template) return template;
+		if (this.options.workerImage) {
+			return {
+				id: "legacy",
+				label: "Legacy worker image",
+				image: this.options.workerImage,
+				dockerfile: "Dockerfile",
+			};
+		}
+		const fallback = getWorkerTemplate(DEFAULT_WORKER_TEMPLATE);
+		if (fallback) return fallback;
+		throw new Error(`Unknown worker template: ${requested ?? DEFAULT_WORKER_TEMPLATE}`);
+	}
+
+	private async ensureWorkerImage(workerTemplate: WorkerTemplate, sessionKey: string): Promise<void> {
+		let ready = this.imageReady.get(workerTemplate.id);
+		if (!ready) {
 			// Rebuild once per control-plane process so deployments cannot reuse a
 			// worker image built from older source. Docker caches unchanged layers.
 			recordSessionLog(sessionKey, {
 				level: "info",
 				message: "Building worker container image; this may take a couple of minutes.",
-				details: { type: "worker_image_build", image: this.options.workerImage },
+				details: { type: "worker_image_build", image: workerTemplate.image, template: workerTemplate.id },
 			});
-			this.imageReady = execFileAsync(
-				"docker",
-				[
-					"build",
-					"--target",
-					"worker",
-					"--label",
-					`${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`,
-					"-t",
-					this.options.workerImage,
-					this.options.projectRoot,
-				],
-				{
-					cwd: this.options.projectRoot,
-				},
-			).then(() => undefined);
+			ready = workerTemplate.id === "legacy"
+				? execFileAsync(
+					"docker",
+					["build", "--target", "worker", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", workerTemplate.image, this.options.projectRoot],
+					{ cwd: this.options.projectRoot },
+				).then(() => undefined)
+				: this.ensureWorkerBaseImage().then(() =>
+					execFileAsync(
+						"docker",
+						["build", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", workerTemplate.image, "-f", path.join(this.options.projectRoot, workerTemplate.dockerfile), this.options.projectRoot],
+						{ cwd: this.options.projectRoot },
+					).then(() => undefined),
+				);
+			this.imageReady.set(workerTemplate.id, ready);
 		}
 
-		await this.imageReady;
+		await ready;
+	}
+
+	private async ensureWorkerBaseImage(): Promise<void> {
+		if (!this.baseImageReady) {
+			this.baseImageReady = execFileAsync(
+				"docker",
+				["build", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", BASE_WORKER_IMAGE, "-f", path.join(this.options.projectRoot, BASE_WORKER_DOCKERFILE), this.options.projectRoot],
+				{ cwd: this.options.projectRoot },
+			).then(() => undefined);
+		}
+		await this.baseImageReady;
 	}
 
 	private buildContainerName(state: SessionState, kind?: string): string {
