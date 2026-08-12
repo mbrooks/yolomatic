@@ -46,6 +46,19 @@ describe("buildFeedbackPrompt", () => {
 		expect(prompt).toContain("trim me");
 		expect(prompt).not.toContain("  trim me  ");
 	});
+
+	it("authorizes acting on the feedback while reserving delivery for the control plane", () => {
+		const prompt = buildFeedbackPrompt("Please fix the failing test.");
+		expect(prompt).toContain("Act on the feedback");
+		expect(prompt).toContain("Do not commit, push, or open a pull request");
+		expect(prompt).not.toContain("Do not modify any files");
+		expect(prompt).not.toContain("during this correction");
+	});
+
+	it("permits one concrete question when waiting for feedback", () => {
+		const prompt = buildFeedbackPrompt("Which option should we use?");
+		expect(prompt).toContain("one concrete question");
+	});
 });
 
 describe("buildStatusCorrectionPrompt", () => {
@@ -70,12 +83,10 @@ describe("buildStatusCorrectionPrompt", () => {
 
 	it("forbids additional work and delivery by the worker", () => {
 		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("Do not repeat implementation work");
-		expect(prompt).toContain("do not modify any files");
-		expect(prompt).toContain("do not commit");
-		expect(prompt).toContain("do not push");
-		expect(prompt).toContain("do not open a pull request");
-		expect(prompt).toContain("control plane owns delivery");
+		expect(prompt).toContain("Do not perform further implementation work");
+		expect(prompt).toContain("or modify files");
+		expect(prompt).toContain("Do not run git or GitHub commands");
+		expect(prompt).toContain("host process handles delivery");
 	});
 
 	it("warns against inferring status from prose or Markdown", () => {
@@ -84,46 +95,28 @@ describe("buildStatusCorrectionPrompt", () => {
 		expect(prompt).toContain("Status: complete");
 	});
 
-	it("guides the worker to choose a status from its prior intent", () => {
+	it("guides the worker to choose a status from the completed turn", () => {
 		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("if you believed the task was finished");
+		expect(prompt).toContain("state at the end of the preceding turn");
+		expect(prompt).toContain("the requested local work is finished");
 		expect(prompt).toContain("YOLO_STATUS: complete");
-		expect(prompt).toContain("if you genuinely need a human answer");
+		expect(prompt).toContain("only when a human answer can unblock");
 		expect(prompt).toContain("YOLO_STATUS: waiting-feedback");
-		expect(prompt).toContain("otherwise");
+		expect(prompt).toContain("Otherwise");
 		expect(prompt).toContain("YOLO_STATUS: working");
 	});
 
-	it("forbids defaulting to a clarification request", () => {
+	it("allows one concrete question only when waiting for feedback", () => {
 		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("must not be a new request for clarification");
-		expect(prompt).toContain("only the marker and a short summary");
+		expect(prompt).toContain("one short summary");
+		expect(prompt).toContain("one concrete question");
 	});
 
-	it("tells the worker that missing git credentials or push failure is not a reason for waiting-feedback", () => {
+	it("keeps delivery failures from changing an otherwise complete status", () => {
 		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("git credentials");
-		expect(prompt).toContain("not a reason");
+		expect(prompt).toContain("Delivery constraints");
+		expect(prompt).toContain("must not change a complete status");
 		expect(prompt).toContain("waiting-feedback");
-	});
-
-	it("tells the worker to use complete when local work is finished even if push or PR is unavailable", () => {
-		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("complete");
-		expect(prompt).toContain("push");
-		expect(prompt).toContain("control plane owns delivery");
-	});
-
-	it("tells the worker to stop deliberating about credentials, git, or comments and just emit the marker", () => {
-		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("Do not deliberate");
-		expect(prompt).toContain("credentials");
-	});
-
-	it("forbids calling GitHub tools or running git commands during the correction", () => {
-		const prompt = buildStatusCorrectionPrompt();
-		expect(prompt).toContain("Do not call any GitHub tools");
-		expect(prompt).toContain("Do not run any git commands");
 	});
 });
 
