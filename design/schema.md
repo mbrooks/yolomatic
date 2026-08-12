@@ -250,8 +250,18 @@ Index:
 - `SessionStore` keeps an in-memory cache keyed by `session_key`; SQLite
   remains the source of truth and the cache only short-circuits
   read-modify-write cycles.
-- `SessionStore.archive()` deletes the `sessions` row after copying state to
-  the archive directory; `session_logs` rows for that key are not removed.
-- `SessionStore.migrateFromFileStoreIfNeeded()` imports any pre-existing
-  `.state.json` files into `sessions` once per process lifetime; existing
-  rows are left untouched and on-disk files are preserved for rollback.
+- `SessionStore.archive()` writes the archived state fresh from the SQLite row
+  to the archive directory and moves the session transcript (`.jsonl`) there;
+  it does **not** move or delete the legacy on-disk `.state.json` file. The
+  `sessions` row is removed; `session_logs` rows for that key are not removed.
+- `SessionStore.delete()` removes only the `sessions` row. Legacy on-disk
+  `.state.json` and `.jsonl` files are intentionally left in place; use
+  `SessionStore.removeLegacyStateFiles()` as the explicit operational cleanup
+  step. See `design/session-migration.md`.
+- `SessionStore.auditLegacyState()` is a read-only preflight that reports
+  remaining legacy `.state.json` files, malformed legacy files, and sessions
+  whose `state_json` omits `kind`. It never mutates files or rows.
+- `SessionStore.migrateFromFileStoreIfNeeded()` is retained as an explicit
+  operational import/recovery tool but is **no longer run automatically at
+  boot**. On-disk files are preserved (not deleted) so a rollback can re-read
+  them. See `design/session-migration.md`.

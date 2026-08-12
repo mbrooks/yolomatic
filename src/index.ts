@@ -38,7 +38,11 @@ export async function main(): Promise<void> {
 	const config = getConfig(settingsStore);
 
 	const sessionStore = new SessionStore(path.join(memoryDir, "bot-state.sqlite"), config.sessionsDir);
-	await sessionStore.migrateFromFileStoreIfNeeded();
+	// The file-backed compatibility importer is no longer run automatically at
+	// boot. Run a read-only preflight audit instead so operators can see whether
+	// legacy state files or unnormalized session kinds remain before the
+	// separate explicit legacy-file deletion step.
+	await logLegacyStateAudit(sessionStore);
 	configureSessionLogPersistence(new SessionLogStore(path.join(memoryDir, "bot-state.sqlite")));
 	loadPersistedSessionLogs();
 	const taskController = new TaskController();
@@ -94,6 +98,38 @@ export async function main(): Promise<void> {
 	}
 
 	await startRuntime(config, { settingsStore, sessionStore, taskController, repositoryStore, userStore });
+}
+
+/**
+ * Read-only boot preflight: reports whether legacy file-backed session data
+ * or unnormalized session kinds still exist. Never mutates files or rows.
+ * Operators use this output to decide when to run the explicit legacy-file
+ * deletion step described in `design/session-migration.md`.
+ */
+async function logLegacyStateAudit(sessionStore: SessionStore): Promise<void> {
+	if (typeof sessionStore.auditLegacyState !== "function") return;
+	let audit;
+	try {
+		audit = await sessionStore.auditLegacyState();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stdout.write(`[session-store] legacy audit failed: ${message}\n`);
+		return;
+	}
+	if (audit.clean) return;
+	const parts: string[] = [];
+	if (audit.legacyStateFiles.length > 0) {
+		parts.push(`${audit.legacyStateFiles.length} legacy state file(s)`);
+	}
+	if (audit.sessionsMissingKind.length > 0) {
+		parts.push(`${audit.sessionsMissingKind.length} session(s) missing kind`);
+	}
+	if (audit.malformedStateFiles.length > 0) {
+		parts.push(`${audit.malformedStateFiles.length} malformed legacy file(s)`);
+	}
+	process.stdout.write(
+		`[session-store] legacy audit: ${parts.join(", ")} remain. Run the explicit legacy-file deletion step from design/session-migration.md once clean.\n`,
+	);
 }
 
 /* v8 ignore start */

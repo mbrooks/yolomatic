@@ -284,6 +284,39 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 14,
+		name: "normalize_session_kinds_durable",
+		up(db) {
+			const rows = db.prepare(
+				"SELECT session_key, state_json FROM sessions",
+			).all() as Array<{ session_key: string; state_json: string }>;
+			const updateStmt = db.prepare(
+				"UPDATE sessions SET state_json = ? WHERE session_key = ?",
+			);
+
+			db.exec("BEGIN IMMEDIATE");
+			try {
+				for (const row of rows) {
+					let state: Record<string, unknown>;
+					try {
+						state = JSON.parse(row.state_json) as Record<string, unknown>;
+					} catch {
+						// Leave malformed rows untouched so they cannot corrupt valid data.
+						continue;
+					}
+				const kind = state.kind === "refinement" ? "refinement" : "implementation";
+				if (state.kind === kind) continue;
+				state.kind = kind;
+				updateStmt.run(JSON.stringify(state, null, 2), row.session_key);
+				}
+				db.exec("COMMIT");
+			} catch (error) {
+				db.exec("ROLLBACK");
+				throw error;
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {
