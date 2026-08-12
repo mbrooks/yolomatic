@@ -60,6 +60,11 @@ USER yolomatic
 
 CMD ["node", "./dist/worker/entrypoint.js"]
 
+# Build this target to verify that the worker image has no GitHub CLI.
+FROM worker AS worker-gh-check
+
+RUN ! command -v gh
+
 
 # Control-plane runtime stage
 FROM base-runtime AS runtime
@@ -95,3 +100,8 @@ ENTRYPOINT ["yolomatic-container-entrypoint"]
 EXPOSE 6767
 
 CMD ["node", "./dist/index.js"]
+
+# Build this target to verify that the controller retains the GitHub CLI.
+FROM runtime AS runtime-gh-check
+
+RUN command -v gh
