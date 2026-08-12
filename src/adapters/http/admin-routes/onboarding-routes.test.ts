@@ -1440,9 +1440,9 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.error).toBe("Enter an OpenAI API key to load models");
 		});
 
-		it("returns Ollama model names", async () => {
+		it("returns tagged Ollama model names from the local daemon", async () => {
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-				providerResponse({ models: [{ name: "llama2" }, { name: "mistral" }] }),
+				providerResponse({ models: [{ name: "llama3.2:latest" }, { name: "kimi-k2.7-code:cloud" }] }),
 			);
 			const store = await tmpStore();
 			const req = mockRequest({ url: "/api/onboarding/llm/models?provider=ollama", method: "GET" });
@@ -1453,8 +1453,8 @@ describe("handleOnboardingRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(String(res.body));
-			expect(body.models).toEqual(["llama2", "mistral"]);
-			expect(fetchSpy).toHaveBeenCalledWith("https://ollama.com/api/tags");
+			expect(body.models).toEqual(["kimi-k2.7-code:cloud", "llama3.2:latest"]);
+			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
 		});
 
 		it("does not require admin authentication", async () => {

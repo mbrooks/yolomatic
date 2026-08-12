@@ -254,9 +254,9 @@ describe("handleSettingsRoutes", () => {
 			expect(body.error).toBe("Enter an OpenAI API key to load models");
 		});
 
-		it("returns sorted Ollama model names", async () => {
+		it("returns sorted tagged Ollama model names from the local daemon", async () => {
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-				providerResponse({ models: [{ name: "llama2" }, { name: "mistral" }] }),
+				providerResponse({ models: [{ name: "llama3.2:latest" }, { name: "kimi-k2.7-code:cloud" }] }),
 			);
 			const res = response();
 			const handled = await handleSettingsRoutes(
@@ -269,9 +269,9 @@ describe("handleSettingsRoutes", () => {
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
 			const body = JSON.parse(res.body);
-			expect(body.models).toEqual(["llama2", "mistral"]);
+			expect(body.models).toEqual(["kimi-k2.7-code:cloud", "llama3.2:latest"]);
 			expect(body.error).toBeUndefined();
-			expect(fetchSpy).toHaveBeenCalledWith("https://ollama.com/api/tags");
+			expect(fetchSpy).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
 		});
 
 		it("returns a graceful error when Ollama is unreachable", async () => {

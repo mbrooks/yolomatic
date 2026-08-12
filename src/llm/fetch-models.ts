@@ -19,12 +19,10 @@ interface OpenAiModelsResponse {
 	error?: { message?: string };
 }
 
-/** Ollama website library /api/tags payload shape. */
+/** Ollama daemon /api/tags payload shape. */
 interface OllamaTagsResponse {
 	models?: Array<{ name?: string }>;
 }
-
-const OLLAMA_LIBRARY_TAGS_URL = "https://ollama.com/api/tags";
 
 function getFetch(fetchImpl?: typeof fetch): typeof fetch {
 	return fetchImpl ?? globalThis.fetch;
@@ -104,22 +102,30 @@ export async function fetchOpenAiModels(
 }
 
 /**
- * Fetches available model names from the Ollama website library API.
+ * Fetches available model identifiers from the local Ollama daemon.
  *
- * This intentionally does **not** talk to the local Ollama daemon because
- * `/api/tags` on the daemon only lists already-installed models. The website
- * API returns the broader catalog available for pulling.
+ * Talks to the daemon's native `/api/tags` endpoint (resolved from
+ * `OLLAMA_HOST`, defaulting to `http://127.0.0.1:11434`) so the returned
+ * `name` fields already include the tag (for example `kimi-k2.7-code:cloud`).
+ * The public Ollama library catalog is intentionally not used because it
+ * returns bare base names without tags, which do not match the tagged
+ * identifiers the worker runtime expects.
  */
-export async function fetchOllamaModels(fetchImpl?: typeof fetch): Promise<LlmModelListResult> {
+export async function fetchOllamaModels(
+	fetchImpl?: typeof fetch,
+	env: NodeJS.ProcessEnv = process.env,
+): Promise<LlmModelListResult> {
 	const fetchFn = getFetch(fetchImpl);
+	const host = resolveOllamaHost(env);
+	const url = `${host}/api/tags`;
 
 	try {
-		const response = await fetchFn(OLLAMA_LIBRARY_TAGS_URL);
+		const response = await fetchFn(url);
 
 		if (!response.ok) {
 			return {
 				models: [],
-				error: `Could not load Ollama models: Ollama library returned HTTP ${response.status}`,
+				error: `Could not load Ollama models: daemon returned HTTP ${response.status}`,
 			};
 		}
 

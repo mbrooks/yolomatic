@@ -54,6 +54,28 @@ describe("LlmModelSelect", () => {
 		expect(screen.queryByLabelText("LLM Model (custom identifier)")).toBeNull();
 	});
 
+	it("renders tagged Ollama identifiers and pre-selects a tagged value", async () => {
+		fetcher.mockResolvedValue({ models: ["kimi-k2.7-code:cloud", "llama3.2:latest"] });
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value="kimi-k2.7-code:cloud"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+			/>,
+		);
+
+		const select = await screen.findByLabelText("LLM Model") as HTMLSelectElement;
+		await waitFor(() => expect(select.value).toBe("kimi-k2.7-code:cloud"));
+		expect(Array.from(select.options).map((o) => o.value)).toEqual([
+			"",
+			"kimi-k2.7-code:cloud",
+			"llama3.2:latest",
+			PRIVATE_MODEL_VALUE,
+		]);
+		expect(screen.queryByLabelText("LLM Model (custom identifier)")).toBeNull();
+	});
+
 	it("shows the private input when the value is not in the model list", async () => {
 		fetcher.mockResolvedValue({ models: ["llama2"] });
 		render(

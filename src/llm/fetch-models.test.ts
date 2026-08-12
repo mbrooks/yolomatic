@@ -161,21 +161,53 @@ describe("fetchOpenAiModels", () => {
 });
 
 describe("fetchOllamaModels", () => {
-	it("returns sorted model names on success", async () => {
+	it("returns sorted tagged model names from the local daemon", async () => {
 		const fetchImpl = vi.fn(async () =>
 			mockResponse({
 				ok: true,
 				status: 200,
 				json: async () => ({
-					models: [{ name: "llama2" }, { name: "mistral" }, { name: "" }],
+					models: [
+						{ name: "llama3.2:latest" },
+						{ name: "kimi-k2.7-code:cloud" },
+						{ name: "" },
+					],
 				}),
+			}),
+		);
+		const result = await fetchOllamaModels(fetchImpl, { OLLAMA_HOST: "http://127.0.0.1:11434" });
+
+		expect(result.models).toEqual(["kimi-k2.7-code:cloud", "llama3.2:latest"]);
+		expect(result.error).toBeUndefined();
+		expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+	});
+
+	it("defaults to the local daemon host when no env is supplied", async () => {
+		const fetchImpl = vi.fn(async () =>
+			mockResponse({
+				ok: true,
+				status: 200,
+				json: async () => ({ models: [{ name: "llama3.2:latest" }] }),
 			}),
 		);
 		const result = await fetchOllamaModels(fetchImpl);
 
-		expect(result.models).toEqual(["llama2", "mistral"]);
-		expect(result.error).toBeUndefined();
-		expect(fetchImpl).toHaveBeenCalledWith("https://ollama.com/api/tags");
+		expect(result.models).toEqual(["llama3.2:latest"]);
+		expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags");
+	});
+
+	it("honors a configured OLLAMA_HOST and strips a trailing /v1", async () => {
+		const fetchImpl = vi.fn(async () =>
+			mockResponse({
+				ok: true,
+				status: 200,
+				json: async () => ({ models: [{ name: "glm-5.2:cloud" }] }),
+			}),
+		);
+		const result = await fetchOllamaModels(fetchImpl, { OLLAMA_HOST: "http://ollama.internal:11434/v1" });
+
+		expect(result.models).toEqual(["glm-5.2:cloud"]);
+		expect(fetchImpl).toHaveBeenCalledWith("http://ollama.internal:11434/api/tags");
 	});
 
 	it("returns an empty list when the response models field is missing", async () => {
@@ -191,7 +223,7 @@ describe("fetchOllamaModels", () => {
 		expect(result.error).toBeUndefined();
 	});
 
-	it("returns an empty list with an error when the Ollama library is unreachable", async () => {
+	it("returns an empty list with an error when the Ollama daemon is unreachable", async () => {
 		const fetchImpl = vi.fn(async () => {
 			throw new Error("fetch failed");
 		});
