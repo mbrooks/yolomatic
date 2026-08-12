@@ -802,3 +802,206 @@ describe("PiAgentExecutor", () => {
 		expect(mockSession.prompt).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("PiAgentExecutor runtime settings injection", () => {
+	afterEach(() => {
+		delete process.env.PI_AGENT_MODEL;
+		delete process.env.PI_AGENT_PROVIDER;
+		delete process.env.OPENAI_API_KEY;
+		vi.restoreAllMocks();
+		vi.clearAllMocks();
+	});
+
+	async function makeSoulPath() {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+		return soulPath;
+	}
+
+	function makeState(issueNumber = 1) {
+		return {
+			issueNumber,
+			repo: "yolomatic",
+			owner: "mbrooks",
+			title: "Test",
+			body: "Body",
+			status: "pending" as const,
+			sessionPath: "/tmp/session",
+			workspacePath: "/tmp/workspace",
+			lastActivity: new Date().toISOString(),
+			seeded: false,
+		};
+	}
+
+	it("passes injected logging settings to the LlmLogger", async () => {
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+			session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
+		});
+		const { LlmLogger } = await import("../logging/llm-logger.js");
+
+		const loggingSettings = {
+			logLevel: "error",
+			logPrompts: false,
+			logThoughts: false,
+			logTools: false,
+			logResponses: false,
+		};
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: { model: {}, logging: loggingSettings },
+		});
+		await executor.execute(makeState(500));
+
+		expect(LlmLogger).toHaveBeenCalledWith(
+			"yolomatic",
+			500,
+			undefined,
+			expect.objectContaining({ loggingSettings }),
+		);
+	});
+
+	it("passes injected openaiApiKey and ollamaHost to the model registry", async () => {
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+			session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
+		});
+
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: {
+				model: { openaiApiKey: "sk-injected", ollamaHost: "http://ollama:11434" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			},
+		});
+		await executor.execute(makeState(501));
+
+		expect(createYolomaticModelRegistry).toHaveBeenCalledWith({
+			openaiApiKey: "sk-injected",
+			ollamaHost: "http://ollama:11434",
+		});
+	});
+
+	it("uses the runtimeSettings provider model as the configured model fallback", async () => {
+		const soulPath = await makeSoulPath();
+		const configuredModel = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
+		const registry = {
+			runtime: {
+				getModel: vi.fn((provider: string, id: string) => (provider === "ollama" && id === "kimi-k2.7-code:cloud" ? { provider, id } : undefined)),
+				getModels: vi.fn(() => [configuredModel]),
+			},
+			find: vi.fn((provider: string, id: string) => (provider === "ollama" && id === "kimi-k2.7-code:cloud" ? { provider, id } : undefined)),
+			getAll: vi.fn(() => [configuredModel]),
+		};
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(registry);
+		const mockSession = { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] };
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: { model: { piAgentModel: "kimi-k2.7-code:cloud", piAgentProvider: "ollama" }, logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true } },
+		});
+		await executor.execute(makeState(502));
+
+		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
+	});
+
+	it("reads the runtime settings provider fresh on each execution", async () => {
+		const soulPath = await makeSoulPath();
+		const configuredModelA = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
+		const configuredModelB = { provider: "ollama", id: "glm-5.2:cloud" };
+		const registry = {
+			runtime: {
+				getModel: vi.fn((provider: string, id: string) => {
+					if (provider === "ollama" && id === "kimi-k2.7-code:cloud") return configuredModelA;
+					if (provider === "ollama" && id === "glm-5.2:cloud") return configuredModelB;
+					return undefined;
+				}),
+				getModels: vi.fn(() => [configuredModelA, configuredModelB]),
+			},
+			find: vi.fn((provider: string, id: string) => {
+				if (provider === "ollama" && id === "kimi-k2.7-code:cloud") return configuredModelA;
+				if (provider === "ollama" && id === "glm-5.2:cloud") return configuredModelB;
+				return undefined;
+			}),
+			getAll: vi.fn(() => [configuredModelA, configuredModelB]),
+		};
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(registry);
+		const mockSession = { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] };
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		let currentModel = "kimi-k2.7-code:cloud";
+		const provider = () => ({
+			model: { piAgentModel: currentModel, piAgentProvider: "ollama" },
+			logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+		});
+		const executor = new PiAgentExecutor({ soulPath, runtimeSettings: provider });
+
+		await executor.execute(makeState(503));
+		expect(createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model: configuredModelA }));
+
+		// Live reconfiguration: the next execution picks up the new value without
+		// reconstructing the executor or mutating process.env.
+		currentModel = "glm-5.2:cloud";
+		await executor.execute(makeState(504));
+		expect(createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model: configuredModelB }));
+	});
+
+	it("preserves fallback behavior when model settings are missing", async () => {
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		});
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+			session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
+		});
+
+		const executor = new PiAgentExecutor({ soulPath });
+		await executor.execute(makeState(505));
+
+		// No configured model => Pi defaults, no unresolved-model warning.
+		expect(stderr).not.toHaveBeenCalledWith(expect.stringContaining("did not resolve"));
+		expect(createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model: undefined }));
+	});
+
+	it("does not read process.env for migrated model keys", async () => {
+		const soulPath = await makeSoulPath();
+		const originalModel = process.env.PI_AGENT_MODEL;
+		try {
+			process.env.PI_AGENT_MODEL = "should-be-ignored";
+			(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+				runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+				find: vi.fn(),
+				getAll: vi.fn(() => []),
+			});
+			(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
+			});
+
+			const executor = new PiAgentExecutor({ soulPath });
+			await executor.execute(makeState(506));
+
+			// No runtime settings injected => process.env.PI_AGENT_MODEL must not be
+			// consulted; the executor falls back to Pi defaults instead.
+			expect(createAgentSession).toHaveBeenLastCalledWith(expect.objectContaining({ model: undefined }));
+			expect(process.env.PI_AGENT_MODEL).toBe("should-be-ignored");
+		} finally {
+			if (originalModel === undefined) delete process.env.PI_AGENT_MODEL;
+			else process.env.PI_AGENT_MODEL = originalModel;
+		}
+	});
+});

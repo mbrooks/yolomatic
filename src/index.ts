@@ -13,7 +13,6 @@ import { createWebhookServer } from "./webhook/server.js";
 import {
 	noOpHandlers,
 	startRuntime,
-	syncConfigToEnv,
 	type RuntimeGraph,
 } from "./app/bootstrap.js";
 
@@ -25,15 +24,6 @@ export async function main(): Promise<void> {
 	const settingsStore = new SettingsStore(path.join(memoryDir, "bot-state.sqlite"));
 	settingsStore.seedFromEnv();
 	settingsStore.applyDefaults();
-
-	settingsStore.onChange(() => {
-		try {
-			syncConfigToEnv(getConfig(settingsStore));
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[settings] failed to sync env after change: ${message}\n`);
-		}
-	});
 
 	const config = getConfig(settingsStore);
 

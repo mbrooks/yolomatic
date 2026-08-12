@@ -13,17 +13,27 @@ export interface ConfiguredModelOverride {
 	model?: string;
 }
 
+/**
+ * Model-settings fallback consumed by {@link resolveConfiguredModel}. This is
+ * a subset of {@link ModelSettings} carrying only the model id/provider
+ * fields; callers pass the relevant slice of their injected runtime settings.
+ */
+export interface ModelSettingsFallback {
+	piAgentModel?: string;
+	piAgentProvider?: string;
+}
+
 export function resolveConfiguredModel<TModel extends ModelReference>(
 	registry: ModelLookup<TModel>,
 	override?: ConfiguredModelOverride,
-	env: NodeJS.ProcessEnv = process.env,
+	fallback?: ModelSettingsFallback,
 ): TModel | undefined {
-	const configuredModel = override?.model?.trim() || env.PI_AGENT_MODEL?.trim();
+	const configuredModel = override?.model?.trim() || fallback?.piAgentModel?.trim();
 	if (!configuredModel) {
 		return undefined;
 	}
 
-	const configuredProvider = override?.provider?.trim() || env.PI_AGENT_PROVIDER?.trim();
+	const configuredProvider = override?.provider?.trim() || fallback?.piAgentProvider?.trim();
 	if (configuredProvider) {
 		return registry.find(configuredProvider, configuredModel);
 	}

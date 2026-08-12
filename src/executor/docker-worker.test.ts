@@ -569,7 +569,7 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
-	it("includes explicit model env vars in docker args", async () => {
+	it("includes model env vars in docker args from injected runtime settings", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
@@ -578,23 +578,37 @@ describe("DockerWorkerExecutor", () => {
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			runtimeSettings: () => ({
+				model: { piAgentProvider: "ollama", piAgentModel: "glm-test" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
 			soulPath: "/app/SOUL.md",
 		});
 
-		process.env.PI_AGENT_PROVIDER = "ollama";
-		process.env.PI_AGENT_MODEL = "glm-test";
-
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+		expect(args).toContain("PI_AGENT_MODEL=glm-test");
+		// Injected settings take precedence over any process.env value: set
+		// divergent sentinel env values and confirm they are NOT forwarded.
+		const priorProvider = process.env.PI_AGENT_PROVIDER;
+		const priorModel = process.env.PI_AGENT_MODEL;
+		process.env.PI_AGENT_PROVIDER = "should-be-ignored-provider";
+		process.env.PI_AGENT_MODEL = "should-be-ignored-model";
 		try {
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("PI_AGENT_PROVIDER=ollama");
-			expect(args).toContain("PI_AGENT_MODEL=glm-test");
+			const args2 = await (executor as any).buildDockerRunArgs("worker-2");
+			expect(args2).toContain("PI_AGENT_PROVIDER=ollama");
+			expect(args2).toContain("PI_AGENT_MODEL=glm-test");
+			expect(args2).not.toContain("PI_AGENT_PROVIDER=should-be-ignored-provider");
+			expect(args2).not.toContain("PI_AGENT_MODEL=should-be-ignored-model");
 		} finally {
-			delete process.env.PI_AGENT_PROVIDER;
-			delete process.env.PI_AGENT_MODEL;
+			if (priorProvider === undefined) delete process.env.PI_AGENT_PROVIDER;
+			else process.env.PI_AGENT_PROVIDER = priorProvider;
+			if (priorModel === undefined) delete process.env.PI_AGENT_MODEL;
+			else process.env.PI_AGENT_MODEL = priorModel;
 		}
 	});
 
-	it("forwards OPENAI_API_KEY from process.env when configured", async () => {
+	it("forwards OPENAI_API_KEY from injected runtime settings when configured", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
@@ -603,22 +617,20 @@ describe("DockerWorkerExecutor", () => {
 			workerWorkspaceMountSource: "/workspace-root",
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			runtimeSettings: () => ({
+				model: { openaiApiKey: "sk-injected" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
 			soulPath: "/app/SOUL.md",
 		});
 
-		process.env.OPENAI_API_KEY = "sk-from-env";
-
-		try {
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("OPENAI_API_KEY=sk-from-env");
-			expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
-			expect(args.some((arg: string) => arg.startsWith("OLLAMA_HOST="))).toBe(false);
-		} finally {
-			delete process.env.OPENAI_API_KEY;
-		}
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toContain("OPENAI_API_KEY=sk-injected");
+		expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
+		expect(args.some((arg: string) => arg.startsWith("OLLAMA_HOST="))).toBe(false);
 	});
 
-	it("prefers an explicit workerOpenAiApiKey option over process.env", async () => {
+	it("prefers an explicit workerOpenAiApiKey option over injected runtime settings", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",
@@ -628,21 +640,19 @@ describe("DockerWorkerExecutor", () => {
 			workerControlBaseUrl: "http://control-plane.test",
 			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
 			workerOpenAiApiKey: "sk-explicit",
+			runtimeSettings: () => ({
+				model: { openaiApiKey: "sk-injected" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
 			soulPath: "/app/SOUL.md",
 		});
 
-		process.env.OPENAI_API_KEY = "sk-from-env";
-
-		try {
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
-			expect(args).toContain("OPENAI_API_KEY=sk-explicit");
-			expect(args).not.toContain("OPENAI_API_KEY=sk-from-env");
-		} finally {
-			delete process.env.OPENAI_API_KEY;
-		}
+		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		expect(args).toContain("OPENAI_API_KEY=sk-explicit");
+		expect(args).not.toContain("OPENAI_API_KEY=sk-injected");
 	});
 
-	it("omits OPENAI_API_KEY when neither option nor env is set", async () => {
+	it("omits OPENAI_API_KEY when neither option nor runtime settings provide one", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
 			projectRoot: "/repo",

@@ -619,33 +619,12 @@ describe("main", () => {
 		expect(createWebhookServer).toHaveBeenCalled();
 	});
 
-	it("re-syncs config to env when settings change", async () => {
+	it("does not register a settings change listener that syncs process.env", async () => {
 		await main();
 		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		expect(settingsStoreMock.onChange).toHaveBeenCalledWith(expect.any(Function));
-		const listener = settingsStoreMock.onChange.mock.calls[0][0];
-		listener();
-		expect(getConfig).toHaveBeenCalledTimes(2);
-	});
-
-	it("logs when settings change listener fails to sync env", async () => {
-		await main();
-		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		const listener = settingsStoreMock.onChange.mock.calls[0][0];
-		vi.mocked(getConfig).mockImplementationOnce(() => {
-			throw new Error("sync fail");
-		});
-		expect(() => listener()).not.toThrow();
-	});
-
-	it("handles non-Error throws in the settings change listener", async () => {
-		await main();
-		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		const listener = settingsStoreMock.onChange.mock.calls[0][0];
-		vi.mocked(getConfig).mockImplementationOnce(() => {
-			throw "string error";
-		});
-		expect(() => listener()).not.toThrow();
+		// The migration removed the syncConfigToEnv live-sync listener; live model
+		// settings now flow through the injected runtime settings provider.
+		expect(settingsStoreMock.onChange).not.toHaveBeenCalled();
 	});
 
 	it("starts full runtime when onboarding completes", async () => {

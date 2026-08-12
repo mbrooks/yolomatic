@@ -97,6 +97,19 @@ const OPENAI_MODELS: RegisteredProviderModel[] = [
 ];
 
 /**
+ * Options for {@link createYolomaticModelRegistry}. Both fields are injected
+ * from runtime settings so the registry never reads `process.env` directly;
+ * the worker runtime reads them from its process environment (its
+ * configuration boundary) and forwards them here.
+ */
+export interface ModelRegistryOptions {
+	/** OpenAI platform API key. When present, the `openai` provider is registered. */
+	openaiApiKey?: string;
+	/** Ollama base URL host. When omitted, the local Ollama default is used. */
+	ollamaHost?: string;
+}
+
+/**
  * Creates a Yolomatic model registry with custom providers defined in code.
  * This replaces the previous models.json-based configuration.
  *
@@ -104,11 +117,12 @@ const OPENAI_MODELS: RegisteredProviderModel[] = [
  * API provider (`openai`, API-key access). OAuth-based ChatGPT Codex access
  * is no longer supported.
  */
-export async function createYolomaticModelRegistry(): Promise<YolomaticModelRegistry> {
+export async function createYolomaticModelRegistry(options: ModelRegistryOptions = {}): Promise<YolomaticModelRegistry> {
 	const runtime = await ModelRuntime.create({ refreshOnCreate: false });
 
+	const ollamaEnv = options.ollamaHost ? { OLLAMA_HOST: options.ollamaHost } : undefined;
 	runtime.registerProvider("ollama", {
-		baseUrl: resolveOllamaBaseUrl(),
+		baseUrl: resolveOllamaBaseUrl(ollamaEnv),
 		api: "openai-completions",
 		apiKey: "ollama",
 		models: [
@@ -141,7 +155,7 @@ export async function createYolomaticModelRegistry(): Promise<YolomaticModelRegi
 		],
 	});
 
-	const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+	const openaiApiKey = options.openaiApiKey?.trim();
 	if (openaiApiKey) {
 		runtime.registerProvider(OPENAI_PROVIDER_ID, {
 			baseUrl: OPENAI_PROVIDER_BASE_URL,

@@ -36,6 +36,8 @@ import type { SettingsStore } from "../settings/store.js";
 import { UserStore } from "../users/store.js";
 import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 import { DEFAULT_WORKER_TEMPLATE } from "../worker/templates.js";
+import { getConfig } from "../config.js";
+import { getRuntimeSettings, type RuntimeSettingsProvider } from "../runtime-settings.js";
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -43,18 +45,6 @@ export const noOpHandlers: WebhookHandlers = {
 		return false;
 	},
 };
-
-export function syncConfigToEnv(nextConfig: AppConfig): void {
-	// Sync database settings to process.env so legacy code paths pick them up.
-	process.env.PI_AGENT_MODEL = nextConfig.piAgentModel ?? "";
-	process.env.PI_AGENT_PROVIDER = nextConfig.piAgentProvider ?? "";
-	process.env.OPENAI_API_KEY = nextConfig.openaiApiKey ?? "";
-	process.env.LOG_LEVEL = nextConfig.logLevel;
-	process.env.LOG_PROMPTS = nextConfig.logPrompts ? "true" : "";
-	process.env.LOG_THOUGHTS = nextConfig.logThoughts ? "true" : "";
-	process.env.LOG_TOOLS = nextConfig.logTools ? "true" : "";
-	process.env.LOG_RESPONSES = nextConfig.logResponses ? "true" : "";
-}
 
 export interface RuntimeDeps {
 	settingsStore: SettingsStore;
@@ -130,6 +120,15 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 	const workerRpcServer = new WorkerRpcServer();
 	const github = new GitHubServiceAdapter({ githubToken: config.githubToken });
 	const githubGateway = new WorkerGitHubGateway(github, workspaceManager);
+	// Live model settings: read fresh from the SettingsStore on each launch so
+	// database-setting updates affect subsequent worker sessions without
+	// mutating process.env. The provider is the replacement for the old
+	// syncConfigToEnv() live-sync path.
+	const runtimeSettingsProvider: RuntimeSettingsProvider = {
+		get() {
+			return getRuntimeSettings(getConfig(settingsStore));
+		},
+	};
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,
@@ -142,6 +141,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		workerOllamaHost: config.workerOllamaHost,
 		soulPath: config.soulPath,
 		githubGateway,
+		runtimeSettings: runtimeSettingsProvider,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const refinementStore = new RefinementStore(path.join(config.memoryDir, "refinement.sqlite"));
@@ -263,7 +263,6 @@ export async function startRuntime(
 	config: AppConfig,
 	deps: RuntimeDeps,
 ): Promise<RuntimeGraph> {
-	syncConfigToEnv(config);
 	const graph = buildRuntimeGraph(config, deps);
 	const { server, handlers, workspaceManager, staleDetector } = graph;
 	const { sessionStore } = deps;
