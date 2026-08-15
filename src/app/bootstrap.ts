@@ -71,43 +71,125 @@ export interface RuntimeGraph {
 }
 
 /**
- * Build the full runtime graph (managers, handlers, server, polling) from a
- * loaded AppConfig and the long-lived shared services. Construction only —
- * no startup side effects are performed here.
+ * Pure startup decision helpers. Exported so startup tests can exercise the
+ * onboarding/full-runtime branching logic directly without reconstructing the
+ * runtime graph through module mocks.
  */
-export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): RuntimeGraph {
-	const { settingsStore, sessionStore, taskController, repositoryStore } = deps;
 
-	const userStore = deps.userStore ?? new UserStore(path.join(config.memoryDir, "bot-state.sqlite"));
-	const sessionAuth = new AdminSessionAuth(userStore);
+/**
+ * Resolve the effective GitHub event mode for a single managed repository,
+ * falling back to the process-wide default when no per-repo override exists.
+ */
+export function resolveManagedGitHubEventMode(
+	config: AppConfig,
+	managed: Repository | null,
+): RepoGitHubEventMode {
+	return resolveRepoGitHubEventMode(managed, config.githubEventMode);
+}
 
-	// Load managed repositories once at construction time. Per-repo overrides
-	// (github_event_mode, default_branch) require a restart to take effect, so
-	// snapshotting the table here matches the existing restart-required contract.
-	const managedRepositories = repositoryStore.listSync();
-	const managedRepoIndex = new Map<string, Repository>(
-		managedRepositories.map((repo) => [repoKey(repo.owner, repo.repo), repo]),
+/**
+ * Compute whether webhook handling and/or polling are active given the
+ * process-wide mode and the per-repo overrides snapshot at startup.
+ */
+export function computeEventModeFlags(
+	config: AppConfig,
+	managedRepositories: Repository[],
+): { githubEventsEnabled: boolean; pollingEnabled: boolean } {
+	const repoModes = managedRepositories.map((repo) =>
+		resolveRepoGitHubEventMode(repo, config.githubEventMode),
 	);
-	const findManaged = (owner: string, repo: string) =>
-		managedRepoIndex.get(repoKey(owner, repo)) ?? null;
-	const resolveDefaultBranch = (owner: string, repo: string) =>
-		resolveRepoDefaultBranch(findManaged(owner, repo), config.defaultBranch);
-	const resolveGitHubEventMode = (owner: string, repo: string) =>
-		resolveRepoGitHubEventMode(findManaged(owner, repo), config.githubEventMode);
-	const resolveWorkerTemplate = (owner: string, repo: string) =>
-		resolveRepoWorkerTemplate(findManaged(owner, repo), config.defaultWorkerTemplate ?? DEFAULT_WORKER_TEMPLATE);
-	// Admin-link settings advertise requiresRestart: false, so read them live
-	// from the SettingsStore at comment-post time instead of snapshotting the
-	// bootstrap-time config value. This lets operators toggle
-	// issue_admin_link_in_comments_enabled / admin_base_url in the admin UI
-	// and see the Track status footer update on subsequently posted comments
-	// without restarting the process.
-	const resolveAdminBaseUrl = () => {
-		const raw = settingsStore.get("admin_base_url")?.trim();
-		return raw || undefined;
+	const githubEventsEnabled =
+		repoModeIncludesWebhook(config.githubEventMode) ||
+		repoModes.some((mode) => repoModeIncludesWebhook(mode));
+	const pollingEnabled =
+		repoModeIncludesPolling(config.githubEventMode) ||
+		repoModes.some((mode) => repoModeIncludesPolling(mode));
+	return { githubEventsEnabled, pollingEnabled };
+}
+
+/**
+ * Build a live runtime-settings provider that reads fresh from the
+ * configuration boundary on each call. The `getConfig` function is injectable
+ * so the provider can be unit-tested without mocking the config module.
+ */
+export function createRuntimeSettingsProvider(
+	settingsStore: SettingsStore,
+	getConfigFn: (store: SettingsStore) => AppConfig = getConfig,
+): RuntimeSettingsProvider {
+	return {
+		get() {
+			return getRuntimeSettings(getConfigFn(settingsStore));
+		},
 	};
-	const resolveIssueAdminLinkInCommentsEnabled = () =>
-		settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true);
+}
+
+/**
+ * Resolvers derived from the startup repository snapshot and the live settings
+ * store. Passed into the runtime factory so it can wire per-repo decisions
+ * into the constructed services without re-reading the repository table.
+ */
+export interface RuntimeResolvers {
+	resolveDefaultBranch: (owner: string, repo: string) => string;
+	resolveGitHubEventMode: (owner: string, repo: string) => RepoGitHubEventMode;
+	resolveWorkerTemplate: (owner: string, repo: string) => string;
+	resolveAdminBaseUrl: () => string | undefined;
+	resolveIssueAdminLinkInCommentsEnabled: () => boolean;
+}
+
+export interface RuntimeBuildContext {
+	config: AppConfig;
+	settingsStore: SettingsStore;
+	sessionStore: SessionStore;
+	taskController: TaskController;
+	repositoryStore: RepositoryStore;
+	userStore: UserStore;
+	resolvers: RuntimeResolvers;
+	findManaged: (owner: string, repo: string) => Repository | null;
+}
+
+/**
+ * The set of runtime services constructed at the composition boundary. The
+ * default factory builds the real first-party objects; tests inject a fake
+ * factory returning doubles so construction can be observed without mocking
+ * broad first-party modules.
+ */
+export interface RuntimeServices {
+	sessionAuth: AdminSessionAuth;
+	sessionManager: SessionManager;
+	workspaceManager: WorkspaceManager;
+	workerRpcServer: WorkerRpcServer;
+	github: GitHubServiceAdapter;
+	githubGateway: WorkerGitHubGateway;
+	executor: DockerWorkerExecutor;
+	eventStore: GitHubEventStore;
+	refinementStore: RefinementStore;
+	handlers: GitHubIssueHandlers;
+	staleDetector: StaleSessionDetector;
+	skillStore: SkillStore;
+	repoSkillService: RepoSkillService;
+	githubPolling: GitHubPollingAdapter;
+	startIssueSession: StartIssueSession;
+	metricsStore: MetricsStore;
+}
+
+export type RuntimeFactory = (ctx: RuntimeBuildContext) => RuntimeServices;
+
+/**
+ * Default {@link RuntimeFactory} that constructs the real runtime services.
+ * Kept as a named export so the production wiring is observable and so tests
+ * can assert the default collaborator wiring without module mocks.
+ */
+export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
+	const { config, settingsStore, sessionStore, taskController, repositoryStore, userStore, resolvers } = ctx;
+	const {
+		resolveDefaultBranch,
+		resolveGitHubEventMode,
+		resolveWorkerTemplate,
+		resolveAdminBaseUrl,
+		resolveIssueAdminLinkInCommentsEnabled,
+	} = resolvers;
+
+	const sessionAuth = new AdminSessionAuth(userStore);
 
 	const sessionManager = new SessionManager(config.sessionsDir, sessionStore);
 	const workspaceManager = new WorkspaceManager({
@@ -126,11 +208,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 	// database-setting updates affect subsequent worker sessions without
 	// mutating process.env. The provider is the replacement for the old
 	// syncConfigToEnv() live-sync path.
-	const runtimeSettingsProvider: RuntimeSettingsProvider = {
-		get() {
-			return getRuntimeSettings(getConfig(settingsStore));
-		},
-	};
+	const runtimeSettingsProvider: RuntimeSettingsProvider = createRuntimeSettingsProvider(settingsStore);
 	const executor = new DockerWorkerExecutor({
 		projectRoot: process.cwd(),
 		workspacesDir: config.workspacesDir,
@@ -207,54 +285,139 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		metrics: metricsStore,
 	});
 
-	const repoModes = managedRepositories.map((repo) =>
-		resolveRepoGitHubEventMode(repo, config.githubEventMode),
-	);
-	const githubEventsEnabled =
-		repoModeIncludesWebhook(config.githubEventMode) ||
-		repoModes.some((mode) => repoModeIncludesWebhook(mode));
-	const pollingEnabled =
-		repoModeIncludesPolling(config.githubEventMode) ||
-		repoModes.some((mode) => repoModeIncludesPolling(mode));
-	const activeHandlers: WebhookHandlers = githubEventsEnabled ? handlers : noOpHandlers;
-
-	const server = createWebhookServer(
-		config.webhookSecret,
-		activeHandlers,
-		sessionStore,
-		taskController,
+	return {
+		sessionAuth,
+		sessionManager,
 		workspaceManager,
-		staleDetector,
-		config.archiveDir,
-		{
-			prebuiltStartIssueSession: startIssueSession,
-			repositoryStore: deps.repositoryStore,
-			adminPath: config.adminPath,
-			adminDefaultPage: config.adminDefaultPage,
-			restartSession: (owner, repo, issueNumber) => handlers.resumeInterruptedSession(owner, repo, issueNumber),
-			userStore,
-			sessionAuth,
-			metricsStore,
-		},
+		workerRpcServer,
 		github,
-		settingsStore,
+		githubGateway,
+		executor,
+		eventStore,
+		refinementStore,
+		handlers,
+		staleDetector,
 		skillStore,
 		repoSkillService,
-		executor,
-		workerRpcServer,
-		refinementStore,
+		githubPolling,
+		startIssueSession,
+		metricsStore,
+	};
+};
+
+/**
+ * Collaborators injected at the composition boundary. Each defaults to the
+ * real first-party implementation; tests pass doubles to observe construction
+ * and side effects without mocking broad project modules.
+ */
+export interface RuntimeCollaborators {
+	factory?: RuntimeFactory;
+	createWebhookServer?: typeof createWebhookServer;
+	startPolling?: typeof startGitHubPolling;
+	cleanupSessions?: typeof cleanupOldSessions;
+}
+
+/**
+ * Build the runtime graph (managers, handlers, server, polling) from a loaded
+ * AppConfig and the long-lived shared services. Construction only — no startup
+ * side effects are performed here. The {@link RuntimeCollaborators} parameter
+ * lets tests observe the composition boundary without module mocks.
+ */
+export function buildRuntimeGraph(
+	config: AppConfig,
+	deps: RuntimeDeps,
+	collaborators: RuntimeCollaborators = {},
+): RuntimeGraph {
+	const { settingsStore, sessionStore, taskController, repositoryStore } = deps;
+	const factory = collaborators.factory ?? defaultRuntimeFactory;
+	const createServer = collaborators.createWebhookServer ?? createWebhookServer;
+
+	const userStore = deps.userStore ?? new UserStore(path.join(config.memoryDir, "bot-state.sqlite"));
+
+	// Load managed repositories once at construction time. Per-repo overrides
+	// (github_event_mode, default_branch) require a restart to take effect, so
+	// snapshotting the table here matches the existing restart-required contract.
+	const managedRepositories = repositoryStore.listSync();
+	const managedRepoIndex = new Map<string, Repository>(
+		managedRepositories.map((repo) => [repoKey(repo.owner, repo.repo), repo]),
 	);
+	const findManaged = (owner: string, repo: string) =>
+		managedRepoIndex.get(repoKey(owner, repo)) ?? null;
+	const resolveDefaultBranch = (owner: string, repo: string) =>
+		resolveRepoDefaultBranch(findManaged(owner, repo), config.defaultBranch);
+	const resolveGitHubEventMode = (owner: string, repo: string) =>
+		resolveManagedGitHubEventMode(config, findManaged(owner, repo));
+	const resolveWorkerTemplate = (owner: string, repo: string) =>
+		resolveRepoWorkerTemplate(findManaged(owner, repo), config.defaultWorkerTemplate ?? DEFAULT_WORKER_TEMPLATE);
+	// Admin-link settings advertise requiresRestart: false, so read them live
+	// from the SettingsStore at comment-post time instead of snapshotting the
+	// bootstrap-time config value. This lets operators toggle
+	// issue_admin_link_in_comments_enabled / admin_base_url in the admin UI
+	// and see the Track status footer update on subsequently posted comments
+	// without restarting the process.
+	const resolveAdminBaseUrl = () => {
+		const raw = settingsStore.get("admin_base_url")?.trim();
+		return raw || undefined;
+	};
+	const resolveIssueAdminLinkInCommentsEnabled = () =>
+		settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true);
+
+	const services = factory({
+		config,
+		settingsStore,
+		sessionStore,
+		taskController,
+		repositoryStore,
+		userStore,
+		resolvers: {
+			resolveDefaultBranch,
+			resolveGitHubEventMode,
+			resolveWorkerTemplate,
+			resolveAdminBaseUrl,
+			resolveIssueAdminLinkInCommentsEnabled,
+		},
+		findManaged,
+	});
+
+	const { githubEventsEnabled, pollingEnabled } = computeEventModeFlags(config, managedRepositories);
+	const activeHandlers: WebhookHandlers = githubEventsEnabled ? services.handlers : noOpHandlers;
+
+	const server = createServer({
+		secret: config.webhookSecret,
+		handlers: activeHandlers,
+		sessionStore,
+		taskController,
+		workspaceManager: services.workspaceManager,
+		staleDetector: services.staleDetector,
+		archiveDir: config.archiveDir,
+		prebuiltStartIssueSession: services.startIssueSession,
+		repositoryStore: deps.repositoryStore,
+		adminPath: config.adminPath,
+		adminDefaultPage: config.adminDefaultPage,
+		restartSession: (owner, repo, issueNumber) =>
+			services.handlers.resumeInterruptedSession(owner, repo, issueNumber),
+		userStore,
+		sessionAuth: services.sessionAuth,
+		githubService: services.github,
+		settingsStore,
+		skillStore: services.skillStore,
+		repoSkillService: services.repoSkillService,
+		executor: services.executor,
+		workerRpcServer: services.workerRpcServer,
+		refinementStore: services.refinementStore,
+		metricsStore: services.metricsStore,
+	});
 
 	return {
 		server,
-		handlers,
-		sessionManager,
-		workspaceManager,
-		staleDetector,
-		executor,
-		startIssueSession,
-		eventStore,
-		githubPolling,
+		handlers: services.handlers,
+		sessionManager: services.sessionManager,
+		workspaceManager: services.workspaceManager,
+		staleDetector: services.staleDetector,
+		executor: services.executor,
+		startIssueSession: services.startIssueSession,
+		eventStore: services.eventStore,
+		githubPolling: services.githubPolling,
 		githubEventsEnabled,
 		pollingEnabled,
 	};
@@ -268,10 +431,14 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 export async function startRuntime(
 	config: AppConfig,
 	deps: RuntimeDeps,
+	collaborators: RuntimeCollaborators = {},
 ): Promise<RuntimeGraph> {
-	const graph = buildRuntimeGraph(config, deps);
+	const startPolling = collaborators.startPolling ?? startGitHubPolling;
+	const cleanupSessions = collaborators.cleanupSessions ?? cleanupOldSessions;
+
+	const graph = buildRuntimeGraph(config, deps, collaborators);
 	const { server, handlers, workspaceManager, staleDetector } = graph;
-	const { sessionStore } = deps;
+	const { sessionStore, repositoryStore } = deps;
 
 	server.listen(config.port, () => {
 		process.stdout.write(`Webhook receiver listening on port ${config.port}\n`);
@@ -284,12 +451,12 @@ export async function startRuntime(
 	void graph.executor.prebuildWorkerImage();
 
 	if (graph.pollingEnabled) {
-		startGitHubPolling({
+		startPolling({
 			github: graph.githubPolling,
 			eventStore: graph.eventStore,
 			githubUsername: config.githubUsername,
 			intervalMs: config.githubPollIntervalMs,
-			listManagedRepos: async () => deps.repositoryStore.listForPolling(),
+			listManagedRepos: async () => repositoryStore.listForPolling(),
 			shouldPollRepo: (owner, repo) =>
 				repoModeIncludesPolling(resolveManagedGitHubEventModeFor(config, deps, owner, repo)),
 			resolveGitHubEventMode: (owner, repo) =>
@@ -364,10 +531,10 @@ export async function startRuntime(
 
 	if (config.cleanupRetentionDays) {
 		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);
-		await cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays);
+		await cleanupSessions(sessionStore, workspaceManager, config.cleanupRetentionDays);
 		const cleanupIntervalMs = 24 * 60 * 60 * 1000;
 		const cleanupInterval = setInterval(() => {
-			void cleanupOldSessions(sessionStore, workspaceManager, config.cleanupRetentionDays!);
+			void cleanupSessions(sessionStore, workspaceManager, config.cleanupRetentionDays!);
 		}, cleanupIntervalMs);
 		cleanupInterval.unref?.();
 	}
