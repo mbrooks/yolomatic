@@ -4,7 +4,7 @@ import type { WebhookHandlers } from "./handlers.js";
 import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
-import type { WorkspaceManager } from "../workspace/manager.js";
+import type { WorkspaceService } from "../ports/workspace-service.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { SkillStore } from "../skills/store.js";
@@ -48,7 +48,7 @@ export function createWebhookServer(
 	handlers: WebhookHandlers,
 	sessionStore: SessionStore,
 	taskController?: TaskController,
-	workspaceManager?: WorkspaceManager,
+	workspaceManager?: WorkspaceService,
 	staleDetector?: StaleSessionDetector,
 	archiveDir?: string,
 	options: WebhookServerOptions = {},
@@ -191,7 +191,7 @@ export function createWebhookServer(
 
 export async function cleanupOldSessions(
 	sessionStore: SessionStore,
-	workspaceManager: WorkspaceManager | undefined,
+	workspaceManager: WorkspaceService | undefined,
 	retentionDays: number,
 ): Promise<{ deleted: number; failed: number }> {
 	const sessionRepo = new SessionStoreRepositoryAdapter(sessionStore);

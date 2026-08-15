@@ -1,15 +1,16 @@
 import { createHmac } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { existsSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
 import { createWebhookServer, cleanupOldSessions, readBody, verifySignature } from "./server.js";
 import { GitHubIssueHandlers } from "./handlers.js";
+import { makeExecutor, makeSessionManager, makeWorkspaceManager } from "./handlers-test-helpers.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 
 import { _resetSessionLogs, recordSessionLog } from "../logging/session-log-store.js";
@@ -21,11 +22,23 @@ import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 // Shared admin account + session cookie used by the admin-route tests. The
 // old Basic Auth path is gone, so tests mint a real signed session cookie via
 // AdminSessionAuth.login and send it as a Cookie header instead.
-const userDbPath = join(tmpdir(), "yolomatic-server-routes-users.sqlite");
-if (existsSync(userDbPath)) rmSync(userDbPath);
+//
+// The SQLite database lives inside a unique temporary directory that is torn
+// down after the suite finishes. Using a fresh directory per run avoids the
+// `disk I/O error` caused by stale SQLite `-wal`/`-shm` sidecars from a
+// previous collection when only the main database file was removed.
+const userDbDir = mkdtempSync(join(tmpdir(), "yolomatic-server-routes-"));
+const userDbPath = join(userDbDir, "users.sqlite");
 const userStore = new UserStore(userDbPath);
 userStore.createSync({ fullName: "Admin", username: "admin", password: "secret" });
 const sessionAuth = new AdminSessionAuth(userStore);
+
+afterAll(() => {
+	// Closing the store checkpoints and releases the WAL before the directory
+	// is removed, so no `-wal`/`-shm` sidecars are left between runs.
+	userStore.close();
+	rmSync(userDbDir, { recursive: true, force: true });
+});
 
 function mintSessionCookie(auth: AdminSessionAuth, username: string, password: string): string {
 	let cookie = "";
@@ -160,7 +173,7 @@ describe("GitHubIssueHandlers", () => {
 			},
 		};
 		let getSessionCallCount = 0;
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 99,
 				repo: "yolomatic",
@@ -190,14 +203,7 @@ describe("GitHubIssueHandlers", () => {
 							seeded: false,
 						};
 			}),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => ({
 				issueNumber: 99,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -212,8 +218,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-99",
 				branch: "yolomatic/issue-99",
@@ -226,18 +232,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
 				rawResponse: "YOLO_STATUS: waiting-feedback\nNeed clarification.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -259,7 +265,7 @@ describe("GitHubIssueHandlers", () => {
 			sender: { login: "mbrooks" },
 		});
 
-		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "implementation");
 		expect(sessionManager.createSession).toHaveBeenCalledWith(
 			"mbrooks",
 			"yolomatic",
@@ -284,7 +290,7 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
@@ -298,14 +304,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => ({
 				issueNumber: 42,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -320,8 +319,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				branch: "yolomatic/issue-42",
@@ -334,18 +333,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -438,7 +437,7 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 42,
@@ -452,14 +451,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => ({
 				issueNumber: 42,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -474,8 +466,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-42",
 				branch: "yolomatic/issue-42",
@@ -488,18 +480,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -540,7 +532,7 @@ describe("GitHubIssueHandlers", () => {
 			},
 		};
 		let storedSession: any = null;
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
@@ -557,13 +549,6 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
 			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => {
 				if (storedSession) {
 					storedSession.status = status;
@@ -584,8 +569,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -598,18 +583,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -651,36 +636,29 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -722,7 +700,7 @@ describe("GitHubIssueHandlers", () => {
 			},
 		};
 		const createdIssues = new Set<number>();
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async (_owner: string, _repo: string, issueNumber: number) => {
 				createdIssues.add(issueNumber);
 				return {
@@ -753,14 +731,7 @@ describe("GitHubIssueHandlers", () => {
 					seeded: false,
 				};
 			}),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issueNumber: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -775,8 +746,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -789,18 +760,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -869,7 +840,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 7,
@@ -883,14 +854,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => ({
 				issueNumber: 7,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -905,8 +869,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-7",
 				branch: "yolomatic/issue-7",
@@ -919,18 +883,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "waiting-feedback" as const,
 				summary: "Need clarification.",
 				rawResponse: "YOLO_STATUS: waiting-feedback\nNeed clarification.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -981,7 +945,7 @@ describe("GitHubIssueHandlers", () => {
 			},
 		};
 		let storedSession: any = null;
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async () => {
 				storedSession = {
 					issueNumber: 1,
@@ -998,14 +962,7 @@ describe("GitHubIssueHandlers", () => {
 				return storedSession;
 			}),
 			getSession: vi.fn(async () => storedSession),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => {
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => {
 				if (storedSession) {
 					storedSession.status = status;
 				}
@@ -1025,8 +982,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1039,16 +996,16 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => {
 				throw new Error("Boom");
 			}),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1080,7 +1037,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
@@ -1094,14 +1051,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -1116,20 +1066,20 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = { execute: vi.fn() };
+		});
+		const executor = makeExecutor({ execute: vi.fn() });
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1155,7 +1105,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
@@ -1173,20 +1123,20 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = { execute: vi.fn() };
+		});
+		const executor = makeExecutor({ execute: vi.fn() });
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1213,7 +1163,7 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/issues/999" } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
@@ -1238,14 +1188,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -1258,8 +1201,8 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			markSeeded: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1272,7 +1215,7 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
+		});
 
 		const { FatalSystemError, SelfMonitor } = await import("../self-monitor/index.js");
 		const evidence = {
@@ -1292,16 +1235,16 @@ describe("GitHubIssueHandlers", () => {
 		};
 		const fatalError = new FatalSystemError(evidence);
 
-		const executor = {
+		const executor = makeExecutor({
 			execute: vi.fn(async () => {
 				throw fatalError;
 			}),
-		};
+		});
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1354,7 +1297,7 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async (_owner: string, _repo: string, _issue: number, title: string, body: string, workspacePath: string) => ({
 				issueNumber: 1,
 				repo: "teamhub-case",
@@ -1379,14 +1322,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: false,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: string) => ({
+			updateStatus: vi.fn(async (_owner: string, _repo: string, _issue: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "teamhub-case",
 				owner: "mbrooks",
@@ -1401,8 +1337,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-teamhub-case/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1417,18 +1353,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1480,7 +1416,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async () => ({
 				issueNumber: 1,
 				repo: "yolomatic",
@@ -1494,19 +1430,12 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 			})),
 			getSession: vi.fn(async () => null),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1519,10 +1448,10 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(),
-		};
+		});
 		const taskController = {
 			isDraining: vi.fn(() => true),
 			setDraining: vi.fn(),
@@ -1532,9 +1461,9 @@ describe("GitHubIssueHandlers", () => {
 			unregister: vi.fn(),
 		};
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1575,7 +1504,7 @@ describe("GitHubIssueHandlers", () => {
 				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/1" } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
@@ -1589,14 +1518,7 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -1611,8 +1533,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1625,18 +1547,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1662,7 +1584,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
@@ -1677,14 +1599,7 @@ describe("GitHubIssueHandlers", () => {
 				seeded: false,
 				resumeOnBoot: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -1700,8 +1615,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1714,18 +1629,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1757,7 +1672,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(),
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
@@ -1773,14 +1688,7 @@ describe("GitHubIssueHandlers", () => {
 				resumeOnBoot: true,
 				queuedComments: ["Please also add tests."],
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: string) => ({
+			updateStatus: vi.fn(async (_o: string, _r: string, _i: number, status: SessionStatus) => ({
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
@@ -1796,8 +1704,8 @@ describe("GitHubIssueHandlers", () => {
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				branch: "yolomatic/issue-1",
@@ -1810,18 +1718,18 @@ describe("GitHubIssueHandlers", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as const,
 				summary: "Done.",
 				rawResponse: "YOLO_STATUS: complete\nDone.",
 			})),
-		};
+		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1849,32 +1757,31 @@ describe("GitHubIssueHandlers", () => {
 	});
 
 	it("skips resume when session is in terminal status", async () => {
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			getSession: vi.fn(async () => ({
+				kind: "implementation",
 				issueNumber: 1,
 				repo: "yolomatic",
 				owner: "mbrooks",
+				title: "Title",
+				body: "Body",
 				status: "complete" as const,
+				sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-1.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
 				lastActivity: new Date().toISOString(),
+				seeded: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
-		};
-		const executor = { execute: vi.fn() };
+		});
+		const executor = makeExecutor({ execute: vi.fn() });
 		const octokit = { issues: { createComment: vi.fn() } };
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1895,7 +1802,7 @@ describe("GitHubIssueHandlers", () => {
 				createComment: vi.fn(async () => ({ data: { id: 1 } })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
 				repo: "yolomatic",
@@ -1908,27 +1815,20 @@ describe("GitHubIssueHandlers", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = { execute: vi.fn() };
+		});
+		const executor = makeExecutor({ execute: vi.fn() });
 		const taskController = {
 			isDraining: vi.fn(() => true),
 			setDraining: vi.fn(),
@@ -1938,9 +1838,9 @@ describe("GitHubIssueHandlers", () => {
 			unregister: vi.fn(),
 		};
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1989,7 +1889,7 @@ describe("GitHubIssueHandlers", () => {
 				listReviewComments: vi.fn(async () => ({ data: [] })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			getSession: vi.fn(async () => ({
 				issueNumber: 1,
 				repo: "yolomatic",
@@ -2004,28 +1904,21 @@ describe("GitHubIssueHandlers", () => {
 				prNumber: 99,
 				prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 			})),
-			get(owner: string, repo: string, issueNumber: number) {
-				return (this.getSession as unknown as (owner: string, repo: string, issueNumber: number) => unknown)(
-					owner,
-					repo,
-					issueNumber,
-				);
-			},
 			updateStatus: vi.fn(),
 			markSeeded: vi.fn(),
 			associatePR: vi.fn(),
 			incrementIterationCount: vi.fn(),
 			findSessionByPR: vi.fn(),
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(),
 			syncWorktree: vi.fn(async () => undefined),
 			commitAndPush: vi.fn(async () => true),
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = { execute: vi.fn() };
+		});
+		const executor = makeExecutor({ execute: vi.fn() });
 		const taskController = {
 			isDraining: vi.fn(() => true),
 			setDraining: vi.fn(),
@@ -2035,9 +1928,9 @@ describe("GitHubIssueHandlers", () => {
 			unregister: vi.fn(),
 		};
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -3050,9 +2943,9 @@ describe("createWebhookServer", () => {
 			delete: vi.fn(async () => undefined),
 		} as unknown as import("../session/store.js").SessionStore;
 
-		const workspaceManager = {
+		const workspaceManager = makeWorkspaceManager({
 			removeWorktree: vi.fn(async () => undefined),
-		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+		});
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
 		const server = createWebhookServer("secret", handlers, mockStore, undefined, workspaceManager, undefined, undefined, { userStore, sessionAuth });
@@ -3518,9 +3411,9 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 
-		const workspaceManager = {
+		const workspaceManager = makeWorkspaceManager({
 			removeWorktree: vi.fn(async () => undefined),
-		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+		});
 		const restartSession = vi.fn(async () => undefined);
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };
@@ -3590,9 +3483,9 @@ describe("createWebhookServer", () => {
 			getStatePath: vi.fn(),
 		} as unknown as import("../session/store.js").SessionStore;
 
-		const workspaceManager = {
+		const workspaceManager = makeWorkspaceManager({
 			removeWorktree: vi.fn(async () => undefined),
-		} as unknown as import("../workspace/manager.js").WorkspaceManager;
+		});
 		const restartSession = vi.fn(async () => undefined);
 
 		const handlers = { handleIssueEvent: vi.fn(), handleCommentEvent: vi.fn(), handlePullRequestReviewCommentEvent: vi.fn(), handlePullRequestReviewEvent: vi.fn(), isInFlight: vi.fn(() => false) };

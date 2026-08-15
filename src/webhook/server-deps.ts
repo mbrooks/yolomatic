@@ -14,7 +14,7 @@ import type { TaskControlService } from "../ports/task-control-service.js";
 import type { SessionStore } from "../session/store.js";
 import type { TaskController } from "../task-controller.js";
 import type { StaleSessionDetector } from "../session/stale-detector.js";
-import type { WorkspaceManager } from "../workspace/manager.js";
+import type { WorkspaceService } from "../ports/workspace-service.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { AdminRouterDeps } from "../adapters/http/admin-router.js";
 import type { SettingsStore } from "../settings/store.js";
@@ -36,7 +36,7 @@ const fallbackTaskController = {
 	setDraining: () => undefined,
 };
 
-const fallbackWorkspaceService = {
+const fallbackWorkspaceService: WorkspaceService = {
 	createOrGetWorktree: async () => ({ path: "", branch: "" }),
 	updateDefaultBranchFromOrigin: async () => ({ branch: "main", before: null, after: "", updated: false }),
 	syncWorktree: async () => undefined,
@@ -54,7 +54,7 @@ export { fallbackWorkspaceService };
 export function createWebhookServerDeps(
 	sessionStore: SessionStore,
 	taskController?: TaskController,
-	workspaceManager?: WorkspaceManager,
+	workspaceManager?: WorkspaceService,
 	staleDetector?: StaleSessionDetector,
 	archiveDir?: string,
 	adminAssetsDir = resolve(process.cwd(), "dist/admin"),
