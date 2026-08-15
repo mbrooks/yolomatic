@@ -1,9 +1,9 @@
 import { Octokit } from "@octokit/rest";
 
 import type { ExecutionService } from "../ports/execution-service.js";
-import type { SessionManager } from "../session/manager.js";
+import type { SessionRepository } from "../ports/session-repository.js";
 import type { SessionState } from "../session/store.js";
-import type { WorkspaceManager } from "../workspace/manager.js";
+import type { WorkspaceService } from "../ports/workspace-service.js";
 import { TaskController } from "../task-controller.js";
 import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 
@@ -38,8 +38,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 
 	public constructor(
 		private readonly deps: {
-			sessionManager: SessionManager;
-			workspaceManager: WorkspaceManager;
+			sessionManager: SessionRepository;
+			workspaceManager: WorkspaceService;
 			executor: ExecutionService;
 			githubToken: string;
 			githubUsername: string;

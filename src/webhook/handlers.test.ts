@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { GitHubIssueHandlers } from "./handlers.js";
+import { makeExecutor, makeSessionManager, makeWorkspaceManager } from "./handlers-test-helpers.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
 
 declare module "./handlers.js" {
@@ -77,7 +78,7 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				listReviewComments: vi.fn(async () => ({ data: [] })),
 			},
 		};
-		const sessionManager = {
+		const sessionManager = makeSessionManager({
 			createSession: vi.fn(async () => ({
 				issueNumber: 56,
 				repo: "yolomatic",
@@ -120,13 +121,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				lastActivity: new Date().toISOString(),
 				seeded: true,
 			})),
-			getSessionKey: vi.fn(),
-			getSessionPath: vi.fn(),
-			resumeSession: vi.fn(),
-			sessionsDir: "/tmp/sessions",
-			store: {} as never,
-		};
-		const workspaceManager = {
+		});
+		const workspaceManager = makeWorkspaceManager({
 			createOrGetWorktree: vi.fn(async () => ({
 				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
 				branch: "yolomatic/issue-56",
@@ -140,8 +136,8 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			removeWorktree: vi.fn(),
 			getGitStatus: vi.fn(async () => ""),
 			getGitDiff: vi.fn(async () => ""),
-		};
-		const executor = {
+		});
+		const executor = makeExecutor({
 			execute: vi.fn(async () => ({
 				status: "complete" as never,
 				summary: "Fixed.",
@@ -152,16 +148,16 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 				summary: "Fixed.",
 				rawResponse: "YOLO_STATUS: complete\nFixed.",
 			})),
-		};
+		});
 		return { octokit, sessionManager, workspaceManager, executor };
 	}
 
 	it("delegates review comment events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -183,9 +179,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("delegates review submission events to the active PR review command", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -220,9 +216,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: false,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -262,9 +258,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -301,9 +297,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: true,
 		});
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -338,9 +334,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		(sessionManager.getSession as any).mockResolvedValueOnce(null).mockResolvedValue(pendingSession);
 		sessionManager.createSession.mockResolvedValue(pendingSession);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -373,9 +369,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: true,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -410,9 +406,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: true,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -442,9 +438,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("routes PR timeline comments through the PR head branch session", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -485,9 +481,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		sessionManager.getSession.mockResolvedValue(null as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -544,9 +540,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -583,9 +579,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("ignores unassigned issue comments without a Yolomatic mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -632,9 +628,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: false,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -659,9 +655,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("ignores assigned issue comments without a Yolomatic label or mention", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -696,9 +692,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: true,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -735,9 +731,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			seeded: true,
 		} as never);
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -788,9 +784,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -843,9 +839,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -873,9 +869,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("ignores /yolomatic stop from non-admin", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -907,9 +903,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			unregister: vi.fn(),
 		};
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -956,9 +952,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1011,9 +1007,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1061,9 +1057,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1110,9 +1106,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1155,9 +1151,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		} as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1187,9 +1183,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		sessionManager.getSession.mockResolvedValue(null as never);
 
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1212,9 +1208,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("clears in-flight after resumeInterruptedSession completes", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1230,9 +1226,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 	it("considers repos managed when no repositoryStore is provided", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
@@ -1256,9 +1252,9 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			getSync: vi.fn((owner: string, repo: string) => (owner === "mbrooks" && repo === "yolomatic" ? { owner, repo } : null)),
 		};
 		const handlers = new GitHubIssueHandlers({
-			sessionManager: sessionManager as never,
-			workspaceManager: workspaceManager as never,
-			executor: executor as never,
+			sessionManager,
+			workspaceManager,
+			executor,
 			githubToken: "token",
 			githubUsername: "yolomatic-bot",
 			defaultBranch: "main",
