@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { unlinkSync } from "node:fs";
 import { runMigrations, MIGRATIONS } from "./index.js";
@@ -181,5 +181,145 @@ describe("migrations", () => {
 		const rows = db.prepare("SELECT id FROM _migrations WHERE id = 5").all() as Array<{ id: number }>;
 		expect(rows).toHaveLength(1);
 		db.close();
+	});
+
+	describe("migration 14: normalize_session_kinds_durable", () => {
+		function insertSession(db: DatabaseSync, key: string, state: Record<string, unknown>, updatedAt = "2026-08-01T00:00:00.000Z") {
+			db.prepare(
+				"INSERT INTO sessions (session_key, owner, repo, issue_number, status, archived_at, state_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+			).run(
+				key,
+				String(state.owner ?? "mbrooks"),
+				String(state.repo ?? "yolomatic"),
+				Number(state.issueNumber ?? 1),
+				String(state.status ?? "working"),
+				null,
+				JSON.stringify(state),
+				updatedAt,
+			);
+		}
+
+		function sessions(db: DatabaseSync): Array<{ session_key: string; state_json: string }> {
+			return db.prepare("SELECT session_key, state_json FROM sessions ORDER BY session_key").all() as Array<{ session_key: string; state_json: string }>;
+		}
+
+		function migration14() {
+			const migration = MIGRATIONS.find((entry) => entry.id === 14);
+			if (!migration) throw new Error("migration 14 not defined");
+			return migration;
+		}
+
+		// Isolate migration 14 from migration 9 (which also normalizes kinds) by
+		// running the full migration set first, then inserting fresh rows that
+		// miss `kind` and invoking migration 14 directly.
+
+		it("durably normalizes sessions missing kind to implementation", () => {
+			const db = new DatabaseSync(dbPath);
+			runMigrations(db);
+			insertSession(db, "github-mbrooks-yolomatic-issue-1-implementation", {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 1,
+				title: "No kind",
+				status: "working",
+			});
+
+			migration14().up(db);
+
+			const rows = sessions(db);
+			expect(rows).toHaveLength(1);
+			expect(JSON.parse(rows[0].state_json)).toMatchObject({ kind: "implementation" });
+			db.close();
+		});
+
+		it("preserves refinement sessions as refinement", () => {
+			const db = new DatabaseSync(dbPath);
+			runMigrations(db);
+			insertSession(db, "github-mbrooks-yolomatic-issue-2-implementation", {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 2,
+				kind: "implementation",
+				title: "Impl",
+				status: "working",
+			});
+			insertSession(db, "github-mbrooks-yolomatic-issue-2-refinement", {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 2,
+				kind: "refinement",
+				title: "Refine",
+				status: "working",
+			});
+
+			migration14().up(db);
+
+			const rows = sessions(db);
+			const byKey = Object.fromEntries(rows.map((r) => [r.session_key, JSON.parse(r.state_json).kind]));
+			expect(byKey["github-mbrooks-yolomatic-issue-2-implementation"]).toBe("implementation");
+			expect(byKey["github-mbrooks-yolomatic-issue-2-refinement"]).toBe("refinement");
+			db.close();
+		});
+
+		it("is idempotent and does not rewrite rows whose kind is already set", () => {
+			const db = new DatabaseSync(dbPath);
+			runMigrations(db);
+			insertSession(db, "github-mbrooks-yolomatic-issue-3-implementation", {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 3,
+				kind: "implementation",
+				title: "Already normalized",
+				status: "working",
+			});
+			const beforeUpdatedAt = db.prepare("SELECT updated_at FROM sessions").get() as { updated_at: string };
+
+			migration14().up(db);
+			migration14().up(db);
+
+			const afterUpdatedAt = db.prepare("SELECT updated_at FROM sessions").get() as { updated_at: string };
+			expect(afterUpdatedAt.updated_at).toBe(beforeUpdatedAt.updated_at);
+			expect(sessions(db)).toHaveLength(1);
+			db.close();
+		});
+
+		it("skips malformed state_json rows without corrupting valid rows", () => {
+			const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+			const db = new DatabaseSync(dbPath);
+			runMigrations(db);
+			// Valid row missing kind.
+			insertSession(db, "github-mbrooks-yolomatic-issue-4-implementation", {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 4,
+				title: "Valid",
+				status: "working",
+			});
+			// Malformed row that cannot be parsed.
+			db.prepare(
+				"INSERT INTO sessions (session_key, owner, repo, issue_number, status, archived_at, state_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+			).run(
+				"github-mbrooks-yolomatic-issue-5-implementation",
+				"mbrooks",
+				"yolomatic",
+				5,
+				"working",
+				null,
+				"{not valid json",
+				"2026-08-01T00:00:00.000Z",
+			);
+
+			migration14().up(db);
+
+			const rows = sessions(db);
+			expect(rows).toHaveLength(2);
+			const valid = rows.find((r) => r.session_key === "github-mbrooks-yolomatic-issue-4-implementation");
+			expect(JSON.parse(valid!.state_json)).toMatchObject({ kind: "implementation" });
+			// Malformed row is left untouched (still unparseable) and not dropped.
+			const malformed = rows.find((r) => r.session_key === "github-mbrooks-yolomatic-issue-5-implementation");
+			expect(malformed!.state_json).toBe("{not valid json");
+			writeSpy.mockRestore();
+			db.close();
+		});
 	});
 });

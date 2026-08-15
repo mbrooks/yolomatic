@@ -95,6 +95,7 @@ vi.mock("./session/store.js", () => ({
 			delete: vi.fn(async () => {}),
 			archive: vi.fn(async () => {}),
 			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
+			auditLegacyState: vi.fn(async () => ({ legacyStateFiles: [], sessionsMissingKind: [], malformedStateFiles: [], clean: true })),
 			getSessionPath: vi.fn(() => "/tmp/session.jsonl"),
 			getStatePath: vi.fn(() => "/tmp/state.json"),
 			getArchivePath: vi.fn(() => "/tmp/archive.json"),
@@ -625,6 +626,92 @@ describe("main", () => {
 		// The migration removed the syncConfigToEnv live-sync listener; live model
 		// settings now flow through the injected runtime settings provider.
 		expect(settingsStoreMock.onChange).not.toHaveBeenCalled();
+	});
+
+	it("logs a legacy state audit summary when legacy data remains", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: vi.fn(async () => []),
+				auditLegacyState: vi.fn(async () => ({
+					legacyStateFiles: ["/sessions/issue-1.state.json"],
+					sessionsMissingKind: ["github-mbrooks-yolomatic-issue-2-implementation"],
+					malformedStateFiles: ["/sessions/issue-3.state.json"],
+					clean: false,
+				})),
+			};
+		});
+
+		await main();
+
+		expect(writeSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				"legacy audit: 1 legacy state file(s), 1 session(s) missing kind, 1 malformed legacy file(s)",
+			),
+		);
+		writeSpy.mockRestore();
+	});
+
+	it("logs a legacy audit failure with a stringified non-Error throw", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: vi.fn(async () => []),
+				auditLegacyState: vi.fn(async () => {
+					throw "not an error";
+				}),
+			};
+		});
+
+		await main();
+
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit failed: not an error"));
+		writeSpy.mockRestore();
+	});
+
+	it("does not log a legacy audit summary when the audit is clean", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: vi.fn(async () => []),
+				auditLegacyState: vi.fn(async () => ({
+					legacyStateFiles: [],
+					sessionsMissingKind: [],
+					malformedStateFiles: [],
+					clean: true,
+				})),
+			};
+		});
+
+		await main();
+
+		expect(writeSpy).not.toHaveBeenCalledWith(expect.stringContaining("legacy audit:"));
+		writeSpy.mockRestore();
+	});
+
+	it("logs a legacy audit failure when auditLegacyState throws", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
+			return {
+				get: vi.fn(),
+				set: vi.fn(),
+				getAll: vi.fn(async () => []),
+				auditLegacyState: vi.fn(async () => {
+					throw new Error("audit boom");
+				}),
+			};
+		});
+
+		await main();
+
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit failed: audit boom"));
+		writeSpy.mockRestore();
 	});
 
 	it("starts full runtime when onboarding completes", async () => {

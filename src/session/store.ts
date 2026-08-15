@@ -1,5 +1,5 @@
 import { DatabaseSync, type StatementSync } from "node:sqlite";
-import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -57,6 +57,23 @@ export interface SessionState {
 }
 
 /**
+ * Read-only preflight report for the file-backed session compatibility
+ * retirement. `auditLegacyState()` never mutates on-disk files or SQLite rows;
+ * it only reports what remains so operators can decide when to remove the
+ * legacy data as a separate explicit operational step.
+ */
+export interface LegacyStateAudit {
+	/** Absolute paths of readable `.state.json` files still on disk. */
+	legacyStateFiles: string[];
+	/** Session keys whose persisted state omits `kind` (not yet normalized). */
+	sessionsMissingKind: string[];
+	/** Legacy `.state.json` files that could not be parsed as JSON. */
+	malformedStateFiles: string[];
+	/** True when there is no remaining legacy data to clean up. */
+	clean: boolean;
+}
+
+/**
  * In-memory cache of the most recently written state for a session key.
  * SQLite is the source of truth; the cache only avoids redundant round-trips
  * for the read-modify-write cycles the session manager issues.
@@ -73,6 +90,7 @@ export class SessionStore {
 	private readonly getArchivedStmt: StatementSync;
 	private readonly deleteStmt: StatementSync;
 	private readonly listActiveStmt: StatementSync;
+	private readonly listAllStateStmt: StatementSync;
 	private readonly cache = new Map<string, CacheEntry>();
 	private migrated = false;
 
@@ -102,6 +120,9 @@ export class SessionStore {
 		this.deleteStmt = this.db.prepare("DELETE FROM sessions WHERE session_key = ?");
 		this.listActiveStmt = this.db.prepare(
 			"SELECT state_json FROM sessions WHERE archived_at IS NULL ORDER BY updated_at",
+		);
+		this.listAllStateStmt = this.db.prepare(
+			"SELECT session_key, state_json FROM sessions ORDER BY session_key",
 		);
 	}
 
@@ -180,11 +201,10 @@ export class SessionStore {
 		this.cache.delete(key);
 		this.deleteStmt.run(key);
 
-		// Remove any legacy on-disk state/transcript files too (idempotent).
-		const statePath = this.getStatePath(owner, repo, issueNumber, kind);
-		const sessionPath = this.getSessionPath(owner, repo, issueNumber, kind);
-		await this.silentRemove(statePath);
-		await this.silentRemove(sessionPath);
+		// Legacy on-disk state/transcript files are intentionally NOT removed
+		// here. Legacy-file deletion is a separate explicit operational step
+		// (`removeLegacyStateFiles`) so it is never an automatic side effect of
+		// a code deployment. SQLite is the source of truth.
 	}
 
 	async getAll(): Promise<SessionState[]> {
@@ -203,26 +223,20 @@ export class SessionStore {
 		const kind = state.kind ?? "implementation";
 		const archiveStatePath = this.getArchivePath(archiveDir, state.owner, state.repo, state.issueNumber, kind);
 		const archiveSessionPath = this.getSessionArchivePath(archiveDir, state.owner, state.repo, state.issueNumber, kind);
-		const currentStatePath = this.getStatePath(state.owner, state.repo, state.issueNumber, kind);
 		const currentSessionPath = this.getSessionPath(state.owner, state.repo, state.issueNumber, kind);
 
 		await mkdir(path.dirname(archiveStatePath), { recursive: true });
 		await mkdir(path.dirname(archiveSessionPath), { recursive: true });
 
-		// Move any legacy on-disk state file to the archive; otherwise write the
-		// current SQLite state out so archived sessions remain queryable on disk.
-		const legacyStateExists = await this.pathExists(currentStatePath);
-		if (legacyStateExists) {
-			try {
-				await rename(currentStatePath, archiveStatePath);
-			} catch {
-				// fall back to writing fresh below if rename fails
-				await writeFile(archiveStatePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-			}
-		} else {
-			await writeFile(archiveStatePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-		}
+		// Always write the archived state fresh from the SQLite source of truth.
+		// The legacy on-disk `.state.json` file (if any) is left in place and is
+		// NOT moved or deleted here; legacy-file deletion is a separate explicit
+		// operational step. This keeps state archiving decoupled from legacy
+		// state JSON lifecycle while preserving transcript archiving below.
+		await writeFile(archiveStatePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 
+		// Transcript archiving remains intact: move the session transcript to
+		// the archive directory when present.
 		try {
 			await rename(currentSessionPath, archiveSessionPath);
 		} catch {
@@ -298,6 +312,86 @@ export class SessionStore {
 		return imported;
 	}
 
+	/**
+	 * Read-only preflight/audit for the file-backed session compatibility
+	 * retirement. Reports remaining legacy `.state.json` files on disk and
+	 * persisted sessions whose `state_json` omits `kind`, without modifying
+	 * anything. Malformed legacy files are reported separately and skipped so
+	 * they cannot corrupt valid SQLite rows.
+	 *
+	 * Run this before retiring the compatibility importer and again before the
+	 * explicit legacy-file deletion step.
+	 */
+	async auditLegacyState(): Promise<LegacyStateAudit> {
+		const legacyStateFiles: string[] = [];
+		const malformedStateFiles: string[] = [];
+
+		let entries: import("node:fs").Dirent[];
+		try {
+			entries = await readdir(this.sessionsDir, { withFileTypes: true });
+		} catch {
+			entries = [];
+		}
+
+		for (const entry of entries) {
+			if (!entry.isDirectory()) continue;
+			const repoDir = path.join(this.sessionsDir, entry.name);
+			let files: string[];
+			try {
+				files = await readdir(repoDir);
+			} catch {
+				continue;
+			}
+			for (const file of files) {
+				if (!file.endsWith(".state.json")) continue;
+				const filePath = path.join(repoDir, file);
+				try {
+					const raw = await readFile(filePath, "utf8");
+					JSON.parse(raw);
+					legacyStateFiles.push(filePath);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					process.stdout.write(`[session-store] warning: malformed legacy state file ${filePath}: ${message}\n`);
+					malformedStateFiles.push(filePath);
+				}
+			}
+		}
+
+		const sessionsMissingKind: string[] = [];
+		const rows = this.listAllStateStmt.all() as Array<{ session_key: string; state_json: string }>;
+		for (const row of rows) {
+			let state: Record<string, unknown>;
+			try {
+				state = JSON.parse(row.state_json) as Record<string, unknown>;
+			} catch {
+				// Malformed SQLite rows are handled by the durable normalization
+				// migration and recovery paths; they are not "missing kind".
+				continue;
+			}
+			if (state.kind === undefined) {
+				sessionsMissingKind.push(row.session_key);
+			}
+		}
+
+		const clean =
+			legacyStateFiles.length === 0 &&
+			sessionsMissingKind.length === 0 &&
+			malformedStateFiles.length === 0;
+		return { legacyStateFiles, sessionsMissingKind, malformedStateFiles, clean };
+	}
+
+	/**
+	 * Explicit operational step that removes the on-disk legacy `.state.json`
+	 * and session transcript (`.jsonl`) files for a single session. This is
+	 * decoupled from `delete()`/`archive()` so legacy-file deletion is never an
+	 * automatic side effect of a code deployment. Idempotent when the files are
+	 * already absent.
+	 */
+	async removeLegacyStateFiles(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<void> {
+		await this.silentRemove(this.getStatePath(owner, repo, issueNumber, kind));
+		await this.silentRemove(this.getSessionPath(owner, repo, issueNumber, kind));
+	}
+
 	private parseState(raw: string, key?: string): SessionState | null {
 		try {
 			return this.normalizeState(JSON.parse(raw) as SessionState);
@@ -310,15 +404,6 @@ export class SessionStore {
 
 	private normalizeState(state: SessionState): SessionState {
 		return { ...state, kind: state.kind ?? "implementation" };
-	}
-
-	private async pathExists(p: string): Promise<boolean> {
-		try {
-			await access(p);
-			return true;
-		} catch {
-			return false;
-		}
 	}
 
 	private async silentRemove(p: string): Promise<void> {
