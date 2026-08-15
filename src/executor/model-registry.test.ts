@@ -57,9 +57,8 @@ describe("createYolomaticModelRegistry", () => {
 	it("registers the openai provider against the platform API", async () => {
 		const mock = mockRuntime();
 		stubRuntime(mock);
-		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
-		await createYolomaticModelRegistry();
+		await createYolomaticModelRegistry({ openaiApiKey: "sk-test-openai-key" });
 
 		expect(mock.registerProvider).toHaveBeenCalledWith(
 			OPENAI_PROVIDER_ID,
@@ -79,7 +78,15 @@ describe("createYolomaticModelRegistry", () => {
 	it("registers only ollama when no OpenAI API key is configured", async () => {
 		const mock = mockRuntime();
 		stubRuntime(mock);
-		vi.stubEnv("OPENAI_API_KEY", "");
+
+		await createYolomaticModelRegistry({ openaiApiKey: "" });
+
+		expect(mock.registerProvider.mock.calls.map(([provider]) => provider)).toEqual(["ollama"]);
+	});
+
+	it("registers only ollama when no options are provided", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
 
 		await createYolomaticModelRegistry();
 
@@ -89,12 +96,23 @@ describe("createYolomaticModelRegistry", () => {
 	it("registers both providers in order (ollama, openai)", async () => {
 		const mock = mockRuntime();
 		stubRuntime(mock);
-		vi.stubEnv("OPENAI_API_KEY", "sk-test-openai-key");
 
-		await createYolomaticModelRegistry();
+		await createYolomaticModelRegistry({ openaiApiKey: "sk-test-openai-key" });
 
 		const registeredNames = mock.registerProvider.mock.calls.map((call) => call[0]);
 		expect(registeredNames).toEqual(["ollama", OPENAI_PROVIDER_ID]);
+	});
+
+	it("uses the injected ollamaHost to resolve the ollama base URL", async () => {
+		const mock = mockRuntime();
+		stubRuntime(mock);
+
+		await createYolomaticModelRegistry({ ollamaHost: "http://ollama.internal:11434" });
+
+		expect(mock.registerProvider).toHaveBeenCalledWith(
+			"ollama",
+			expect.objectContaining({ baseUrl: "http://ollama.internal:11434/v1" }),
+		);
 	});
 
 	it("exposes a lookup that maps runtime models to provider/id references", async () => {

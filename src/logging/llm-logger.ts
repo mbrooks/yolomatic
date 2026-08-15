@@ -1,3 +1,5 @@
+import { DEFAULT_LOGGING_SETTINGS, type LoggingSettings } from "../runtime-settings.js";
+
 /**
  * Comprehensive LLM interaction logger.
  *
@@ -5,7 +7,17 @@
  * responses, and errors to stdout with a consistent format:
  *
  *   [ISO_TIMESTAMP] [repo-issue-N] [category] message
+ *
+ * Logging flags and level are injected via {@link LlmLoggerOptions} so the
+ * logger never reads `process.env` directly; the configuration boundary
+ * (`getConfig()` for the control plane, worker env ingestion for workers)
+ * supplies the settings.
  */
+export interface LlmLoggerOptions {
+	/** Explicit logging settings. Defaults to {@link DEFAULT_LOGGING_SETTINGS}. */
+	loggingSettings?: LoggingSettings;
+}
+
 export class LlmLogger {
 	private readonly sessionTag: string;
 	private readonly logPrompts: boolean;
@@ -14,13 +26,14 @@ export class LlmLogger {
 	private readonly logResponses: boolean;
 	private readonly logLevel: string;
 
-	constructor(repo: string, issueNumber: number, sessionTag?: string) {
+	constructor(repo: string, issueNumber: number, sessionTag?: string, options?: LlmLoggerOptions) {
 		this.sessionTag = sessionTag ?? `${repo}-issue-${issueNumber}`;
-		this.logLevel = process.env.LOG_LEVEL?.trim().toLowerCase() ?? "info";
-		this.logPrompts = process.env.LOG_PROMPTS !== "false";
-		this.logThoughts = process.env.LOG_THOUGHTS !== "false";
-		this.logTools = process.env.LOG_TOOLS !== "false";
-		this.logResponses = process.env.LOG_RESPONSES !== "false";
+		const settings = options?.loggingSettings ?? DEFAULT_LOGGING_SETTINGS;
+		this.logLevel = settings.logLevel.trim().toLowerCase() || "info";
+		this.logPrompts = settings.logPrompts;
+		this.logThoughts = settings.logThoughts;
+		this.logTools = settings.logTools;
+		this.logResponses = settings.logResponses;
 	}
 
 	logPrompt(prompt: string, tokens?: number): void {

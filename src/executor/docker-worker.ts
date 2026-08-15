@@ -10,6 +10,11 @@ import { recordSessionLog } from "../logging/session-log-store.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 import { sessionStorageKey, type SessionState } from "../session/store.js";
 import {
+	resolveRuntimeSettings,
+	type RuntimeSettings,
+	type RuntimeSettingsProvider,
+} from "../runtime-settings.js";
+import {
 	WORKER_PROTOCOL_VERSION,
 	createWorkerMessage,
 	type AnyWorkerProtocolMessage,
@@ -68,6 +73,13 @@ export interface DockerWorkerExecutorOptions {
 	soulPath: string;
 	/** Scoped GitHub gateway used to serve worker tool_request calls. */
 	githubGateway?: WorkerGitHubGateway;
+	/**
+	 * Runtime settings provider (or static snapshot) supplying the model
+	 * provider/model and OpenAI API key forwarded into worker containers. Read
+	 * fresh at each launch so live database-setting updates affect subsequent
+	 * sessions. When omitted, no model env vars are forwarded.
+	 */
+	runtimeSettings?: RuntimeSettingsProvider | (() => RuntimeSettings);
 }
 
 export class DockerWorkerExecutor implements ExecutionService {
@@ -595,6 +607,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 		);
 	}
 
+	/**
+	 * Resolves the runtime settings snapshot used for this launch. Read fresh
+	 * on each call so live database-setting updates affect subsequent sessions.
+	 */
+	private getRuntimeSettings(): RuntimeSettings {
+		return resolveRuntimeSettings(this.options.runtimeSettings);
+	}
+
 	private async buildDockerRunArgs(containerName: string, workerTemplate = this.resolveTemplate()): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
@@ -615,11 +635,12 @@ export class DockerWorkerExecutor implements ExecutionService {
 			args.push("--add-host", "host.docker.internal:host-gateway");
 		}
 
-		if (process.env.PI_AGENT_PROVIDER?.trim()) {
-			args.push("-e", `PI_AGENT_PROVIDER=${process.env.PI_AGENT_PROVIDER.trim()}`);
+		const modelSettings = this.getRuntimeSettings().model;
+		if (modelSettings.piAgentProvider?.trim()) {
+			args.push("-e", `PI_AGENT_PROVIDER=${modelSettings.piAgentProvider.trim()}`);
 		}
-		if (process.env.PI_AGENT_MODEL?.trim()) {
-			args.push("-e", `PI_AGENT_MODEL=${process.env.PI_AGENT_MODEL.trim()}`);
+		if (modelSettings.piAgentModel?.trim()) {
+			args.push("-e", `PI_AGENT_MODEL=${modelSettings.piAgentModel.trim()}`);
 		}
 		const initScript = process.env.YOLO_WORKER_INIT_SCRIPT?.trim();
 		if (initScript) {
@@ -777,14 +798,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	/**
-	 * Resolves the OpenAI API key to forward into worker containers. An
-	 * explicit option takes precedence; otherwise the control plane's
-	 * `OPENAI_API_KEY` env var (synced from settings) is forwarded.
+	 * Resolves the OpenAI API key to forward into worker containers. An explicit
+	 * option takes precedence; otherwise the injected runtime settings' key
+	 * (synced from database settings) is forwarded.
 	 */
 	resolveWorkerOpenAiApiKey(): string | undefined {
 		const explicit = this.options.workerOpenAiApiKey?.trim();
 		if (explicit) return explicit;
-		return process.env.OPENAI_API_KEY?.trim() || undefined;
+		return this.getRuntimeSettings().model.openaiApiKey?.trim() || undefined;
 	}
 
 	/**

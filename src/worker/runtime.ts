@@ -12,6 +12,7 @@ import { runEnvironmentInit } from "./env-init.js";
 import { createWorkerMessage, WORKER_PROTOCOL_VERSION, type WorkerProtocolMessage } from "./protocol.js";
 import { setGitHubGatewayTransport, type GatewayCallResult } from "./github-gateway-client.js";
 import { decodeWorkerWebSocketMessage, sendWorkerWebSocketMessage } from "./websocket-transport.js";
+import { runtimeSettingsFromEnv } from "../runtime-settings.js";
 
 export interface WorkerRuntimeOptions {
 	wsUrl: string;
@@ -148,6 +149,10 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<v
 				"extensions",
 				"github-issues.ts",
 			),
+			// The worker process environment is the worker's configuration boundary:
+			// read the migrated model/logging keys once here and inject them so the
+			// executor and logger never read process.env directly.
+			runtimeSettings: runtimeSettingsFromEnv(process.env),
 		});
 
 		ws.on("message", (raw) => {

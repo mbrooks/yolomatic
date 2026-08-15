@@ -252,12 +252,58 @@ describe("runWorkerRuntime", () => {
 		});
 
 		expect(mockSession.steer).toHaveBeenCalledWith("Please adjust course");
-		expect(PiAgentExecutor).toHaveBeenCalledWith({
+		expect(PiAgentExecutor).toHaveBeenCalledWith(expect.objectContaining({
 			soulPath: "/tmp/SOUL.md",
 			trustedExtensionPath: "/tmp/.pi/extensions/github-issues.ts",
-		});
+			runtimeSettings: expect.objectContaining({
+				model: expect.any(Object),
+				logging: expect.objectContaining({ logLevel: expect.any(String) }),
+			}),
+		}));
 		expect(seenMessages.some((message) => message.type === "event_batch")).toBe(true);
 		expect(seenMessages.some((message) => message.type === "complete")).toBe(true);
+	});
+
+	it("injects worker env model and logging settings into the executor", async () => {
+		const sessionKey = "github-mbrooks-yolomatic-issue-31-implementation";
+		const originalModel = process.env.PI_AGENT_MODEL;
+		const originalProvider = process.env.PI_AGENT_PROVIDER;
+		const originalLevel = process.env.LOG_LEVEL;
+		const originalPrompts = process.env.LOG_PROMPTS;
+		process.env.PI_AGENT_MODEL = "glm-5.2:cloud";
+		process.env.PI_AGENT_PROVIDER = "ollama";
+		process.env.LOG_LEVEL = "error";
+		process.env.LOG_PROMPTS = "false";
+		try {
+			executeWithOverride.mockImplementation(async (_state, _prompt, _signal, onSessionCreated) => {
+				onSessionCreated?.(mockSession);
+				return { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" };
+			});
+			wsTestHarness.setConnectionHandler(({ server }) => {
+				server.on("message", async (raw: Buffer) => {
+					const message = decodeWorkerWebSocketMessage(raw);
+					if (message.type !== "hello") return;
+					await sendWorkerWebSocketMessage(server as never, createWorkerMessage("launch_config", sessionKey, "launch-env", {
+						session: { owner: "mbrooks", repo: "yolomatic", issueNumber: 31, workspacePath: "/workspaces/x", title: "T", body: "B" },
+						prompt: { kind: "override", text: "custom prompt" },
+					}));
+				});
+			});
+
+			await runWorkerRuntime({ wsUrl: "ws://worker.test/session-31", sessionKey, soulPath: "/tmp/SOUL.md" });
+
+			expect(PiAgentExecutor).toHaveBeenCalledWith(expect.objectContaining({
+				runtimeSettings: expect.objectContaining({
+					model: expect.objectContaining({ piAgentModel: "glm-5.2:cloud", piAgentProvider: "ollama" }),
+					logging: expect.objectContaining({ logLevel: "error", logPrompts: false }),
+				}),
+			}));
+		} finally {
+			if (originalModel === undefined) delete process.env.PI_AGENT_MODEL; else process.env.PI_AGENT_MODEL = originalModel;
+			if (originalProvider === undefined) delete process.env.PI_AGENT_PROVIDER; else process.env.PI_AGENT_PROVIDER = originalProvider;
+			if (originalLevel === undefined) delete process.env.LOG_LEVEL; else process.env.LOG_LEVEL = originalLevel;
+			if (originalPrompts === undefined) delete process.env.LOG_PROMPTS; else process.env.LOG_PROMPTS = originalPrompts;
+		}
 	});
 
 	it("rejects invalid launch metadata from the server", async () => {

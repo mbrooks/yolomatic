@@ -136,7 +136,7 @@ vi.mock("../skills/repo-skill-service.js", () => ({
 	}),
 }));
 
-import { buildRuntimeGraph, noOpHandlers, startRuntime, syncConfigToEnv } from "./bootstrap.js";
+import { buildRuntimeGraph, noOpHandlers, startRuntime } from "./bootstrap.js";
 import { GitHubIssueHandlers } from "../webhook/handlers.js";
 import { getConfig } from "../config.js";
 import { startGitHubPolling } from "../github-events/polling.js";
@@ -188,35 +188,6 @@ describe("noOpHandlers", () => {
 
 	it("isInFlight returns false", () => {
 		expect(noOpHandlers.isInFlight("mbrooks", "yolomatic", 1)).toBe(false);
-	});
-});
-
-describe("syncConfigToEnv", () => {
-	afterEach(() => {
-		process.env.PI_AGENT_MODEL = "";
-		process.env.PI_AGENT_PROVIDER = "";
-		process.env.OPENAI_API_KEY = "";
-		process.env.LOG_LEVEL = "";
-		process.env.LOG_PROMPTS = "";
-		process.env.LOG_THOUGHTS = "";
-		process.env.LOG_TOOLS = "";
-		process.env.LOG_RESPONSES = "";
-	});
-
-	it("writes configured values into process.env", () => {
-		syncConfigToEnv(baseConfig);
-		expect(process.env.PI_AGENT_MODEL).toBe("kimi");
-		expect(process.env.PI_AGENT_PROVIDER).toBe("ollama");
-		expect(process.env.OPENAI_API_KEY).toBe("sk-test");
-		expect(process.env.LOG_LEVEL).toBe("debug");
-		expect(process.env.LOG_PROMPTS).toBe("true");
-		expect(process.env.LOG_TOOLS).toBe("true");
-	});
-
-	it("clears env vars when flags are disabled", () => {
-		syncConfigToEnv({ ...baseConfig, logPrompts: false, logThoughts: false, logTools: false, logResponses: false });
-		expect(process.env.LOG_PROMPTS).toBe("");
-		expect(process.env.LOG_TOOLS).toBe("");
 	});
 });
 
@@ -311,6 +282,38 @@ describe("buildRuntimeGraph", () => {
 		settingsValues.admin_base_url = "   ";
 		expect(handlerDeps.resolveAdminBaseUrl()).toBeUndefined();
 	});
+
+	it("injects a live runtime settings provider into the Docker worker executor", () => {
+		const deps = makeDeps();
+		buildRuntimeGraph(baseConfig, deps);
+		const executorOptions = (DockerWorkerExecutor as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as {
+			runtimeSettings: { get(): unknown };
+		};
+		expect(executorOptions.runtimeSettings).toBeDefined();
+		expect(typeof executorOptions.runtimeSettings.get).toBe("function");
+
+		// The provider reads from getConfig(settingsStore) live, so it reflects
+		// the current config snapshot (the mocked getConfig returns baseConfig).
+		const snapshot = executorOptions.runtimeSettings.get() as {
+			model: { piAgentModel?: string; piAgentProvider?: string; openaiApiKey?: string };
+			logging: { logLevel: string };
+		};
+		expect(snapshot.model.piAgentModel).toBe("kimi");
+		expect(snapshot.model.piAgentProvider).toBe("ollama");
+		expect(snapshot.model.openaiApiKey).toBe("sk-test");
+		expect(snapshot.logging.logLevel).toBe("debug");
+
+		// Live reconfiguration: a new getConfig return value flows through the
+		// provider on the next call without reconstructing the executor.
+		vi.mocked(getConfig).mockImplementationOnce(() => ({
+			...baseConfig,
+			piAgentModel: "glm-5.2:cloud",
+			logLevel: "info",
+			openaiApiKey: "sk-rotated",
+		}));
+		const next = executorOptions.runtimeSettings.get() as { model: { piAgentModel?: string } };
+		expect(next.model.piAgentModel).toBe("glm-5.2:cloud");
+	});
 });
 
 describe("startRuntime", () => {
@@ -323,6 +326,44 @@ describe("startRuntime", () => {
 		const graph = await startRuntime(baseConfig, deps);
 		expect(graph.server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
 		expect(startGitHubPolling).not.toHaveBeenCalled();
+	});
+
+	it("does not mutate process.env migrated model/logging keys", async () => {
+		const saved = {
+			piAgentModel: process.env.PI_AGENT_MODEL,
+			piAgentProvider: process.env.PI_AGENT_PROVIDER,
+			openaiApiKey: process.env.OPENAI_API_KEY,
+			logLevel: process.env.LOG_LEVEL,
+			logPrompts: process.env.LOG_PROMPTS,
+			logThoughts: process.env.LOG_THOUGHTS,
+			logTools: process.env.LOG_TOOLS,
+			logResponses: process.env.LOG_RESPONSES,
+		};
+		// Sentinel values distinct from baseConfig so any write is detectable.
+		process.env.PI_AGENT_MODEL = "pre-existing-model";
+		process.env.PI_AGENT_PROVIDER = "pre-existing-provider";
+		process.env.OPENAI_API_KEY = "pre-existing-key";
+		process.env.LOG_LEVEL = "warn";
+		process.env.LOG_PROMPTS = "false";
+		process.env.LOG_THOUGHTS = "false";
+		process.env.LOG_TOOLS = "false";
+		process.env.LOG_RESPONSES = "false";
+		try {
+			await startRuntime(baseConfig, makeDeps());
+			// startRuntime no longer syncs config into process.env; the injected
+			// runtime settings provider carries those values instead.
+			expect(process.env.PI_AGENT_MODEL).toBe("pre-existing-model");
+			expect(process.env.PI_AGENT_PROVIDER).toBe("pre-existing-provider");
+			expect(process.env.OPENAI_API_KEY).toBe("pre-existing-key");
+			expect(process.env.LOG_LEVEL).toBe("warn");
+			expect(process.env.LOG_PROMPTS).toBe("false");
+			expect(process.env.LOG_TOOLS).toBe("false");
+		} finally {
+			for (const [key, value] of Object.entries(saved)) {
+				if (value === undefined) delete process.env[key];
+				else (process.env as Record<string, string | undefined>)[key] = value;
+			}
+		}
 	});
 
 	it("starts GitHub polling when polling is enabled", async () => {

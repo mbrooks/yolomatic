@@ -13,7 +13,12 @@ import { LlmLogger } from "../logging/llm-logger.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
 import { SelfMonitor } from "../self-monitor/index.js";
 import { sessionStorageKey, type SessionState } from "../session/store.js";
-import { resolveConfiguredModel, type ConfiguredModelOverride } from "./model-selection.js";
+import { resolveConfiguredModel, type ConfiguredModelOverride, type ModelSettingsFallback } from "./model-selection.js";
+import {
+	resolveRuntimeSettings,
+	type RuntimeSettings,
+	type RuntimeSettingsProvider,
+} from "../runtime-settings.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { loadSoulContent } from "./soul-loader.js";
@@ -26,19 +31,31 @@ export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
 
+/**
+ * Runtime settings input for {@link PiAgentExecutor}. Accepts a static
+ * snapshot, a `() => RuntimeSettings` function, or a {@link RuntimeSettingsProvider}
+ * so live database-setting updates affect the next execution. Omitted
+ * settings preserve the legacy default behavior (Pi default model, default
+ * logging flags).
+ */
+type RuntimeSettingsInput = RuntimeSettings | RuntimeSettingsProvider | (() => RuntimeSettings) | undefined;
+
 export class PiAgentExecutor implements ExecutionService {
 	private readonly soulPath: string;
 	private readonly modelConfig: ModelConfigProvider;
 	private readonly trustedExtensionPath: string | undefined;
+	private readonly runtimeSettings: RuntimeSettingsInput;
 
 	constructor(options: {
 		soulPath: string;
 		modelConfig?: ModelConfigProvider;
 		trustedExtensionPath?: string;
+		runtimeSettings?: RuntimeSettingsInput;
 	}) {
 		this.soulPath = options.soulPath;
 		this.modelConfig = options.modelConfig;
 		this.trustedExtensionPath = options.trustedExtensionPath;
+		this.runtimeSettings = options.runtimeSettings;
 	}
 
 	execute(
@@ -107,7 +124,10 @@ export class PiAgentExecutor implements ExecutionService {
 		options?: { refinement?: boolean },
 		priorComments?: PriorDiscussionComment[],
 	): Promise<ExecutionResult> {
-		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag);
+		const settings = resolveRuntimeSettings(this.runtimeSettings);
+		const logger = new LlmLogger(state.repo, state.issueNumber, state.sessionTag, {
+			loggingSettings: settings.logging,
+		});
 		const notifyActivity = () => {
 			onActivity?.();
 		};
@@ -148,13 +168,16 @@ export class PiAgentExecutor implements ExecutionService {
 		});
 		await loader.reload();
 
-		const modelRegistry = await createYolomaticModelRegistry();
+		const modelRegistry = await createYolomaticModelRegistry({
+			openaiApiKey: settings.model.openaiApiKey,
+			ollamaHost: settings.model.ollamaHost,
+		});
 		const configuredModelOverride = this.getModelConfig();
-		const configuredModelRef = resolveConfiguredModel(modelRegistry, configuredModelOverride);
+		const configuredModelRef = resolveConfiguredModel(modelRegistry, configuredModelOverride, settings.model);
 		const configuredModel = configuredModelRef
 			? modelRegistry.runtime.getModel(configuredModelRef.provider, configuredModelRef.id)
 			: undefined;
-		const configuredModelName = configuredModelOverride?.model?.trim() ?? process.env.PI_AGENT_MODEL?.trim();
+		const configuredModelName = configuredModelOverride?.model?.trim() ?? settings.model.piAgentModel?.trim();
 		if (configuredModelName && !configuredModel) {
 			process.stderr.write(
 				`Warning: configured Pi model ${configuredModelName} did not resolve; falling back to Pi defaults.\n`,
