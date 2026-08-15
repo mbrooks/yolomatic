@@ -1,7 +1,38 @@
-import type { GitHubService, PullRequestInfo } from "../../ports/github-service.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
+import type { PullRequestInfo } from "../../ports/github-service.js";
 import type { SessionState } from "../../session/store.js";
 import { expectedBranchForIssue } from "../../pr-review/session-invariant.js";
+
+/**
+ * Narrow GitHub operations {@link PRRecovery} can call: validate a stored PR
+ * mapping and discover open PRs by deterministic head/base. Composed from
+ * {@link GitHubService} at the wiring boundary via TypeScript structural
+ * typing; production adapters keep implementing the full interface.
+ */
+export interface PRRecoveryGithubPort {
+	getPullRequest(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null>;
+	listPullRequests(
+		owner: string,
+		repo: string,
+		options: { head: string; base: string; state: string },
+	): Promise<Array<{ number: number; html_url: string }>>;
+}
+
+/**
+ * Narrow session operations {@link PRRecovery} can call: clear a stale PR
+ * association and persist a discovered one. Composed from
+ * {@link SessionRepository} at the wiring boundary.
+ */
+export interface PRRecoverySessionPort {
+	updateStatus(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		status: SessionState["status"],
+		updates?: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">>,
+		kind?: SessionState["kind"],
+	): Promise<SessionState>;
+	associatePR(owner: string, repo: string, issueNumber: number, prNumber: number, prUrl: string): Promise<SessionState>;
+}
 
 export interface RecoveredPR {
 	number: number;
@@ -18,8 +49,8 @@ export type PRRecoveryResult =
 	| { ok: false; reason: string };
 
 export interface PRRecoveryDeps {
-	github: GitHubService;
-	sessions: SessionRepository;
+	github: PRRecoveryGithubPort;
+	sessions: PRRecoverySessionPort;
 }
 
 /**

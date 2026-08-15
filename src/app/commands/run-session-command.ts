@@ -1,12 +1,56 @@
 import type { Clock } from "../../ports/clock.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { WorkspaceService } from "../../ports/workspace-service.js";
-import type { TaskControlService } from "../../ports/task-control-service.js";
+import type { SessionState } from "../../session/store.js";
 import { isTerminalStatus } from "../../domain/session/model.js";
 import { canDelete, canPause, canRestart, canResume } from "../../domain/workflow/policy.js";
 import { clearSessionLogs } from "../../logging/session-log-store.js";
 import { sessionStorageKey } from "../../session/store.js";
 import { fail, ok, type AppResult } from "../result.js";
+
+/**
+ * Narrow session operations {@link RunSessionCommand} can call. Composed from
+ * {@link SessionRepository} at the wiring boundary via structural typing;
+ * production adapters keep implementing the full interface.
+ */
+export interface RunSessionCommandSessionPort {
+	get(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<SessionState | null>;
+	cancelSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	pauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	unpauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	delete(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<void>;
+	markFailed(owner: string, repo: string, issueNumber: number, reason?: string): Promise<SessionState>;
+	markComplete(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	updateStatus(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		status: SessionState["status"],
+		updates?: Partial<Omit<SessionState, "repo" | "issueNumber" | "sessionPath">>,
+		kind?: SessionState["kind"],
+	): Promise<SessionState>;
+	save(state: SessionState): Promise<SessionState>;
+	archive(state: SessionState, archiveDir: string): Promise<void>;
+}
+
+/**
+ * Narrow workspace operations {@link RunSessionCommand} can call: resolve a
+ * worktree path, check for uncommitted changes, and remove a worktree.
+ */
+export interface RunSessionCommandWorkspacePort {
+	getWorktreePath(owner: string, repo: string, issueNumber: number): string;
+	hasChanges(workspacePath: string, cached?: boolean): Promise<boolean>;
+	removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
+}
+
+/**
+ * Narrow task-control operations {@link RunSessionCommand} can call: check
+ * active execution, signal cancellation, and consult draining mode.
+ */
+export interface RunSessionCommandTaskPort {
+	isActive(key: string): boolean;
+	cancel(key: string): boolean;
+	isDraining(): boolean;
+}
 
 export type SessionCommand =
 	| "cancel"
@@ -79,9 +123,9 @@ export type SessionCommandResult =
 
 export class RunSessionCommand {
 	constructor(
-		private readonly sessions: SessionRepository,
-		private readonly workspaces: WorkspaceService,
-		private readonly tasks: TaskControlService,
+		private readonly sessions: RunSessionCommandSessionPort,
+		private readonly workspaces: RunSessionCommandWorkspacePort,
+		private readonly tasks: RunSessionCommandTaskPort,
 		private readonly clock: Clock,
 		private readonly archiveDir?: string,
 		private readonly restartSession?: RestartSessionDispatcher,

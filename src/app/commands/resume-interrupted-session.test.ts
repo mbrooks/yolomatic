@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ResumeInterruptedSession } from "./resume-interrupted-session.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { GitHubService } from "../../ports/github-service.js";
+import { ResumeInterruptedSession, type ResumeSessionPort, type ResumeGithubPort } from "./resume-interrupted-session.js";
 import type { ExecuteSessionDeps } from "./execute-session.js";
 import type { SessionState } from "../../session/store.js";
 
@@ -33,20 +31,17 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 }
 
 function makeDeps(session: SessionState | null) {
-	const sessions: SessionRepository = {
+	const sessions: ResumeSessionPort = {
 		get: vi.fn(async (_owner, _repo, _issueNumber, kind = "implementation") =>
 			session && (session.kind ?? "implementation") === kind ? session : null,
 		),
 		save: vi.fn(async (s) => s),
-		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
-			...session!,
-			...updates,
-			status,
-		})),
-	} as unknown as SessionRepository;
-	const github: GitHubService = {
+	} satisfies ResumeSessionPort;
+	const github: ResumeGithubPort = {
 		postComment: vi.fn(async () => 1),
-	} as unknown as GitHubService;
+		addLabels: vi.fn(async () => {}),
+		removeLabel: vi.fn(async () => {}),
+	} satisfies ResumeGithubPort;
 	const executor = {} as ExecuteSessionDeps;
 	return { sessions, github, executor };
 }
@@ -85,7 +80,6 @@ describe("ResumeInterruptedSession", () => {
 		const command = new ResumeInterruptedSession(deps);
 		await command.execute("mbrooks", "yolomatic", 7);
 
-		expect(deps.sessions.updateStatus).not.toHaveBeenCalled();
 		expect(deps.github.postComment).not.toHaveBeenCalled();
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("no session for"));
 		writeSpy.mockRestore();
