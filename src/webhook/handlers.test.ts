@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { GitHubIssueHandlers } from "./handlers.js";
 import { makeExecutor, makeSessionManager, makeWorkspaceManager } from "./handlers-test-helpers.js";
 import { normalizeWebhookEvent } from "../adapters/github/webhook-adapter.js";
+import type { GitHubEvent, GitHubEventSource } from "../github-events/model.js";
+import type { RepoGitHubEventMode } from "../repos/repository.js";
 
 declare module "./handlers.js" {
 	interface GitHubIssueHandlers {
@@ -1272,5 +1274,107 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 			}),
 		).resolves.toBeUndefined();
 		expect(repositoryStore.getSync).toHaveBeenCalledWith("mbrooks", "yolomatic");
+	});
+});
+
+describe("GitHubIssueHandlers handleGitHubEvent mode gating", () => {
+	function buildHandlers(resolveGitHubEventMode: (owner: string, repo: string) => RepoGitHubEventMode) {
+		const octokit = {
+			issues: {
+				addLabels: vi.fn(async () => ({})),
+				removeLabel: vi.fn().mockResolvedValue({}),
+				createComment: vi.fn(async () => ({ data: { id: 1 } })),
+			},
+			pulls: {
+				get: vi.fn(async () => ({
+					data: {
+						head: { ref: "yolomatic/issue-56" },
+						base: { ref: "main" },
+						state: "open",
+						merged: false,
+						mergeable: true,
+						mergeable_state: "clean",
+						draft: false,
+					},
+				})),
+				create: vi.fn(async () => ({ data: { html_url: "https://github.com/mbrooks/yolomatic/pull/99", number: 99 } })),
+				list: vi.fn(async () => ({ data: [] as any[] })),
+				listReviewComments: vi.fn(async () => ({ data: [] })),
+			},
+		};
+		const sessionManager = makeSessionManager({
+			getSession: vi.fn(async () => null),
+		});
+		const workspaceManager = makeWorkspaceManager({
+			createOrGetWorktree: vi.fn(async () => ({
+				path: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+				branch: "yolomatic/issue-56",
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 56,
+			})),
+			syncWorktree: vi.fn(async () => undefined),
+			getGitStatus: vi.fn(async () => ""),
+			getGitDiff: vi.fn(async () => ""),
+		});
+		const executor = makeExecutor({
+			execute: vi.fn(async () => ({ status: "complete" as never, summary: "Fixed.", rawResponse: "YOLO_STATUS: complete\nFixed." })),
+			executePRReview: vi.fn(async () => ({ status: "complete" as never, summary: "Fixed.", rawResponse: "YOLO_STATUS: complete\nFixed." })),
+		});
+		const handlers = new GitHubIssueHandlers({
+			sessionManager,
+			workspaceManager,
+			executor,
+			githubToken: "token",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+			resolveGitHubEventMode,
+		});
+		const dispatch = vi.fn(async () => undefined);
+		Object.assign((handlers as unknown as { dispatcher: { dispatch: unknown } }).dispatcher, { dispatch });
+		return { handlers, dispatch };
+	}
+
+	function makeEvent(source: GitHubEventSource): GitHubEvent {
+		return {
+			id: `evt-${source}`,
+			type: "issue",
+			source,
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: new Date().toISOString(),
+			payload: {
+				action: "opened",
+				issue: { number: 56, title: "T", body: "B", assignees: [], labels: [], user: { login: "mbrooks" } },
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "mbrooks" },
+			} as never,
+		};
+	}
+
+	it("ignores a webhook event when the repo mode is polling-only", async () => {
+		const { handlers, dispatch } = buildHandlers(() => "polling");
+		await handlers.handleGitHubEvent(makeEvent("webhook"));
+		expect(dispatch).not.toHaveBeenCalled();
+	});
+
+	it("ignores a polling event when the repo mode is webhook-only", async () => {
+		const { handlers, dispatch } = buildHandlers(() => "webhook");
+		await handlers.handleGitHubEvent(makeEvent("polling"));
+		expect(dispatch).not.toHaveBeenCalled();
+	});
+
+	it("dispatches a webhook event when the repo mode includes webhook", async () => {
+		const { handlers, dispatch } = buildHandlers(() => "webhook");
+		await handlers.handleGitHubEvent(makeEvent("webhook"));
+		expect(dispatch).toHaveBeenCalledTimes(1);
+	});
+
+	it("dispatches a polling event when the repo mode is both", async () => {
+		const { handlers, dispatch } = buildHandlers(() => "both");
+		await handlers.handleGitHubEvent(makeEvent("polling"));
+		expect(dispatch).toHaveBeenCalledTimes(1);
 	});
 });

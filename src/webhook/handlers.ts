@@ -13,6 +13,7 @@ import { HandleIssueEvent } from "../app/commands/handle-issue-event.js";
 import { HandleIssueComment } from "../app/commands/handle-issue-comment.js";
 import { HandleIssueRefinement } from "../app/commands/handle-issue-refinement.js";
 import { HandlePRReview } from "../app/commands/handle-pr-review.js";
+import { HandleFixMergeConflicts } from "../app/commands/handle-fix-merge-conflicts.js";
 import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-session.js";
 import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
@@ -59,6 +60,9 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			adminBaseUrl?: string;
 			resolveAdminBaseUrl?: () => string | undefined;
 			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+			maxConflictAttempts?: number;
+			mergeabilityPollDelayMs?: number;
+			mergeabilityPollMaxAttempts?: number;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -143,6 +147,21 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			selfReportEnabled: deps.selfReportEnabled,
 		});
 
+		const fixMergeConflictsCmd = new HandleFixMergeConflicts({
+			sessions,
+			workspaces,
+			executor,
+			github,
+			tasks,
+			githubUsername: deps.githubUsername,
+			adminGithubUsername: deps.adminGithubUsername,
+			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
+			maxConflictAttempts: deps.maxConflictAttempts,
+			mergeabilityPollDelayMs: deps.mergeabilityPollDelayMs,
+			mergeabilityPollMaxAttempts: deps.mergeabilityPollMaxAttempts,
+		});
+
 		this.handleIssueCommentCmd = new HandleIssueComment({
 			sessions,
 			workspaces,
@@ -155,6 +174,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: execDeps,
 			refinement,
 			prReview: this.handlePRReviewCmd,
+			fixMergeConflicts: fixMergeConflictsCmd,
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			adminBaseUrl: deps.adminBaseUrl,
 			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,

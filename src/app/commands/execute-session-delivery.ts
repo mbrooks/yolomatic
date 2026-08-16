@@ -1,14 +1,42 @@
 import type { ExecutionResult } from "../../executor/index.js";
 import type { ExecutionService } from "../../ports/execution-service.js";
-import type { GitHubService, PullRequestInfo } from "../../ports/github-service.js";
+import type { GitHubService } from "../../ports/github-service.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { SessionState } from "../../session/store.js";
 import { generateCommitMessage } from "../../workspace/commit-message.js";
 import { ExecuteSessionReporter } from "./execute-session-reporter.js";
+import { MergeConflictReworkService } from "./merge-conflict-rework.js";
 import { appendAdminLink, resolveAdminIssueUrl } from "./comment-links.js";
 
+/** Shared fallback for `getGitStatus` failures so delivery diagnostics still print. */
+const UNKNOWN_GIT_STATUS = (): string => "(unknown)";
+/** Shared fallback for `getGitDiff` failures so PR body building still succeeds. */
+const EMPTY_GIT_DIFF = (): string => "";
+
+export const PR_COMMANDS_COMMENT_MARKER = "\u003c!-- yolomatic: pr-commands --\u003e";
+
+/**
+ * Builds the static comment posted once on a Yolomatic-created PR listing
+ * the available `/yolomatic` commands on PRs. The hidden marker lets
+ * Yolomatic detect that the comment has already been posted so it is never
+ * duplicated on edits or later events.
+ */
+export function buildPRCommandsComment(): string {
+	return [
+		PR_COMMANDS_COMMENT_MARKER,
+		"**Yolomatic PR commands**",
+		"",
+		"- `/yolomatic fix-merge-conflicts` — ask Yolomatic to rebase this PR onto the default branch and resolve merge conflicts (authorized maintainers only).",
+		"- `/yolomatic stop` — stop the active Yolomatic session for this PR (authorized maintainers only).",
+		"",
+		"These commands work on this PR's timeline for both webhook-delivered and polled events.",
+	].join("\n");
+}
+
 export class ExecuteSessionDelivery {
+	private readonly rework: MergeConflictReworkService;
+
 	constructor(
 		private readonly deps: {
 			sessions: SessionRepository;
@@ -29,7 +57,16 @@ export class ExecuteSessionDelivery {
 			/** Max worker-driven rebase/rework attempts before failing delivery. */
 			maxConflictAttempts?: number;
 		},
-	) {}
+	) {
+		this.rework = new MergeConflictReworkService({
+			github: deps.github,
+			executor: deps.executor,
+			workspaces: deps.workspaces,
+			mergeabilityPollDelayMs: deps.mergeabilityPollDelayMs,
+			mergeabilityPollMaxAttempts: deps.mergeabilityPollMaxAttempts,
+			maxConflictAttempts: deps.maxConflictAttempts,
+		});
+	}
 
 	private adminIssueUrl(owner: string, repo: string, issueNumber: number): string | undefined {
 		const adminBaseUrl = this.deps.resolveAdminBaseUrl?.() ?? this.deps.adminBaseUrl;
@@ -53,7 +90,7 @@ export class ExecuteSessionDelivery {
 
 		try {
 			const worktreePath = current.workspacePath;
-			const preStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+			const preStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(UNKNOWN_GIT_STATUS);
 			process.stdout.write(`[execute] pre-commit status for ${repo}#${issueNumber} at ${worktreePath}:\n${preStatus}\n`);
 
 			const pushed = await this.deps.workspaces.commitAndPush(
@@ -64,7 +101,7 @@ export class ExecuteSessionDelivery {
 			);
 
 			if (!pushed) {
-				const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+				const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(UNKNOWN_GIT_STATUS);
 				process.stdout.write(`[execute] commitAndPush returned false for ${repo}#${issueNumber}. worktree=${worktreePath}\nstatus=${postStatus}\n`);
 
 				await this.deps.github.postComment(
@@ -96,13 +133,17 @@ export class ExecuteSessionDelivery {
 				return;
 			}
 
-			const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "(unknown)");
+			const postStatus = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(UNKNOWN_GIT_STATUS);
 			process.stdout.write(`[execute] post-commit status for ${repo}#${issueNumber}: ${postStatus}\n`);
 
 			const prResult = await this.createPR(owner, repo, issueNumber, current.title, result, current);
 			prUrl = prResult.url;
 			prNumber = prResult.number;
 			deliveryOutcome = prResult.outcome;
+
+			if (deliveryOutcome !== "no-changes" && prNumber !== undefined) {
+				await this.postPRCommandsCommentOnce(owner, repo, prNumber);
+			}
 
 			if (deliveryOutcome !== "no-changes" && prNumber !== undefined) {
 				const gate = await this.runMergeabilityGate(owner, repo, issueNumber, prNumber, current);
@@ -180,7 +221,7 @@ export class ExecuteSessionDelivery {
 		const base = this.deps.resolveDefaultBranch?.(owner, repo) ?? this.deps.defaultBranch ?? "main";
 		const head = `yolomatic/issue-${issueNumber}`;
 
-		const gitDiff = await this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(() => "");
+		const gitDiff = await this.deps.workspaces.getGitDiff(owner, repo, issueNumber).catch(EMPTY_GIT_DIFF);
 		const prBody = this.buildPRBody(issueNumber, current, result, gitDiff);
 
 		try {
@@ -291,7 +332,7 @@ export class ExecuteSessionDelivery {
 		prNumber: number,
 		current: SessionState,
 	): Promise<"clean" | "conflict-failed"> {
-		const info = await this.pollMergeability(owner, repo, prNumber);
+		const info = await this.rework.pollMergeability(owner, repo, prNumber);
 		if (!info || info.mergeable === null || info.mergeable === undefined) {
 			await this.failConflictDelivery(
 				owner,
@@ -304,16 +345,16 @@ export class ExecuteSessionDelivery {
 			return "conflict-failed";
 		}
 
-		if (!this.hasConflicts(info)) {
-			await this.markReadyIfDraft(owner, repo, prNumber, info);
+		if (!this.rework.hasConflicts(info)) {
+			await this.rework.markReadyIfDraft(owner, repo, prNumber, info);
 			return "clean";
 		}
 
 		const maxAttempts = this.deps.maxConflictAttempts ?? 2;
 		for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-			const reworked = await this.runConflictRework(owner, repo, issueNumber, prNumber, current, attempt, maxAttempts);
+			const reworked = await this.rework.runConflictRework(owner, repo, issueNumber, prNumber, current, attempt, maxAttempts);
 			if (!reworked) {
-				const files = await this.listConflictedFiles(owner, repo, issueNumber);
+				const files = await this.rework.listConflictedFiles(owner, repo, issueNumber);
 				await this.failConflictDelivery(
 					owner,
 					repo,
@@ -326,14 +367,14 @@ export class ExecuteSessionDelivery {
 				return "conflict-failed";
 			}
 
-			const recheck = await this.pollMergeability(owner, repo, prNumber);
-			if (recheck && recheck.mergeable !== null && recheck.mergeable !== undefined && !this.hasConflicts(recheck)) {
-				await this.markReadyIfDraft(owner, repo, prNumber, recheck);
+			const recheck = await this.rework.pollMergeability(owner, repo, prNumber);
+			if (recheck && recheck.mergeable !== null && recheck.mergeable !== undefined && !this.rework.hasConflicts(recheck)) {
+				await this.rework.markReadyIfDraft(owner, repo, prNumber, recheck);
 				return "clean";
 			}
 		}
 
-		const files = await this.listConflictedFiles(owner, repo, issueNumber);
+		const files = await this.rework.listConflictedFiles(owner, repo, issueNumber);
 		await this.failConflictDelivery(
 			owner,
 			repo,
@@ -346,90 +387,28 @@ export class ExecuteSessionDelivery {
 		return "conflict-failed";
 	}
 
-	private hasConflicts(info: PullRequestInfo): boolean {
-		return info.mergeable === false || info.mergeableState === "dirty";
-	}
-
-	private async markReadyIfDraft(owner: string, repo: string, prNumber: number, info: PullRequestInfo): Promise<void> {
-		if (info.draft === true) {
-			await this.deps.github.markPullRequestReadyForReview(owner, repo, prNumber);
-		}
-	}
-
 	/**
-	 * Poll `getPullRequest` until `mergeable` is non-null, bounded by
-	 * `mergeabilityPollMaxAttempts` with `mergeabilityPollDelayMs` between tries.
+	 * Posts the static PR-commands comment on a freshly created Yolomatic PR.
+	 * Skips the post when an existing comment carrying the marker is already
+	 * present on the PR timeline, so the comment is never duplicated on edits
+	 * or later events.
 	 */
-	private async pollMergeability(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null> {
-		const maxAttempts = this.deps.mergeabilityPollMaxAttempts ?? 30;
-		const delayMs = this.deps.mergeabilityPollDelayMs ?? 1000;
-		let info = await this.deps.github.getPullRequest(owner, repo, prNumber);
-		for (let attempt = 1; attempt < maxAttempts; attempt += 1) {
-			if (!info || (info.mergeable !== null && info.mergeable !== undefined)) {
-				return info;
+	private async postPRCommandsCommentOnce(owner: string, repo: string, prNumber: number): Promise<void> {
+		try {
+			const comments = await this.deps.github.listIssueComments(owner, repo, prNumber);
+			if (comments.some((comment) => comment.body.includes(PR_COMMANDS_COMMENT_MARKER))) {
+				process.stdout.write(`[execute] pr-commands comment already present for ${owner}/${repo}#${prNumber}
+`);
+				return;
 			}
-			await this.delay(delayMs);
-			info = await this.deps.github.getPullRequest(owner, repo, prNumber);
+		} catch (error) {
+			process.stdout.write(
+				`[execute] listIssueComments failed for pr-commands check on ${owner}/${repo}#${prNumber}: ${
+					error instanceof Error ? error.message : String(error)
+			}\n`,
+			);
 		}
-		return info;
-	}
-
-	private delay(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
-	}
-
-	/**
-	 * Launch a worker iteration with a steering comment that tells the worker to
-	 * `git rebase origin/main`, resolve conflict markers, and leave the worktree
-	 * clean. After success, commit and push the rebased branch. Returns `true`
-	 * when the branch was pushed and should be re-checked for mergeability.
-	 */
-	private async runConflictRework(
-		owner: string,
-		repo: string,
-		issueNumber: number,
-		prNumber: number,
-		current: SessionState,
-		attempt: number,
-		maxAttempts: number,
-	): Promise<boolean> {
-		const expectedRemoteHead = (await this.deps.github.getPullRequest(owner, repo, prNumber))?.head.sha;
-		const comment = [
-			`Merge conflict rework attempt ${attempt} of ${maxAttempts}.`,
-			"",
-			"The pull request for this issue conflicts with the base branch.",
-			"",
-			"Run `git rebase origin/main` in the worktree, resolve all conflict markers, preserve the issue's intent, and leave the worktree clean (no unresolved conflicts).",
-			"",
-			"After resolving, finish the rebase. The control plane will commit, push, and re-check mergeability.",
-		].join("\n");
-
-		const reworkResult = await this.deps.executor.execute(current, comment);
-		if (reworkResult.status === "failed" || reworkResult.status === "cancelled") {
-			return false;
-		}
-
-		const branchName = current.branch ?? `yolomatic/issue-${issueNumber}`;
-		const commitMessage = generateCommitMessage(current.labels, issueNumber, reworkResult.summary);
-		const pushed = await this.deps.workspaces.commitAndPushPath(
-			current.workspacePath,
-			branchName,
-			commitMessage,
-			undefined,
-			expectedRemoteHead,
-		);
-		return pushed;
-	}
-
-	private async listConflictedFiles(owner: string, repo: string, issueNumber: number): Promise<string[]> {
-		const status = await this.deps.workspaces.getGitStatus(owner, repo, issueNumber).catch(() => "");
-		if (!status) return [];
-		const files: string[] = [];
-		for (const raw of status.split(/\r?\n/u)) {
-			const match = /^(DD|AU|UD|UA|DU|AA|UU) (.+)$/u.exec(raw.trim());
-			if (match) files.push(match[2]!.trim());
-		}
-		return files;
+		await this.deps.github.postPRComment(owner, repo, prNumber, buildPRCommandsComment());
 	}
 
 	private async failConflictDelivery(

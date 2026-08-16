@@ -220,6 +220,19 @@ export function isIssueRefinementCommand(commentBody: string): boolean {
 	return parseIssueRefinementCommand(commentBody).matched;
 }
 
+export const FIX_MERGE_CONFLICTS_COMMAND = "/yolomatic fix-merge-conflicts";
+
+/**
+ * Whether a comment body is the `/yolomatic fix-merge-conflicts` command. The
+ * command must start the trimmed comment (case-insensitive) and must not be
+ * embedded or quoted within surrounding text. Trailing text after the command
+ * token is allowed (and ignored); the command takes no arguments, but a
+ * maintainer may add a short note without breaking the match.
+ */
+export function isFixMergeConflictsCommand(commentBody: string): boolean {
+	return commentStartsWithCommand(commentBody, FIX_MERGE_CONFLICTS_COMMAND);
+}
+
 const STOP_COMMAND = "/yolomatic stop";
 
 /**

@@ -115,6 +115,9 @@ describe("HandleIssueComment", () => {
 		const prReview = {
 			execute: vi.fn(async () => undefined),
 		};
+		const fixMergeConflicts = {
+			execute: vi.fn(async () => undefined),
+		};
 
 		const executorExecute = vi.fn(async () => ({ status: "complete" as const, summary: "Done.", rawResponse: "YOLO_STATUS: complete\nDone." }));
 		const executorExecutePRReview = vi.fn();
@@ -139,9 +142,10 @@ describe("HandleIssueComment", () => {
 			adminGithubUsername: "admin",
 			executor: handlerDepsExecutor,
 			prReview: prReview as never,
+			fixMergeConflicts: fixMergeConflicts as never,
 		});
 
-		return { handler, sessions, github, prReview, tasks, workspaces, executor: handlerDepsExecutor, executorExecute };
+		return { handler, sessions, github, prReview, fixMergeConflicts, tasks, workspaces, executor: handlerDepsExecutor, executorExecute };
 	}
 
 	it("routes a refinement command with trailing text as a steering prompt", async () => {
@@ -261,6 +265,38 @@ describe("HandleIssueComment", () => {
 				}),
 			}),
 		);
+		expect(github.postComment).not.toHaveBeenCalled();
+	});
+
+	it("routes the /yolomatic fix-merge-conflicts command on a PR to the fixMergeConflicts handler", async () => {
+		const { handler, sessions, github, prReview, fixMergeConflicts } = createHandler();
+		sessions.findSessionByPR.mockResolvedValue({
+			issueNumber: 56,
+			repo: "yolomatic",
+			owner: "mbrooks",
+			title: "Title",
+			body: "Body",
+			status: "complete",
+			sessionPath: "/tmp/sessions/github-mbrooks-yolomatic/issue-56.jsonl",
+			workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-56",
+			lastActivity: new Date().toISOString(),
+			seeded: true,
+			prNumber: 99,
+			prUrl: "https://github.com/mbrooks/yolomatic/pull/99",
+		} as never);
+
+		await handler.execute({
+			action: "created",
+			issue: { number: 99, pull_request: { url: "https://api.github.com/repos/mbrooks/yolomatic/pulls/99" } },
+			comment: { id: 9, body: "/yolomatic fix-merge-conflicts", user: { login: "admin" } },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "admin" },
+		});
+
+		expect(fixMergeConflicts.execute).toHaveBeenCalledWith(
+			expect.objectContaining({ owner: "mbrooks", repo: "yolomatic", prNumber: 99, senderLogin: "admin", mappedIssueNumber: 56 }),
+		);
+		expect(prReview.execute).not.toHaveBeenCalled();
 		expect(github.postComment).not.toHaveBeenCalled();
 	});
 
