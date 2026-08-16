@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RunSessionCommand } from "./run-session-command.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { WorkspaceService } from "../../ports/workspace-service.js";
-import type { TaskControlService } from "../../ports/task-control-service.js";
+import { RunSessionCommand, type RunSessionCommandSessionPort, type RunSessionCommandWorkspacePort, type RunSessionCommandTaskPort } from "./run-session-command.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionState } from "../../session/store.js";
 
@@ -11,39 +8,29 @@ vi.mock("../../logging/session-log-store.js", () => ({
 	recordSessionLog: vi.fn(),
 }));
 
-function makeMockRepo(state: SessionState | null = null): SessionRepository {
+function makeMockRepo(state: SessionState | null = null): RunSessionCommandSessionPort {
+	let currentState = state;
 	return {
-		get: vi.fn(async () => state),
-		getAll: vi.fn(async () => (state ? [state] : [])),
-		save: vi.fn(async (s) => s),
-		delete: vi.fn(),
-		archive: vi.fn(),
-		createSession: vi.fn(),
-		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({
-			...(state as SessionState),
-			status,
-			...updates,
-		})),
-		markSeeded: vi.fn(),
-		associatePR: vi.fn(),
-		incrementIterationCount: vi.fn(),
-		findSessionByPR: vi.fn(),
-		cancelSession: vi.fn(async () => ({ ...(state as SessionState), status: "cancelled" as const })),
-		pauseSession: vi.fn(async () => ({ ...(state as SessionState), status: "paused" as const })),
-		unpauseSession: vi.fn(async () => ({ ...(state as SessionState), status: "pending" as const })),
+		get: vi.fn(async () => currentState),
+		cancelSession: vi.fn(async () => ({ ...(currentState as SessionState), status: "cancelled" as const })),
+		pauseSession: vi.fn(async () => ({ ...(currentState as SessionState), status: "paused" as const })),
+		unpauseSession: vi.fn(async () => ({ ...(currentState as SessionState), status: "pending" as const })),
 		restartSession: vi.fn(
 			async () =>
 				({
-					...(state as SessionState),
+					...(currentState as SessionState),
 					status: "pending" as const,
 					summary: undefined,
 					prNumber: undefined,
 				}) satisfies SessionState,
 		),
-		markComplete: vi.fn(async () => ({ ...(state as SessionState), status: "complete" as const })),
-		markFailed: vi.fn(async () => ({ ...(state as SessionState), status: "failed" as const })),
-		markStale: vi.fn(),
-	} as unknown as SessionRepository;
+		delete: vi.fn(async () => {}),
+		markFailed: vi.fn(async () => ({ ...(currentState as SessionState), status: "failed" as const })),
+		markComplete: vi.fn(async () => ({ ...(currentState as SessionState), status: "complete" as const })),
+		updateStatus: vi.fn(async (_owner, _repo, _issueNumber, status, updates) => ({ ...(currentState as SessionState), status, ...updates } as SessionState)),
+		save: vi.fn(async (s) => s),
+		archive: vi.fn(async () => {}),
+	} satisfies RunSessionCommandSessionPort;
 }
 
 function makeState(status: SessionState["status"]): SessionState {
@@ -64,33 +51,22 @@ function makeState(status: SessionState["status"]): SessionState {
 function makeCommand(
 	state: SessionState | null,
 	deps?: Partial<{
-		workspaces: WorkspaceService;
-		tasks: TaskControlService;
+		workspaces: RunSessionCommandWorkspacePort;
+		tasks: RunSessionCommandTaskPort;
 		archiveDir: string;
 		restartSession: ((owner: string, repo: string, issueNumber: number) => Promise<void>) | null;
 	}>,
 ) {
 	const repo = makeMockRepo(state);
-	const workspaces: WorkspaceService = deps?.workspaces ?? {
-		createOrGetWorktree: vi.fn(),
-		updateDefaultBranchFromOrigin: vi.fn(async () => ({ branch: "main", before: null, after: "sha", updated: true })),
-		syncWorktree: vi.fn(async () => undefined),
+	const workspaces: RunSessionCommandWorkspacePort = deps?.workspaces ?? {
 		removeWorktree: vi.fn(),
-		commitAndPush: vi.fn(),
-		commitAndPushPath: vi.fn(),
-		hasChanges: vi.fn(async () => false),
 		getWorktreePath: vi.fn(() => "/tmp/ws"),
-		getGitStatus: vi.fn(async () => ""),
-		getGitDiff: vi.fn(async () => ""),
+		hasChanges: vi.fn(async () => false),
 	};
-	const tasks: TaskControlService = deps?.tasks ?? {
+	const tasks: RunSessionCommandTaskPort = deps?.tasks ?? {
 		cancel: vi.fn(() => false),
 		isActive: vi.fn(() => false),
-		steer: vi.fn(async () => false),
-		register: vi.fn(),
-		unregister: vi.fn(),
 		isDraining: vi.fn(() => false),
-		setDraining: vi.fn(),
 	};
 	const clock: Clock = { now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 };
 	const restartSession =
@@ -234,6 +210,26 @@ describe("RunSessionCommand", () => {
 				"Admin restart dispatch failed: dispatch unavailable",
 			);
 		});
+	});
+
+	it("logs and swallows the error when recording a restart failure also rejects", async () => {
+		const state = makeState("failed");
+		const restartSession = vi.fn(async () => {
+			throw new Error("dispatch unavailable");
+		});
+		const { command, repo } = makeCommand(state, { restartSession });
+		(repo.markFailed as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("mark failed unavailable"));
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		const result = await command.execute("mbrooks", "yolomatic", 1, "restart");
+		expect(result.success).toBe(true);
+		await vi.waitFor(() => {
+			expect(writeSpy).toHaveBeenCalledWith(
+				expect.stringContaining("failed to record restart failure for mbrooks/yolomatic#1: mark failed unavailable"),
+			);
+		});
+
+		writeSpy.mockRestore();
 	});
 
 	it("rejects restarting a completed session", async () => {

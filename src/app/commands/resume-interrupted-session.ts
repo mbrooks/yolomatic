@@ -1,16 +1,31 @@
-import { isTerminalStatus } from "../../session/store.js";
-import { issueSessionKey, markIssueWorking } from "./workflow-helpers.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { GitHubService } from "../../ports/github-service.js";
+import { isTerminalStatus, type SessionState } from "../../session/store.js";
+import { issueSessionKey, markIssueWorking, type WorkflowLabelGithubPort } from "./workflow-helpers.js";
 import { ExecuteSession, type ExecuteSessionDeps } from "./execute-session.js";
+
+/**
+ * Narrow session operations {@link ResumeInterruptedSession} can call: read
+ * the latest implementation session and persist cleared resume/queue state.
+ * Composed from {@link SessionRepository} at the wiring boundary.
+ */
+export interface ResumeSessionPort {
+	get(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<SessionState | null>;
+	save(state: SessionState): Promise<SessionState>;
+}
+
+/**
+ * Narrow GitHub operations {@link ResumeInterruptedSession} can call directly
+ * or via {@link markIssueWorking}: post a comment and flip workflow labels.
+ * Composed from {@link GitHubService} at the wiring boundary.
+ */
+export type ResumeGithubPort = WorkflowLabelGithubPort;
 
 export class ResumeInterruptedSession {
 	private readonly executor: ExecuteSession;
 
 	constructor(
 		private readonly deps: {
-			sessions: SessionRepository;
-			github: GitHubService;
+			sessions: ResumeSessionPort;
+			github: ResumeGithubPort;
 			executor: ExecuteSessionDeps;
 		},
 	) {

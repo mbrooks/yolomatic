@@ -1,11 +1,28 @@
 import { isTerminalStatus, type SessionState } from "../../session/store.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { WorkspaceService } from "../../ports/workspace-service.js";
+
+/**
+ * Narrow session operations {@link CleanupOldSessions} can call: list every
+ * session and delete one by issue. Composed from {@link SessionRepository}
+ * at the wiring boundary via structural typing.
+ */
+export interface CleanupSessionPort {
+	getAll(): Promise<SessionState[]>;
+	delete(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<void>;
+}
+
+/**
+ * Narrow workspace operations {@link CleanupOldSessions} can call: remove a
+ * session's worktree. Composed from {@link WorkspaceService} at the wiring
+ * boundary.
+ */
+export interface CleanupWorkspacePort {
+	removeWorktree(owner: string, repo: string, issueNumber: number): Promise<void>;
+}
 
 export class CleanupOldSessions {
 	constructor(
-		private readonly sessions: SessionRepository,
-		private readonly workspaces: WorkspaceService,
+		private readonly sessions: CleanupSessionPort,
+		private readonly workspaces: CleanupWorkspacePort,
 	) {}
 
 	async execute(retentionDays: number): Promise<{ deleted: number; failed: number }> {

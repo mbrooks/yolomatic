@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PRRecovery, validateRecoveryCandidate } from "./pr-recovery.js";
-import type { GitHubService, PullRequestInfo } from "../../ports/github-service.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
+import { PRRecovery, validateRecoveryCandidate, type PRRecoveryGithubPort, type PRRecoverySessionPort } from "./pr-recovery.js";
+import type { PullRequestInfo } from "../../ports/github-service.js";
 import type { SessionState } from "../../session/store.js";
 
 function prInfo(overrides: Partial<PullRequestInfo> = {}): PullRequestInfo {
@@ -18,65 +17,31 @@ function prInfo(overrides: Partial<PullRequestInfo> = {}): PullRequestInfo {
 	};
 }
 
-function makeGitHub(overrides: Partial<GitHubService> = {}): GitHubService {
+/**
+ * Typed builder for the narrow GitHub port {@link PRRecovery} depends on.
+ * `satisfies` enforces the fixture implements exactly the contract the
+ * command can call — no `as unknown as` escape, and adding a method the
+ * port does not declare is a compile error.
+ */
+function makeGitHub(overrides: Partial<PRRecoveryGithubPort> = {}): PRRecoveryGithubPort {
 	return {
 		listPullRequests: vi.fn(async () => []),
 		getPullRequest: vi.fn(async () => prInfo()),
-		updatePullRequestBranch: vi.fn(),
-		createPullRequest: vi.fn(),
-		markPullRequestReadyForReview: vi.fn(),
-		postComment: vi.fn(),
-		postPRComment: vi.fn(),
-		addLabels: vi.fn(),
-		removeLabel: vi.fn(),
-		getIssue: vi.fn(),
-		createIssue: vi.fn(),
-		initializeEmptyRepo: vi.fn(),
-		fileSelfReport: vi.fn(),
-		listReviewComments: vi.fn(),
-		listLabels: vi.fn(),
-		getIssueTemplates: vi.fn(),
-		listRecentCommits: vi.fn(),
-		listRelatedIssues: vi.fn(),
-		listOpenIssues: vi.fn(),
-		listPendingInvitations: vi.fn(),
-		acceptInvitation: vi.fn(),
-		updateIssueAssignees: vi.fn(),
-		closeIssue: vi.fn(),
-		updateIssueBody: vi.fn(),
-		updateIssueTitle: vi.fn(),
-		getAuthenticatedUser: vi.fn(),
-		listAccessibleRepositories: vi.fn(),
-		getRepository: vi.fn(),
-		getCollaboratorPermissionLevel: vi.fn(),
-		isCollaborator: vi.fn(),
-		listIssueComments: vi.fn(),
 		...overrides,
-	} as unknown as GitHubService;
+	} satisfies PRRecoveryGithubPort;
 }
 
-function makeSessions(overrides: Partial<SessionRepository> = {}): SessionRepository {
+/**
+ * Typed builder for the narrow session port {@link PRRecovery} depends on.
+ * Only `updateStatus` and `associatePR` are faked because those are the only
+ * session operations the command can invoke.
+ */
+function makeSessions(overrides: Partial<PRRecoverySessionPort> = {}): PRRecoverySessionPort {
 	return {
-		get: vi.fn(),
-		getAll: vi.fn(),
-		save: vi.fn(async (s) => s),
-		delete: vi.fn(),
-		archive: vi.fn(),
-		createSession: vi.fn(),
 		updateStatus: vi.fn(async (_o, _r, _i, status, updates) => ({ ...updates, status } as SessionState)),
-		markSeeded: vi.fn(),
 		associatePR: vi.fn(),
-		incrementIterationCount: vi.fn(),
-		findSessionByPR: vi.fn(),
-		cancelSession: vi.fn(),
-		pauseSession: vi.fn(),
-		unpauseSession: vi.fn(),
-		restartSession: vi.fn(),
-		markComplete: vi.fn(),
-		markFailed: vi.fn(),
-		markStale: vi.fn(),
 		...overrides,
-	} as unknown as SessionRepository;
+	} satisfies PRRecoverySessionPort;
 }
 
 function session(overrides: Partial<SessionState> = {}): SessionState {

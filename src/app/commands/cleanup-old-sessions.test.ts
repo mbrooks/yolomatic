@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CleanupOldSessions } from "./cleanup-old-sessions.js";
-import type { SessionRepository } from "../../ports/session-repository.js";
-import type { WorkspaceService } from "../../ports/workspace-service.js";
+import { CleanupOldSessions, type CleanupSessionPort, type CleanupWorkspacePort } from "./cleanup-old-sessions.js";
 import type { SessionState } from "../../session/store.js";
 
 function makeSession(overrides: Partial<SessionState> = {}): SessionState {
@@ -38,10 +36,10 @@ describe("CleanupOldSessions", () => {
 		const sessions = {
 			getAll: vi.fn(async () => [stale, recent, working]),
 			delete: vi.fn(async () => {}),
-		} as unknown as SessionRepository;
+		} satisfies CleanupSessionPort;
 		const workspaces = {
 			removeWorktree: vi.fn(async () => {}),
-		} as unknown as WorkspaceService;
+		} satisfies CleanupWorkspacePort;
 
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -62,12 +60,12 @@ describe("CleanupOldSessions", () => {
 		const sessions = {
 			getAll: vi.fn(async () => [stale]),
 			delete: vi.fn(async () => {}),
-		} as unknown as SessionRepository;
+		} satisfies CleanupSessionPort;
 		const workspaces = {
 			removeWorktree: vi.fn(async () => {
 				throw new Error("git worktree remove failed");
 			}),
-		} as unknown as WorkspaceService;
+		} satisfies CleanupWorkspacePort;
 
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -87,12 +85,12 @@ describe("CleanupOldSessions", () => {
 		const sessions = {
 			getAll: vi.fn(async () => [stale]),
 			delete: vi.fn(async () => {}),
-		} as unknown as SessionRepository;
+		} satisfies CleanupSessionPort;
 		const workspaces = {
 			removeWorktree: vi.fn(async () => {
 				// Successful safe removal (stash + force fallback handled inside WorktreeManager).
 			}),
-		} as unknown as WorkspaceService;
+		} satisfies CleanupWorkspacePort;
 
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 

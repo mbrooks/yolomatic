@@ -4,6 +4,18 @@ import type { SessionRepository } from "../../ports/session-repository.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { SessionState } from "../../session/store.js";
+
+/**
+ * Narrow GitHub operations the workflow label/comment helpers can call. The
+ * full {@link GitHubService} adapter satisfies this structurally at the
+ * wiring boundary; declaring it here lets commands depend on only the
+ * subset of GitHub they actually invoke via these helpers.
+ */
+export interface WorkflowLabelGithubPort {
+	removeLabel(owner: string, repo: string, issueNumber: number, label: string): Promise<void>;
+	addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void>;
+	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<number>;
+}
 import { EmptyRepositoryError } from "../../workspace/errors.js";
 import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
@@ -266,7 +278,7 @@ export function issueSessionKey(owner: string, repo: string, issueNumber: number
 }
 
 export async function removeWorkflowLabels(
-	github: GitHubService,
+	github: WorkflowLabelGithubPort,
 	owner: string,
 	repo: string,
 	issueNumber: number,
@@ -278,7 +290,7 @@ export async function removeWorkflowLabels(
 }
 
 export async function markIssueWorking(
-	github: GitHubService,
+	github: WorkflowLabelGithubPort,
 	owner: string,
 	repo: string,
 	issueNumber: number,
