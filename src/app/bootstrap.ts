@@ -288,6 +288,8 @@ export async function startRuntime(
 				repoModeIncludesPolling(resolveManagedGitHubEventModeFor(config, deps, owner, repo)),
 			resolveGitHubEventMode: (owner, repo) =>
 				resolveManagedGitHubEventModeFor(config, deps, owner, repo),
+			resolveDefaultBranch: (owner, repo) =>
+				resolveManagedDefaultBranchFor(config, deps, owner, repo),
 			dispatch: (event) => handlers.handleGitHubEvent(event),
 		});
 	}
@@ -375,4 +377,14 @@ function resolveManagedGitHubEventModeFor(
 ): RepoGitHubEventMode {
 	const managed = deps.repositoryStore.getSync(owner, repo);
 	return resolveRepoGitHubEventMode(managed, config.githubEventMode);
+}
+
+function resolveManagedDefaultBranchFor(
+	config: AppConfig,
+	deps: RuntimeDeps,
+	owner: string,
+	repo: string,
+): string {
+	const managed = deps.repositoryStore.getSync(owner, repo);
+	return resolveRepoDefaultBranch(managed, config.defaultBranch);
 }

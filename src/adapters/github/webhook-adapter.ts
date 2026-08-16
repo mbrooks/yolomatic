@@ -39,7 +39,7 @@ function repoFromPayload(payload: {
 	};
 }
 
-function eventTime(payload: { comment?: { created_at?: string; updated_at?: string }; review?: { submitted_at?: string }; issue?: { updated_at?: string; created_at?: string }; pull_request?: { updated_at?: string; created_at?: string } }): string {
+function eventTime(payload: { comment?: { created_at?: string; updated_at?: string }; review?: { submitted_at?: string }; issue?: { updated_at?: string; created_at?: string }; pull_request?: { updated_at?: string; created_at?: string }; head_commit?: { timestamp?: string }; repository?: { pushed_at?: string } }): string {
 	return (
 		payload.comment?.updated_at ??
 		payload.comment?.created_at ??
@@ -48,6 +48,8 @@ function eventTime(payload: { comment?: { created_at?: string; updated_at?: stri
 		payload.issue?.created_at ??
 		payload.pull_request?.updated_at ??
 		payload.pull_request?.created_at ??
+		payload.head_commit?.timestamp ??
+		payload.repository?.pushed_at ??
 		new Date().toISOString()
 	);
 }
@@ -108,6 +110,31 @@ export function normalizeWebhookEvent(event: string | undefined, rawPayload: unk
 				occurredAt,
 				payload: payload as GitHubEvent & any,
 			} as GitHubEvent];
+		case "push": {
+			const ref = String(payload.ref ?? "");
+			const after = String(payload.after ?? "");
+			// Only normalize branch pushes that land a new commit. Tag pushes,
+			// branch deletions (all-zero `after`), and payloads without a ref
+			// are not actionable for auto-rebase and are dropped here.
+			if (!ref.startsWith("refs/heads/") || !after || /^0+$/.test(after)) {
+				return [];
+			}
+			return [{
+				id: `github:push:${owner}/${repo}:${ref}:${after}`,
+				type: "push",
+				source: "webhook",
+				owner,
+				repo,
+				occurredAt,
+				payload: {
+					ref,
+					before: String(payload.before ?? ""),
+					after,
+					repository: { name: repo, owner: { login: owner } },
+					sender: { login: String(payload.sender?.login ?? payload.pusher?.name ?? "unknown") },
+				},
+			}];
+		}
 		default:
 			return [];
 	}

@@ -1,12 +1,15 @@
 import type { HandleIssueEvent } from "../app/commands/handle-issue-event.js";
 import type { HandleIssueComment } from "../app/commands/handle-issue-comment.js";
 import type { HandlePRReview } from "../app/commands/handle-pr-review.js";
+import type { HandleAutoRebaseOnPush } from "../app/commands/handle-auto-rebase-on-push.js";
 import type { GitHubEvent, GitHubEventStateStore, GitHubPollSubject, GitHubPollSubjectType } from "./model.js";
 
 export interface GitHubEventDispatcherDeps {
 	handleIssueEvent: HandleIssueEvent;
 	handleIssueComment: HandleIssueComment;
 	handlePRReview: HandlePRReview;
+	/** Optional auto-rebase handler for default-branch push events. */
+	handleAutoRebase?: HandleAutoRebaseOnPush;
 	eventStore?: GitHubEventStateStore;
 	githubUsername?: string;
 }
@@ -35,6 +38,22 @@ export class GitHubEventDispatcher {
 				process.stdout.write(
 					`[github-event] pull_request.${event.payload.action} repo=${event.owner}/${event.repo} pr=#${event.payload.pull_request.number}\n`,
 				);
+				break;
+			case "push":
+				if (this.deps.handleAutoRebase) {
+					await this.deps.handleAutoRebase.execute({
+						source: event.source,
+						owner: event.owner,
+						repo: event.repo,
+						ref: event.payload.ref,
+						before: event.payload.before,
+						after: event.payload.after,
+					});
+				} else {
+					process.stdout.write(
+						`[github-event] push repo=${event.owner}/${event.repo} ref=${event.payload.ref} ignored: no auto-rebase handler\n`,
+					);
+				}
 				break;
 		}
 

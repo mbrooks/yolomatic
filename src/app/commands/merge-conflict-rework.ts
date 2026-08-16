@@ -1,5 +1,6 @@
 import type { ExecutionService } from "../../ports/execution-service.js";
 import type { GitHubService, PullRequestInfo } from "../../ports/github-service.js";
+import type { SessionRepository } from "../../ports/session-repository.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { SessionState } from "../../session/store.js";
 import { generateCommitMessage } from "../../workspace/commit-message.js";
@@ -166,4 +167,64 @@ export class MergeConflictReworkService {
 	private delay(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 	}
+}
+
+/**
+ * Posts the PR-timeline outcome comment for a conflict-resolution result and
+ * advances the session status, mirroring the manual `/yolomatic
+ * fix-merge-conflicts` reporting. Shared by the manual command and the
+ * automatic push-triggered rebase so both report identically.
+ */
+export async function reportConflictResolutionResult(
+	deps: { github: GitHubService; sessions: SessionRepository; maxConflictAttempts?: number },
+	owner: string,
+	repo: string,
+	prNumber: number,
+	issueNumber: number,
+	result: ConflictResolutionResult,
+): Promise<void> {
+	const maxAttempts = deps.maxConflictAttempts ?? 2;
+	if (result.outcome === "clean") {
+		if (result.attempts === 0) {
+			await deps.github.postPRComment(owner, repo, prNumber, "No conflicts need resolution. This pull request is already mergeable.");
+			await deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
+			return;
+		}
+		await deps.github.postPRComment(
+			owner,
+			repo,
+			prNumber,
+			`Rebased this pull request onto the default branch and resolved merge conflicts (attempt ${result.attempts} of ${maxAttempts}). The PR is now mergeable.`,
+		);
+		await deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
+		return;
+	}
+
+	if (result.outcome === "unknown-mergeability") {
+		await deps.github.postPRComment(
+			owner,
+			repo,
+			prNumber,
+			"GitHub could not compute mergeability for this pull request within the polling window. Please re-run `/yolomatic fix-merge-conflicts` or resolve the conflicts manually.",
+		);
+		await deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: "mergeability unknown" });
+		return;
+	}
+
+	const fileList = result.conflictedFiles.length > 0
+		? ["", "Conflicted files:", ...result.conflictedFiles.map((f) => `- \`${f}\``)].join("\n")
+		: "";
+	await deps.github.postPRComment(
+		owner,
+		repo,
+		prNumber,
+		[
+			"**Yolomatic could not resolve the merge conflicts.**",
+			"",
+			`Merge conflicts with the base branch could not be resolved after ${result.attempts} rework attempt${result.attempts === 1 ? "" : "s"}.`,
+			"A maintainer must resolve the conflicts manually.",
+			fileList,
+		].filter(Boolean).join("\n"),
+	);
+	await deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: "merge conflicts unresolved" });
 }

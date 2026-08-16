@@ -52,6 +52,24 @@ export type GitHubEvent =
 				repository: { name: string; owner: { login: string } };
 				sender: { login: string };
 			};
+	  }
+	| {
+			id: string;
+			type: "push";
+			source: GitHubEventSource;
+			owner: string;
+			repo: string;
+			occurredAt: string;
+			payload: {
+				/** Full ref name, e.g. `refs/heads/main`. */
+				ref: string;
+				/** SHA before the push (all-zero on a new branch). */
+				before: string;
+				/** SHA after the push (all-zero on a branch deletion). */
+				after: string;
+				repository: { name: string; owner: { login: string } };
+				sender: { login: string };
+			};
 	  };
 
 export interface GitHubEventStateStore {
@@ -65,6 +83,13 @@ export interface GitHubEventStateStore {
 	markPollingSubjectChecked?(subjectKey: string, checkedAt: string): void;
 	getRepoPollBaseline?(owner: string, repo: string): string | null;
 	setRepoPollBaseline?(owner: string, repo: string, baselineAt: string): void;
+	/**
+	 * Returns the last-seen HEAD SHA of a repository's default branch, or
+	 * `null` when none has been recorded. Used by polling to detect new
+	 * commits on the default branch so Yolomatic can auto-rebase its PRs.
+	 */
+	getDefaultBranchHead?(owner: string, repo: string): string | null;
+	setDefaultBranchHead?(owner: string, repo: string, sha: string): void;
 }
 
 export function isPollingSource(source: GitHubEventSource): source is "polling" {

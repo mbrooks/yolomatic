@@ -386,16 +386,22 @@ describe("startRuntime", () => {
 		(deps.repositoryStore.getSync as ReturnType<typeof vi.fn>).mockImplementation(
 			(owner: string, repo: string) => (owner === "mbrooks" && repo === "yolomatic" ? managedRepo : null),
 		);
+		(deps.repositoryStore.listForPolling as ReturnType<typeof vi.fn>).mockResolvedValue([{ owner: "mbrooks", repo: "yolomatic" }]);
 		const pollingConfig = { ...baseConfig, githubEventMode: "webhook" as const };
 		await startRuntime(pollingConfig, deps);
 		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as {
 			resolveGitHubEventMode: (owner: string, repo: string) => string;
 			shouldPollRepo: (owner: string, repo: string) => boolean;
+			resolveDefaultBranch: (owner: string, repo: string) => string;
+			listManagedRepos: () => Promise<Array<{ owner: string; repo: string }>>;
 		};
 		expect(pollingDeps.resolveGitHubEventMode("mbrooks", "yolomatic")).toBe("polling");
 		expect(pollingDeps.resolveGitHubEventMode("other", "repo")).toBe("webhook");
 		expect(pollingDeps.shouldPollRepo("mbrooks", "yolomatic")).toBe(true);
 		expect(pollingDeps.shouldPollRepo("other", "repo")).toBe(false);
+		expect(pollingDeps.resolveDefaultBranch("mbrooks", "yolomatic")).toBe("main");
+		expect(pollingDeps.resolveDefaultBranch("other", "repo")).toBe("main");
+		expect(await pollingDeps.listManagedRepos()).toEqual([{ owner: "mbrooks", repo: "yolomatic" }]);
 	});
 
 	it("uses noOpHandlers for the webhook server in pure polling mode", async () => {

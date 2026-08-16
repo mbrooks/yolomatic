@@ -129,6 +129,7 @@ Supported normalized webhook event types are:
 - `pull_request`
 - `pull_request_review`
 - `pull_request_review_comment`
+- `push` (default-branch advances only; tag pushes and branch deletions are dropped)
 
 ### Polling
 
@@ -145,7 +146,10 @@ On each tick, the poller:
 4. Fetches updated issues, assignment timeline events, issue comments, pull
    requests, reviews, and inline review comments for each eligible repository.
 5. Re-polls known issue and PR subjects on an adaptive schedule.
-6. Sorts normalized events by GitHub occurrence time and dispatches them in
+6. Checks each managed repository's default-branch HEAD SHA against the last
+   observed value and, when it has advanced, emits a `push` event (mirroring a
+   `push` webhook delivery) so Yolomatic can auto-rebase its conflicted PRs.
+7. Sorts normalized events by GitHub occurrence time and dispatches them in
    order.
 
 Subject polling uses the base interval for activity less than one day old,
@@ -154,11 +158,13 @@ Overlapping ticks are suppressed by a process-local lock.
 
 ### Deduplication and Cursoring
 
-The `GitHubEventStore` persists three kinds of state in SQLite:
+The `GitHubEventStore` persists four kinds of state in SQLite:
 
 - the global `last_event_received_at` cursor;
 - processed event IDs in `github_event_dedupe`;
-- known issue and PR subjects in `github_poll_subjects`.
+- known issue and PR subjects in `github_poll_subjects`;
+- the last-seen default-branch HEAD SHA per repository (used by polling to
+  detect default-branch advances and emit `push` events).
 
 Comments and reviews use GitHub object IDs in their normalized event IDs, so a
 poll result and webhook for the same object converge on the same dedupe key.
@@ -181,6 +187,7 @@ between GitHub occurrence time and local receipt time.
 | `pull_request_review` | `submitted`, `edited` | Classify and process review feedback. |
 | `pull_request_review_comment` | `created`, `edited` | Classify and process inline feedback. |
 | `pull_request` | Any normalized action | Log and maintain polling-subject state; no execution. |
+| `push` | Default-branch advance | Enumerate Yolomatic-owned open PRs for the repository and auto-rebase any that now conflict (see [Automatic Rebase on Default-Branch Push](#automatic-rebase-on-default-branch-push)). |
 
 Issue pickup is rejected when any of these conditions applies:
 
@@ -399,6 +406,48 @@ For an actionable review:
 If another execution already owns the session, review text is steered into it
 when possible and the PR receives an explicit busy/steered response.
 
+## Automatic Rebase on Default-Branch Push
+
+When a new commit lands on a managed repository's default branch, Yolomatic
+automatically reconciles its own open pull requests so they do not silently
+fall behind and become un-mergeable. The trigger is the normalized `push`
+event, produced two ways:
+
+- a GitHub `push` webhook delivery for the default branch (tag pushes and
+  branch deletions are dropped during normalization); or
+- the polling tick, which records each managed repository's default-branch
+  HEAD SHA and emits a `push` event when it advances from a previously
+  observed value (the first observation seeds the baseline without
+  dispatching).
+
+Either source is gated by the per-repository event mode, so a `push` from a
+source the repository does not enable is ignored before any handler runs.
+
+For a default-branch `push`, Yolomatic enumerates the sessions it owns for
+that `owner/repo` — sessions whose head branch is `yolomatic/issue-{number}`
+and that have a stored PR number — and for each one:
+
+1. fetches the PR and skips it if it is missing, closed, or merged;
+2. re-checks the session/PR/branch invariant and skips silently on mismatch
+   (it never comments on PRs it did not create);
+3. skips silently if the session's task-admission key is already active, so
+   an automatic rebase never displaces an active implementation, refinement,
+   or PR-review iteration;
+4. polls GitHub mergeability and skips silently when the PR is still
+   mergeable or mergeability is unknown (no comment, no worker);
+5. for a PR that now conflicts, posts a start comment on the PR timeline,
+   then runs the same worker-driven `git rebase origin/main` rework
+   iteration used by `/yolomatic fix-merge-conflicts` and initial delivery
+   (bounded by `maxConflictAttempts`, default 2), commits, and pushes;
+6. reports the outcome with the same comments as the manual command — the
+   now-mergeable result on success, a failure comment with conflicted files
+   on exhaustion, and an unknown-mergeability comment when GitHub cannot
+   compute mergeability.
+
+The whole batch is skipped while the control plane is draining for a deploy.
+Yolomatic still never merges its own PRs; it only rebases them so a human can
+merge.
+
 ## Stop, Unassignment, Draining, and Restart
 
 ### GitHub Stop Command
@@ -520,6 +569,9 @@ trust model.
 | Issue assignment/edit/unassignment | `src/app/commands/handle-issue-event.ts` |
 | Issue and PR timeline comments | `src/app/commands/handle-issue-comment.ts` |
 | PR review iterations | `src/app/commands/handle-pr-review.ts` |
+| Manual `/yolomatic fix-merge-conflicts` | `src/app/commands/handle-fix-merge-conflicts.ts` |
+| Automatic rebase on default-branch push | `src/app/commands/handle-auto-rebase-on-push.ts` |
+| Shared conflict rework and reporting | `src/app/commands/merge-conflict-rework.ts` |
 | Manual dashboard start | `src/app/commands/start-issue-session.ts` |
 | Execution admission and preflight | `src/app/commands/execute-session.ts`, `src/task-controller.ts` |
 | Git worktrees and authenticated Git | `src/workspace/worktree.ts`, `src/workspace/git-runner.ts` |

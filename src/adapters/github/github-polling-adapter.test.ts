@@ -378,4 +378,22 @@ describe("GitHubPollingAdapter", () => {
 		await expect(adapter.listIssueEventsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
 		await expect(adapter.listPRReviewsSince("mbrooks", "yolomatic", "2026-06-01T00:00:00Z")).resolves.toEqual([]);
 	});
+
+	it("returns the default-branch HEAD sha from repos.getBranch", async () => {
+		const getBranch = vi.fn(async () => ({ data: { commit: { sha: "head-sha-1" } } }));
+		const octokit = createMockOctokit({
+			repos: { getBranch } as never,
+		});
+		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
+		expect(await adapter.getDefaultBranchHeadSha("mbrooks", "yolomatic", "main")).toBe("head-sha-1");
+		expect(getBranch).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", branch: "main" });
+	});
+
+	it("returns null when the default-branch HEAD cannot be resolved", async () => {
+		const octokit = createMockOctokit({
+			repos: { getBranch: vi.fn(async () => { throw new Error("not found"); }) } as never,
+		});
+		const adapter = new GitHubPollingAdapter({ githubToken: "token", octokit: octokit as never });
+		expect(await adapter.getDefaultBranchHeadSha("mbrooks", "yolomatic", "main")).toBeNull();
+	});
 });

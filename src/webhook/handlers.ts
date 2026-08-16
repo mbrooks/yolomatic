@@ -14,6 +14,7 @@ import { HandleIssueComment } from "../app/commands/handle-issue-comment.js";
 import { HandleIssueRefinement } from "../app/commands/handle-issue-refinement.js";
 import { HandlePRReview } from "../app/commands/handle-pr-review.js";
 import { HandleFixMergeConflicts } from "../app/commands/handle-fix-merge-conflicts.js";
+import { HandleAutoRebaseOnPush } from "../app/commands/handle-auto-rebase-on-push.js";
 import { ResumeInterruptedSession } from "../app/commands/resume-interrupted-session.js";
 import { ExecuteSession } from "../app/commands/execute-session.js";
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
@@ -187,10 +188,25 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			executor: execDeps,
 		});
 
+		const autoRebaseCmd = new HandleAutoRebaseOnPush({
+			sessions,
+			workspaces,
+			executor,
+			github,
+			tasks,
+			githubUsername: deps.githubUsername,
+			defaultBranch: deps.defaultBranch,
+			resolveDefaultBranch: deps.resolveDefaultBranch,
+			maxConflictAttempts: deps.maxConflictAttempts,
+			mergeabilityPollDelayMs: deps.mergeabilityPollDelayMs,
+			mergeabilityPollMaxAttempts: deps.mergeabilityPollMaxAttempts,
+		});
+
 		this.dispatcher = new GitHubEventDispatcher({
 			handleIssueEvent: this.handleIssueEventCmd,
 			handleIssueComment: this.handleIssueCommentCmd,
 			handlePRReview: this.handlePRReviewCmd,
+			handleAutoRebase: autoRebaseCmd,
 			eventStore: deps.eventStore,
 			githubUsername: deps.githubUsername,
 		});

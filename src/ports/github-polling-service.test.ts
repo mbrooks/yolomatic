@@ -15,9 +15,11 @@ describe("GitHubPollingService interface", () => {
 			listPullRequestsUpdatedSince: async () => [],
 			listPRReviewsSince: async () => [],
 			listPRReviewCommentsSince: async () => [],
+			getDefaultBranchHeadSha: async () => null,
 		};
 		expect(typeof service.listAccessibleRepositories).toBe("function");
 		expect(typeof service.listPRReviewCommentsSince).toBe("function");
+		expect(typeof service.getDefaultBranchHeadSha).toBe("function");
 	});
 
 	it("polling model types accept expected fields", () => {

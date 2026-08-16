@@ -160,4 +160,89 @@ describe("GitHubEventDispatcher", () => {
 			},
 		})).toEqual(expect.objectContaining({ subjectKey: "mbrooks/yolomatic:pull_request:4" }));
 	});
+
+	it("dispatches push events to the auto-rebase handler and records receive time", async () => {
+		const store = makeStore();
+		const handleAutoRebase = { execute: vi.fn(async () => {}) };
+		const dispatcher = new GitHubEventDispatcher({
+			handleIssueEvent: { execute: vi.fn() } as never,
+			handleIssueComment: { execute: vi.fn() } as never,
+			handlePRReview: { execute: vi.fn() } as never,
+			handleAutoRebase: handleAutoRebase as never,
+			eventStore: store,
+		});
+
+		await dispatcher.dispatch({
+			id: "push-1",
+			type: "push",
+			source: "webhook",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-01T00:00:00.000Z",
+			payload: {
+				ref: "refs/heads/main",
+				before: "old",
+				after: "new",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		});
+
+		expect(handleAutoRebase.execute).toHaveBeenCalledWith(expect.objectContaining({
+			source: "webhook",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			ref: "refs/heads/main",
+			before: "old",
+			after: "new",
+		}));
+		expect(store.markSeen).toHaveBeenCalledWith(expect.objectContaining({ id: "push-1" }));
+		expect(store.updateLastEventReceivedAt).toHaveBeenCalled();
+		expect(store.upsertPollingSubject).not.toHaveBeenCalled();
+	});
+
+	it("logs push events when no auto-rebase handler is wired", async () => {
+		const store = makeStore();
+		const dispatcher = new GitHubEventDispatcher({
+			handleIssueEvent: { execute: vi.fn() } as never,
+			handleIssueComment: { execute: vi.fn() } as never,
+			handlePRReview: { execute: vi.fn() } as never,
+			eventStore: store,
+		});
+
+		await expect(dispatcher.dispatch({
+			id: "push-2",
+			type: "push",
+			source: "polling",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-01T00:00:00.000Z",
+			payload: {
+				ref: "refs/heads/main",
+				before: "old",
+				after: "new",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		})).resolves.toBeUndefined();
+		expect(store.markSeen).toHaveBeenCalled();
+	});
+
+	it("does not derive a polling subject from push events", () => {
+		expect(pollingSubjectFromEvent({
+			id: "push",
+			type: "push",
+			source: "polling",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-01T00:00:00.000Z",
+			payload: {
+				ref: "refs/heads/main",
+				before: "old",
+				after: "new",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		})).toBeNull();
+	});
 });

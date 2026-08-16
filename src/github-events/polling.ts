@@ -26,6 +26,8 @@ export interface GitHubPollingDeps {
 	listManagedRepos?: () => Promise<Array<{ owner: string; repo: string }>>;
 	shouldPollRepo?: (owner: string, repo: string) => boolean;
 	resolveGitHubEventMode?: (owner: string, repo: string) => RepoGitHubEventMode;
+	/** Resolves the effective default branch for a repository. */
+	resolveDefaultBranch?: (owner: string, repo: string) => string;
 	now?: () => Date;
 }
 
@@ -235,6 +237,36 @@ export function normalizePolledPRReviewComment(owner: string, repo: string, comm
 	};
 }
 
+/**
+ * Build a normalized `push` event for a default-branch HEAD change detected
+ * by polling. The event id is keyed on the new SHA so a re-poll that observes
+ * the same HEAD dedupes against the previously dispatched event.
+ */
+export function normalizePolledDefaultBranchPush(
+	owner: string,
+	repo: string,
+	ref: string,
+	before: string,
+	after: string,
+	occurredAt: string,
+): GitHubEvent {
+	return {
+		id: `github:push:poll:${owner}/${repo}:${ref}:${after}`,
+		type: "push",
+		source: "polling",
+		owner,
+		repo,
+		occurredAt,
+		payload: {
+			ref,
+			before,
+			after,
+			repository: repoPayload(owner, repo),
+			sender: senderFrom(undefined),
+		},
+	};
+}
+
 async function listPollingRepos(deps: GitHubPollingDeps): Promise<Array<{ owner: string; repo: string }>> {
 	if (deps.listManagedRepos) {
 		return deps.listManagedRepos();
@@ -268,6 +300,7 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 				log(`[github-poll] initialized baseline for ${repo.owner}/${repo.repo}=${now.toISOString()}`);
 			}
 		}
+		await collectDefaultBranchPush(deps, repo.owner, repo.repo, now, events);
 		log(`[github-poll] checking ${repo.owner}/${repo.repo} (lastEventReceivedAt=${lastReceivedAt}, since=${since})`);
 		try {
 			const [issues, issueEvents, comments, prs, reviews, reviewComments] = await Promise.all([
@@ -305,6 +338,36 @@ export async function tickGitHubPolling(deps: GitHubPollingDeps): Promise<void> 
 		}
 	}
 	log(`[github-poll] tick completed: ${dispatched} events dispatched`);
+}
+
+async function collectDefaultBranchPush(
+	deps: GitHubPollingDeps,
+	owner: string,
+	repo: string,
+	now: Date,
+	events: GitHubEvent[],
+): Promise<void> {
+	if (!deps.eventStore.getDefaultBranchHead || !deps.eventStore.setDefaultBranchHead) return;
+	if (!deps.github.getDefaultBranchHeadSha) return;
+	const defaultBranch = deps.resolveDefaultBranch?.(owner, repo) ?? "main";
+	const ref = `refs/heads/${defaultBranch}`;
+	let head: string | null;
+	try {
+		head = await deps.github.getDefaultBranchHeadSha(owner, repo, defaultBranch);
+	} catch (error) {
+		process.stdout.write(`[github-poll] default-branch head failed ${owner}/${repo}: ${errorMessage(error)}\n`);
+		return;
+	}
+	if (!head) return;
+	const previous = deps.eventStore.getDefaultBranchHead(owner, repo);
+	// Record the current HEAD so the next tick has a baseline. Only emit a
+	// push event when the HEAD actually changed from a previously recorded
+	// value; the first observation seeds the baseline without dispatching.
+	deps.eventStore.setDefaultBranchHead(owner, repo, head);
+	if (previous && previous !== head) {
+		log(`[github-poll] default-branch head changed for ${owner}/${repo}: ${previous} -> ${head}`);
+		events.push(normalizePolledDefaultBranchPush(owner, repo, ref, previous, head, now.toISOString()));
+	}
 }
 
 async function collectDueSubjectEvents(deps: GitHubPollingDeps, now: Date): Promise<GitHubEvent[]> {

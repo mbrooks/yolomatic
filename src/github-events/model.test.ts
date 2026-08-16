@@ -26,5 +26,25 @@ describe("GitHubEvent model", () => {
 		expect(isPollingSource("polling")).toBe(true);
 		expect(isPollingSource("webhook")).toBe(false);
 	});
+
+	it("accepts normalized push events", () => {
+		const event: GitHubEvent = {
+			id: "github:push:mbrooks/yolomatic:refs/heads/main:sha-after",
+			type: "push",
+			source: "webhook",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-01T00:00:00.000Z",
+			payload: {
+				ref: "refs/heads/main",
+				before: "sha-before",
+				after: "sha-after",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		};
+		expect(event.type).toBe("push");
+		expect(event.payload.ref).toBe("refs/heads/main");
+	});
 });
 

@@ -132,4 +132,13 @@ export class GitHubEventStore implements GitHubEventStateStore {
 		const now = new Date().toISOString();
 		this.setRepoBaselineStmt.run(owner, repo, baselineAt, now, now);
 	}
+
+	getDefaultBranchHead(owner: string, repo: string): string | null {
+		const row = this.getStateStmt.get(`default-branch-head:${owner}/${repo}`) as { value?: string } | undefined;
+		return row?.value ?? null;
+	}
+
+	setDefaultBranchHead(owner: string, repo: string, sha: string): void {
+		this.upsertStateStmt.run(`default-branch-head:${owner}/${repo}`, sha, new Date().toISOString());
+	}
 }
