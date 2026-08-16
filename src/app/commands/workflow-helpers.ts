@@ -17,11 +17,12 @@ export interface WorkflowLabelGithubPort {
 	postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<number>;
 }
 import { EmptyRepositoryError } from "../../workspace/errors.js";
-import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand } from "../../domain/workflow/policy.js";
+import { isAdmin, shouldIgnoreIssueEvent, shouldIgnoreCommentEvent, isStopCommand, isFixMergeConflictsCommand } from "../../domain/workflow/policy.js";
 import { extractIssueNumberFromBranch } from "../../pr-review/session-invariant.js";
 import { appendAdminLink } from "./comment-links.js";
 import type { PriorDiscussionComment } from "../../executor/index.js";
 import type { PRReviewPayload } from "./handle-pr-review.js";
+import type { FixMergeConflictsPayload } from "./handle-fix-merge-conflicts.js";
 
 /**
  * Minimal event-payload shape required to resolve issue context. Matches the
@@ -212,6 +213,7 @@ export async function routePRTimelineComment(
 		tasks: TaskControlService;
 		adminGithubUsername?: string;
 		prReview?: { execute: (payload: PRReviewPayload) => Promise<void> } | undefined;
+		fixMergeConflicts?: { execute: (payload: FixMergeConflictsPayload) => Promise<void> } | undefined;
 	},
 	payload: PRTimelineCommentPayload,
 	owner: string,
@@ -229,7 +231,30 @@ export async function routePRTimelineComment(
 	}
 	const branchIssueNumber = extractIssueNumberFromBranch(pr.head.ref);
 	const mappedSession = branchIssueNumber ? null : await deps.sessions.findSessionByPR(owner, repo, issueNumber);
-	const mappedIssueNumber = branchIssueNumber ?? mappedSession?.issueNumber;
+	const mappedIssueNumber = branchIssueNumber ?? mappedSession?.issueNumber ?? null;
+
+	if (isFixMergeConflictsCommand(payload.comment.body)) {
+		if (deps.fixMergeConflicts) {
+			await deps.fixMergeConflicts.execute({
+				action: payload.action,
+				owner,
+				repo,
+				prNumber: issueNumber,
+				pr: { head: pr.head, state: pr.state, merged: pr.merged },
+				senderLogin: payload.sender.login,
+				comment: {
+					id: payload.comment.id,
+					body: payload.comment.body,
+					user: payload.comment.user,
+				},
+				mappedIssueNumber,
+			});
+		} else {
+			process.stdout.write(`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: fix-merge-conflicts handler not configured\n`);
+		}
+		return true;
+	}
+
 	if (!mappedIssueNumber) {
 		process.stdout.write(
 			`[webhook] issue_comment ignored for ${owner}/${repo}#${issueNumber}: PR branch ${pr.head.ref} is not associated with a Yolomatic session\n`,

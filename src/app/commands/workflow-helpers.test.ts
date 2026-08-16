@@ -770,6 +770,7 @@ describe("workflow helpers", () => {
 			getPullRequest?: ReturnType<typeof vi.fn>;
 			findSessionByPR?: ReturnType<typeof vi.fn>;
 			prReview?: { execute: ReturnType<typeof vi.fn> };
+			fixMergeConflicts?: { execute: ReturnType<typeof vi.fn> };
 			adminGithubUsername?: string;
 		}) {
 			const sessions = {
@@ -793,6 +794,7 @@ describe("workflow helpers", () => {
 					tasks: tasks as never,
 					adminGithubUsername: overrides?.adminGithubUsername,
 					prReview: overrides?.prReview as { execute: (payload: PRReviewPayload) => Promise<void> } | undefined,
+					fixMergeConflicts: overrides?.fixMergeConflicts as { execute: (payload: import("./handle-fix-merge-conflicts.js").FixMergeConflictsPayload) => Promise<void> } | undefined,
 				},
 				github,
 				sessions,
@@ -898,6 +900,61 @@ describe("workflow helpers", () => {
 			const routed = await routePRTimelineComment(deps, basePayload, "mbrooks", "yolomatic", 99);
 
 			expect(routed).toBe(true);
+		});
+
+		it("routes the fix-merge-conflicts command to the fixMergeConflicts handler with the mapped issue", async () => {
+			const execute = vi.fn(async () => undefined);
+			const { deps } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "yolomatic/issue-56", sha: "sha" }, state: "open", merged: false })),
+				fixMergeConflicts: { execute },
+			});
+			const payload = {
+				...basePayload,
+				comment: { id: 7, body: "/yolomatic fix-merge-conflicts", user: { login: "admin" } },
+			};
+			const routed = await routePRTimelineComment(deps, payload, "mbrooks", "yolomatic", 99);
+
+			expect(routed).toBe(true);
+			expect(execute).toHaveBeenCalledWith(
+				expect.objectContaining({
+					owner: "mbrooks",
+					repo: "yolomatic",
+					prNumber: 99,
+					senderLogin: "human",
+					mappedIssueNumber: 56,
+					pr: expect.objectContaining({ head: { ref: "yolomatic/issue-56", sha: "sha" } }),
+				}),
+			);
+		});
+
+		it("routes the fix-merge-conflicts command with a null mapping when the PR is unmapped", async () => {
+			const execute = vi.fn(async () => undefined);
+			const { deps, sessions } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "feature/x", sha: "sha" }, state: "open", merged: false })),
+				findSessionByPR: vi.fn(async () => null),
+				fixMergeConflicts: { execute },
+			});
+			await routePRTimelineComment(
+				deps,
+				{ ...basePayload, comment: { id: 7, body: "/yolomatic fix-merge-conflicts", user: { login: "admin" } } },
+				"mbrooks",
+				"yolomatic",
+				99,
+			);
+
+			expect(sessions.findSessionByPR).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
+			expect(execute).toHaveBeenCalledWith(expect.objectContaining({ mappedIssueNumber: null }));
+		});
+
+		it("does not treat non-command comments as fix-merge-conflicts", async () => {
+			const execute = vi.fn(async () => undefined);
+			const { deps } = makeDeps({
+				getPullRequest: vi.fn(async () => ({ head: { ref: "yolomatic/issue-56" }, state: "open", merged: false })),
+				fixMergeConflicts: { execute },
+			});
+			await routePRTimelineComment(deps, basePayload, "mbrooks", "yolomatic", 99);
+
+			expect(execute).not.toHaveBeenCalled();
 		});
 	});
 });

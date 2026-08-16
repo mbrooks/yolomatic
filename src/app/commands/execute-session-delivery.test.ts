@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ExecuteSessionDelivery } from "./execute-session-delivery.js";
+import { ExecuteSessionDelivery, buildPRCommandsComment, PR_COMMANDS_COMMENT_MARKER } from "./execute-session-delivery.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
 import type { GitHubService } from "../../ports/github-service.js";
@@ -827,5 +827,94 @@ describe("ExecuteSessionDelivery", () => {
 			state,
 			expect.any(Error),
 		);
+	});
+});
+
+describe("buildPRCommandsComment", () => {
+	it("includes the marker and the two PR commands", () => {
+		const comment = buildPRCommandsComment();
+		expect(comment).toContain(PR_COMMANDS_COMMENT_MARKER);
+		expect(comment).toContain("/yolomatic fix-merge-conflicts");
+		expect(comment).toContain("/yolomatic stop");
+	});
+});
+
+describe("ExecuteSessionDelivery PR commands comment", () => {
+	it("posts the static PR-commands comment once when a new PR is created", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" })),
+		});
+		(deps.github.listIssueComments as ReturnType<typeof vi.fn>) = vi.fn(async () => []);
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining(PR_COMMANDS_COMMENT_MARKER));
+		expect(deps.github.listIssueComments).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
+	});
+
+	it("posts the PR-commands comment on a pre-existing PR when no marker is present", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => {
+				throw new Error("A pull request already exists");
+			}),
+		});
+		(deps.github.listPullRequests as ReturnType<typeof vi.fn>) = vi.fn(async () => [{ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" }]);
+		(deps.github.getPullRequest as ReturnType<typeof vi.fn>) = vi.fn(async () => ({
+			head: { ref: "yolomatic/issue-1", sha: "sha" },
+			base: { ref: "main" },
+			state: "open",
+			merged: false,
+			mergeable: true,
+			mergeableState: "clean",
+			draft: true,
+		}));
+		(deps.github.listIssueComments as ReturnType<typeof vi.fn>) = vi.fn(async () => []);
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		expect(deps.github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining(PR_COMMANDS_COMMENT_MARKER));
+	});
+
+	it("does not duplicate the PR-commands comment when one is already present", async () => {
+		const deps = makeDeps({
+			createPullRequest: vi.fn(async () => ({ number: 42, html_url: "https://github.com/mbrooks/yolomatic/pull/42" })),
+		});
+		(deps.github.listIssueComments as ReturnType<typeof vi.fn>) = vi.fn(async () => [
+			{ id: 1, body: buildPRCommandsComment(), author: "yolomatic-bot", created_at: "", updated_at: "", html_url: "" },
+		]);
+		const delivery = new ExecuteSessionDelivery({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			github: deps.github,
+			executor: deps.executor,
+			defaultBranch: "main",
+			reporter: deps.reporter,
+			mergeabilityPollDelayMs: 0,
+		});
+
+		await delivery.deliverCompletion(state, result);
+
+		const markerCalls = (deps.github.postPRComment as ReturnType<typeof vi.fn>).mock.calls.filter(
+			(call) => typeof call[3] === "string" && call[3].includes(PR_COMMANDS_COMMENT_MARKER),
+		);
+		expect(markerCalls).toHaveLength(0);
 	});
 });

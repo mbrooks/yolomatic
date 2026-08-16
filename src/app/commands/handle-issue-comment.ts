@@ -54,6 +54,7 @@ export class HandleIssueComment {
 			executor: ExecuteSessionDeps;
 			refinement?: HandleIssueRefinement;
 			prReview?: { execute: (payload: import("./handle-pr-review.js").PRReviewPayload) => Promise<void> };
+			fixMergeConflicts?: { execute: (payload: import("./handle-fix-merge-conflicts.js").FixMergeConflictsPayload) => Promise<void> };
 			issueAdminLinkInCommentsEnabled?: boolean;
 			adminBaseUrl?: string;
 			resolveAdminBaseUrl?: () => string | undefined;
@@ -103,6 +104,7 @@ export class HandleIssueComment {
 				tasks: this.deps.tasks,
 				adminGithubUsername: this.deps.adminGithubUsername,
 				prReview: this.deps.prReview,
+				fixMergeConflicts: this.deps.fixMergeConflicts,
 			},
 			payload,
 			owner,

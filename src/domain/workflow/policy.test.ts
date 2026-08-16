@@ -9,6 +9,7 @@ import {
 	isStopCommand,
 	isIssueRefinementCommand,
 	parseIssueRefinementCommand,
+	isFixMergeConflictsCommand,
 	canPause,
 	canResume,
 	canRestart,
@@ -464,6 +465,48 @@ describe("isStopCommand", () => {
 	it("rejects embedded commands that do not start the trimmed body", () => {
 		expect(isStopCommand("please /yolomatic stop")).toBe(false);
 		expect(isStopCommand("`/yolomatic stop`")).toBe(false);
+	});
+});
+
+describe("isFixMergeConflictsCommand", () => {
+	it("matches exact /yolomatic fix-merge-conflicts", () => {
+		expect(isFixMergeConflictsCommand("/yolomatic fix-merge-conflicts")).toBe(true);
+	});
+
+	it("strips leading and trailing whitespace before matching", () => {
+		expect(isFixMergeConflictsCommand("   /yolomatic fix-merge-conflicts   ")).toBe(true);
+		expect(isFixMergeConflictsCommand("\n/yolomatic fix-merge-conflicts\n")).toBe(true);
+	});
+
+	it("is case-insensitive", () => {
+		expect(isFixMergeConflictsCommand("/Yolomatic Fix-Merge-Conflicts")).toBe(true);
+		expect(isFixMergeConflictsCommand("/YOLOMATIC FIX-MERGE-CONFLICTS")).toBe(true);
+	});
+
+	it("allows trailing text after the command token", () => {
+		expect(isFixMergeConflictsCommand("/yolomatic fix-merge-conflicts please")).toBe(true);
+		expect(isFixMergeConflictsCommand("/yolomatic fix-merge-conflicts   \n")).toBe(true);
+	});
+
+	it("rejects embedded commands that do not start the trimmed body", () => {
+		expect(isFixMergeConflictsCommand("please run /yolomatic fix-merge-conflicts")).toBe(false);
+		expect(isFixMergeConflictsCommand("`/yolomatic fix-merge-conflicts`")).toBe(false);
+	});
+
+	it("rejects tokens that extend the command with non-whitespace", () => {
+		expect(isFixMergeConflictsCommand("/yolomatic fix-merge-conflicts-now")).toBe(false);
+		expect(isFixMergeConflictsCommand("/yolomatic fix-merge-conflictsx")).toBe(false);
+	});
+
+	it("returns false for empty or whitespace-only bodies", () => {
+		expect(isFixMergeConflictsCommand("")).toBe(false);
+		expect(isFixMergeConflictsCommand("   ")).toBe(false);
+	});
+
+	it("returns false for the other /yolomatic commands", () => {
+		expect(isFixMergeConflictsCommand("/yolomatic stop")).toBe(false);
+		expect(isFixMergeConflictsCommand("/yolomatic feedback")).toBe(false);
+		expect(isFixMergeConflictsCommand("/yolomatic issue-refinement")).toBe(false);
 	});
 });
 
