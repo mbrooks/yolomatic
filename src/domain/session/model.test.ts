@@ -5,10 +5,9 @@ import {
 	detectSessionRisk,
 	buildRepoSummaries,
 	computeAgentStatus,
-	isTerminalStatus,
 	sortSessionsByRecency,
-	type SessionState,
 } from "./model.js";
+import type { SessionState } from "../../session/store.js";
 
 function makeSession(partial: Partial<SessionState> & { owner: string; repo: string; issueNumber: number }): SessionState {
 	return {
@@ -32,13 +31,6 @@ describe("sessionKey", () => {
 describe("branchName", () => {
 	it("formats yolomatic/issue-N", () => {
 		expect(branchName(42)).toBe("yolomatic/issue-42");
-	});
-});
-
-describe("compatibility re-exports", () => {
-	it("keeps isTerminalStatus available from the domain model module", () => {
-		expect(isTerminalStatus("complete")).toBe(true);
-		expect(isTerminalStatus("working")).toBe(false);
 	});
 });
 
@@ -70,6 +62,13 @@ describe("detectSessionRisk", () => {
 		const risk = detectSessionRisk(session);
 		expect(risk.suspectedMisroute).toBe(false);
 		expect(risk.referencedIssueNumber).toBe(42);
+	});
+
+	it("flags workspace path not ending with issue-N", () => {
+		const session = makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 42, workspacePath: "/tmp/wrong-location" });
+		const risk = detectSessionRisk(session);
+		expect(risk.suspectedMisroute).toBe(true);
+		expect(risk.reasons).toContain("Workspace path does not end with issue-42.");
 	});
 });
 
@@ -109,6 +108,52 @@ describe("buildRepoSummaries", () => {
 
 	it("returns empty array for no sessions", () => {
 		expect(buildRepoSummaries([])).toEqual([]);
+	});
+
+	it("accumulates active counts and latest activity across sessions in a repo", () => {
+		const sessions = [
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 1, kind: "implementation", status: "complete", lastActivity: "2026-01-01T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 2, kind: "implementation", status: "working", lastActivity: "2026-01-03T00:00:00Z" }),
+			makeSession({ owner: "mbrooks", repo: "yolomatic", issueNumber: 3, kind: "refinement", status: "working", lastActivity: "2026-01-02T00:00:00Z" }),
+		];
+		expect(buildRepoSummaries(sessions)[0]).toMatchObject({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			sessionCount: 3,
+			activeCount: 2,
+			implementationSessionCount: 2,
+			implementationActiveCount: 1,
+			refinementSessionCount: 1,
+			refinementActiveCount: 1,
+			lastActivity: "2026-01-03T00:00:00Z",
+		});
+	});
+
+	it("creates a refinement-first summary entry for the first refinement session in a repo", () => {
+		const sessions = [
+			makeSession({ owner: "other", repo: "case", issueNumber: 5, kind: "refinement", status: "working" }),
+		];
+		expect(buildRepoSummaries(sessions)[0]).toEqual({
+			owner: "other",
+			repo: "case",
+			sessionCount: 1,
+			activeCount: 1,
+			implementationSessionCount: 0,
+			implementationActiveCount: 0,
+			refinementSessionCount: 1,
+			refinementActiveCount: 1,
+			lastActivity: expect.any(String),
+		});
+	});
+
+	it("sorts summaries by owner then repo", () => {
+		const sessions = [
+			makeSession({ owner: "zeta", repo: "repo", issueNumber: 1 }),
+			makeSession({ owner: "alpha", repo: "zeta", issueNumber: 2 }),
+			makeSession({ owner: "alpha", repo: "beta", issueNumber: 3 }),
+		];
+		const summaries = buildRepoSummaries(sessions);
+		expect(summaries.map((s) => `${s.owner}/${s.repo}`)).toEqual(["alpha/beta", "alpha/zeta", "zeta/repo"]);
 	});
 });
 

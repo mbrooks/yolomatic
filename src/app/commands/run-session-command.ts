@@ -1,6 +1,5 @@
 import type { Clock } from "../../ports/clock.js";
-import type { SessionState } from "../../session/store.js";
-import { isTerminalStatus } from "../../domain/session/model.js";
+import { isTerminalStatus, type SessionState } from "../../session/store.js";
 import { canDelete, canPause, canRestart, canResume } from "../../domain/workflow/policy.js";
 import { clearSessionLogs } from "../../logging/session-log-store.js";
 import { sessionStorageKey } from "../../session/store.js";

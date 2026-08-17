@@ -1,5 +1,4 @@
-import { isTerminalStatus } from "../session/model.js";
-import type { SessionState, SessionStatus } from "../../session/store.js";
+import { isTerminalStatus, type SessionState, type SessionStatus } from "../../session/store.js";
 import type { CollaboratorPermission } from "../../ports/github-service.js";
 
 interface IssueLabel {
