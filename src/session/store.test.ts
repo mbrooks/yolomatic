@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-import { SessionStore } from "./store.js";
+import { SessionStore, isTerminalStatus, TERMINAL_STATUSES } from "./store.js";
 
 function dbPathFor(dir: string): string {
 	return path.join(dir, "sessions.sqlite");
@@ -612,5 +612,20 @@ describe("SessionStore (SQLite-backed)", () => {
 			expect(await store.migrateFromFileStoreIfNeeded()).toBe(1);
 			expect((await store.getAll()).length).toBe(1);
 		});
+	});
+});
+
+describe("isTerminalStatus (canonical terminal-status semantics)", () => {
+	it("returns true for terminal statuses", () => {
+		for (const status of TERMINAL_STATUSES) {
+			expect(isTerminalStatus(status)).toBe(true);
+		}
+	});
+
+	it("returns false for non-terminal statuses", () => {
+		const nonTerminal = ["pending", "working", "waiting-feedback", "paused"] as const;
+		for (const status of nonTerminal) {
+			expect(isTerminalStatus(status)).toBe(false);
+		}
 	});
 });

@@ -1,18 +1,14 @@
 import { isTerminalStatus, type SessionState } from "../../session/store.js";
 
 /**
- * Compatibility re-exports for existing callers.
+ * Domain helpers for derived session concepts such as keys, branch names,
+ * repo summaries, risks, and agent status.
  *
- * Canonical imports:
- * - Persisted session shapes and storage classes live in `src/session/store.ts`.
- * - Domain helpers in this module are the canonical source for derived session
- *   concepts such as keys, branch names, repo summaries, risks, and agent status.
- *
- * Keep these re-exports during the transition so public imports from
- * `domain/session/model.js` continue to compile. Remove them only as part of a
- * separate API migration.
+ * Persisted session shapes (`SessionState`, `SessionStatus`) and storage
+ * helpers (`isTerminalStatus`) live canonically in `src/session/store.ts`;
+ * import them from there directly. This module only re-imports them to
+ * implement the derived domain helpers below and never re-exports them.
  */
-export { isTerminalStatus, type SessionState, type SessionStatus } from "../../session/store.js";
 
 export function sessionKey(owner: string, repo: string, issueNumber: number): string {
 	return `${owner}/${repo}#${issueNumber}`;
