@@ -31,8 +31,8 @@ export interface SessionRepository {
 	cancelSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
 	pauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
 	unpauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
-	restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
-	markComplete(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
-	markFailed(owner: string, repo: string, issueNumber: number, reason?: string): Promise<SessionState>;
+	restartSession(owner: string, repo: string, issueNumber: number, kind?: SessionKind): Promise<SessionState>;
+	markComplete(owner: string, repo: string, issueNumber: number, kind?: SessionKind): Promise<SessionState>;
+	markFailed(owner: string, repo: string, issueNumber: number, reason?: string, kind?: SessionKind): Promise<SessionState>;
 	markStale(owner: string, repo: string, issueNumber: number, reason: string): Promise<SessionState>;
 }

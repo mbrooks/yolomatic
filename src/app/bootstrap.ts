@@ -396,6 +396,8 @@ export function buildRuntimeGraph(
 		adminDefaultPage: config.adminDefaultPage,
 		restartSession: (owner, repo, issueNumber) =>
 			services.handlers.resumeInterruptedSession(owner, repo, issueNumber),
+		restartRefinement: (owner, repo, issueNumber) =>
+			services.handlers.restartRefinement(owner, repo, issueNumber),
 		userStore,
 		sessionAuth: services.sessionAuth,
 		githubService: services.github,

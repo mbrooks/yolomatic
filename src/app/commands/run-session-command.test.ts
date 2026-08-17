@@ -55,6 +55,7 @@ function makeCommand(
 		tasks: RunSessionCommandTaskPort;
 		archiveDir: string;
 		restartSession: ((owner: string, repo: string, issueNumber: number) => Promise<void>) | null;
+		restartRefinement: ((owner: string, repo: string, issueNumber: number) => Promise<void>) | null;
 	}>,
 ) {
 	const repo = makeMockRepo(state);
@@ -71,8 +72,10 @@ function makeCommand(
 	const clock: Clock = { now: () => new Date("2026-01-01T00:00:00Z"), uptime: () => 0 };
 	const restartSession =
 		deps && "restartSession" in deps ? deps.restartSession ?? undefined : vi.fn(async () => undefined);
-	const command = new RunSessionCommand(repo, workspaces, tasks, clock, deps?.archiveDir, restartSession);
-	return { command, repo, workspaces, tasks, restartSession };
+	const restartRefinement =
+		deps && "restartRefinement" in deps ? deps.restartRefinement ?? undefined : vi.fn(async () => undefined);
+	const command = new RunSessionCommand(repo, workspaces, tasks, clock, deps?.archiveDir, restartSession, restartRefinement);
+	return { command, repo, workspaces, tasks, restartSession, restartRefinement };
 }
 
 describe("RunSessionCommand", () => {
@@ -151,6 +154,39 @@ describe("RunSessionCommand", () => {
 		const result = await command.execute("mbrooks", "yolomatic", 1, "restart");
 		expect(result.success).toBe(true);
 		expect(restartSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 1);
+	});
+
+	it("restarts a failed refinement without removing the implementation worktree", async () => {
+		const state = { ...makeState("failed"), kind: "refinement" as const };
+		const { command, repo, workspaces, restartRefinement } = makeCommand(state);
+
+		const result = await command.execute("mbrooks", "yolomatic", 1, "restart", undefined, "refinement");
+
+		expect(result.success).toBe(true);
+		expect(repo.get).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "refinement");
+		expect(repo.restartSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "refinement");
+		expect(workspaces.removeWorktree).not.toHaveBeenCalled();
+		expect(restartRefinement).toHaveBeenCalledWith("mbrooks", "yolomatic", 1);
+	});
+
+	it("marks a failed refinement complete using refinement identity", async () => {
+		const state = { ...makeState("failed"), kind: "refinement" as const };
+		const { command, repo } = makeCommand(state);
+
+		const result = await command.execute("mbrooks", "yolomatic", 1, "mark-complete", undefined, "refinement");
+
+		expect(result.success).toBe(true);
+		expect(repo.markComplete).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "refinement");
+	});
+
+	it("rejects implementation-only commands for refinement sessions", async () => {
+		const state = { ...makeState("failed"), kind: "refinement" as const };
+		const { command, repo } = makeCommand(state);
+
+		const result = await command.execute("mbrooks", "yolomatic", 1, "pause", undefined, "refinement");
+
+		expect(result.success).toBe(false);
+		expect(repo.pauseSession).not.toHaveBeenCalled();
 	});
 
 	it("rejects restart when the session is already active", async () => {

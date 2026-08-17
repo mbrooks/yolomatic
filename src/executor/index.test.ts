@@ -801,6 +801,44 @@ describe("PiAgentExecutor", () => {
 		expect(result.proposedTaskBody).toContain("Refined.");
 		expect(mockSession.prompt).toHaveBeenCalledTimes(1);
 	});
+
+	it("issues one JSON correction prompt and accepts a valid corrected refinement result", async () => {
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
+		const corrected = JSON.stringify({
+			proposedTaskBody: "## Summary\nRefined with an escaped \"quote\".",
+			summary: "Clarified.",
+			investigation: "Read code.",
+		});
+		const { mockSession } = mockSequentialSession([
+			'{"proposedTaskBody":"Invalid "quote"","summary":"Clarified.","investigation":"Read code."}',
+			corrected,
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.executeRefinement(makeState(30), "refine prompt");
+
+		expect(result.proposedTaskBody).toContain('escaped "quote"');
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("valid JSON"));
+		expect(mockSession.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining("Escape every double quote"));
+	});
+
+	it("fails after one JSON correction when the corrected refinement result is still invalid", async () => {
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistry());
+		const { mockSession } = mockSequentialSession([
+			'{"proposedTaskBody":"Invalid "quote"","summary":"One","investigation":"Read code."}',
+			'{"proposedTaskBody":"Still "invalid"","summary":"Two","investigation":"Read code."}',
+		]);
+
+		const executor = new PiAgentExecutor({ soulPath });
+
+		await expect(executor.executeRefinement(makeState(31), "refine prompt")).rejects.toThrow(
+			"Worker did not return a parseable refinement result after one correction prompt.",
+		);
+		expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+	});
 });
 
 describe("PiAgentExecutor runtime settings injection", () => {

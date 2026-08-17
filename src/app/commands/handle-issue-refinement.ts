@@ -118,6 +118,43 @@ export class HandleIssueRefinement {
 		return attempt.proposedTaskBody === (payload.issue.body ?? "");
 	}
 
+	async restart(owner: string, repo: string, issueNumber: number): Promise<void> {
+		const previous = this.deps.refinementStore.getLatestAttempt(owner, repo, issueNumber);
+		if (!previous) {
+			throw new Error(`No refinement attempt exists for ${owner}/${repo}#${issueNumber}`);
+		}
+		const issue = await this.deps.github.getIssue(owner, repo, issueNumber);
+		if (!issue) {
+			throw new Error(`Issue ${owner}/${repo}#${issueNumber} was not found`);
+		}
+		if (issue.state === "closed") {
+			throw new Error(`Cannot restart refinement for closed issue ${owner}/${repo}#${issueNumber}`);
+		}
+		const requester = this.deps.adminGithubUsername?.trim() || previous.requester;
+		const commandBody = previous.steeringPrompt
+			? `/yolomatic issue-refinement ${previous.steeringPrompt}`
+			: "/yolomatic issue-refinement";
+		await this.execute(
+			{
+				action: "created",
+				issue: {
+					number: issueNumber,
+					state: issue.state,
+					title: issue.title ?? previous.originalTitle,
+					body: issue.body ?? "",
+					labels: [],
+				},
+				comment: {
+					body: commandBody,
+					user: { login: requester, type: "User" },
+				},
+				repository: { name: repo, owner: { login: owner } },
+				sender: { login: requester },
+			},
+			previous.steeringPrompt,
+		);
+	}
+
 	async postInstructions(payload: IssueRefinementInstructionPayload): Promise<void> {
 		const { owner, repo, issueNumber } = this.resolveContext(payload);
 		const issue = payload.issue;

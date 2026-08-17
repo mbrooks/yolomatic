@@ -3,6 +3,7 @@ import { isTerminalStatus, type SessionState } from "../../session/store.js";
 import { canDelete, canPause, canRestart, canResume } from "../../domain/workflow/policy.js";
 import { clearSessionLogs } from "../../logging/session-log-store.js";
 import { sessionStorageKey } from "../../session/store.js";
+import type { SessionKind } from "../../session/store.js";
 import { fail, ok, type AppResult } from "../result.js";
 
 /**
@@ -15,10 +16,10 @@ export interface RunSessionCommandSessionPort {
 	cancelSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
 	pauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
 	unpauseSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
-	restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	restartSession(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<SessionState>;
 	delete(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<void>;
-	markFailed(owner: string, repo: string, issueNumber: number, reason?: string): Promise<SessionState>;
-	markComplete(owner: string, repo: string, issueNumber: number): Promise<SessionState>;
+	markFailed(owner: string, repo: string, issueNumber: number, reason?: string, kind?: SessionState["kind"]): Promise<SessionState>;
+	markComplete(owner: string, repo: string, issueNumber: number, kind?: SessionState["kind"]): Promise<SessionState>;
 	updateStatus(
 		owner: string,
 		repo: string,
@@ -128,6 +129,7 @@ export class RunSessionCommand {
 		private readonly clock: Clock,
 		private readonly archiveDir?: string,
 		private readonly restartSession?: RestartSessionDispatcher,
+		private readonly restartRefinement?: RestartSessionDispatcher,
 	) {}
 
 	async execute(
@@ -136,14 +138,18 @@ export class RunSessionCommand {
 		issueNumber: number,
 		command: SessionCommand,
 		payload?: Record<string, unknown>,
+		kind: SessionKind = "implementation",
 	): Promise<AppResult<SessionCommandResult>> {
-		const session = await this.sessions.get(owner, repo, issueNumber);
+		if (kind === "refinement" && command !== "restart" && command !== "mark-complete") {
+			return fail("invalid_state", "Restart and Mark complete are the only commands available for refinement sessions");
+		}
+		const session = await this.sessions.get(owner, repo, issueNumber, kind);
 		if (!session) {
 			return fail("not_found", "Session not found");
 		}
 
 		const key = `${owner}/${repo}#${issueNumber}`;
-		const logKey = sessionStorageKey(owner, repo, issueNumber, "implementation");
+		const logKey = sessionStorageKey(owner, repo, issueNumber, kind);
 		const now = this.clock.now().toISOString();
 
 		switch (command) {
@@ -178,12 +184,20 @@ export class RunSessionCommand {
 					return fail("conflict", "Session is already being executed");
 				}
 				const draining = this.tasks.isDraining();
-				if (!draining && !this.restartSession) {
+				if (kind === "refinement" && draining) {
+					return fail("conflict", "Refinement cannot restart while a deployment is in progress");
+				}
+				const dispatcher = kind === "refinement" ? this.restartRefinement : this.restartSession;
+				if (!draining && !dispatcher) {
 					return fail("internal", "Session restart dispatcher is not configured");
 				}
-				await this.workspaces.removeWorktree(owner, repo, issueNumber);
+				if (kind === "implementation") {
+					await this.workspaces.removeWorktree(owner, repo, issueNumber);
+				}
 				clearSessionLogs(logKey);
-				const restarted = await this.sessions.restartSession(owner, repo, issueNumber);
+				const restarted = kind === "refinement"
+					? await this.sessions.restartSession(owner, repo, issueNumber, kind)
+					: await this.sessions.restartSession(owner, repo, issueNumber);
 				if (draining) {
 					const queued = await this.sessions.updateStatus(owner, repo, issueNumber, "pending", {
 						resumeOnBoot: true,
@@ -196,11 +210,13 @@ export class RunSessionCommand {
 					});
 				}
 
-				void this.restartSession!(owner, repo, issueNumber).catch((error: unknown) => {
+				void dispatcher!(owner, repo, issueNumber).catch((error: unknown) => {
 					const message = error instanceof Error ? error.message : String(error);
 					process.stdout.write(`[admin] failed to dispatch restart for ${key}: ${message}\n`);
-					void this.sessions
-						.markFailed(owner, repo, issueNumber, `Admin restart dispatch failed: ${message}`)
+					const markFailed = kind === "refinement"
+						? this.sessions.markFailed(owner, repo, issueNumber, `Admin restart dispatch failed: ${message}`, kind)
+						: this.sessions.markFailed(owner, repo, issueNumber, `Admin restart dispatch failed: ${message}`);
+					void markFailed
 						.catch((markError: unknown) => {
 							const markMessage = markError instanceof Error ? markError.message : String(markError);
 							process.stdout.write(`[admin] failed to record restart failure for ${key}: ${markMessage}\n`);
@@ -270,7 +286,17 @@ export class RunSessionCommand {
 			}
 
 			case "mark-complete": {
-				const updated = await this.sessions.markComplete(owner, repo, issueNumber);
+				if (kind === "refinement") {
+					if (this.tasks.isActive(key)) {
+						return fail("conflict", "Refinement is currently active");
+					}
+					if (session.status !== "failed" && session.status !== "cancelled") {
+						return fail("invalid_state", "Only failed or cancelled refinement sessions can be marked complete");
+					}
+				}
+				const updated = kind === "refinement"
+					? await this.sessions.markComplete(owner, repo, issueNumber, kind)
+					: await this.sessions.markComplete(owner, repo, issueNumber);
 				return ok<MarkResult>({
 					status: updated.status,
 					message: "Session marked as complete.",

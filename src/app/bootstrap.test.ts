@@ -335,13 +335,14 @@ describe("buildRuntimeGraph", () => {
 		expect(options[0].handlers).toBe(noOpHandlers);
 	});
 
-	it("wires the prebuilt start-issue session and restart dispatcher into the server options", async () => {
+	it("wires the prebuilt start-issue session and restart dispatchers into the server options", async () => {
 		const services: Partial<RuntimeServices> = {
 			startIssueSession: vi.fn(async () => undefined) as never,
 			handlers: {
 				handleGitHubEvent: vi.fn(async () => undefined),
-				isInFlight: vi.fn(() => false),
-				resumeInterruptedSession: vi.fn(async () => undefined),
+					isInFlight: vi.fn(() => false),
+					resumeInterruptedSession: vi.fn(async () => undefined),
+					restartRefinement: vi.fn(async () => undefined),
 			} as never,
 		};
 		const factory = makeFakeFactory(services);
@@ -353,6 +354,10 @@ describe("buildRuntimeGraph", () => {
 		const restartSession = options[0].restartSession as (owner: string, repo: string, n: number) => Promise<void>;
 		await restartSession("mbrooks", "yolomatic", 513);
 		expect(graph.handlers.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 513);
+
+		const restartRefinement = options[0].restartRefinement as (owner: string, repo: string, n: number) => Promise<void>;
+		await restartRefinement("mbrooks", "yolomatic", 670);
+		expect(graph.handlers.restartRefinement).toHaveBeenCalledWith("mbrooks", "yolomatic", 670);
 	});
 
 	it("passes repository resolvers derived from the startup snapshot into the factory context", () => {

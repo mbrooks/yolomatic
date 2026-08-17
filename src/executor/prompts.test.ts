@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildRefinementJsonCorrectionPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion } from "./prompts.js";
 
 describe("buildIssuePrompt", () => {
 	it("includes issue metadata", () => {
@@ -117,6 +117,24 @@ describe("buildStatusCorrectionPrompt", () => {
 		expect(prompt).toContain("Delivery constraints");
 		expect(prompt).toContain("must not change a complete status");
 		expect(prompt).toContain("waiting-feedback");
+	});
+});
+
+describe("buildRefinementJsonCorrectionPrompt", () => {
+	it("requests one serialization-only repair with the exact refinement schema", () => {
+		const prompt = buildRefinementJsonCorrectionPrompt();
+
+		expect(prompt).toContain("previous response was rejected");
+		expect(prompt).toContain("valid JSON");
+		expect(prompt).toContain('"proposedTaskBody"');
+		expect(prompt).toContain('"summary"');
+		expect(prompt).toContain('"investigation"');
+		expect(prompt).toContain('"proposedTitle"');
+		expect(prompt).toContain("JSON string");
+		expect(prompt).toContain("Escape every double quote");
+		expect(prompt).toContain("raw JSON");
+		expect(prompt).toContain("Do not perform more investigation");
+		expect(prompt).toContain("Do not modify files");
 	});
 });
 

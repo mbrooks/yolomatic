@@ -211,6 +211,40 @@ describe("SessionDetail", () => {
 		expect(screen.queryByText("Pause")).toBeNull();
 	});
 
+	it("shows only Restart and Mark complete for a failed refinement session", async () => {
+		const session = makeSession({ kind: "refinement", status: "failed" });
+
+		render(<SessionDetail selected={session} onMutate={vi.fn()} />);
+
+		expect(screen.getByText("Actions")).toBeDefined();
+		expect(screen.getByText("Restart")).toBeDefined();
+		expect(screen.getByText("Mark complete")).toBeDefined();
+		expect(screen.queryByText("Pause")).toBeNull();
+		expect(screen.queryByText("Delete")).toBeNull();
+	});
+
+	it("sends refinement identity when restarting a failed refinement session", async () => {
+		const onMutate = vi.fn();
+		const session = makeSession({ kind: "refinement", status: "failed" });
+		const { sendSessionCommand } = await import("../../api/sessions.js");
+		vi.mocked(sendSessionCommand).mockResolvedValue({ ok: true, message: "restarted" });
+		window.confirm = () => true;
+
+		render(<SessionDetail selected={session} onMutate={onMutate} />);
+		fireEvent.click(screen.getByText("Restart"));
+
+		await vi.waitFor(() =>
+			expect(sendSessionCommand).toHaveBeenCalledWith(
+				"mbrooks",
+				"yolomatic",
+				42,
+				"refinement",
+				{ type: "restart" },
+			),
+		);
+		expect(onMutate).toHaveBeenCalled();
+	});
+
 	it("invokes onMutate after a successful action command", async () => {
 		const onMutate = vi.fn();
 		const session = makeSession({ status: "working" });

@@ -110,6 +110,23 @@ export function buildStatusCorrectionPrompt(): string {
 	].join("\n");
 }
 
+export function buildRefinementJsonCorrectionPrompt(): string {
+	return [
+		"Your previous response was rejected because it was not valid JSON matching the refinement result contract. This is a serialization-repair turn, not another investigation turn.",
+		"",
+		"Return exactly one valid JSON object with these fields:",
+		'- "proposedTaskBody": the complete Markdown issue body as a JSON string',
+		'- "summary": a concise explanation as a JSON string',
+		'- "investigation": the investigation notes as a single Markdown JSON string',
+		'- "proposedTitle": an optional concise title as a JSON string; omit it or use an empty string to keep the original title',
+		"",
+		"Each non-optional field must be a non-empty JSON string. Escape every double quote, backslash, newline, tab, and other control character required by JSON string syntax.",
+		"Return raw JSON only, without Markdown code fences, commentary, or a status marker.",
+		"Preserve the substance of the preceding answer. Do not perform more investigation, call tools, or change the proposed task.",
+		"Do not modify files, commit, push, or change GitHub state.",
+	].join("\n");
+}
+
 export interface PRReviewComment {
 	body: string;
 	user: string;

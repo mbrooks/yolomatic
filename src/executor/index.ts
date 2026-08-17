@@ -19,7 +19,7 @@ import {
 	type RuntimeSettings,
 	type RuntimeSettingsProvider,
 } from "../runtime-settings.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
+import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildRefinementJsonCorrectionPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { extractTokenUsage, mergeUsage, type TokenUsage } from "./usage.js";
 import { loadSoulContent } from "./soul-loader.js";
@@ -27,7 +27,7 @@ import type { ExecutionService, LiveExecutionSession } from "../ports/execution-
 
 export { resolveConfiguredModel } from "./model-selection.js";
 export { extractText, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, detectStatusMarker, type ExecutionResult, type ExecutionStatus, type RefinementResult } from "./results.js";
-export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
+export { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildRefinementJsonCorrectionPrompt, buildStatusCorrectionPrompt, formatPriorDiscussion, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 export { loadSoulContent } from "./soul-loader.js";
 
 type ModelConfigProvider = ConfiguredModelOverride | (() => ConfiguredModelOverride | undefined) | undefined;
@@ -109,6 +109,9 @@ export class PiAgentExecutor implements ExecutionService {
 		);
 		const parsed = parseRefinementResult(result.rawResponse);
 		if (!parsed) {
+			if (result.status === "failed" && result.summary.startsWith("Worker did not return a parseable refinement result")) {
+				throw new Error(result.summary);
+			}
 			throw new Error("Worker did not return a parseable refinement result.");
 		}
 		return { ...parsed, usage: result.usage };
@@ -348,7 +351,7 @@ export class PiAgentExecutor implements ExecutionService {
 			}
 		}
 
-		const rawResponse = getLastAssistantText(session);
+		let rawResponse = getLastAssistantText(session);
 		// Aggregate token usage from the assistant messages produced during the
 		// run. When the provider does not report usage, `available` is false and
 		// all counts are zero; the dashboard renders "unknown" in that case.
@@ -398,7 +401,10 @@ export class PiAgentExecutor implements ExecutionService {
 			};
 		}
 
-		if (!options?.refinement && result.status !== "failed" && detectStatusMarker(rawResponse) === null) {
+		if (options?.refinement && !parseRefinementResult(rawResponse)) {
+			result = await this.correctRefinementJson(session, key, rawResponse, logger, abortSignal, usage);
+			rawResponse = result.rawResponse;
+		} else if (!options?.refinement && result.status !== "failed" && detectStatusMarker(rawResponse) === null) {
 			result = await this.correctStatusProtocol(session, key, rawResponse, logger, abortSignal, usage);
 		} else {
 			result = { ...result, usage };
@@ -412,6 +418,84 @@ export class PiAgentExecutor implements ExecutionService {
 		notifyActivity();
 
 		return result;
+	}
+
+	private async correctRefinementJson(
+		session: AgentSession,
+		key: string,
+		originalRaw: string,
+		logger: LlmLogger,
+		abortSignal?: AbortSignal,
+		priorUsage?: TokenUsage,
+	): Promise<ExecutionResult> {
+		recordSessionLog(key, {
+			level: "warn",
+			message: "Refinement result protocol violation: worker response was not parseable JSON. Issuing one correction prompt.",
+			details: { type: "refinement_protocol_violation" },
+		});
+		recordSessionLog(key, {
+			level: "assistant",
+			message: originalRaw || "(no response)",
+			details: { type: "invalid_refinement_response" },
+		});
+		const correctionPrompt = buildRefinementJsonCorrectionPrompt();
+		logger.logPrompt(correctionPrompt);
+		recordSessionLog(key, {
+			level: "info",
+			message: "Correction prompt sent to request valid refinement JSON.",
+			details: { type: "refinement_correction_prompt", length: correctionPrompt.length },
+		});
+
+		try {
+			await session.prompt(correctionPrompt);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			logger.logError(error instanceof Error ? error : new Error(message), "Refinement JSON correction prompt failed");
+			recordSessionLog(key, {
+				level: "error",
+				message: `Refinement JSON correction prompt failed: ${message}`,
+				details: { type: "refinement_correction_prompt_error", error: message },
+			});
+			return {
+				status: "failed",
+				summary: `Worker did not return a parseable refinement result and the correction prompt failed (${message}).`,
+				rawResponse: originalRaw,
+				usage: priorUsage,
+			};
+		}
+
+		const correctedUsage = mergeUsage(priorUsage, extractTokenUsage(session.messages));
+		if (abortSignal?.aborted) {
+			return {
+				status: "cancelled",
+				summary: "Task cancelled by admin during refinement JSON correction.",
+				rawResponse: "",
+				usage: correctedUsage,
+			};
+		}
+
+		const correctedRaw = getLastAssistantText(session);
+		logger.logResponse(correctedRaw);
+		if (parseRefinementResult(correctedRaw)) {
+			recordSessionLog(key, {
+				level: "info",
+				message: "Refinement JSON correction succeeded.",
+				details: { type: "refinement_correction_result" },
+			});
+			return { ...parseExecutionResult(correctedRaw), usage: correctedUsage };
+		}
+
+		recordSessionLog(key, {
+			level: "error",
+			message: "Refinement result remained invalid after one correction prompt.",
+			details: { type: "refinement_protocol_violation_exhausted" },
+		});
+		return {
+			status: "failed",
+			summary: "Worker did not return a parseable refinement result after one correction prompt.",
+			rawResponse: correctedRaw || originalRaw,
+			usage: correctedUsage,
+		};
 	}
 
 	private async correctStatusProtocol(

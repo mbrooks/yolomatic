@@ -155,8 +155,8 @@ export class SessionManager implements SessionRepository {
 		});
 	}
 
-	async markFailed(owner: string, repo: string, issueNumber: number, reason?: string): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+	async markFailed(owner: string, repo: string, issueNumber: number, reason?: string, kind: SessionKind = "implementation"): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
@@ -171,8 +171,8 @@ export class SessionManager implements SessionRepository {
 		});
 	}
 
-	async markComplete(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+	async markComplete(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}
@@ -251,8 +251,8 @@ export class SessionManager implements SessionRepository {
 		});
 	}
 
-	async restartSession(owner: string, repo: string, issueNumber: number): Promise<SessionState> {
-		const existing = await this.store.get(owner, repo, issueNumber);
+	async restartSession(owner: string, repo: string, issueNumber: number, kind: SessionKind = "implementation"): Promise<SessionState> {
+		const existing = await this.store.get(owner, repo, issueNumber, kind);
 		if (!existing) {
 			throw new Error(`No session for ${owner}/${repo}#${issueNumber}`);
 		}

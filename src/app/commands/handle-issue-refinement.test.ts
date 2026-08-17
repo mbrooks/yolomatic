@@ -1151,6 +1151,41 @@ describe("HandleIssueRefinement", () => {
 		expect(attempt!.steeringPrompt).toBe("Focus on polling");
 	});
 
+	it("restarts the latest failed refinement against the current issue", async () => {
+		store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 1,
+			requester: "original-requester",
+			originalTitle: "Old title",
+			originalBody: "Old body",
+			originalBodyFingerprint: "old-fingerprint",
+			instructionSource: "prompt-defaults",
+			state: "failed",
+			failureReason: "invalid JSON",
+			steeringPrompt: "Keep it narrow",
+		});
+		github.getIssue.mockResolvedValue({ state: "open", title: "Current title", body: "Current body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.restart("mbrooks", "yolomatic", 1);
+
+		expect(executor.executeRefinement).toHaveBeenCalledWith(
+			expect.objectContaining({ title: "Current title", body: "Current body", kind: "refinement" }),
+			undefined,
+			"Keep it narrow",
+		);
+		const attempts = store.listAttemptsByIssue("mbrooks", "yolomatic", 1);
+		expect(attempts).toHaveLength(2);
+		expect(attempts.find((attempt) => attempt.requester === "admin")).toEqual(
+			expect.objectContaining({ state: "applied" }),
+		);
+	});
+
 	function createGitHubMock() {
 		return {
 			postComment: vi.fn(async () => 1),

@@ -27,6 +27,14 @@ export function SessionDetail({
 			</div>
 		);
 	}
+	const availableActions = selected.kind === "refinement"
+		? SESSION_ACTIONS.filter(
+			(action) =>
+				(action.key === "restart" || action.key === "mark-complete") &&
+				(selected.status === "failed" || selected.status === "cancelled") &&
+				action.visible(selected.status),
+		)
+		: SESSION_ACTIONS.filter((action) => action.visible(selected.status));
 
 	return (
 		<div className="detail-pane">
@@ -137,11 +145,11 @@ export function SessionDetail({
 				</div>
 			) : null}
 
-			{selected.kind === "implementation" ? (
+			{availableActions.length > 0 ? (
 				<div className="detail-section">
 					<h3>Actions</h3>
 					<div className="detail-actions">
-						{SESSION_ACTIONS.filter((action) => action.visible(selected.status)).map((action) => (
+						{availableActions.map((action) => (
 							<SessionActionControl
 								key={action.key}
 								session={selected}

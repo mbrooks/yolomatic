@@ -42,8 +42,8 @@ const registry = new AdminRouteRegistry()
 			if (!body.command) {
 				throw new ValidationError("Missing command");
 			}
-			if (kind !== "implementation") {
-				throw new ValidationError("Commands are only available for implementation sessions");
+			if (kind === "refinement" && body.command !== "restart" && body.command !== "mark-complete") {
+				throw new ValidationError("Restart and Mark complete are the only commands available for refinement sessions");
 			}
 			const result = await ctx.deps.runSessionCommand.execute(
 				owner,
@@ -51,6 +51,7 @@ const registry = new AdminRouteRegistry()
 				issueNumber,
 				body.command,
 				body.payload,
+				kind as "implementation" | "refinement",
 			);
 			if (!result.success) {
 				sendJson(ctx.response, mapResultToStatus(result.code), { error: result.message });
