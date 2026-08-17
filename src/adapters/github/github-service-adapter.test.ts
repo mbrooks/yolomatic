@@ -306,6 +306,71 @@ describe("GitHubServiceAdapter", () => {
 		});
 	});
 
+	describe("listOpenPullRequests", () => {
+		it("returns open PR numbers from a single page", async () => {
+			const octokit = createMockOctokit({
+				pulls: {
+					list: vi.fn(async () => ({
+						data: [
+							{ number: 11 },
+							{ number: 12 },
+						],
+					})),
+				},
+			});
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listOpenPullRequests("mbrooks", "yolomatic");
+			expect(octokit.pulls.list).toHaveBeenCalledWith({ owner: "mbrooks", repo: "yolomatic", state: "open", per_page: 100, page: 1 });
+			expect(result).toEqual([11, 12]);
+		});
+
+		it("paginates until a short page is returned", async () => {
+			const page1 = Array.from({ length: 100 }, (_, i) => ({ number: 1000 + i }));
+			const page2 = [{ number: 5 }, { number: 6 }];
+			const list = vi.fn(async (_args: unknown) => {
+				const page = (_args as { page: number }).page;
+				return { data: page === 1 ? page1 : page2 };
+			});
+			const octokit = createMockOctokit({ pulls: { list } });
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listOpenPullRequests("mbrooks", "yolomatic");
+			expect(list).toHaveBeenCalledTimes(2);
+			expect(list).toHaveBeenNthCalledWith(2, { owner: "mbrooks", repo: "yolomatic", state: "open", per_page: 100, page: 2 });
+			expect(result).toHaveLength(102);
+			expect(result[0]).toBe(1000);
+			expect(result[101]).toBe(6);
+		});
+
+		it("stops at the safety cap of 500 PRs", async () => {
+			const fullPage = () => ({ data: Array.from({ length: 100 }, (_, i) => ({ number: i })) });
+			const list = vi.fn(fullPage);
+			const octokit = createMockOctokit({ pulls: { list } });
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listOpenPullRequests("mbrooks", "yolomatic");
+			expect(result).toHaveLength(500);
+		});
+
+		it("returns what was collected so far on error", async () => {
+			let calls = 0;
+			const list = vi.fn(async () => {
+				calls += 1;
+				if (calls === 1) return { data: [{ number: 7 }] };
+				throw new Error("network down");
+			});
+			const octokit = createMockOctokit({ pulls: { list } });
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			const result = await adapter.listOpenPullRequests("mbrooks", "yolomatic");
+			expect(result).toEqual([7]);
+		});
+
+		it("returns an empty array when the first page errors", async () => {
+			const list = vi.fn(async () => { throw new Error("nope"); });
+			const octokit = createMockOctokit({ pulls: { list } });
+			const adapter = new GitHubServiceAdapter({ githubToken: "token", octokit: octokit as never });
+			expect(await adapter.listOpenPullRequests("mbrooks", "yolomatic")).toEqual([]);
+		});
+	});
+
 	describe("getIssue", () => {
 		it("returns issue state", async () => {
 			const octokit = createMockOctokit();

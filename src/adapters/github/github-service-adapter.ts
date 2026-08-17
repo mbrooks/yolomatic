@@ -156,6 +156,32 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		return data.map((pr) => ({ number: pr.number, html_url: pr.html_url }));
 	}
 
+	async listOpenPullRequests(owner: string, repo: string): Promise<number[]> {
+		const numbers: number[] = [];
+		const perPage = 100;
+		const maxPrs = 500;
+		let page = 1;
+		try {
+			while (true) {
+				const { data } = await this.octokit.pulls.list({
+					owner,
+					repo,
+					state: "open",
+					per_page: perPage,
+					page,
+				});
+				for (const pr of data) {
+					numbers.push(pr.number);
+					if (numbers.length >= maxPrs) return numbers;
+				}
+				if (data.length < perPage) return numbers;
+				page += 1;
+			}
+		} catch {
+			return numbers;
+		}
+	}
+
 	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; title?: string; body?: string } | null> {
 		try {
 			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });

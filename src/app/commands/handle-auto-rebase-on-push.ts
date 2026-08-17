@@ -99,7 +99,24 @@ export class HandleAutoRebaseOnPush {
 			return;
 		}
 
-		for (const session of candidates) {
+		// Restrict to PRs that are currently open (not merged, not closed) using a
+		// single repo-wide listing, so merged/closed PRs that linger in the session
+		// store are excluded before any per-PR `getPullRequest` round-trip. This
+		// matches the design intent in `design/github-workflow.md` ("Enumerate
+		// Yolomatic-owned open PRs") and avoids repeated
+		// `[auto-rebase] ignored: PR #X is merged` noise on every default-branch push.
+		const openPrNumbers = await this.deps.github.listOpenPullRequests(owner, repo);
+		const openPrSet = new Set(openPrNumbers);
+		const openCandidates = candidates.filter(
+			(session) => session.prNumber !== undefined && openPrSet.has(session.prNumber),
+		);
+
+		if (openCandidates.length === 0) {
+			process.stdout.write(`[auto-rebase] no open Yolomatic-owned PRs for ${owner}/${repo}\n`);
+			return;
+		}
+
+		for (const session of openCandidates) {
 			try {
 				await this.processCandidate(owner, repo, session);
 			} catch (error) {
@@ -123,7 +140,10 @@ export class HandleAutoRebaseOnPush {
 			return;
 		}
 		if (info.merged || info.state !== "open") {
-			process.stdout.write(`[auto-rebase] ignored: PR #${prNumber} is ${info.merged ? "merged" : info.state}\n`);
+			// Defensive fallback: the candidate was reported open by listOpenPullRequests
+		// but is now merged/closed (race between listing and polling). Skip silently
+		// rather than emitting per-PR noise; the open-PR listing is the authoritative
+		// filter per the design.
 			return;
 		}
 

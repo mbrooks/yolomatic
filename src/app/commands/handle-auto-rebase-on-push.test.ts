@@ -39,6 +39,7 @@ const basePayload: AutoRebasePushPayload = {
 interface CreateHandlerOverrides {
 	sessions?: SessionState[];
 	getPullRequest?: (owner: string, repo: string, prNumber: number) => Promise<PullRequestInfo | null>;
+	listOpenPullRequests?: (owner: string, repo: string) => Promise<number[]>;
 	getGitStatus?: () => Promise<string>;
 	execute?: () => Promise<import("../../executor/index.js").ExecutionResult>;
 	isDraining?: () => boolean;
@@ -110,6 +111,13 @@ function createHandler(overrides: CreateHandlerOverrides = {}) {
 		updatePullRequestBranch: vi.fn(),
 		createPullRequest: vi.fn(),
 		markPullRequestReadyForReview: vi.fn(),
+		listOpenPullRequests: overrides.listOpenPullRequests
+			? vi.fn(overrides.listOpenPullRequests)
+			: vi.fn(async () =>
+					sessionsList
+						.map((s) => s.prNumber)
+						.filter((n): n is number => n !== undefined),
+			 ),
 		createIssue: vi.fn(),
 		initializeEmptyRepo: vi.fn(),
 		fileSelfReport: vi.fn(),
@@ -299,11 +307,74 @@ describe("HandleAutoRebaseOnPush", () => {
 	it("ignores a PR that is closed or merged", async () => {
 		const { handler, github, executor } = createHandler({
 			sessions: [makeSession({ prNumber: 99 })],
+			listOpenPullRequests: async () => [], // PR #99 is merged/closed => not open
 			getPullRequest: async () => ({ head: { ref: "yolomatic/issue-56" }, state: "closed", merged: true, mergeable: false, mergeableState: "dirty", draft: false }),
 		});
 		await handler.execute(basePayload);
+		expect(github.listOpenPullRequests).toHaveBeenCalledWith("mbrooks", "yolomatic");
+		expect(github.getPullRequest).not.toHaveBeenCalled();
 		expect(github.postPRComment).not.toHaveBeenCalled();
 		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("does not call getPullRequest or emit an ignored line for a merged PR", async () => {
+		const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		const { handler, github, executor } = createHandler({
+			sessions: [makeSession({ prNumber: 99 })],
+			listOpenPullRequests: async () => [],
+			getPullRequest: async () => ({ head: { ref: "yolomatic/issue-56" }, state: "closed", merged: true, mergeable: false, mergeableState: "dirty", draft: false }),
+		});
+		await handler.execute(basePayload);
+		expect(github.getPullRequest).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
+		const output = write.mock.calls.map((c) => String(c[0])).join("");
+		expect(output).not.toContain("is merged");
+		expect(output).not.toContain("is closed");
+		write.mockRestore();
+	});
+
+	it("does not call getPullRequest for a closed-but-not-merged PR", async () => {
+		const { handler, github, executor } = createHandler({
+			sessions: [makeSession({ prNumber: 99 })],
+			listOpenPullRequests: async () => [],
+			getPullRequest: async () => ({ head: { ref: "yolomatic/issue-56" }, state: "closed", merged: false, mergeable: false, mergeableState: "dirty", draft: false }),
+		});
+		await handler.execute(basePayload);
+		expect(github.getPullRequest).not.toHaveBeenCalled();
+		expect(executor.execute).not.toHaveBeenCalled();
+		expect(github.postPRComment).not.toHaveBeenCalled();
+	});
+
+	it("calls listOpenPullRequests once per push for the pushed repository", async () => {
+		const { handler, github } = createHandler({
+			sessions: [makeSession({ prNumber: 99 })],
+			listOpenPullRequests: async () => [99],
+			getPullRequest: async () => ({ head: { ref: "yolomatic/issue-56" }, state: "open", merged: false, mergeable: true, mergeableState: "clean", draft: false }),
+		});
+		await handler.execute(basePayload);
+		expect(github.listOpenPullRequests).toHaveBeenCalledTimes(1);
+		expect(github.listOpenPullRequests).toHaveBeenCalledWith("mbrooks", "yolomatic");
+	});
+
+	it("processes only the open conflicting PR when mixing one merged and one open", async () => {
+		const s1 = makeSession({ issueNumber: 56, prNumber: 99, branch: "yolomatic/issue-56" });
+		const s2 = makeSession({ issueNumber: 57, prNumber: 100, branch: "yolomatic/issue-57" });
+		const prByNumber: Record<number, PullRequestInfo> = {
+			100: { head: { ref: "yolomatic/issue-57" }, state: "open", merged: false, mergeable: false, mergeableState: "dirty", draft: false },
+		};
+		const getPullRequest = vi.fn(async (_o: string, _r: string, pr: number) => prByNumber[pr] ?? null);
+		const { handler, github, executor } = createHandler({
+			sessions: [s1, s2],
+			listOpenPullRequests: async () => [100], // #99 merged, #100 open
+			getPullRequest,
+			execute: async () => ({ status: "failed" as const, summary: "stuck", rawResponse: "YOLO_STATUS: failed\nstuck." }),
+		});
+		await handler.execute(basePayload);
+		expect(github.getPullRequest).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
+		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yolomatic", 100);
+		expect(github.postPRComment).not.toHaveBeenCalledWith("mbrooks", "yolomatic", 99, expect.anything());
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 100, expect.stringContaining("Automatic conflict resolution"));
+		expect(executor.execute).toHaveBeenCalled();
 	});
 
 	it("ignores a PR whose head branch does not match the session invariant", async () => {

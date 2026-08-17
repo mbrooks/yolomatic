@@ -71,6 +71,7 @@ function makeDeps(overrides?: {
 		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: overrides?.createPullRequest ? vi.fn(overrides.createPullRequest) : vi.fn(async () => null),
 		markPullRequestReadyForReview: vi.fn(async () => undefined),
+		listOpenPullRequests: vi.fn(async () => []),
 		createIssue: vi.fn(),
 		initializeEmptyRepo: vi.fn(async () => undefined),
 		postComment: vi.fn(async () => 1),

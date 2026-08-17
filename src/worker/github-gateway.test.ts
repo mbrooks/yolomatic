@@ -36,6 +36,7 @@ function makeFakeGateway(overrides: Partial<GitHubGatewayService> = {}): GitHubG
 		updatePullRequestBranch: vi.fn(async () => undefined),
 		createPullRequest: vi.fn(async () => null),
 		markPullRequestReadyForReview: vi.fn(async () => undefined),
+		listOpenPullRequests: vi.fn(async () => []),
 		listPullRequests: vi.fn(async () => []),
 		getIssue: vi.fn(async () => null),
 		createIssue: vi.fn(async () => ({ number: 1, html_url: "u" })),
