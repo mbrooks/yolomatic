@@ -16,6 +16,15 @@ import { WorkspaceManager } from "../../../workspace/manager.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
 import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
 import type { User } from "../../../users/store.js";
+import {
+	VALID_EVENT_MODES,
+	VALID_ONBOARDING_PROVIDERS,
+	MIN_POLL_INTERVAL_MS,
+	isValidEventMode,
+	isPollingMode,
+	isWebhookMode,
+	isValidPollIntervalMs,
+} from "../../../domain/onboarding/policy.js";
 
 const REQUIRED_ONBOARDING_SETTINGS = [
 	"github_token",
@@ -45,7 +54,7 @@ export const ONBOARDING_CONFIG_KEYS = [
 ] as const;
 
 /** LLM provider values accepted by the onboarding submission handler. */
-export const VALID_ONBOARDING_PROVIDERS: readonly string[] = ["ollama", "openai"];
+export { VALID_ONBOARDING_PROVIDERS } from "../../../domain/onboarding/policy.js";
 
 export const SENSITIVE_ONBOARDING_KEYS: ReadonlySet<string> = new Set([
 	"github_token",
@@ -103,28 +112,14 @@ export function resolveSecretSetting(
 	return undefined;
 }
 
-export const VALID_EVENT_MODES: readonly string[] = ["webhook", "polling", "both"];
-export const MIN_POLL_INTERVAL_MS = 1000;
-
-export function isValidEventMode(mode: string | undefined): boolean {
-	return typeof mode === "string" && VALID_EVENT_MODES.includes(mode);
-}
-
-export function isPollingMode(mode: string | undefined): boolean {
-	return mode === "polling" || mode === "both";
-}
-
-export function isWebhookMode(mode: string | undefined): boolean {
-	return mode === "webhook" || mode === "both";
-}
-
-export function isValidPollIntervalMs(raw: string | undefined): boolean {
-	if (raw === undefined) return false;
-	const trimmed = raw.trim();
-	if (!/^[0-9]+$/.test(trimmed)) return false;
-	const value = Number.parseInt(trimmed, 10);
-	return Number.isInteger(value) && value >= MIN_POLL_INTERVAL_MS;
-}
+export {
+	VALID_EVENT_MODES,
+	MIN_POLL_INTERVAL_MS,
+	isValidEventMode,
+	isPollingMode,
+	isWebhookMode,
+	isValidPollIntervalMs,
+} from "../../../domain/onboarding/policy.js";
 
 function storeConfiguredRepositories(
 	deps: AdminRouterDeps,

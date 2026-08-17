@@ -7,6 +7,7 @@ export default defineConfig({
 		include: ["tests/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
 		pool: "threads",
 		maxThreads: 1,
+		setupFiles: ["./tests/setup/happy-dom-localstorage.ts"],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],
