@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { MOCK_EXCEPTIONS_FILE, runMockBoundaryGuardrail } from "./mock-boundary.js";
+
 export const MINIMUM_COVERAGE = 80;
 export const COVERAGE_SUMMARY_FILE = resolve(process.cwd(), "coverage/coverage-summary.json");
 
@@ -238,6 +240,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 				console.error(`FAIL: ${failure}`);
 			}
 			console.error(`\nGuardrail failed: ${result.failures.length} issue(s).`);
+			exitCode = 1;
+		}
+
+		const mockBoundary = await runMockBoundaryGuardrail(
+			getDefaultChangedFiles(),
+			MOCK_EXCEPTIONS_FILE,
+		);
+		if (mockBoundary.failures.length > 0) {
+			for (const failure of mockBoundary.failures) {
+				console.error(`FAIL: ${failure}`);
+			}
+			console.error(
+				`\nMock-boundary guardrail failed: ${mockBoundary.failures.length} issue(s).`,
+			);
 			exitCode = 1;
 		}
 

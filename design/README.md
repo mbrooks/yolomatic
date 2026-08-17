@@ -25,6 +25,7 @@ implemented by Yolomatic, plus explicitly labeled proposed extensions:
 - [schema.md](schema.md): SQLite tables, columns, indexes, and persistence conventions used by the control plane
 - [session-migration.md](session-migration.md): retiring the legacy file-backed session compatibility layer, the read-only audit, durable kind normalization, and the explicit legacy-file deletion operational step
 - [worker-env-init.md](worker-env-init.md): proposed design for deterministically running a repository-provided `.pi/init.sh` in the worker container before the agent starts
+- [guardrails.md](guardrails.md): coverage enforcement and mock-boundary policy for guardrail-relevant business logic under `src/`
 
 ## Goals
 

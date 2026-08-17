@@ -1,0 +1,179 @@
+{
+  "_comment": "Auditable exception list for the mock-boundary guardrail. Each entry permits a specific relative vi.mock(...) in a specific test file. Add a new entry only when the mock targets an external adapter or composition root (or, for existing internal mocks, mark it legacy with a removal plan). The completeness audit in src/mock-boundary.test.ts pins this set.",
+  "exceptions": [
+    {
+      "testFile": "src/session/stale-detector.test.ts",
+      "module": "../adapters/github/octokit.js",
+      "category": "external-adapter",
+      "reason": "Wraps the third-party Octokit GitHub SDK; mocking isolates unit tests from GitHub API calls."
+    },
+    {
+      "testFile": "src/adapters/http/admin-router.test.ts",
+      "module": "./asset-server.js",
+      "category": "legacy",
+      "reason": "Mocks a sibling static-asset collaborator; grandfathered while the router is decomposed into transport adapters."
+    },
+    {
+      "testFile": "src/admin/features/onboarding/OnboardingWizard.test.tsx",
+      "module": "../../api/onboarding.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/repos/RepoInventoryScreen.test.tsx",
+      "module": "../../api/repos.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/repos/RepoManager.test.tsx",
+      "module": "../../api/repos.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/useRepoIssues.test.ts",
+      "module": "../../api/issues.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates hook tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/IssuesScreen.test.tsx",
+      "module": "./useRepoIssues.js",
+      "category": "legacy",
+      "reason": "Mocks a sibling data hook; grandfathered pending extraction of a testable query seam."
+    },
+    {
+      "testFile": "src/admin/features/issues/IssueDetail.test.tsx",
+      "module": "../../api/issues.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/IssueDetail.test.tsx",
+      "module": "../../api/refinements.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/IssueDetail.test.tsx",
+      "module": "../../api/websocket.js",
+      "category": "composition-root",
+      "reason": "Admin WebSocket transport; mocking isolates UI tests from live socket I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/RefinementPanel.test.tsx",
+      "module": "../../api/refinements.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/features/issues/RefinementPanel.test.tsx",
+      "module": "../../api/websocket.js",
+      "category": "composition-root",
+      "reason": "Admin WebSocket transport; mocking isolates UI tests from live socket I/O."
+    },
+    {
+      "testFile": "src/admin/features/sessions/SessionScreen.test.tsx",
+      "module": "../../hooks/useSessionLog.js",
+      "category": "legacy",
+      "reason": "Mocks a sibling log-streaming hook; grandfathered pending a transport seam."
+    },
+    {
+      "testFile": "src/admin/features/sessions/SessionDetail.test.tsx",
+      "module": "../../hooks/useSessionLog.js",
+      "category": "legacy",
+      "reason": "Mocks a sibling log-streaming hook; grandfathered pending a transport seam."
+    },
+    {
+      "testFile": "src/admin/features/sessions/SessionDetail.test.tsx",
+      "module": "../../api/sessions.js",
+      "category": "composition-root",
+      "reason": "Admin API transport client; mocking isolates UI tests from HTTP I/O."
+    },
+    {
+      "testFile": "src/admin/api/users.test.ts",
+      "module": "./client.js",
+      "category": "composition-root",
+      "reason": "HTTP transport client wiring; mocking isolates API unit tests from network I/O."
+    },
+    {
+      "testFile": "src/admin/api/refinements.test.ts",
+      "module": "./client.js",
+      "category": "composition-root",
+      "reason": "HTTP transport client wiring; mocking isolates API unit tests from network I/O."
+    },
+    {
+      "testFile": "src/admin/api/sessions.test.ts",
+      "module": "./client.js",
+      "category": "composition-root",
+      "reason": "HTTP transport client wiring; mocking isolates API unit tests from network I/O."
+    },
+    {
+      "testFile": "src/admin/api/metrics.test.ts",
+      "module": "./client.js",
+      "category": "composition-root",
+      "reason": "HTTP transport client wiring; mocking isolates API unit tests from network I/O."
+    },
+    {
+      "testFile": "src/admin/api/auth.test.ts",
+      "module": "./client.js",
+      "category": "composition-root",
+      "reason": "HTTP transport client wiring; mocking isolates API unit tests from network I/O."
+    },
+    {
+      "testFile": "src/executor/index.test.ts",
+      "module": "./model-registry.js",
+      "category": "legacy",
+      "reason": "Mocks a sibling model registry; grandfathered pending injection of the registry seam."
+    },
+    {
+      "testFile": "src/executor/index.test.ts",
+      "module": "../logging/llm-logger.js",
+      "category": "external-adapter",
+      "reason": "LLM provider logging side-effect boundary; mocking isolates executor tests from LLM I/O."
+    },
+    {
+      "testFile": "src/executor/index.test.ts",
+      "module": "../logging/session-log-store.js",
+      "category": "external-adapter",
+      "reason": "Persistent session log storage boundary; mocking isolates executor tests from filesystem I/O."
+    },
+    {
+      "testFile": "src/executor/docker-worker.test.ts",
+      "module": "../logging/session-log-store.js",
+      "category": "external-adapter",
+      "reason": "Persistent session log storage boundary; mocking isolates worker tests from filesystem I/O."
+    },
+    {
+      "testFile": "src/worker/runtime.test.ts",
+      "module": "../executor/index.js",
+      "category": "legacy",
+      "reason": "Mocks the executor collaborator; grandfathered pending an executor port seam."
+    },
+    {
+      "testFile": "src/worker/entrypoint.test.ts",
+      "module": "./runtime.js",
+      "category": "legacy",
+      "reason": "Mocks the sibling runtime entry; grandfathered pending dependency injection."
+    },
+    {
+      "testFile": "src/app/commands/resume-interrupted-session.test.ts",
+      "module": "./workflow-helpers.js",
+      "category": "legacy",
+      "reason": "Mocks sibling workflow helpers; grandfathered pending a command-handler seam."
+    },
+    {
+      "testFile": "src/app/commands/resume-interrupted-session.test.ts",
+      "module": "./execute-session.js",
+      "category": "legacy",
+      "reason": "Mocks the sibling session executor; grandfathered pending dependency injection."
+    },
+    {
+      "testFile": "src/app/commands/run-session-command.test.ts",
+      "module": "../../logging/session-log-store.js",
+      "category": "external-adapter",
+      "reason": "Persistent session log storage boundary; mocking isolates command tests from filesystem I/O."
+    }
+  ]
+}
