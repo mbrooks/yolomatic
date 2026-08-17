@@ -4,6 +4,7 @@ import type { GetSession } from "../../app/queries/get-session.js";
 import type { GetSessionLog } from "../../app/queries/get-session-log.js";
 import type { GetRefinementLog } from "../../app/queries/get-refinement-log.js";
 import type { ListRefinementAttempts } from "../../app/queries/list-refinement-attempts.js";
+import type { GetMetrics } from "../../app/queries/get-metrics.js";
 import type { RunSessionCommand } from "../../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../../ports/task-control-service.js";
@@ -55,6 +56,7 @@ const missingDependencyErrors = {
 	ollamaSignInService: "Ollama sign-in service not configured",
 	sessionAuth: "Admin authentication not configured",
 	userStore: "User store not configured",
+	getMetrics: "Metrics query not configured",
 } satisfies Partial<Record<keyof AdminRouterDeps, string>>;
 
 export type RequiredAdminRouteDep = keyof typeof missingDependencyErrors;
@@ -182,6 +184,7 @@ export interface AdminRouterDeps {
 	refinementStore?: RefinementStore;
 	getRefinementLog?: GetRefinementLog;
 	listRefinementAttempts?: ListRefinementAttempts;
+	getMetrics?: GetMetrics;
 	onOnboardingComplete?: () => void | Promise<void>;
 	adminPath?: string;
 	adminDefaultPage?: string;

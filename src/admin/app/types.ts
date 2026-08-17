@@ -118,3 +118,31 @@ export type StatusResponse = {
 	repos: RepoSummary[];
 	sessions: Session[];
 };
+
+/** Daily aggregate bucket for the metrics dashboard time-series. */
+export type MetricsBucket = {
+	date: string;
+	sessions: { total: number; complete: number; failed: number; cancelled: number };
+	tokens: { available: boolean; input: number; output: number; total: number; cost: number };
+	runtimeMs: number;
+};
+
+/** A single recorded per-execution metric, returned in the recent list. */
+export type SessionMetric = {
+	sessionKey: string;
+	owner: string;
+	repo: string;
+	issueNumber: number;
+	kind: "implementation" | "refinement";
+	status: string;
+	startedAt: string;
+	finishedAt: string;
+	durationMs: number;
+	tokenUsage: { available: boolean; input: number; output: number; totalTokens: number; cost: number };
+};
+
+export type MetricsResponse = {
+	windowDays: number;
+	buckets: MetricsBucket[];
+	recent: SessionMetric[];
+};

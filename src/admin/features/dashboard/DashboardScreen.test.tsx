@@ -39,6 +39,7 @@ const defaultProps = {
 	draining: false,
 	repos: [] as RepoSummary[],
 	sessions: [] as Session[],
+	metrics: null,
 	onSelectWorking: vi.fn(),
 	onSelectRepos: vi.fn(),
 	onSelectSession: vi.fn(),

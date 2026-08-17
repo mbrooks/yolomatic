@@ -4,6 +4,12 @@ export interface ExecutionResult {
 	status: "working" | "waiting-feedback" | "complete" | "cancelled" | "failed";
 	summary: string;
 	rawResponse: string;
+	/**
+	 * Aggregated token usage for the run, when the underlying provider reported
+	 * it. Omitted when the provider did not return usage; the control plane
+	 * treats an omitted value as "unknown" for metrics/dashboard purposes.
+	 */
+	usage?: import("./usage.js").TokenUsage;
 }
 
 const STATUS_MARKER_PATTERN = /^YOLO_STATUS:\s*(working|waiting-feedback|complete)$/u;
@@ -41,6 +47,11 @@ export interface RefinementResult {
 	 * that the control plane should update the issue title alongside the body.
 	 */
 	proposedTitle?: string;
+	/**
+	 * Aggregated token usage for the refinement run, when the underlying
+	 * provider reported it. Omitted when unavailable.
+	 */
+	usage?: import("./usage.js").TokenUsage;
 }
 
 function normalizeRefinementInvestigation(value: unknown): string | null {

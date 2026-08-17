@@ -8,6 +8,7 @@ import { GetSession } from "../app/queries/get-session.js";
 import { GetSessionLog } from "../app/queries/get-session-log.js";
 import { GetRefinementLog } from "../app/queries/get-refinement-log.js";
 import { ListRefinementAttempts } from "../app/queries/list-refinement-attempts.js";
+import { GetMetrics } from "../app/queries/get-metrics.js";
 import { RunSessionCommand, type RestartSessionDispatcher } from "../app/commands/run-session-command.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
@@ -25,6 +26,7 @@ import type { ExecutionService } from "../ports/execution-service.js";
 import { DefaultOllamaSignInService } from "../ollama/signin-status.js";
 import type { UserStore } from "../users/store.js";
 import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
+import type { MetricsStore } from "../metrics/store.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -69,6 +71,7 @@ export function createWebhookServerDeps(
 	restartSession?: RestartSessionDispatcher,
 	userStore?: UserStore,
 	sessionAuth?: AdminSessionAuth,
+	metricsStore?: MetricsStore,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -104,5 +107,6 @@ export function createWebhookServerDeps(
 		adminPath,
 		adminDefaultPage,
 		ollamaSignInService: settingsStore ? new DefaultOllamaSignInService(settingsStore) : undefined,
+		getMetrics: metricsStore ? new GetMetrics(metricsStore) : undefined,
 	};
 }

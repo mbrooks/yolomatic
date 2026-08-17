@@ -15,6 +15,7 @@ import type { ExecutionService } from "../ports/execution-service.js";
 import type { WorkerRpcServer } from "../worker/rpc-server.js";
 import type { StartIssueSession } from "../app/commands/start-issue-session.js";
 import type { RestartSessionDispatcher } from "../app/commands/run-session-command.js";
+import type { MetricsStore } from "../metrics/store.js";
 
 import { handleAdminRoute } from "../adapters/http/admin-router.js";
 import { sendText } from "../adapters/http/response-helpers.js";
@@ -39,6 +40,8 @@ type WebhookServerOptions = {
 	restartSession?: RestartSessionDispatcher;
 	userStore?: UserStore;
 	sessionAuth?: AdminSessionAuth;
+	/** SQLite-backed metrics store used to serve the admin metrics API. */
+	metricsStore?: MetricsStore;
 };
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -80,6 +83,7 @@ export function createWebhookServer(
 		options.restartSession,
 		options.userStore,
 		options.sessionAuth,
+		options.metricsStore,
 	);
 
 	serverDeps.skillStore = skillStore;

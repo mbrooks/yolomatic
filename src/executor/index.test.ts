@@ -1004,4 +1004,76 @@ describe("PiAgentExecutor runtime settings injection", () => {
 			else process.env.PI_AGENT_MODEL = originalModel;
 		}
 	});
+
+	it("attaches aggregated token usage to the execution result when the provider reports usage", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const mockSession = {
+			subscribe: vi.fn(() => vi.fn()),
+			prompt: vi.fn(),
+			abort: vi.fn(),
+			messages: [
+				{
+					role: "assistant",
+					content: [{ type: "text", text: "YOLO_STATUS: complete\nDone." }],
+					usage: {
+						input: 100,
+						output: 40,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 140,
+						cost: { input: 0.5, output: 0.3, cacheRead: 0, cacheWrite: 0, total: 0.8 },
+					},
+				},
+			],
+		};
+
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(601));
+
+		expect(result.status).toBe("complete");
+		expect(result.usage).toBeDefined();
+		expect(result.usage!.available).toBe(true);
+		expect(result.usage!.totalTokens).toBe(140);
+		expect(result.usage!.input).toBe(100);
+		expect(result.usage!.output).toBe(40);
+		expect(result.usage!.cost).toBeCloseTo(0.8, 10);
+	});
+
+	it("reports unavailable usage on the result when the provider omits usage", async () => {
+		const dir = await mkdtemp(path.join(os.tmpdir(), "yolomatic-executor-"));
+		const soulPath = path.join(dir, "SOUL.md");
+		await writeFile(soulPath, "SOUL content", "utf-8");
+
+		const mockSession = {
+			subscribe: vi.fn(() => vi.fn()),
+			prompt: vi.fn(),
+			abort: vi.fn(),
+			messages: [
+				{ role: "assistant", content: [{ type: "text", text: "YOLO_STATUS: complete\nDone." }] },
+			],
+		};
+
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+		});
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+
+		const executor = new PiAgentExecutor({ soulPath });
+		const result = await executor.execute(makeState(602));
+
+		expect(result.status).toBe("complete");
+		expect(result.usage).toBeDefined();
+		expect(result.usage!.available).toBe(false);
+		expect(result.usage!.totalTokens).toBe(0);
+	});
 });

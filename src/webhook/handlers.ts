@@ -24,6 +24,7 @@ import { RefinementStore } from "../refinement/store.js";
 import { RepositoryStore } from "../repos/repository-store.js";
 import path from "node:path";
 import { repoKey } from "../repos/repository.js";
+import type { MetricsRecorder } from "../ports/metrics-recorder.js";
 
 export interface WebhookHandlers {
 	handleGitHubEvent?(event: GitHubEvent): Promise<void>;
@@ -64,6 +65,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			maxConflictAttempts?: number;
 			mergeabilityPollDelayMs?: number;
 			mergeabilityPollMaxAttempts?: number;
+			/** Optional recorder for per-execution metrics (runtime + token usage). */
+			metrics?: MetricsRecorder;
 		},
 	) {
 		const sessions = deps.sessionManager;
@@ -100,6 +103,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			adminBaseUrl: deps.adminBaseUrl,
 			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
 			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
+			metrics: deps.metrics,
 		});
 
 		const execDeps = {
@@ -117,6 +121,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			adminBaseUrl: deps.adminBaseUrl,
 			resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
 			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
+			metrics: deps.metrics,
 		};
 
 		this.handleIssueEventCmd = new HandleIssueEvent({

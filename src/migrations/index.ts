@@ -317,6 +317,34 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 15,
+		name: "create_session_metrics_table",
+		up(db) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS session_metrics (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					session_key TEXT NOT NULL,
+					owner TEXT NOT NULL,
+					repo TEXT NOT NULL,
+					issue_number INTEGER NOT NULL,
+					kind TEXT NOT NULL,
+					status TEXT NOT NULL,
+					started_at TEXT NOT NULL,
+					finished_at TEXT NOT NULL,
+					duration_ms INTEGER NOT NULL,
+					tokens_available INTEGER NOT NULL,
+					input_tokens INTEGER NOT NULL,
+					output_tokens INTEGER NOT NULL,
+					total_tokens INTEGER NOT NULL,
+					cost REAL NOT NULL,
+					recorded_at TEXT NOT NULL
+				)
+			`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_recorded ON session_metrics(recorded_at)`);
+			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_owner_repo ON session_metrics(owner, repo)`);
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

@@ -1204,4 +1204,153 @@ describe("ExecuteSession", () => {
 		);
 		expect(heartbeatCalls.length).toBeGreaterThanOrEqual(2);
 	});
+
+	it("records a per-execution metric with runtime, status, and token usage", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => ({
+					status: "complete" as const,
+					summary: "Done.",
+					rawResponse: "YOLO_STATUS: complete\nDone.",
+					usage: { available: true, input: 100, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: 140, cost: 0.8 },
+				})),
+				executePRReview: vi.fn(),
+			},
+		});
+		const metrics = { record: vi.fn() };
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+			metrics,
+		});
+
+		await execute.run(state);
+
+		expect(metrics.record).toHaveBeenCalledOnce();
+		const metric = (metrics.record as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(metric).toMatchObject({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 1,
+			kind: "implementation",
+			status: "complete",
+		});
+		expect(metric.sessionKey).toBe("github-mbrooks-yolomatic-issue-1-implementation");
+		expect(typeof metric.durationMs).toBe("number");
+		expect(metric.durationMs).toBeGreaterThanOrEqual(0);
+		expect(metric.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		expect(metric.finishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		expect(metric.tokenUsage.available).toBe(true);
+		expect(metric.tokenUsage.totalTokens).toBe(140);
+	});
+
+	it("records a metric with unavailable token usage when the provider omits usage", async () => {
+		const deps = makeDeps();
+		const metrics = { record: vi.fn() };
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+			metrics,
+		});
+
+		await execute.run(state);
+
+		const metric = (metrics.record as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(metric.tokenUsage.available).toBe(false);
+		expect(metric.tokenUsage.totalTokens).toBe(0);
+	});
+
+	it("records a failed metric when the executor throws", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async () => {
+					throw new Error("boom");
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+		const metrics = { record: vi.fn() };
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: false,
+			metrics,
+		});
+
+		await expect(execute.run(state)).rejects.toThrow("boom");
+
+		expect(metrics.record).toHaveBeenCalledOnce();
+		const metric = (metrics.record as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(metric.status).toBe("failed");
+		expect(metric.tokenUsage.available).toBe(false);
+	});
+
+	it("does not require a metrics recorder (no-op when omitted)", async () => {
+		const deps = makeDeps();
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await expect(execute.run(state)).resolves.toBeUndefined();
+	});
+
+	it("invokes the onSessionCreated callback exposed by the executor", async () => {
+		const deps = makeDeps({
+			executor: {
+				execute: vi.fn(async (s, _comment, _signal, onSessionCreated) => {
+					if (typeof onSessionCreated === "function") {
+						onSessionCreated({ steer: vi.fn(async () => true) } as never);
+					}
+					return {
+						status: "complete" as const,
+						summary: "Done.",
+						rawResponse: "YOLO_STATUS: complete\nDone.",
+					};
+				}),
+				executePRReview: vi.fn(),
+			},
+		});
+		const execute = new ExecuteSession({
+			sessions: deps.sessions,
+			workspaces: deps.workspaces,
+			executor: deps.executor,
+			github: deps.github,
+			tasks: deps.tasks,
+			clock: deps.clock,
+			defaultBranch: "main",
+			githubUsername: "yolomatic-bot",
+			selfReportEnabled: true,
+		});
+
+		await expect(execute.run(state)).resolves.toBeUndefined();
+		expect((deps.executor.execute as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+	});
 });

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerState } from "../hooks/useServerState.js";
+import { useMetrics } from "../hooks/useMetrics.js";
 import { useRoute, navigate, DEFAULT_SETTINGS_TAB, type Route } from "./routes.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { RestartBanner } from "../components/RestartBanner.js";
@@ -13,11 +14,12 @@ import { RepoSettingsScreen } from "../features/repos/RepoSettingsScreen.js";
 import { LoginScreen } from "../features/auth/LoginScreen.js";
 import { fetchMe, logout, type AuthUser } from "../api/auth.js";
 import { isInProgressStatus } from "../lib/status-helpers.js";
-import type { AgentStatus, RepoSummary, Session } from "./types.js";
+import type { AgentStatus, MetricsResponse, RepoSummary, Session } from "./types.js";
 
 export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = {}): React.ReactElement {
 	const [tick, setTick] = useState(0);
 	const serverState = useServerState(tick);
+	const metricsState = useMetrics(tick);
 	const route = useRoute();
 	const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
 
@@ -47,6 +49,7 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 	const agentStatus: AgentStatus = serverState.status === "ready" ? serverState.data.agent : "offline";
 	const sessions = serverState.status === "ready" ? serverState.data.sessions : [];
 	const repos = serverState.status === "ready" ? serverState.data.repos : [];
+	const metrics = metricsState.status === "ready" ? metricsState.data : null;
 
 	const workingSessions = useMemo(() => sessions.filter((s) => isInProgressStatus(s.status)), [sessions]);
 
@@ -185,6 +188,7 @@ export function App({ onRerunOnboarding }: { onRerunOnboarding?: () => void } = 
 						onSelectSettings={handleSelectSettings}
 						onDeselectSession={handleDeselectSession}
 						onRerunOnboarding={onRerunOnboarding}
+						metrics={metrics}
 					/>
 			)}
 
@@ -254,6 +258,7 @@ function AppContent({
 	onSelectSettings,
 	onDeselectSession,
 	onRerunOnboarding,
+	metrics,
 }: {
 	route: Route;
 	repos: RepoSummary[];
@@ -274,6 +279,7 @@ function AppContent({
 	onSelectSettings: () => void;
 	onDeselectSession: () => void;
 	onRerunOnboarding?: () => void;
+	metrics: MetricsResponse | null;
 }): React.ReactElement {
 	if (route.screen === "dashboard") {
 		return (
@@ -283,6 +289,7 @@ function AppContent({
 				draining={draining}
 				repos={repos}
 				sessions={sessions}
+				metrics={metrics}
 				onSelectWorking={onSelectWorking}
 				onSelectRepos={onSelectRepos}
 				onSelectSession={onSelectSession}
@@ -382,6 +389,7 @@ function AppContent({
 			draining={draining}
 			repos={repos}
 			sessions={sessions}
+			metrics={metrics}
 			onSelectWorking={onSelectWorking}
 			onSelectRepos={onSelectRepos}
 			onSelectSession={onSelectSession}
