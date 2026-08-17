@@ -265,3 +265,27 @@ Index:
   operational import/recovery tool but is **no longer run automatically at
   boot**. On-disk files are preserved (not deleted) so a rollback can re-read
   them. See `design/session-migration.md`.
+- `RefinementStore` opens `bot-state.sqlite` (the canonical database). It
+  previously opened a separate `refinement.sqlite`; migration 16
+  (`migrate_refinement_store_into_bot_state`) copies any remaining legacy
+  rows into `bot-state.sqlite` in a single transaction and records a durable
+  marker. The legacy `refinement.sqlite` file is preserved for rollback and
+  removed only through an explicit operational cleanup step. See
+  `design/refinement-migration.md`.
+
+### `refinement_store_migration`
+
+Durable marker written by migration 16. A single row (`id = 1`) records that
+the legacy `refinement.sqlite` rows have been copied into `bot-state.sqlite`.
+Its presence short-circuits the migration body on subsequent boots. Created on
+`bot-state.sqlite` even when no legacy file exists so the marker check is
+reliable on fresh installs.
+
+| Column               | Type    | Constraints        | Notes                                                       |
+| -------------------- | ------- | ------------------ | ----------------------------------------------------------- |
+| `id`                 | INTEGER | `PRIMARY KEY`      | Always `1` (single-shot migration marker).                |
+| `source_path`        | TEXT    | `NOT NULL`         | Absolute path of the legacy `refinement.sqlite` copied from. |
+| `source_size`        | INTEGER | `NOT NULL`         | Byte size of the legacy file at copy time.                 |
+| `attempts_copied`    | INTEGER | `NOT NULL`         | Number of `refinement_attempts` rows copied.              |
+| `instructions_copied`| INTEGER | `NOT NULL`         | Number of `refinement_instructions` rows copied.          |
+| `migrated_at`        | TEXT    | `NOT NULL`         | ISO timestamp the copy transaction committed.             |

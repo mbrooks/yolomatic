@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { migrateRefinementStoreIntoBotState } from "./refinement-consolidation.js";
 
 export interface Migration {
 	id: number;
@@ -343,6 +344,17 @@ export const MIGRATIONS: Migration[] = [
 			`);
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_recorded ON session_metrics(recorded_at)`);
 			db.exec(`CREATE INDEX IF NOT EXISTS idx_session_metrics_owner_repo ON session_metrics(owner, repo)`);
+		},
+	},
+	{
+		id: 16,
+		name: "migrate_refinement_store_into_bot_state",
+		up(db) {
+			// Delegates to `refinement-consolidation.ts`. See that module and
+			// `design/refinement-migration.md` for the documented, idempotent,
+			// rollback-safe copy of legacy `refinement.sqlite` rows into
+			// `bot-state.sqlite`.
+			migrateRefinementStoreIntoBotState(db);
 		},
 	},
 ];

@@ -225,7 +225,7 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const metricsStore = new MetricsStore(new DatabaseSync(path.join(config.memoryDir, "bot-state.sqlite")));
-	const refinementStore = new RefinementStore(path.join(config.memoryDir, "refinement.sqlite"));
+	const refinementStore = new RefinementStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
 		workspaceManager,
