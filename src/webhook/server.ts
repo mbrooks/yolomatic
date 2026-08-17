@@ -30,65 +30,94 @@ import { CleanupOldSessions } from "../app/commands/cleanup-old-sessions.js";
 import type { UserStore } from "../users/store.js";
 import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 
-type WebhookServerOptions = {
+/**
+ * Typed dependency/options object for {@link createWebhookServer}. Replaces the
+ * long positional parameter list so construction sites are self-documenting
+ * and observable at the composition boundary without counting argument
+ * positions. All fields except `secret`, `handlers`, and `sessionStore` are
+ * optional and fall back to internal no-op/fallback services.
+ */
+export interface WebhookServerOptions {
+	secret: string;
+	handlers: WebhookHandlers;
+	sessionStore: SessionStore;
+	taskController?: TaskController;
+	workspaceManager?: WorkspaceService;
+	staleDetector?: StaleSessionDetector;
+	archiveDir?: string;
+	githubService?: GitHubService;
+	settingsStore?: SettingsStore;
+	skillStore?: SkillStore;
+	repoSkillService?: RepoSkillService;
+	executor?: ExecutionService;
+	workerRpcServer?: WorkerRpcServer;
+	refinementStore?: RefinementStore;
 	adminAssetsDir?: string;
+	adminPath?: string;
+	adminDefaultPage?: string;
 	onOnboardingComplete?: () => void | Promise<void>;
 	prebuiltStartIssueSession?: StartIssueSession;
 	repositoryStore?: RepositoryStore;
-	adminPath?: string;
-	adminDefaultPage?: string;
 	restartSession?: RestartSessionDispatcher;
 	userStore?: UserStore;
 	sessionAuth?: AdminSessionAuth;
 	/** SQLite-backed metrics store used to serve the admin metrics API. */
 	metricsStore?: MetricsStore;
-};
+}
 
 export { readBody, verifySignature } from "./http-utils.js";
 
-export function createWebhookServer(
-	secret: string,
-	handlers: WebhookHandlers,
-	sessionStore: SessionStore,
-	taskController?: TaskController,
-	workspaceManager?: WorkspaceService,
-	staleDetector?: StaleSessionDetector,
-	archiveDir?: string,
-	options: WebhookServerOptions = {},
-	githubService?: GitHubService,
-	settingsStore?: SettingsStore,
-	skillStore?: SkillStore,
-	repoSkillService?: RepoSkillService,
-	executor?: ExecutionService,
-	workerRpcServer?: WorkerRpcServer,
-	refinementStore?: RefinementStore,
-) {
-	const adminPath = options.adminPath ?? DEFAULT_ADMIN_PATH;
-	const adminDefaultPage = options.adminDefaultPage ?? DEFAULT_ADMIN_DEFAULT_PAGE;
+export function createWebhookServer(options: WebhookServerOptions) {
+	const {
+		secret,
+		handlers,
+		sessionStore,
+		taskController,
+		workspaceManager,
+		staleDetector,
+		archiveDir,
+		githubService,
+		settingsStore,
+		skillStore,
+		repoSkillService,
+		executor,
+		workerRpcServer,
+		refinementStore,
+		adminAssetsDir,
+		adminPath = DEFAULT_ADMIN_PATH,
+		adminDefaultPage = DEFAULT_ADMIN_DEFAULT_PAGE,
+		onOnboardingComplete,
+		prebuiltStartIssueSession,
+		repositoryStore,
+		restartSession,
+		userStore,
+		sessionAuth,
+		metricsStore,
+	} = options;
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
 		taskController,
 		workspaceManager,
 		staleDetector,
 		archiveDir,
-		options.adminAssetsDir,
+		adminAssetsDir,
 		githubService,
 		settingsStore,
 		executor,
-		options.prebuiltStartIssueSession,
-		options.repositoryStore,
+		prebuiltStartIssueSession,
+		repositoryStore,
 		adminPath,
 		adminDefaultPage,
 		refinementStore,
-		options.restartSession,
-		options.userStore,
-		options.sessionAuth,
-		options.metricsStore,
+		restartSession,
+		userStore,
+		sessionAuth,
+		metricsStore,
 	);
 
 	serverDeps.skillStore = skillStore;
 	serverDeps.repoSkillService = repoSkillService;
-	serverDeps.onOnboardingComplete = options.onOnboardingComplete;
+	serverDeps.onOnboardingComplete = onOnboardingComplete;
 
 	const authProvider: WebSocketAuthProvider = {
 		isAuthorized: (request) => {

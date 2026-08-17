@@ -1,650 +1,164 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 
-// dotenv/config side effect must be suppressed before index.ts is loaded
-vi.mock("dotenv/config", () => ({}));
+import {
+	createOnboardingCompleteHandler,
+	defaultConfigureLogging,
+	defaultStartupStateFactory,
+	logLegacyStateAudit,
+	main,
+	shouldEnterOnboarding,
+	type OnboardingCompleteHandlerDeps,
+	type StartupState,
+} from "./index.js";
+import { noOpHandlers } from "./app/bootstrap.js";
+import type { AppConfig } from "./config.js";
+import type { RuntimeDeps, RuntimeGraph } from "./app/bootstrap.js";
 
-vi.mock("./config.js", () => ({
-	getConfig: vi.fn(() => ({
-		port: 6767,
-		webhookSecret: "secret",
-		sessionsDir: "/tmp/sessions",
-		archiveDir: "/tmp/sessions/archive",
-		memoryDir: "/tmp/memory",
-		defaultBranch: "main",
-		githubToken: "token",
-		githubUsername: "yolomatic-bot",
-		workspacesDir: "/tmp/workspaces",
-		soulPath: "/tmp/SOUL.md",
-		selfReportEnabled: true,
-		onboardingComplete: true,
-		adminGithubUsername: "admin",
-		cleanupRetentionDays: undefined,
-		staleThresholdMs: 14400000,
-		maxWorktrees: 10,
-		evictionStrategy: "lru",
-		githubEventMode: "webhook",
-		githubPollIntervalMs: 60000,
-		workerImage: "yolomatic-worker:latest",
-		workerWorkspaceMountSource: "/tmp/workspaces",
-		workerControlBaseUrl: "http://host.docker.internal:6767",
-		workerDockerNetworkMode: undefined,
-		workerOllamaHost: undefined,
-		openaiApiKey: "",
-		adminPath: "/yolomatic/admin",
-		adminDefaultPage: "#/dashboard",
-		issueNewCommentEnabled: true,
-		issueAdminLinkInCommentsEnabled: true,
-		adminBaseUrl: undefined,
-	})),
-	isBootstrapComplete: vi.fn(() => true),
-}));
+const baseConfig: AppConfig = {
+	port: 6767,
+	webhookSecret: "secret",
+	sessionsDir: "/tmp/sessions",
+	archiveDir: "/tmp/sessions/archive",
+	memoryDir: "/tmp/memory",
+	defaultBranch: "main",
+	githubToken: "token",
+	githubUsername: "yolomatic-bot",
+	workspacesDir: "/tmp/workspaces",
+	soulPath: "/tmp/SOUL.md",
+	selfReportEnabled: true,
+	onboardingComplete: true,
+	adminGithubUsername: "admin",
+	cleanupRetentionDays: undefined,
+	staleThresholdMs: 14400000,
+	maxWorktrees: 10,
+	evictionStrategy: "lru",
+	piAgentModel: undefined,
+	piAgentProvider: undefined,
+	logLevel: "info",
+	logPrompts: true,
+	logThoughts: true,
+	logTools: true,
+	logResponses: true,
+	githubEventMode: "webhook",
+	githubPollIntervalMs: 60000,
+	workerWorkspaceMountSource: "/tmp/workspaces",
+	workerControlBaseUrl: "http://host.docker.internal:6767",
+	openaiApiKey: "",
+	adminPath: "/yolomatic/admin",
+	adminDefaultPage: "#/dashboard",
+	issueNewCommentEnabled: true,
+	issueAdminLinkInCommentsEnabled: true,
+	adminBaseUrl: undefined,
+};
 
-vi.mock("./settings/store.js", () => ({
-	SettingsStore: vi.fn(function () {
-		return {
+function makeFakeStores(overrides: Partial<StartupState> = {}): StartupState {
+	return {
+		settingsStore: {
 			get: vi.fn(() => undefined),
 			seedFromEnv: vi.fn(),
 			applyDefaults: vi.fn(),
 			onChange: vi.fn(() => () => {}),
-		};
-	}),
-}));
+		} as never,
+		sessionStore: {
+			auditLegacyState: vi.fn(async () => ({
+				legacyStateFiles: [],
+				sessionsMissingKind: [],
+				malformedStateFiles: [],
+				clean: true,
+			})),
+		} as never,
+		repositoryStore: {} as never,
+		userStore: {
+			hasAnySync: vi.fn(() => true),
+		} as never,
+		taskController: {} as never,
+		config: baseConfig,
+		...overrides,
+	};
+}
 
-const repositoryStoreMock = vi.hoisted(() => ({
-	list: vi.fn(async () => [] as unknown[]),
-	listSync: vi.fn(() => [] as unknown[]),
-	get: vi.fn(async (_owner?: string, _repo?: string) => null as unknown),
-	getSync: vi.fn((_owner?: string, _repo?: string) => null as unknown),
-	upsert: vi.fn(async () => ({} as unknown)),
-	upsertSync: vi.fn(() => ({} as unknown)),
-	remove: vi.fn(async () => false),
-	removeSync: vi.fn(() => false),
-	listForPolling: vi.fn(async () => [] as unknown[]),
-	close: vi.fn(),
-}));
-
-vi.mock("./repos/repository-store.js", () => ({
-	RepositoryStore: vi.fn(function () {
-		return repositoryStoreMock;
-	}),
-}));
-
-const userStoreMock = vi.hoisted(() => ({
-	hasAnySync: vi.fn(() => true),
-	createSync: vi.fn(),
-	firstSync: vi.fn(() => null),
-	listSync: vi.fn(() => []),
-	getByUsernameSync: vi.fn(() => null),
-	getByIdSync: vi.fn(() => null),
-}));
-
-vi.mock("./users/store.js", () => ({
-	UserStore: vi.fn(function () {
-		return userStoreMock;
-	}),
-}));
-
-
-vi.mock("./session/store.js", () => ({
-	SessionStore: vi.fn(function () {
-		return {
-			get: vi.fn(),
-			set: vi.fn(),
-			getAll: vi.fn(async () => []),
-			exists: vi.fn(async () => false),
-			delete: vi.fn(async () => {}),
-			archive: vi.fn(async () => {}),
-			migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-			auditLegacyState: vi.fn(async () => ({ legacyStateFiles: [], sessionsMissingKind: [], malformedStateFiles: [], clean: true })),
-			getSessionPath: vi.fn(() => "/tmp/session.jsonl"),
-			getStatePath: vi.fn(() => "/tmp/state.json"),
-			getArchivePath: vi.fn(() => "/tmp/archive.json"),
-			getSessionArchivePath: vi.fn(() => "/tmp/archive.jsonl"),
-			getSessionKey: vi.fn((owner, repo, n) => `github-${owner}-${repo}-issue-${n}`),
-		};
-	}),
-}));
-
-vi.mock("./logging/session-log-store.js", () => ({
-	SessionLogStore: vi.fn(function () {
-		return {};
-	}),
-	configureSessionLogPersistence: vi.fn(),
-	loadPersistedSessionLogs: vi.fn(),
-}));
-
-vi.mock("./session/manager.js", () => ({
-	SessionManager: vi.fn(function () {
-		return {
-			getSessionKey: vi.fn(),
-			getSessionPath: vi.fn(),
-			createSession: vi.fn(),
-			getSession: vi.fn(),
-			resumeSession: vi.fn(),
-			updateStatus: vi.fn(),
-			markSeeded: vi.fn(),
-			markFailed: vi.fn(),
-		};
-	}),
-}));
-
-vi.mock("./workspace/manager.js", () => ({
-	WorkspaceManager: vi.fn(function () {
-		return {
-			createOrGetWorktree: vi.fn(),
-			commitAndPush: vi.fn(async () => true),
-			commitAndPushPath: vi.fn(async () => true),
-			removeWorktree: vi.fn(),
-		};
-	}),
-}));
-
-vi.mock("./executor/docker-worker.js", () => ({
-	DockerWorkerExecutor: vi.fn(function () {
-		return {
-			execute: vi.fn(),
-			prebuildWorkerImage: vi.fn(),
-		};
-	}),
-}));
-
-
-vi.mock("./github-events/polling.js", () => ({
-	startGitHubPolling: vi.fn(),
-}));
-
-vi.mock("./webhook/handlers.js", () => ({
-	GitHubIssueHandlers: vi.fn(function () {
-		return {
-			handleGitHubEvent: vi.fn(),
-			isInFlight: vi.fn(() => false),
-			resumeInterruptedSession: vi.fn(),
-		};
-	}),
-}));
-
-vi.mock("./webhook/server.js", () => ({
-	createWebhookServer: vi.fn(() => ({
-		listen: vi.fn((port, cb) => {
-			if (typeof cb === "function") cb();
-			return { close: vi.fn() };
-		}),
-		close: vi.fn((cb) => {
+function makeFakeServer() {
+	return {
+		listen: vi.fn((_port: number, cb?: () => void) => {
 			if (typeof cb === "function") cb();
 			return undefined;
 		}),
-	})),
-	cleanupOldSessions: vi.fn(),
-}));
+		close: vi.fn((cb?: (err?: Error) => void) => {
+			if (typeof cb === "function") cb();
+			return undefined;
+		}),
+	};
+}
 
-vi.mock("./session/stale-detector.js", () => ({
-	StaleSessionDetector: vi.fn(function () {
-		return {
-			detectStaleSessions: vi.fn(async () => []),
-		};
-	}),
-}));
+function captureServer() {
+	const options: Record<string, unknown>[] = [];
+	const instances: ReturnType<typeof makeFakeServer>[] = [];
+	const createWebhookServer = vi.fn((opts: Record<string, unknown>) => {
+		options.push(opts);
+		const server = makeFakeServer();
+		instances.push(server);
+		return server;
+	}) as never;
+	return { createWebhookServer, options, instances };
+}
 
-vi.mock("./skills/store.js", () => ({
-	SkillStore: vi.fn(function () {
-		return {};
-	}),
-}));
-
-vi.mock("./skills/repo-skill-service.js", () => ({
-	RepoSkillService: vi.fn(function () {
-		return {};
-	}),
-}));
-
-import { createWebhookServer } from "./webhook/server.js";
-import { main, noOpHandlers } from "./index.js";
-import { GitHubIssueHandlers } from "./webhook/handlers.js";
-import { SessionStore } from "./session/store.js";
-import { SettingsStore } from "./settings/store.js";
-import { isBootstrapComplete, getConfig } from "./config.js";
-import { StaleSessionDetector } from "./session/stale-detector.js";
-import { startGitHubPolling } from "./github-events/polling.js";
-import { DockerWorkerExecutor } from "./executor/docker-worker.js";
-
-describe("main", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		vi.mocked(isBootstrapComplete).mockReturnValue(true);
-		repositoryStoreMock.listSync.mockReturnValue([]);
-		repositoryStoreMock.getSync.mockReturnValue(null);
-		repositoryStoreMock.list.mockResolvedValue([]);
-		repositoryStoreMock.listForPolling.mockResolvedValue([]);
-		repositoryStoreMock.get.mockResolvedValue(null);
-		(GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				handleGitHubEvent: vi.fn(),
-				isInFlight: vi.fn(() => false),
-				resumeInterruptedSession: vi.fn(),
-			};
-		});
+describe("default startup collaborators", () => {
+	it("defaultStartupStateFactory constructs shared stores and loads config from a memory dir", async () => {
+		const memoryDir = await mkdtemp(join(tmpdir(), "yolomatic-index-startup-"));
+		try {
+			const state = defaultStartupStateFactory(memoryDir);
+			expect(state.settingsStore).toBeDefined();
+			expect(state.sessionStore).toBeDefined();
+			expect(state.repositoryStore).toBeDefined();
+			expect(state.userStore).toBeDefined();
+			expect(state.taskController).toBeDefined();
+			expect(state.config.port).toBe(6767);
+			expect(state.config.defaultBranch).toBe("main");
+		} finally {
+			await rm(memoryDir, { recursive: true, force: true });
+		}
 	});
 
-	it("enters onboarding mode when bootstrap incomplete", async () => {
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
-		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
+	it("defaultConfigureLogging wires session log persistence without throwing", async () => {
+		const memoryDir = await mkdtemp(join(tmpdir(), "yolomatic-index-logging-"));
+		try {
+			expect(() => defaultConfigureLogging(memoryDir)).not.toThrow();
+		} finally {
+			await rm(memoryDir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("shouldEnterOnboarding", () => {
+	it("enters onboarding when bootstrap is incomplete", () => {
+		expect(shouldEnterOnboarding(false, true)).toBe(true);
 	});
 
-	it("creates webhook server and listens on configured port", async () => {
-		await main();
-		expect(createWebhookServer).toHaveBeenCalledWith(
-			"secret",
-			expect.objectContaining({
-				handleGitHubEvent: expect.any(Function),
-			}),
-			expect.objectContaining({
-				get: expect.any(Function),
-				set: expect.any(Function),
-				getAll: expect.any(Function),
-			}),
-			expect.any(Object),
-			expect.objectContaining({
-				createOrGetWorktree: expect.any(Function),
-				commitAndPush: expect.any(Function),
-				removeWorktree: expect.any(Function),
-			}),
-			expect.any(Object),
-			expect.any(String),
-			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-		);
-		const server = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		expect(server.listen).toHaveBeenCalledWith(6767, expect.any(Function));
+	it("enters onboarding when no admin user exists", () => {
+		expect(shouldEnterOnboarding(true, false)).toBe(true);
 	});
 
-	it("starts GitHub polling when event mode is polling", async () => {
-		const { getConfig } = await import("./config.js");
-		vi.mocked(getConfig).mockReturnValueOnce({
-			port: 6767,
-			webhookSecret: "secret",
-			sessionsDir: "/tmp/sessions",
-			archiveDir: "/tmp/sessions/archive",
-			memoryDir: "/tmp/memory",
-			defaultBranch: "main",
-			githubToken: "token",
-			githubUsername: "yolomatic-bot",
-			workspacesDir: "/tmp/workspaces",
-			soulPath: "/tmp/SOUL.md",
-			selfReportEnabled: true,
-			onboardingComplete: true,
-			adminGithubUsername: "admin",
-			cleanupRetentionDays: undefined,
-			staleThresholdMs: 14400000,
-			maxWorktrees: 10,
-			evictionStrategy: "lru",
-			piAgentModel: undefined,
-			piAgentProvider: undefined,
-			logLevel: "info",
-			logPrompts: true,
-			logThoughts: true,
-			logTools: true,
-			logResponses: true,
-			githubEventMode: "polling",
-			githubPollIntervalMs: 30000,
-			workerImage: "yolomatic-worker:latest",
-			workerWorkspaceMountSource: "/tmp/workspaces",
-			workerControlBaseUrl: "http://host.docker.internal:6767",
-			workerDockerNetworkMode: undefined,
-			workerOllamaHost: undefined,
-			openaiApiKey: "",
-		adminPath: "/yolomatic/admin",
-		adminDefaultPage: "#/dashboard",
-		issueNewCommentEnabled: true,
-		issueAdminLinkInCommentsEnabled: true,
-		adminBaseUrl: undefined,
-		});
-
-		await main();
-
-		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({
-			intervalMs: 30000,
-			githubUsername: "yolomatic-bot",
-			dispatch: expect.any(Function),
-		}));
-		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls[0][0] as { dispatch: (event: unknown) => Promise<void> };
-		await pollingDeps.dispatch({ id: "e1" });
-		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
-		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.handleGitHubEvent).toHaveBeenCalledWith({ id: "e1" });
-		expect(createWebhookServer).toHaveBeenCalledWith(
-			"secret",
-			noOpHandlers,
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(String),
-			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-		);
+	it("starts the full runtime when bootstrap is complete and an admin user exists", () => {
+		expect(shouldEnterOnboarding(true, true)).toBe(false);
 	});
+});
 
-	it("starts polling when a configured repository overrides webhook mode to polling", async () => {
-		const managedRepo = {
-			id: "mbrooks/yolomatic",
-			owner: "mbrooks",
-			repo: "yolomatic",
-			fullName: null,
-			visibility: null,
-			githubEventMode: "polling" as const,
-			defaultBranch: null,
-			createdAt: "",
-			updatedAt: "",
-		};
-		repositoryStoreMock.listSync.mockReturnValue([managedRepo]);
-		repositoryStoreMock.getSync.mockImplementation((owner, repo) =>
-			owner === "mbrooks" && repo === "yolomatic" ? managedRepo : null,
-		);
-
-		await main();
-
-		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({
-			shouldPollRepo: expect.any(Function),
-		}));
-		const pollingDeps = vi.mocked(startGitHubPolling).mock.calls.at(-1)?.[0] as { shouldPollRepo: (owner: string, repo: string) => boolean };
-		expect(pollingDeps.shouldPollRepo("mbrooks", "yolomatic")).toBe(true);
-		expect(pollingDeps.shouldPollRepo("mbrooks", "case")).toBe(false);
-	});
-
-	it("keeps webhook handlers active and starts polling when event mode is both", async () => {
-		const { getConfig } = await import("./config.js");
-		vi.mocked(getConfig).mockReturnValueOnce({
-			port: 6767,
-			webhookSecret: "secret",
-			sessionsDir: "/tmp/sessions",
-			archiveDir: "/tmp/sessions/archive",
-			memoryDir: "/tmp/memory",
-			defaultBranch: "main",
-			githubToken: "token",
-			githubUsername: "yolomatic-bot",
-			workspacesDir: "/tmp/workspaces",
-			soulPath: "/tmp/SOUL.md",
-			selfReportEnabled: true,
-			onboardingComplete: true,
-			adminGithubUsername: "admin",
-			cleanupRetentionDays: undefined,
-			staleThresholdMs: 14400000,
-			maxWorktrees: 10,
-			evictionStrategy: "lru",
-			piAgentModel: undefined,
-			piAgentProvider: undefined,
-			logLevel: "info",
-			logPrompts: true,
-			logThoughts: true,
-			logTools: true,
-			logResponses: true,
-			githubEventMode: "both",
-			githubPollIntervalMs: 45000,
-			workerImage: "yolomatic-worker:latest",
-			workerWorkspaceMountSource: "/tmp/workspaces",
-			workerControlBaseUrl: "http://host.docker.internal:6767",
-			workerDockerNetworkMode: undefined,
-			workerOllamaHost: undefined,
-			openaiApiKey: "",
-		adminPath: "/yolomatic/admin",
-		adminDefaultPage: "#/dashboard",
-		issueNewCommentEnabled: true,
-		issueAdminLinkInCommentsEnabled: true,
-		adminBaseUrl: undefined,
-		});
-
-		await main();
-
-		expect(startGitHubPolling).toHaveBeenCalledWith(expect.objectContaining({ intervalMs: 45000 }));
-		expect(createWebhookServer).toHaveBeenCalledWith(
-			"secret",
-			expect.objectContaining({ handleGitHubEvent: expect.any(Function) }),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(String),
-			expect.objectContaining({ prebuiltStartIssueSession: expect.any(Object) }),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-			expect.any(Object),
-		);
-	});
-
-	it("resumes interrupted working sessions on startup", async () => {
-		const mockGetAll = vi.fn(async () => [
-			{
-				owner: "mbrooks",
-				repo: "yolomatic",
-				issueNumber: 42,
-				status: "working",
-				workspacePath: "/tmp/ws",
-				title: "Title",
-				body: "Body",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			},
-		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: mockGetAll,
-				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-			};
-		});
-		await main();
-		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
-		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
-	});
-
-	it("resumes checkpointed sessions with resumeOnBoot on startup", async () => {
-		const mockGetAll = vi.fn(async () => [
-			{
-				owner: "mbrooks",
-				repo: "yolomatic",
-				issueNumber: 43,
-				status: "pending",
-				workspacePath: "/tmp/ws",
-				title: "Title",
-				body: "Body",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-				resumeOnBoot: true,
-			},
-		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: mockGetAll,
-				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-			};
-		});
-		await main();
-		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
-		const handlersInstance = mockFn.mock.results[mockFn.mock.results.length - 1]?.value;
-		expect(handlersInstance.resumeInterruptedSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 43);
-	});
-
-	it("runs stale session detection on startup", async () => {
-		vi.mocked(StaleSessionDetector).mockImplementation(function () {
-			return {
-				detectStaleSessions: vi.fn(async () => [
-					{
-						isStale: true,
-						ageMs: 99999999,
-						session: {
-							owner: "mbrooks",
-							repo: "yolomatic",
-							issueNumber: 99,
-							status: "working",
-							staleDetectedAt: null,
-							lastActivity: new Date().toISOString(),
-							workspacePath: "/tmp/ws",
-							createdAt: new Date().toISOString(),
-						},
-					},
-				]),
-			};
-		});
-		const { SessionManager } = await import("./session/manager.js");
-		const mockMarkFailed = vi.fn();
-		vi.mocked(SessionManager).mockImplementation(function () {
-			return {
-				markFailed: mockMarkFailed,
-			};
-		});
-		await main();
-		expect(mockMarkFailed).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, "interrupted_or_abandoned");
-	});
-
-	it("handles stale detection errors gracefully", async () => {
-		vi.mocked(StaleSessionDetector).mockImplementation(function () {
-			return {
-				detectStaleSessions: vi.fn(async () => { throw new Error("stale error"); }),
-			};
-		});
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
-	});
-
-	it("handles resume errors gracefully", async () => {
-		const mockGetAll = vi.fn(async () => [
-			{
-				owner: "mbrooks",
-				repo: "yolomatic",
-				issueNumber: 1,
-				status: "working",
-				workspacePath: "/tmp/ws",
-				title: "Title",
-				body: "Body",
-				lastActivity: new Date().toISOString(),
-				seeded: false,
-			},
-		]);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: mockGetAll,
-				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-			};
-		});
-		const mockFn = GitHubIssueHandlers as unknown as ReturnType<typeof vi.fn>;
-		mockFn.mockImplementation(function () {
-			return {
-				resumeInterruptedSession: vi.fn(async () => { throw new Error("resume error"); }),
-				isInFlight: vi.fn(() => false),
-			};
-		});
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
-	});
-
-	it("runs cleanup when retention is configured", async () => {
-		const { getConfig } = await import("./config.js");
-		vi.mocked(getConfig).mockReturnValueOnce({
-			port: 6767,
-			webhookSecret: "secret",
-			sessionsDir: "/tmp/sessions",
-			archiveDir: "/tmp/sessions/archive",
-			memoryDir: "/tmp/memory",
-			defaultBranch: "main",
-			githubToken: "token",
-			githubUsername: "yolomatic-bot",
-			workspacesDir: "/tmp/workspaces",
-			soulPath: "/tmp/SOUL.md",
-			selfReportEnabled: true,
-			onboardingComplete: true,
-			adminGithubUsername: "admin",
-			cleanupRetentionDays: 7,
-			staleThresholdMs: 14400000,
-			maxWorktrees: 10,
-			evictionStrategy: "lru",
-			piAgentModel: undefined,
-			piAgentProvider: undefined,
-			logLevel: "info",
-			logPrompts: true,
-			logThoughts: true,
-			logTools: true,
-			logResponses: true,
-			githubEventMode: "webhook",
-			githubPollIntervalMs: 60000,
-			workerImage: "yolomatic-worker:latest",
-			workerWorkspaceMountSource: "/tmp/workspaces",
-			workerControlBaseUrl: "http://host.docker.internal:6767",
-			workerDockerNetworkMode: undefined,
-			workerOllamaHost: undefined,
-			openaiApiKey: "",
-		adminPath: "/yolomatic/admin",
-		adminDefaultPage: "#/dashboard",
-		issueNewCommentEnabled: true,
-		issueAdminLinkInCommentsEnabled: true,
-		adminBaseUrl: undefined,
-		});
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
-	});
-
-	it("handles resume outer catch error", async () => {
-		(SessionStore as any).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: vi.fn(async () => { throw new Error("resume outer"); }),
-				migrateFromFileStoreIfNeeded: vi.fn(async () => 0),
-			};
-		});
-		await main();
-		expect(createWebhookServer).toHaveBeenCalled();
-	});
-
-	it("does not register a settings change listener that syncs process.env", async () => {
-		await main();
-		const settingsStoreMock = (SettingsStore as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-		// The migration removed the syncConfigToEnv live-sync listener; live model
-		// settings now flow through the injected runtime settings provider.
-		expect(settingsStoreMock.onChange).not.toHaveBeenCalled();
-	});
-
-	it("logs a legacy state audit summary when legacy data remains", async () => {
+describe("logLegacyStateAudit", () => {
+	it("writes a summary when legacy data remains", async () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: vi.fn(async () => []),
-				auditLegacyState: vi.fn(async () => ({
-					legacyStateFiles: ["/sessions/issue-1.state.json"],
-					sessionsMissingKind: ["github-mbrooks-yolomatic-issue-2-implementation"],
-					malformedStateFiles: ["/sessions/issue-3.state.json"],
-					clean: false,
-				})),
-			};
-		});
+		const sessionStore = {
+			auditLegacyState: vi.fn(async () => ({
+				legacyStateFiles: ["/sessions/issue-1.state.json"],
+				sessionsMissingKind: ["github-mbrooks-yolomatic-issue-2-implementation"],
+				malformedStateFiles: ["/sessions/issue-3.state.json"],
+				clean: false,
+			})),
+		} as never;
 
-		await main();
+		await logLegacyStateAudit(sessionStore);
 
 		expect(writeSpy).toHaveBeenCalledWith(
 			expect.stringContaining(
@@ -654,124 +168,316 @@ describe("main", () => {
 		writeSpy.mockRestore();
 	});
 
-	it("logs a legacy audit failure with a stringified non-Error throw", async () => {
+	it("does not write a summary when the audit is clean", async () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: vi.fn(async () => []),
-				auditLegacyState: vi.fn(async () => {
-					throw "not an error";
-				}),
-			};
-		});
+		const sessionStore = {
+			auditLegacyState: vi.fn(async () => ({
+				legacyStateFiles: [],
+				sessionsMissingKind: [],
+				malformedStateFiles: [],
+				clean: true,
+			})),
+		} as never;
 
-		await main();
-
-		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit failed: not an error"));
-		writeSpy.mockRestore();
-	});
-
-	it("does not log a legacy audit summary when the audit is clean", async () => {
-		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: vi.fn(async () => []),
-				auditLegacyState: vi.fn(async () => ({
-					legacyStateFiles: [],
-					sessionsMissingKind: [],
-					malformedStateFiles: [],
-					clean: true,
-				})),
-			};
-		});
-
-		await main();
+		await logLegacyStateAudit(sessionStore);
 
 		expect(writeSpy).not.toHaveBeenCalledWith(expect.stringContaining("legacy audit:"));
 		writeSpy.mockRestore();
 	});
 
-	it("logs a legacy audit failure when auditLegacyState throws", async () => {
+	it("logs a failure message when auditLegacyState throws an Error", async () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-		(SessionStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(function () {
-			return {
-				get: vi.fn(),
-				set: vi.fn(),
-				getAll: vi.fn(async () => []),
-				auditLegacyState: vi.fn(async () => {
-					throw new Error("audit boom");
-				}),
-			};
-		});
+		const sessionStore = {
+			auditLegacyState: vi.fn(async () => {
+				throw new Error("audit boom");
+			}),
+		} as never;
 
-		await main();
+		await logLegacyStateAudit(sessionStore);
 
 		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit failed: audit boom"));
 		writeSpy.mockRestore();
 	});
 
-	it("starts full runtime when onboarding completes", async () => {
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
-		await main();
+	it("stringifies non-Error throws in the failure message", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		const sessionStore = {
+			auditLegacyState: vi.fn(async () => {
+				throw "not an error";
+			}),
+		} as never;
 
-		const onboardingCall = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0];
-		const options = onboardingCall?.[7] as { onOnboardingComplete: () => Promise<void> };
-		expect(options.onOnboardingComplete).toBeTypeOf("function");
+		await logLegacyStateAudit(sessionStore);
 
-		// Completing onboarding re-reads config and must see a complete config now.
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
-		await options.onOnboardingComplete();
-
-		// A second createWebhookServer call comes from startRuntime after onboarding.
-		expect(createWebhookServer).toHaveBeenCalledTimes(2);
-		const runtimeServer = (createWebhookServer as ReturnType<typeof vi.fn>).mock.results[1]?.value;
-		expect(runtimeServer.listen).toHaveBeenCalledWith(6767, expect.any(Function));
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit failed: not an error"));
+		writeSpy.mockRestore();
 	});
 
-	it("does not start runtime when onboarding complete fires before config is complete", async () => {
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
-		await main();
-		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[7] as {
-			onOnboardingComplete: () => Promise<void>;
-		};
-		const callsBefore = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length;
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
-		await options.onOnboardingComplete();
-		expect((createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
-	});
-
-	it("does not start runtime twice if onboarding complete fires again", async () => {
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(false);
-		await main();
-		const options = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls[0]?.[7] as {
-			onOnboardingComplete: () => Promise<void>;
-		};
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
-		await options.onOnboardingComplete();
-		const callsAfterFirst = (createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length;
-		// Second fire should be a no-op (activated guard).
-		vi.mocked(isBootstrapComplete).mockReturnValueOnce(true);
-		await options.onOnboardingComplete();
-		expect((createWebhookServer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
-	});
-
-	it("does not prebuild the worker image in onboarding-only mode", async () => {
-		userStoreMock.hasAnySync.mockReturnValueOnce(false);
-		await main();
-		expect(DockerWorkerExecutor).not.toHaveBeenCalled();
+	it("is a no-op when the session store does not implement auditLegacyState", async () => {
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		await logLegacyStateAudit({} as never);
+		expect(writeSpy).not.toHaveBeenCalled();
+		writeSpy.mockRestore();
 	});
 });
 
-describe("noOpHandlers", () => {
-	it("handleGitHubEvent does nothing", async () => {
-		await expect(noOpHandlers.handleGitHubEvent?.({} as never)).resolves.toBeUndefined();
+describe("createOnboardingCompleteHandler", () => {
+	function makeHandlerDeps(overrides: Partial<OnboardingCompleteHandlerDeps> = {}): OnboardingCompleteHandlerDeps {
+		const stores = makeFakeStores();
+		return {
+			settingsStore: stores.settingsStore,
+			sessionStore: stores.sessionStore,
+			taskController: stores.taskController,
+			repositoryStore: stores.repositoryStore,
+			userStore: stores.userStore,
+			getConfig: vi.fn(() => baseConfig),
+			isBootstrapComplete: vi.fn(() => true),
+			closeServer: vi.fn(async () => undefined),
+			startRuntime: vi.fn(async () => ({}) as RuntimeGraph),
+			...overrides,
+		};
+	}
+
+	it("closes the onboarding server and starts the full runtime when bootstrap becomes complete", async () => {
+		const nextConfig = { ...baseConfig, webhookSecret: "rotated" };
+		const getConfig = vi.fn(() => nextConfig);
+		const closeServer = vi.fn(async () => undefined);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const userStore = { hasAnySync: vi.fn(() => true) } as never;
+		const deps = makeHandlerDeps({ getConfig, closeServer, startRuntime, userStore });
+
+		const handler = createOnboardingCompleteHandler(deps);
+		await handler();
+
+		expect(getConfig).toHaveBeenCalledWith(deps.settingsStore);
+		expect(closeServer).toHaveBeenCalledTimes(1);
+		expect(startRuntime).toHaveBeenCalledWith(
+			nextConfig,
+			expect.objectContaining({ settingsStore: deps.settingsStore, userStore: deps.userStore }),
+		);
 	});
 
-	it("isInFlight returns false", () => {
-		expect(noOpHandlers.isInFlight("mbrooks", "yolomatic", 1)).toBe(false);
+	it("does not start the runtime when bootstrap is still incomplete", async () => {
+		const closeServer = vi.fn(async () => undefined);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const isBootstrapComplete = vi.fn(() => false);
+		const deps = makeHandlerDeps({ closeServer, startRuntime, isBootstrapComplete });
+
+		const handler = createOnboardingCompleteHandler(deps);
+		await handler();
+
+		expect(closeServer).not.toHaveBeenCalled();
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("does not start the runtime when no admin user exists yet", async () => {
+		const closeServer = vi.fn(async () => undefined);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const userStore = { hasAnySync: vi.fn(() => false) } as never;
+		const deps = makeHandlerDeps({ closeServer, startRuntime, userStore });
+
+		const handler = createOnboardingCompleteHandler(deps);
+		await handler();
+
+		expect(closeServer).not.toHaveBeenCalled();
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("only transitions once even if the callback fires again", async () => {
+		const closeServer = vi.fn(async () => undefined);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const deps = makeHandlerDeps({ closeServer, startRuntime });
+
+		const handler = createOnboardingCompleteHandler(deps);
+		await handler();
+		await handler();
+
+		expect(closeServer).toHaveBeenCalledTimes(1);
+		expect(startRuntime).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("main", () => {
+	it("starts the full runtime directly when bootstrap is complete and an admin user exists", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const { createWebhookServer } = captureServer();
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer,
+			configureLogging: vi.fn(),
+		});
+
+		expect(startupState).toHaveBeenCalledTimes(1);
+		expect(startRuntime).toHaveBeenCalledWith(
+			baseConfig,
+			expect.objectContaining({
+				settingsStore: stores.settingsStore,
+				sessionStore: stores.sessionStore,
+				repositoryStore: stores.repositoryStore,
+				userStore: stores.userStore,
+				taskController: stores.taskController,
+			}) as RuntimeDeps,
+		);
+		expect(createWebhookServer).not.toHaveBeenCalled();
+	});
+
+	it("starts in onboarding mode with noOpHandlers and listens on the configured port when bootstrap is incomplete", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const isBootstrapComplete = vi.fn(() => false);
+		const { createWebhookServer, options, instances } = captureServer();
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer,
+			isBootstrapComplete,
+			configureLogging: vi.fn(),
+		});
+
+		expect(createWebhookServer).toHaveBeenCalledTimes(1);
+		expect(options[0].handlers).toBe(noOpHandlers);
+		expect(options[0].onOnboardingComplete).toBeTypeOf("function");
+		expect(instances[0].listen).toHaveBeenCalledWith(6767, expect.any(Function));
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("starts in onboarding mode when no admin user exists even if bootstrap is complete", async () => {
+		const stores = makeFakeStores({
+			userStore: { hasAnySync: vi.fn(() => false) } as never,
+		});
+		const startupState = vi.fn(() => stores);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const { createWebhookServer } = captureServer();
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer,
+			configureLogging: vi.fn(),
+		});
+
+		expect(createWebhookServer).toHaveBeenCalledTimes(1);
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("transitions from onboarding to full runtime when onOnboardingComplete fires", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		const nextConfig = { ...baseConfig, webhookSecret: "rotated" };
+		const loadConfig = vi.fn(() => nextConfig);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const isBootstrapComplete = vi.fn(() => false);
+		const { createWebhookServer, options, instances } = captureServer();
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer,
+			isBootstrapComplete,
+			loadConfig,
+			configureLogging: vi.fn(),
+		});
+
+		// main enters onboarding because the initial isBootstrapComplete returns false.
+		expect(createWebhookServer).toHaveBeenCalledTimes(1);
+		expect(startRuntime).not.toHaveBeenCalled();
+
+		// The onboarding server closes when the wizard completes.
+		instances[0].close.mockImplementation((cb?: (err?: Error) => void) => {
+			if (typeof cb === "function") cb();
+			return undefined;
+		});
+		isBootstrapComplete.mockReturnValue(true);
+
+		const onOnboardingComplete = options[0].onOnboardingComplete as () => Promise<void>;
+		await onOnboardingComplete();
+
+		expect(instances[0].close).toHaveBeenCalled();
+		expect(loadConfig).toHaveBeenCalledWith(stores.settingsStore);
+		expect(startRuntime).toHaveBeenCalledWith(nextConfig, expect.objectContaining({}) as RuntimeDeps);
+	});
+
+	it("does not transition when onOnboardingComplete fires before bootstrap is complete", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const isBootstrapComplete = vi.fn(() => false);
+		const loadConfig = vi.fn(() => baseConfig);
+		const { createWebhookServer, options } = captureServer();
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer,
+			isBootstrapComplete,
+			loadConfig,
+			configureLogging: vi.fn(),
+		});
+
+		const onOnboardingComplete = options[0].onOnboardingComplete as () => Promise<void>;
+		await onOnboardingComplete();
+
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("does not register a settings change listener that syncs process.env", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		await main({
+			startupState,
+			startRuntime: vi.fn(async () => ({}) as RuntimeGraph),
+			createWebhookServer: captureServer().createWebhookServer,
+			configureLogging: vi.fn(),
+		});
+		// The migration removed the syncConfigToEnv live-sync listener; live model
+		// settings now flow through the injected runtime settings provider.
+		expect(stores.settingsStore.onChange).not.toHaveBeenCalled();
+	});
+
+	it("does not start the runtime (and therefore does not prebuild the worker) in onboarding-only mode", async () => {
+		const stores = makeFakeStores();
+		const startupState = vi.fn(() => stores);
+		const startRuntime = vi.fn(async () => ({}) as RuntimeGraph);
+		const isBootstrapComplete = vi.fn(() => false);
+
+		await main({
+			startupState,
+			startRuntime,
+			createWebhookServer: captureServer().createWebhookServer,
+			isBootstrapComplete,
+			configureLogging: vi.fn(),
+		});
+
+		expect(startRuntime).not.toHaveBeenCalled();
+	});
+
+	it("runs the legacy state audit during startup", async () => {
+		const auditLegacyState = vi.fn(async () => ({
+			legacyStateFiles: ["/sessions/issue-1.state.json"],
+			sessionsMissingKind: [],
+			malformedStateFiles: [],
+			clean: false,
+		}));
+		const stores = makeFakeStores({
+			sessionStore: { auditLegacyState } as never,
+		});
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		await main({
+			startupState: vi.fn(() => stores),
+			startRuntime: vi.fn(async () => ({}) as RuntimeGraph),
+			createWebhookServer: captureServer().createWebhookServer,
+			configureLogging: vi.fn(),
+		});
+
+		expect(auditLegacyState).toHaveBeenCalledTimes(1);
+		expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("legacy audit: 1 legacy state file(s)"));
+		writeSpy.mockRestore();
 	});
 });
