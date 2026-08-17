@@ -8,6 +8,7 @@ import { handleSessionRoutes } from "./admin-routes/session-routes.js";
 import { handleSettingsRoutes } from "./admin-routes/settings-routes.js";
 import { handleSkillRoutes } from "./admin-routes/skill-routes.js";
 import { handleStatusRoutes } from "./admin-routes/status-routes.js";
+import { handleMetricsRoutes } from "./admin-routes/metrics-routes.js";
 import { handleAuthRoutes } from "./admin-routes/auth-routes.js";
 import { handleUserRoutes } from "./admin-routes/user-routes.js";
 
@@ -26,6 +27,7 @@ export async function handleAdminRoute(
 		(await handleUserRoutes(request, response, deps, pathname)) ||
 		(await handleOnboardingRoutes(request, response, deps, pathname)) ||
 		(await handleStatusRoutes(request, response, deps, pathname)) ||
+		(await handleMetricsRoutes(request, response, deps, requestUrl, pathname)) ||
 		(await handleSessionRoutes(request, response, deps, requestUrl, pathname)) ||
 		(await handleRefinementRoutes(request, response, deps, requestUrl, pathname)) ||
 		(await handleRepoRoutes(request, response, deps, pathname)) ||

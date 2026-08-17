@@ -4,6 +4,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import type { ExecutionService } from "../../ports/execution-service.js";
 import type { Clock } from "../../ports/clock.js";
+import type { MetricsRecorder } from "../../ports/metrics-recorder.js";
 import { ExecuteSession } from "./execute-session.js";
 import { ensureSessionExists, issueSessionKey, startIssueExecution } from "./workflow-helpers.js";
 import { resolveAdminSessionUrl } from "./comment-links.js";
@@ -30,6 +31,8 @@ export interface StartIssueSessionDeps {
 	adminBaseUrl?: string;
 	resolveAdminBaseUrl?: () => string | undefined;
 	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+	/** Optional recorder for per-execution metrics (runtime + token usage). */
+	metrics?: MetricsRecorder;
 }
 
 export class StartIssueSession {
@@ -49,6 +52,7 @@ export class StartIssueSession {
 			issueAdminLinkInCommentsEnabled?: boolean;
 			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
 		} = {},
+		private readonly metrics?: MetricsRecorder,
 	) {}
 
 	async execute(
@@ -112,6 +116,7 @@ export class StartIssueSession {
 						: undefined,
 				githubUsername: this.githubUsername,
 				selfReportEnabled: this.selfReportEnabled,
+				metrics: this.metrics,
 			};
 
 			const executor = new ExecuteSession(execDeps);
@@ -171,5 +176,6 @@ export function createStartIssueSession(deps: StartIssueSessionDeps): StartIssue
 			issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		},
+		deps.metrics,
 	);
 }

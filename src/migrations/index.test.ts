@@ -47,7 +47,52 @@ describe("migrations", () => {
 		expect(tableNames).toContain("github_poll_subjects");
 		expect(tableNames).toContain("sessions");
 		expect(tableNames).toContain("session_logs");
+		expect(tableNames).toContain("session_metrics");
 		expect(tableNames).toContain("_migrations");
+		db.close();
+	});
+
+	it("creates the session_metrics table via migration 15", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(session_metrics)").all() as Array<{ name: string }>;
+		const names = columns.map((c) => c.name);
+		expect(names).toContain("id");
+		expect(names).toContain("session_key");
+		expect(names).toContain("owner");
+		expect(names).toContain("repo");
+		expect(names).toContain("issue_number");
+		expect(names).toContain("kind");
+		expect(names).toContain("status");
+		expect(names).toContain("started_at");
+		expect(names).toContain("finished_at");
+		expect(names).toContain("duration_ms");
+		expect(names).toContain("tokens_available");
+		expect(names).toContain("input_tokens");
+		expect(names).toContain("output_tokens");
+		expect(names).toContain("total_tokens");
+		expect(names).toContain("cost");
+		expect(names).toContain("recorded_at");
+
+		db.prepare(
+			"INSERT INTO session_metrics (session_key, owner, repo, issue_number, kind, status, started_at, finished_at, duration_ms, tokens_available, input_tokens, output_tokens, total_tokens, cost, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		).run("k", "mbrooks", "yolomatic", 1, "implementation", "complete", "2026-08-01T00:00:00Z", "2026-08-01T00:01:00Z", 60000, 1, 30, 12, 42, 1.26, "2026-08-01T00:01:00Z");
+		const row = db.prepare("SELECT total_tokens, cost FROM session_metrics WHERE session_key = ?").get("k") as { total_tokens: number; cost: number };
+		expect(row.total_tokens).toBe(42);
+		expect(row.cost).toBeCloseTo(1.26, 10);
+		db.close();
+	});
+
+	it("is idempotent when creating the session_metrics table", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+		runMigrations(db);
+
+		const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='session_metrics'").all();
+		expect(tables).toHaveLength(1);
+		const rows = db.prepare("SELECT id FROM _migrations WHERE id = 15").all() as Array<{ id: number }>;
+		expect(rows).toHaveLength(1);
 		db.close();
 	});
 

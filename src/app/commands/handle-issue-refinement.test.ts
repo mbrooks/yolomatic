@@ -1250,4 +1250,75 @@ describe("HandleIssueRefinement", () => {
 			})),
 		};
 	}
+
+	it("records a refinement metric with runtime and token usage on success", async () => {
+		const metrics = { record: vi.fn() };
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			metrics,
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+			usage: { available: true, input: 50, output: 20, cacheRead: 0, cacheWrite: 0, totalTokens: 70, cost: 0.4 },
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(metrics.record).toHaveBeenCalledOnce();
+		const metric = metrics.record.mock.calls[0][0];
+		expect(metric).toMatchObject({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 1,
+			kind: "refinement",
+			status: "complete",
+		});
+		expect(metric.sessionKey).toBe("github-mbrooks-yolomatic-issue-1-refinement");
+		expect(typeof metric.durationMs).toBe("number");
+		expect(metric.tokenUsage.available).toBe(true);
+		expect(metric.tokenUsage.totalTokens).toBe(70);
+	});
+
+	it("records a failed refinement metric when the worker throws", async () => {
+		const metrics = { record: vi.fn() };
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as DockerWorkerExecutor,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			metrics,
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockRejectedValue(new Error("worker crashed"));
+
+		await handler.execute(createCommandPayload() as never);
+
+		expect(metrics.record).toHaveBeenCalledOnce();
+		const metric = metrics.record.mock.calls[0][0];
+		expect(metric.kind).toBe("refinement");
+		expect(metric.status).toBe("failed");
+		expect(metric.tokenUsage.available).toBe(false);
+	});
 });

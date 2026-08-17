@@ -7,6 +7,8 @@ import type { Clock } from "../../ports/clock.js";
 import type { ExecutionResult, PriorDiscussionComment } from "../../executor/index.js";
 import { isExecutionEnvironmentBlocker } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
+import { sessionStorageKey } from "../../session/store.js";
+import type { MetricsRecorder } from "../../ports/metrics-recorder.js";
 import { FatalSystemError, SelfMonitor } from "../../self-monitor/index.js";
 import { SelfEvolutionEngine } from "../../self-evolution/index.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
@@ -32,6 +34,8 @@ export interface ExecuteSessionDeps {
 	adminBaseUrl?: string;
 	resolveAdminBaseUrl?: () => string | undefined;
 	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+	/** Optional recorder for per-execution metrics (runtime + token usage). */
+	metrics?: MetricsRecorder;
 }
 
 export class ExecuteSession {
@@ -128,6 +132,7 @@ export class ExecuteSession {
 			};
 
 			let result: ExecutionResult;
+			let metricResult: ExecutionResult | undefined = undefined;
 			try {
 				current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", {
 					taskStartedAt: new Date().toISOString(),
@@ -146,12 +151,14 @@ export class ExecuteSession {
 						onActivity,
 						priorComments,
 					);
+					metricResult = result;
 				} finally {
 					const durationMs = Date.now() - taskStartedAt;
 					current = await this.deps.sessions.updateStatus(owner, repo, issueNumber, sessionStatus, {
 						taskFinishedAt: new Date().toISOString(),
 						totalExecutionTimeMs: priorExecutionTimeMs + durationMs,
 					});
+					this.recordMetric(current, taskStartedAt, durationMs, metricResult, abortController.signal.aborted);
 				}
 			} catch (error) {
 				if (abortController.signal.aborted) {
@@ -329,6 +336,55 @@ export class ExecuteSession {
 			"",
 			"Yolomatic will not launch a worker on a stale or credential-bearing workspace.",
 		].join("\n");
+	}
+
+	/**
+	 * Record a per-execution metric when a recorder is configured. Called from
+	 * the inner `finally` so runtime is captured even when the executor throws
+	 * or the run is aborted. Token usage comes from {@link ExecutionResult.usage}
+	 * when the run produced a result; otherwise usage is recorded as
+	 * unavailable so the dashboard can render "unknown" without breaking
+	 * aggregates.
+	 */
+	private recordMetric(
+		state: SessionState,
+		taskStartedAtMs: number,
+		durationMs: number,
+		result: ExecutionResult | undefined,
+		aborted: boolean,
+	): void {
+		const recorder = this.deps.metrics;
+		if (!recorder) return;
+		const kind = state.kind ?? "implementation";
+		const status = result?.status ?? (aborted ? "cancelled" : "failed");
+		const usage = result?.usage ?? {
+			available: false,
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: 0,
+		};
+		try {
+			recorder.record({
+				sessionKey: sessionStorageKey(state.owner, state.repo, state.issueNumber, kind),
+				owner: state.owner,
+				repo: state.repo,
+				issueNumber: state.issueNumber,
+				kind,
+				status,
+				startedAt: new Date(taskStartedAtMs).toISOString(),
+				finishedAt: new Date(taskStartedAtMs + durationMs).toISOString(),
+				durationMs,
+				tokenUsage: usage,
+			});
+		} catch (error) {
+			// Metrics recording must never regress session execution.
+			process.stdout.write(
+				`[execute] metrics record failed for ${state.owner}/${state.repo}#${state.issueNumber}: ${error instanceof Error ? error.message : String(error)}\n`,
+			);
+		}
 	}
 
 	private async failBeforeExecution(state: SessionState, key: string, message: string): Promise<void> {

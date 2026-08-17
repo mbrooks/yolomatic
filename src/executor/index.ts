@@ -21,6 +21,7 @@ import {
 } from "../runtime-settings.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
 import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
+import { extractTokenUsage, mergeUsage, type TokenUsage } from "./usage.js";
 import { loadSoulContent } from "./soul-loader.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 
@@ -110,7 +111,7 @@ export class PiAgentExecutor implements ExecutionService {
 		if (!parsed) {
 			throw new Error("Worker did not return a parseable refinement result.");
 		}
-		return parsed;
+		return { ...parsed, usage: result.usage };
 	}
 
 	private async run(
@@ -348,6 +349,32 @@ export class PiAgentExecutor implements ExecutionService {
 		}
 
 		const rawResponse = getLastAssistantText(session);
+		// Aggregate token usage from the assistant messages produced during the
+		// run. When the provider does not report usage, `available` is false and
+		// all counts are zero; the dashboard renders "unknown" in that case.
+		const usage = extractTokenUsage(session.messages);
+		if (usage.available) {
+			recordSessionLog(key, {
+				level: "info",
+				message: `Token usage: ${usage.totalTokens} tokens (in ${usage.input}, out ${usage.output}), cost ${usage.cost.toFixed(4)}`,
+				details: {
+					type: "usage",
+					available: true,
+					input: usage.input,
+					output: usage.output,
+					cacheRead: usage.cacheRead,
+					cacheWrite: usage.cacheWrite,
+					totalTokens: usage.totalTokens,
+					cost: usage.cost,
+				},
+			});
+		} else {
+			recordSessionLog(key, {
+				level: "info",
+				message: "Token usage unavailable (provider did not report usage).",
+				details: { type: "usage", available: false },
+			});
+		}
 		logger.logResponse(rawResponse);
 		let result = parseExecutionResult(rawResponse);
 		if (result.status === "working" && isExecutionEnvironmentBlocker(result.summary || result.rawResponse)) {
@@ -367,11 +394,14 @@ export class PiAgentExecutor implements ExecutionService {
 				status: "cancelled",
 				summary: "Task cancelled by admin.",
 				rawResponse: rawResponse,
+				usage,
 			};
 		}
 
 		if (!options?.refinement && result.status !== "failed" && detectStatusMarker(rawResponse) === null) {
-			result = await this.correctStatusProtocol(session, key, rawResponse, logger, abortSignal);
+			result = await this.correctStatusProtocol(session, key, rawResponse, logger, abortSignal, usage);
+		} else {
+			result = { ...result, usage };
 		}
 
 		recordSessionLog(key, {
@@ -390,6 +420,7 @@ export class PiAgentExecutor implements ExecutionService {
 		originalRaw: string,
 		logger: LlmLogger,
 		abortSignal?: AbortSignal,
+		priorUsage?: TokenUsage,
 	): Promise<ExecutionResult> {
 		recordSessionLog(key, {
 			level: "warn",
@@ -418,6 +449,7 @@ export class PiAgentExecutor implements ExecutionService {
 				status: "failed",
 				summary: `Worker protocol failure: the worker response omitted a valid YOLO_STATUS marker and the correction prompt failed (${message}). No work was delivered.`,
 				rawResponse: originalRaw,
+				usage: priorUsage,
 			};
 		}
 
@@ -426,10 +458,15 @@ export class PiAgentExecutor implements ExecutionService {
 				status: "cancelled",
 				summary: "Task cancelled by admin during status correction.",
 				rawResponse: "",
+				usage: extractTokenUsage(session.messages),
 			};
 		}
 
 		const correctedRaw = getLastAssistantText(session);
+		// Re-extract usage after the correction turn so it includes the extra
+		// assistant message. Falls back to the prior usage snapshot when the
+		// correction produced no new usage.
+		const correctedUsage = mergeUsage(priorUsage, extractTokenUsage(session.messages));
 		logger.logResponse(correctedRaw);
 		if (detectStatusMarker(correctedRaw) !== null) {
 			const corrected = parseExecutionResult(correctedRaw);
@@ -438,7 +475,7 @@ export class PiAgentExecutor implements ExecutionService {
 				message: `Status correction succeeded with status ${corrected.status}.`,
 				details: { type: "correction_result", status: corrected.status },
 			});
-			return corrected;
+			return { ...corrected, usage: correctedUsage };
 		}
 
 		recordSessionLog(key, {
@@ -450,6 +487,7 @@ export class PiAgentExecutor implements ExecutionService {
 			status: "failed",
 			summary: "Worker protocol failure: the worker did not return a valid YOLO_STATUS marker after one correction prompt. No work was delivered.",
 			rawResponse: correctedRaw || originalRaw,
+			usage: correctedUsage,
 		};
 	}
 

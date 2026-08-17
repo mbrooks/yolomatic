@@ -31,6 +31,8 @@ import { GitHubEventStore } from "../github-events/store.js";
 import { startGitHubPolling } from "../github-events/polling.js";
 import { SessionStoreRepositoryAdapter } from "../adapters/persistence/session-store-repository-adapter.js";
 import { systemClock } from "../ports/clock.js";
+import { DatabaseSync } from "node:sqlite";
+import { MetricsStore } from "../metrics/store.js";
 import { createStartIssueSession, type StartIssueSession } from "./commands/start-issue-session.js";
 import type { SettingsStore } from "../settings/store.js";
 import { UserStore } from "../users/store.js";
@@ -144,6 +146,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		runtimeSettings: runtimeSettingsProvider,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
+	const metricsStore = new MetricsStore(new DatabaseSync(path.join(config.memoryDir, "bot-state.sqlite")));
 	const refinementStore = new RefinementStore(path.join(config.memoryDir, "refinement.sqlite"));
 	const handlers = new GitHubIssueHandlers({
 		sessionManager,
@@ -165,6 +168,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		adminBaseUrl: config.adminBaseUrl,
 		resolveAdminBaseUrl,
 		resolveIssueAdminLinkInCommentsEnabled,
+		metrics: metricsStore,
 	});
 
 	const staleDetector = new StaleSessionDetector(
@@ -200,6 +204,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 		adminBaseUrl: config.adminBaseUrl,
 		resolveAdminBaseUrl,
 		resolveIssueAdminLinkInCommentsEnabled,
+		metrics: metricsStore,
 	});
 
 	const repoModes = managedRepositories.map((repo) =>
@@ -229,6 +234,7 @@ export function buildRuntimeGraph(config: AppConfig, deps: RuntimeDeps): Runtime
 			restartSession: (owner, repo, issueNumber) => handlers.resumeInterruptedSession(owner, repo, issueNumber),
 			userStore,
 			sessionAuth,
+			metricsStore,
 		},
 		github,
 		settingsStore,

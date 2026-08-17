@@ -1,6 +1,7 @@
 import React from "react";
-import type { AgentStatus, RepoSummary, Session } from "../../app/types.js";
+import type { AgentStatus, MetricsResponse, RepoSummary, Session } from "../../app/types.js";
 import { StatusBadge } from "../../components/StatusBadge.js";
+import { MetricsSection } from "./MetricsSection.js";
 import { formatRelative } from "../../lib/format.js";
 
 export function DashboardScreen({
@@ -9,6 +10,7 @@ export function DashboardScreen({
 	draining,
 	repos,
 	sessions,
+	metrics,
 	onSelectWorking,
 	onSelectRepos,
 	onSelectSession,
@@ -18,6 +20,7 @@ export function DashboardScreen({
 	draining: boolean;
 	repos: RepoSummary[];
 	sessions: Session[];
+	metrics: MetricsResponse | null;
 	onSelectWorking: () => void;
 	onSelectRepos: () => void;
 	onSelectSession: (session: Session) => void;
@@ -75,6 +78,8 @@ export function DashboardScreen({
 					</button>
 				</div>
 			</div>
+
+			<MetricsSection metrics={metrics} />
 
 			<div className="dashboard-section">
 				<h2>Recent Activity</h2>

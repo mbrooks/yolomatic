@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { statSync } from "node:fs";
 import { sessionStorageKey } from "../../session/store.js";
+import type { MetricsRecorder } from "../../ports/metrics-recorder.js";
 
 export interface IssueRefinementEventPayload {
 	source?: "webhook" | "polling";
@@ -99,6 +100,8 @@ export class HandleIssueRefinement {
 			adminBaseUrl?: string;
 			resolveAdminBaseUrl?: () => string | undefined;
 			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+			/** Optional recorder for per-execution metrics (runtime + token usage). */
+			metrics?: MetricsRecorder;
 		},
 	) {}
 
@@ -250,11 +253,15 @@ export class HandleIssueRefinement {
 		let attemptId: string | undefined;
 		let worktreePath: string | undefined;
 		let sessionStarted = false;
+		let refinementResult: import("../../executor/index.js").RefinementResult | undefined;
+		let metricStatus: string = "failed";
+		let taskStartedAtMs = 0;
 
 		try {
 			const title = payload.issue.title ?? "";
 			const body = payload.issue.body ?? "";
 			const taskStartedAt = this.deps.clock.now().toISOString();
+			taskStartedAtMs = this.deps.clock.now().getTime();
 			await this.deps.sessions.createSession(
 				owner,
 				repo,
@@ -337,6 +344,7 @@ export class HandleIssueRefinement {
 				workspacePath: worktreePath,
 			}, "refinement");
 			const result = await this.deps.executor.executeRefinement(state, skillInfo.content, steering);
+			refinementResult = result;
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", { summary: result.summary }, "refinement");
 
 			this.deps.refinementStore.updateAttempt(attemptId, {
@@ -406,6 +414,7 @@ export class HandleIssueRefinement {
 				summary: result.summary,
 				taskFinishedAt: this.deps.clock.now().toISOString(),
 			}, "refinement");
+			metricStatus = "complete";
 			this.log(owner, repo, issueNumber, "info", "Applied refined issue body");
 			const completionBody = applyTitle
 				? `Issue refined at the request of @${payload.sender.login}. The issue title and body now contain the Proposed Task. No implementation session was started.`
@@ -429,6 +438,7 @@ export class HandleIssueRefinement {
 			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, `Refinement failed: ${message}`));
 		} finally {
 			if (sessionStarted) {
+				this.recordRefinementMetric(owner, repo, issueNumber, taskStartedAtMs, metricStatus, refinementResult);
 				await this.ensureTerminalSession(owner, repo, issueNumber);
 			}
 			this.deps.tasks.unregister(key, registration);
@@ -438,6 +448,52 @@ export class HandleIssueRefinement {
 				this.log(owner, repo, issueNumber, "info", "Removed refinement worktree");
 			}
 			this.log(owner, repo, issueNumber, "info", "Refinement finished");
+		}
+	}
+
+	/**
+	 * Record a per-refinement metric when a recorder is configured. Called from
+	 * the `finally` so runtime is captured for both successful and failed
+	 * refinements. Token usage comes from the refinement result when the
+	 * worker returned one; otherwise usage is recorded as unavailable.
+	 */
+	private recordRefinementMetric(
+		owner: string,
+		repo: string,
+		issueNumber: number,
+		taskStartedAtMs: number,
+		status: string,
+		result: { usage?: import("../../executor/usage.js").TokenUsage } | undefined,
+	): void {
+		const recorder = this.deps.metrics;
+		if (!recorder) return;
+		const durationMs = this.deps.clock.now().getTime() - taskStartedAtMs;
+		const usage = result?.usage ?? {
+			available: false,
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: 0,
+		};
+		try {
+			recorder.record({
+				sessionKey: sessionStorageKey(owner, repo, issueNumber, "refinement"),
+				owner,
+				repo,
+				issueNumber,
+				kind: "refinement",
+				status,
+				startedAt: new Date(taskStartedAtMs).toISOString(),
+				finishedAt: new Date(taskStartedAtMs + durationMs).toISOString(),
+				durationMs,
+				tokenUsage: usage,
+			});
+		} catch (error) {
+			process.stdout.write(
+				`[refinement] metrics record failed for ${owner}/${repo}#${issueNumber}: ${error instanceof Error ? error.message : String(error)}\n`,
+			);
 		}
 	}
 
