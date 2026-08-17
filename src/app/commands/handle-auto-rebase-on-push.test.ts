@@ -327,15 +327,21 @@ describe("HandleAutoRebaseOnPush", () => {
 		expect(executor.execute).not.toHaveBeenCalled();
 	});
 
-	it("ignores sessions whose branch is not a yolomatic issue branch", async () => {
+	it("enumerates a session that has no stored branch field but has a prNumber (production sessions do not persist branch)", async () => {
+		// Regression: real sessions are created via createSession/associatePR,
+		// which never populate `branch`. Candidate enumeration must not depend on
+		// session.branch; the branch invariant is enforced per-PR against the
+		// live PR head ref by validatePRSessionMapping.
 		const { handler, github, executor } = createHandler({
-			sessions: [makeSession({ prNumber: 99, branch: "feature/x" })],
+			sessions: [makeSession({ prNumber: 99, branch: undefined })],
+			getPullRequest: async () => ({ head: { ref: "yolomatic/issue-56" }, state: "open", merged: false, mergeable: false, mergeableState: "dirty", draft: false }),
 		});
 		await handler.execute(basePayload);
-		expect(github.getPullRequest).not.toHaveBeenCalled();
-		expect(github.postPRComment).not.toHaveBeenCalled();
-		expect(executor.execute).not.toHaveBeenCalled();
+		expect(github.getPullRequest).toHaveBeenCalledWith("mbrooks", "yolomatic", 99);
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 99, expect.stringContaining("Automatic conflict resolution"));
+		expect(executor.execute).toHaveBeenCalled();
 	});
+
 
 	it("only enumerates sessions for the pushed repository", async () => {
 		const other = makeSession({ owner: "other", repo: "repo", issueNumber: 7, prNumber: 3, branch: "yolomatic/issue-7" });

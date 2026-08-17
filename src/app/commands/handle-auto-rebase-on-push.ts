@@ -5,7 +5,7 @@ import type { GitHubService } from "../../ports/github-service.js";
 import type { TaskControlService, TaskRegistration } from "../../ports/task-control-service.js";
 import type { GitHubEventSource } from "../../github-events/model.js";
 import type { SessionState } from "../../session/store.js";
-import { validatePRSessionMapping, expectedBranchForIssue } from "../../pr-review/session-invariant.js";
+import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import { issueSessionKey } from "./workflow-helpers.js";
 import {
 	MergeConflictReworkService,
@@ -81,12 +81,17 @@ export class HandleAutoRebaseOnPush {
 		}
 
 		const allSessions = await this.deps.sessions.getAll();
+		// Candidate enumeration is keyed on the stored PR association only.
+		// Production sessions do not persist a `branch` field (createSession and
+		// associatePR never set it), so filtering on session.branch would silently
+		// drop every real session. The Yolomatic-ownership / branch invariant is
+		// enforced per-PR against the live PR head ref by validatePRSessionMapping
+		// in processCandidate, mirroring HandleFixMergeConflicts.
 		const candidates = allSessions.filter(
 			(session) =>
 				session.owner === owner &&
 				session.repo === repo &&
-				session.prNumber !== undefined &&
-				session.branch === expectedBranchForIssue(session.issueNumber),
+				session.prNumber !== undefined,
 		);
 
 		if (candidates.length === 0) {
