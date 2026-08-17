@@ -104,4 +104,17 @@ describe("GitHubEventStore", () => {
 
 		expect(store.getRepoPollBaseline("other", "repo")).toBeNull();
 	});
+
+	it("persists the last-seen default-branch HEAD sha per repository", () => {
+		const store = new GitHubEventStore(TEST_DB);
+		expect(store.getDefaultBranchHead("mbrooks", "yolomatic")).toBeNull();
+
+		store.setDefaultBranchHead("mbrooks", "yolomatic", "sha-1");
+		expect(store.getDefaultBranchHead("mbrooks", "yolomatic")).toBe("sha-1");
+
+		store.setDefaultBranchHead("mbrooks", "yolomatic", "sha-2");
+		expect(store.getDefaultBranchHead("mbrooks", "yolomatic")).toBe("sha-2");
+
+		expect(store.getDefaultBranchHead("other", "repo")).toBeNull();
+	});
 });

@@ -7,6 +7,7 @@ import {
 	normalizePolledPRReview,
 	normalizePolledPRReviewComment,
 	normalizePolledPullRequest,
+	normalizePolledDefaultBranchPush,
 	isPollingSubjectDue,
 	pollingSubjectCheckIntervalMs,
 	startGitHubPolling,
@@ -34,6 +35,7 @@ function makeStore(last: string | null, subjects: GitHubPollSubject[] = []): Git
 function makeStatefulStore(last: string | null): GitHubEventStateStore {
 	let lastReceivedAt = last;
 	const baselines = new Map<string, string>();
+	const heads = new Map<string, string>();
 	return {
 		getLastEventReceivedAt: () => lastReceivedAt,
 		initializeLastEventReceivedAt: (value: string) => {
@@ -51,6 +53,10 @@ function makeStatefulStore(last: string | null): GitHubEventStateStore {
 		setRepoPollBaseline: (owner, repo, value) => {
 			baselines.set(`${owner}/${repo}`, value);
 		},
+		getDefaultBranchHead: (owner, repo) => heads.get(`${owner}/${repo}`) ?? null,
+		setDefaultBranchHead: (owner, repo, sha) => {
+			heads.set(`${owner}/${repo}`, sha);
+		},
 	};
 }
 
@@ -65,6 +71,7 @@ function makeGithub(overrides = {}) {
 		listPullRequestsUpdatedSince: vi.fn(async () => []),
 		listPRReviewsSince: vi.fn(async () => []),
 		listPRReviewCommentsSince: vi.fn(async () => []),
+		getDefaultBranchHeadSha: vi.fn(async () => null as string | null),
 		...overrides,
 	};
 }
@@ -193,7 +200,7 @@ describe("tickGitHubPolling", () => {
 		};
 
 		expect(normalizePolledIssue("mbrooks", "yolomatic", issue, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "issue" }));
-		expect(normalizePolledIssue("mbrooks", "yolomatic", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("edited");
+		expect((normalizePolledIssue("mbrooks", "yolomatic", { ...issue, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z") as { payload: { action: string } }).payload.action).toBe("edited");
 		expect(normalizePolledIssueTimelineEvent("mbrooks", "yolomatic", {
 			id: 3,
 			event: "assigned",
@@ -216,7 +223,7 @@ describe("tickGitHubPolling", () => {
 			issue: { ...issue, pull_request: { url: "https://api.github.com/pr" } },
 		})).toEqual(expect.objectContaining({ type: "issue_comment" }));
 		expect(normalizePolledPullRequest("mbrooks", "yolomatic", pr, "2026-06-01T12:00:00.000Z")).toEqual(expect.objectContaining({ type: "pull_request" }));
-		expect(normalizePolledPullRequest("mbrooks", "yolomatic", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z").payload.action).toBe("synchronize");
+		expect((normalizePolledPullRequest("mbrooks", "yolomatic", { ...pr, created_at: "2026-06-01T11:00:00.000Z" }, "2026-06-01T12:00:00.000Z") as { payload: { action: string } }).payload.action).toBe("synchronize");
 		expect(normalizePolledPRReview("mbrooks", "yolomatic", {
 			id: 6,
 			body: "Review",
@@ -852,5 +859,133 @@ describe("tickGitHubPolling", () => {
 				vi.useRealTimers();
 			}
 		});
+	});
+});
+
+describe("normalizePolledDefaultBranchPush", () => {
+	it("builds a polling-sourced push event keyed on the new sha", () => {
+		const event = normalizePolledDefaultBranchPush("mbrooks", "yolomatic", "refs/heads/main", "old", "new", "2026-06-02T00:00:00.000Z");
+		expect(event).toEqual({
+			id: "github:push:poll:mbrooks/yolomatic:refs/heads/main:new",
+			type: "push",
+			source: "polling",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-02T00:00:00.000Z",
+			payload: {
+				ref: "refs/heads/main",
+				before: "old",
+				after: "new",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "unknown" },
+			},
+		});
+	});
+});
+
+describe("tickGitHubPolling default-branch push detection", () => {
+	it("seeds the default-branch HEAD on the first tick without dispatching a push", async () => {
+		const store = makeStatefulStore("2026-06-01T12:00:00.000Z");
+		const dispatch = vi.fn(async () => undefined);
+		const github = makeGithub({
+			getDefaultBranchHeadSha: vi.fn(async () => "sha-1"),
+		});
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yolomatic-bot",
+			intervalMs: 60000,
+			resolveDefaultBranch: () => "main",
+			now: () => new Date("2026-06-01T12:00:05.000Z"),
+			dispatch,
+		});
+		expect(store.getDefaultBranchHead!("mbrooks", "yolomatic")).toBe("sha-1");
+		expect(dispatch).not.toHaveBeenCalled();
+	});
+
+	it("dispatches a push event when the default-branch HEAD changes between ticks", async () => {
+		const store = makeStatefulStore("2026-06-01T12:00:00.000Z");
+		store.setDefaultBranchHead!("mbrooks", "yolomatic", "sha-1");
+		const dispatch = vi.fn(async () => undefined);
+		const github = makeGithub({
+			getDefaultBranchHeadSha: vi.fn(async () => "sha-2"),
+		});
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yolomatic-bot",
+			intervalMs: 60000,
+			resolveDefaultBranch: () => "main",
+			now: () => new Date("2026-06-01T12:01:00.000Z"),
+			dispatch,
+		});
+		expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+			type: "push",
+			source: "polling",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			payload: expect.objectContaining({ ref: "refs/heads/main", before: "sha-1", after: "sha-2" }),
+		}));
+		expect(store.getDefaultBranchHead!("mbrooks", "yolomatic")).toBe("sha-2");
+	});
+
+	it("does not dispatch a push when the default-branch HEAD is unchanged", async () => {
+		const store = makeStatefulStore("2026-06-01T12:00:00.000Z");
+		store.setDefaultBranchHead!("mbrooks", "yolomatic", "sha-1");
+		const dispatch = vi.fn(async () => undefined);
+		const github = makeGithub({
+			getDefaultBranchHeadSha: vi.fn(async () => "sha-1"),
+		});
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yolomatic-bot",
+			intervalMs: 60000,
+			resolveDefaultBranch: () => "main",
+			now: () => new Date("2026-06-01T12:01:00.000Z"),
+			dispatch,
+		});
+		expect(dispatch).not.toHaveBeenCalled();
+	});
+
+	it("uses resolveDefaultBranch to form the watched ref", async () => {
+		const store = makeStatefulStore("2026-06-01T12:00:00.000Z");
+		store.setDefaultBranchHead!("mbrooks", "yolomatic", "sha-1");
+		const dispatch = vi.fn(async () => undefined);
+		const github = makeGithub({
+			getDefaultBranchHeadSha: vi.fn(async () => "sha-2"),
+		});
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yolomatic-bot",
+			intervalMs: 60000,
+			resolveDefaultBranch: () => "develop",
+			now: () => new Date("2026-06-01T12:01:00.000Z"),
+			dispatch,
+		});
+		expect(github.getDefaultBranchHeadSha).toHaveBeenCalledWith("mbrooks", "yolomatic", "develop");
+		expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+			payload: expect.objectContaining({ ref: "refs/heads/develop" }),
+		}));
+	});
+
+	it("skips default-branch detection when the store does not support it", async () => {
+		const store = makeStore("2026-06-01T12:00:00.000Z");
+		const dispatch = vi.fn(async () => undefined);
+		const github = makeGithub({
+			getDefaultBranchHeadSha: vi.fn(async () => "sha-2"),
+		});
+		await tickGitHubPolling({
+			github,
+			eventStore: store,
+			githubUsername: "yolomatic-bot",
+			intervalMs: 60000,
+			resolveDefaultBranch: () => "main",
+			now: () => new Date("2026-06-01T12:01:00.000Z"),
+			dispatch,
+		});
+		expect(github.getDefaultBranchHeadSha).not.toHaveBeenCalled();
+		expect(dispatch).not.toHaveBeenCalled();
 	});
 });

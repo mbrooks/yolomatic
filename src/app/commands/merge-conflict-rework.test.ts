@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MergeConflictReworkService } from "./merge-conflict-rework.js";
+import { MergeConflictReworkService, reportConflictResolutionResult } from "./merge-conflict-rework.js";
 import type { ExecutionResult } from "../../executor/index.js";
 import type { SessionState } from "../../session/store.js";
 import type { GitHubService } from "../../ports/github-service.js";
@@ -276,5 +276,63 @@ describe("MergeConflictReworkService", () => {
 			await service.resolveConflicts("mbrooks", "yolomatic", 7, 42, state);
 			expect(deps.github.markPullRequestReadyForReview).toHaveBeenCalledWith("mbrooks", "yolomatic", 42);
 		});
+	});
+});
+
+describe("reportConflictResolutionResult", () => {
+	function makeReportDeps() {
+		const github = {
+			postPRComment: vi.fn(async () => 1),
+		} as unknown as GitHubService & { postPRComment: ReturnType<typeof vi.fn> };
+		const sessions = {
+			updateStatus: vi.fn(async () => ({ ...state, status: "complete" }) as never),
+		} as never as import("../../ports/session-repository.js").SessionRepository & {
+			updateStatus: ReturnType<typeof vi.fn>;
+		};
+		return { github, sessions };
+	}
+
+	it("posts the already-mergeable no-op and marks complete when clean with zero attempts", async () => {
+		const { github, sessions } = makeReportDeps();
+		await reportConflictResolutionResult(
+			{ github, sessions, maxConflictAttempts: 2 },
+			"mbrooks", "yolomatic", 42, 7,
+			{ outcome: "clean", attempts: 0, conflictedFiles: [] },
+		);
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining("already mergeable"));
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 7, "complete");
+	});
+
+	it("posts the rebase success comment and marks complete after a rework attempt", async () => {
+		const { github, sessions } = makeReportDeps();
+		await reportConflictResolutionResult(
+			{ github, sessions, maxConflictAttempts: 2 },
+			"mbrooks", "yolomatic", 42, 7,
+			{ outcome: "clean", attempts: 1, conflictedFiles: [] },
+		);
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining("now mergeable"));
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 7, "complete");
+	});
+
+	it("posts a failure comment and marks failed when rework is exhausted", async () => {
+		const { github, sessions } = makeReportDeps();
+		await reportConflictResolutionResult(
+			{ github, sessions, maxConflictAttempts: 2 },
+			"mbrooks", "yolomatic", 42, 7,
+			{ outcome: "conflict-failed", attempts: 2, conflictedFiles: ["src/a.ts"] },
+		);
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining("could not resolve"));
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 7, "failed", expect.objectContaining({ summary: "merge conflicts unresolved" }));
+	});
+
+	it("posts an unknown-mergeability comment and marks failed when mergeability is unknown", async () => {
+		const { github, sessions } = makeReportDeps();
+		await reportConflictResolutionResult(
+			{ github, sessions, maxConflictAttempts: 2 },
+			"mbrooks", "yolomatic", 42, 7,
+			{ outcome: "unknown-mergeability", attempts: 0, conflictedFiles: [] },
+		);
+		expect(github.postPRComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 42, expect.stringContaining("mergeability"));
+		expect(sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 7, "failed", expect.objectContaining({ summary: "mergeability unknown" }));
 	});
 });

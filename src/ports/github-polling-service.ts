@@ -72,4 +72,10 @@ export interface GitHubPollingService {
 	listPullRequestsUpdatedSince(owner: string, repo: string, since: string): Promise<PollPullRequest[]>;
 	listPRReviewsSince(owner: string, repo: string, since: string): Promise<PollPRReview[]>;
 	listPRReviewCommentsSince(owner: string, repo: string, since: string): Promise<PollPRReviewComment[]>;
+	/**
+	 * Returns the current HEAD commit SHA of `branch`, or `null` when it
+	 * cannot be resolved. Used by polling to detect new commits on a managed
+	 * repository's default branch.
+	 */
+	getDefaultBranchHeadSha(owner: string, repo: string, branch: string): Promise<string | null>;
 }

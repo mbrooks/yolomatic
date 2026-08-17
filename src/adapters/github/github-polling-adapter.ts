@@ -194,6 +194,15 @@ export class GitHubPollingAdapter implements GitHubPollingService {
 		}
 	}
 
+	async getDefaultBranchHeadSha(owner: string, repo: string, branch: string): Promise<string | null> {
+		try {
+			const { data } = await this.octokit.repos.getBranch({ owner, repo, branch });
+			return String(data?.commit?.sha ?? "");
+		} catch {
+			return null;
+		}
+	}
+
 	private async getPollIssue(owner: string, repo: string, issueNumber: number): Promise<PollIssue | null> {
 		try {
 			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });

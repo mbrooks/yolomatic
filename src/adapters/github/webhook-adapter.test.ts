@@ -22,6 +22,40 @@ describe("webhook-adapter", () => {
 		expect(normalizeWebhookEvent("ping", payload)).toEqual([]);
 	});
 
+	it("normalizes default-branch push webhook events", () => {
+		const pushPayload = {
+			ref: "refs/heads/main",
+			before: "oldsha",
+			after: "newsha",
+			head_commit: { id: "newsha", timestamp: "2026-06-02T00:00:00Z" },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "human" },
+		};
+		const [event] = normalizeWebhookEvent("push", pushPayload, "d2");
+		expect(event).toEqual(expect.objectContaining({
+			type: "push",
+			source: "webhook",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: "2026-06-02T00:00:00Z",
+			id: "github:push:mbrooks/yolomatic:refs/heads/main:newsha",
+		}));
+		expect(event?.payload).toEqual({
+			ref: "refs/heads/main",
+			before: "oldsha",
+			after: "newsha",
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "human" },
+		});
+	});
+
+	it("ignores tag pushes and branch deletions", () => {
+		const repo = { name: "yolomatic", owner: { login: "mbrooks" } };
+		expect(normalizeWebhookEvent("push", { ref: "refs/tags/v1", before: "x", after: "y", repository: repo }, "d3")).toEqual([]);
+		expect(normalizeWebhookEvent("push", { ref: "refs/heads/main", before: "x", after: "0000000000000000000000000000000000000000", repository: repo }, "d3")).toEqual([]);
+		expect(normalizeWebhookEvent("push", { before: "x", after: "y", repository: repo }, "d3")).toEqual([]);
+	});
+
 	it("falls back when payload metadata is missing", () => {
 		const [event] = normalizeWebhookEvent("issue_comment", {}, undefined);
 		expect(event).toEqual(expect.objectContaining({

@@ -1377,4 +1377,29 @@ describe("GitHubIssueHandlers handleGitHubEvent mode gating", () => {
 		await handlers.handleGitHubEvent(makeEvent("polling"));
 		expect(dispatch).toHaveBeenCalledTimes(1);
 	});
+
+	it("gates push events by source like other event types", async () => {
+		const { handlers, dispatch } = buildHandlers(() => "webhook");
+		const pushEvent: GitHubEvent = {
+			id: "push-webhook",
+			type: "push",
+			source: "webhook",
+			owner: "mbrooks",
+			repo: "yolomatic",
+			occurredAt: new Date().toISOString(),
+			payload: {
+				ref: "refs/heads/main",
+				before: "old",
+				after: "new",
+				repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+				sender: { login: "human" },
+			},
+		};
+		await handlers.handleGitHubEvent(pushEvent);
+		expect(dispatch).toHaveBeenCalledTimes(1);
+
+		const pollingPush: GitHubEvent = { ...pushEvent, id: "push-poll", source: "polling" };
+		await handlers.handleGitHubEvent(pollingPush);
+		expect(dispatch).toHaveBeenCalledTimes(1);
+	});
 });

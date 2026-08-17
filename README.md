@@ -134,7 +134,7 @@ Expose port `6767` through HTTPS, then create a GitHub repository webhook with:
 - **Payload URL:** `https://your-host.example/webhook`
 - **Content type:** `application/json`
 - **Secret:** the secret generated during setup
-- **Events:** issues, issue comments, pull request reviews, and pull request review comments
+- **Events:** issues, issue comments, pull request reviews, pull request review comments, and push (for automatic PR rebasing when the default branch advances)
 
 For local testing, a tunnel such as `ngrok http 6767` can provide the public URL.
 
@@ -150,6 +150,8 @@ Select `polling` if Yolomatic cannot receive a public webhook. No public URL is 
 4. Follow progress in GitHub or inspect the live session log in the dashboard.
 5. Add an issue comment that tags the configured Yolomatic account (or contains the `/yolomatic feedback` command) to steer active work, or update the issue description. Yolomatic keeps the same issue session and worktree. Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.
 6. Review the pull request. Actionable review comments trigger another implementation pass and are pushed to the same branch.
+
+When a new commit lands on a managed repository's default branch, Yolomatic automatically checks its own open pull requests for that repository and rebases any that now conflict (running the same `git rebase origin/main` worker iteration used by `/yolomatic fix-merge-conflicts`), posting a comment on each affected PR when the rebase starts. PRs that are still mergeable are left alone. This works whether the commit is observed via a `push` webhook or detected by polling the default-branch HEAD.
 
 Yolomatic uses workflow labels and GitHub comments to show its current state:
 

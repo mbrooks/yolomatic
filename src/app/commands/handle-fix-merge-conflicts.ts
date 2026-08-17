@@ -8,7 +8,7 @@ import type { SessionState } from "../../session/store.js";
 import { isAdmin } from "../../domain/workflow/policy.js";
 import { validatePRSessionMapping } from "../../pr-review/session-invariant.js";
 import { issueSessionKey } from "./workflow-helpers.js";
-import { MergeConflictReworkService } from "./merge-conflict-rework.js";
+import { MergeConflictReworkService, reportConflictResolutionResult } from "./merge-conflict-rework.js";
 
 export interface FixMergeConflictsPayload {
 	source?: GitHubEventSource;
@@ -156,64 +156,19 @@ export class HandleFixMergeConflicts {
 		try {
 			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working");
 			const result = await this.rework.resolveConflicts(owner, repo, issueNumber, prNumber, session);
-			await this.reportResult(owner, repo, prNumber, issueNumber, result);
+			await reportConflictResolutionResult(
+				{ github: this.deps.github, sessions: this.deps.sessions, maxConflictAttempts: this.deps.maxConflictAttempts },
+				owner,
+				repo,
+				prNumber,
+				issueNumber,
+				result,
+			);
 		} finally {
 			this.deps.tasks.unregister(key, registration);
 		}
 	}
 
-	private async reportResult(
-		owner: string,
-		repo: string,
-		prNumber: number,
-		issueNumber: number,
-		result: Awaited<ReturnType<MergeConflictReworkService["resolveConflicts"]>>,
-	): Promise<void> {
-		const maxAttempts = this.deps.maxConflictAttempts ?? 2;
-		if (result.outcome === "clean") {
-			if (result.attempts === 0) {
-				await this.deps.github.postPRComment(owner, repo, prNumber, "No conflicts need resolution. This pull request is already mergeable.");
-				await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
-				return;
-			}
-			await this.deps.github.postPRComment(
-				owner,
-				repo,
-				prNumber,
-				`Rebased this pull request onto the default branch and resolved merge conflicts (attempt ${result.attempts} of ${maxAttempts}). The PR is now mergeable.`,
-			);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete");
-			return;
-		}
-
-		if (result.outcome === "unknown-mergeability") {
-			await this.deps.github.postPRComment(
-				owner,
-				repo,
-				prNumber,
-				"GitHub could not compute mergeability for this pull request within the polling window. Please re-run `/yolomatic fix-merge-conflicts` or resolve the conflicts manually.",
-			);
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: "mergeability unknown" });
-			return;
-		}
-
-		const fileList = result.conflictedFiles.length > 0
-			? ["", "Conflicted files:", ...result.conflictedFiles.map((f) => `- \`${f}\``)].join("\n")
-			: "";
-		await this.deps.github.postPRComment(
-			owner,
-			repo,
-			prNumber,
-			[
-				"**Yolomatic could not resolve the merge conflicts.**",
-				"",
-				`Merge conflicts with the base branch could not be resolved after ${result.attempts} rework attempt${result.attempts === 1 ? "" : "s"}.`,
-				"A maintainer must resolve the conflicts manually.",
-				fileList,
-			].filter(Boolean).join("\n"),
-		);
-		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", { summary: "merge conflicts unresolved" });
-	}
 }
 
 export { type SessionState, type TaskRegistration };
