@@ -78,8 +78,8 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		const refinementStore =
 			deps.refinementStore ??
 			(deps.memoryDir
-				? new RefinementStore(path.join(deps.memoryDir, "refinement.sqlite"))
-				: new RefinementStore(path.join(process.cwd(), "memory", "refinement.sqlite")));
+				? new RefinementStore(path.join(deps.memoryDir, "bot-state.sqlite"))
+				: new RefinementStore(path.join(process.cwd(), "memory", "bot-state.sqlite")));
 		const isRepoManaged = (owner: string, repo: string) => {
 			if (!deps.repositoryStore) return true;
 			return !!deps.repositoryStore.getSync(owner, repo);
