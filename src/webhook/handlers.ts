@@ -36,6 +36,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 	private readonly handleIssueEventCmd: HandleIssueEvent;
 	private readonly handleIssueCommentCmd: HandleIssueComment;
 	private readonly handlePRReviewCmd: HandlePRReview;
+	private readonly handleIssueRefinementCmd: HandleIssueRefinement;
 	private readonly resumeSessionCmd: ResumeInterruptedSession;
 	private readonly dispatcher: GitHubEventDispatcher;
 
@@ -105,6 +106,7 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 			resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 			metrics: deps.metrics,
 		});
+		this.handleIssueRefinementCmd = refinement;
 
 		const execDeps = {
 			sessions,
@@ -240,6 +242,10 @@ export class GitHubIssueHandlers implements WebhookHandlers {
 		} finally {
 			this.inFlight.delete(key);
 		}
+	}
+
+	async restartRefinement(owner: string, repo: string, issueNumber: number): Promise<void> {
+		await this.handleIssueRefinementCmd.restart(owner, repo, issueNumber);
 	}
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {

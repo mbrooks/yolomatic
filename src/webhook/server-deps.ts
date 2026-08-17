@@ -72,6 +72,7 @@ export function createWebhookServerDeps(
 	userStore?: UserStore,
 	sessionAuth?: AdminSessionAuth,
 	metricsStore?: MetricsStore,
+	restartRefinement?: RestartSessionDispatcher,
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -91,6 +92,7 @@ export function createWebhookServerDeps(
 			systemClock,
 			archiveDir,
 			restartSession,
+			restartRefinement,
 		),
 		startIssueSession: prebuiltStartIssueSession,
 		taskController: taskService,

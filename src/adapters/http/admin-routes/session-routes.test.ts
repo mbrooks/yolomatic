@@ -149,6 +149,51 @@ describe("handleSessionRoutes", () => {
 		expect(res.statusCode).toBe(200);
 	});
 
+	it("allows restart and mark-complete commands for refinement sessions and passes the kind", async () => {
+		const execute = vi.fn(async () => ok({ status: "complete", message: "done" }));
+		const refinementDeps = {
+			...deps,
+			runSessionCommand: { execute } as unknown as AdminRouterDeps["runSessionCommand"],
+		};
+
+		for (const command of ["restart", "mark-complete"]) {
+			const res = response();
+			await handleSessionRoutes(
+				request(
+					"/api/sessions/mbrooks/yolomatic/658/refinement/commands",
+					"POST",
+					JSON.stringify({ command }),
+				),
+				res,
+				refinementDeps,
+				new URL("http://localhost/api/sessions/mbrooks/yolomatic/658/refinement/commands"),
+				"/api/sessions/mbrooks/yolomatic/658/refinement/commands",
+			);
+			expect(res.statusCode).toBe(200);
+		}
+
+		expect(execute).toHaveBeenNthCalledWith(1, "mbrooks", "yolomatic", 658, "restart", undefined, "refinement");
+		expect(execute).toHaveBeenNthCalledWith(2, "mbrooks", "yolomatic", 658, "mark-complete", undefined, "refinement");
+	});
+
+	it("rejects implementation-only commands for refinement sessions", async () => {
+		const res = response();
+		await handleSessionRoutes(
+			request(
+				"/api/sessions/mbrooks/yolomatic/658/refinement/commands",
+				"POST",
+				JSON.stringify({ command: "pause" }),
+			),
+			res,
+			deps,
+			new URL("http://localhost/api/sessions/mbrooks/yolomatic/658/refinement/commands"),
+			"/api/sessions/mbrooks/yolomatic/658/refinement/commands",
+		);
+
+		expect(res.statusCode).toBe(400);
+		expect(JSON.parse(res.body).error).toContain("Restart and Mark complete");
+	});
+
 	it("returns mapped error status when command returns a failure", async () => {
 		const res = response();
 		const failDeps: AdminRouterDeps = {

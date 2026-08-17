@@ -59,6 +59,7 @@ export interface WebhookServerOptions {
 	prebuiltStartIssueSession?: StartIssueSession;
 	repositoryStore?: RepositoryStore;
 	restartSession?: RestartSessionDispatcher;
+	restartRefinement?: RestartSessionDispatcher;
 	userStore?: UserStore;
 	sessionAuth?: AdminSessionAuth;
 	/** SQLite-backed metrics store used to serve the admin metrics API. */
@@ -90,6 +91,7 @@ export function createWebhookServer(options: WebhookServerOptions) {
 		prebuiltStartIssueSession,
 		repositoryStore,
 		restartSession,
+		restartRefinement,
 		userStore,
 		sessionAuth,
 		metricsStore,
@@ -113,6 +115,7 @@ export function createWebhookServer(options: WebhookServerOptions) {
 		userStore,
 		sessionAuth,
 		metricsStore,
+		restartRefinement,
 	);
 
 	serverDeps.skillStore = skillStore;

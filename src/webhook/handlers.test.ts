@@ -1225,6 +1225,101 @@ describe("GitHubIssueHandlers PR review delegation", () => {
 		expect(handlers.isInFlight("mbrooks", "yolomatic", 56)).toBe(false);
 	});
 
+	it("delegates admin refinement restarts to the refinement command", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+		const refinement = (handlers as unknown as {
+			handleIssueRefinementCmd: { restart: (owner: string, repo: string, issueNumber: number) => Promise<void> };
+		}).handleIssueRefinementCmd;
+		const restart = vi.spyOn(refinement, "restart").mockResolvedValue(undefined);
+
+		await handlers.restartRefinement("mbrooks", "yolomatic", 658);
+
+		expect(restart).toHaveBeenCalledWith("mbrooks", "yolomatic", 658);
+	});
+
+	it("ignores webhook events when the repository is polling-only", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			resolveGitHubEventMode: () => "polling",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 56, title: "Title", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("ignores polling events when the repository is webhook-only", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			resolveGitHubEventMode: () => "webhook",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+		const [event] = normalizeWebhookEvent("issues", {
+			action: "opened",
+			issue: { number: 56, title: "Title", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		}, "polling-mode-test");
+
+		await handlers.handleGitHubEvent({ ...event!, source: "polling" });
+
+		expect(executor.execute).not.toHaveBeenCalled();
+	});
+
+	it("dispatches webhook events when the repository accepts both sources", async () => {
+		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
+		const handlers = new GitHubIssueHandlers({
+			sessionManager: sessionManager as never,
+			workspaceManager: workspaceManager as never,
+			executor: executor as never,
+			githubToken: "token",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			resolveGitHubEventMode: () => "both",
+			selfReportEnabled: true,
+			octokit: octokit as never,
+		});
+
+		await handlers.handleIssueEvent({
+			action: "opened",
+			issue: { number: 56, title: "Title", body: "Body", assignees: [{ login: "yolomatic-bot" }] },
+			repository: { name: "yolomatic", owner: { login: "mbrooks" } },
+			sender: { login: "user" },
+		});
+
+		expect(sessionManager.getSession).toHaveBeenCalledWith("mbrooks", "yolomatic", 56, "implementation");
+	});
+
 	it("considers repos managed when no repositoryStore is provided", async () => {
 		const { octokit, sessionManager, workspaceManager, executor } = createDeps();
 		const handlers = new GitHubIssueHandlers({
