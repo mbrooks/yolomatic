@@ -110,16 +110,27 @@ export class WorkspaceManager implements WorkspaceService {
 		try {
 			await this.git.runAuthenticated(["push", "origin", branchName], { cwd: worktreePath });
 		} catch (error) {
-			if (!expectedRemoteHead || !isNonFastForwardPushError(error)) {
+			if (!isNonFastForwardPushError(error)) {
 				throw error;
 			}
-			if (!/^[0-9a-f]{40,64}$/iu.test(expectedRemoteHead)) {
-				throw new Error(`Cannot safely update ${branchName}: invalid expected remote head '${expectedRemoteHead}'.`);
+			// The worktree's view of origin/<branch> can lag behind the real remote
+			// (e.g. when the worktree was created from a stale bare-repo ref), so a
+			// plain push can be rejected as non-fast-forward even for Yolomatic's
+			// own branch. Recover by leasing against the live remote head: when the
+			// caller captured an expected head, use it; otherwise fetch the current
+			// remote head now. The force-with-lease only overwrites the remote when
+			// no concurrent push landed since that head was observed.
+			const leaseHead = expectedRemoteHead ?? (await this.resolveRemoteHeadForLease(worktreePath, branchName));
+			if (!leaseHead || !/^[0-9a-f]{40,64}$/iu.test(leaseHead)) {
+				if (expectedRemoteHead) {
+					throw new Error(`Cannot safely update ${branchName}: invalid expected remote head '${expectedRemoteHead}'.`);
+				}
+				throw error;
 			}
 			await this.git.runAuthenticated(
 				[
 					"push",
-					`--force-with-lease=refs/heads/${branchName}:${expectedRemoteHead}`,
+					`--force-with-lease=refs/heads/${branchName}:${leaseHead}`,
 					"origin",
 					branchName,
 				],
@@ -127,6 +138,29 @@ export class WorkspaceManager implements WorkspaceService {
 			);
 		}
 		return true;
+	}
+
+	/**
+	 * Resolve the live remote head for `origin/<branch>` from within a worktree
+	 * so a non-fast-forward push can be retried with a safe `--force-with-lease`.
+	 * Fetches the single branch ref from origin first, then reads the updated
+	 * remote-tracking ref. Returns `null` when the head cannot be determined so
+	 * callers can surface the original push error instead of blind-force-pushing.
+	 */
+	private async resolveRemoteHeadForLease(worktreePath: string, branchName: string): Promise<string | null> {
+		try {
+			await this.git.runAuthenticated(["fetch", "origin", branchName], { cwd: worktreePath });
+		} catch {
+			// Fall through to the remote-tracking ref, which may still be usable
+			// even if the network fetch failed.
+		}
+		try {
+			const { stdout } = await this.git.run("git", ["rev-parse", `origin/${branchName}`], { cwd: worktreePath });
+			const sha = stdout.trim();
+			return sha.length > 0 ? sha : null;
+		} catch {
+			return null;
+		}
 	}
 
 	async createRefinementWorktree(owner: string, repo: string, issueNumber: number): Promise<string> {
