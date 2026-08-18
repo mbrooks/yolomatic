@@ -553,6 +553,115 @@ describe("WorkspaceManager", () => {
 		);
 	});
 
+	it("rejects an invalid caller-provided expected remote head with a clear diagnostic", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-push-lease-invalid-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "push") {
+				const error = new Error("failed to push some refs") as Error & { stderr?: string };
+				error.stderr = "! [rejected] branch -> branch (non-fast-forward)";
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(
+			manager.commitAndPushPath(worktreePath, "yolomatic/issue-42", "fix", undefined, "not-a-sha"),
+		).rejects.toThrow("Cannot safely update yolomatic/issue-42: invalid expected remote head 'not-a-sha'.");
+	});
+
+	it("recovers from a non-fast-forward push without an expected remote head by leasing against the fetched remote", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-push-lease-fetch-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		const remoteHead = "c".repeat(40);
+		let pushAttempts = 0;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "rev-parse" && args[1] === "origin/yolomatic/issue-42") {
+				return { stdout: `${remoteHead}\n`, stderr: "" };
+			}
+			if (args[0] === "push") {
+				pushAttempts += 1;
+				if (pushAttempts === 1) {
+					const error = new Error("failed to push some refs") as Error & { stderr?: string };
+					error.stderr = "! [rejected] yolomatic/issue-42 -> yolomatic/issue-42 (non-fast-forward)";
+					throw error;
+				}
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(
+			manager.commitAndPushPath(worktreePath, "yolomatic/issue-42", "fix: Resolve feedback"),
+		).resolves.toBe(true);
+
+		expect(pushAttempts).toBe(2);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["fetch", "origin", "yolomatic/issue-42"],
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["rev-parse", "origin/yolomatic/issue-42"],
+			{ cwd: worktreePath },
+		);
+		expect(runCommand).toHaveBeenCalledWith(
+			"git",
+			["push", `--force-with-lease=refs/heads/yolomatic/issue-42:${remoteHead}`, "origin", "yolomatic/issue-42"],
+			expect.objectContaining({ cwd: worktreePath, env: expect.any(Object) }),
+		);
+	});
+
+	it("rethrows the original non-fast-forward error when the remote head cannot be resolved", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-push-lease-unresolvable-"));
+		const worktreePath = path.join(root, "custom-worktree");
+		let pushAttempts = 0;
+		const runCommand: CommandRunner = vi.fn(async (_cmd, args) => {
+			if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet") {
+				const error = new Error("changes exist") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "fetch") {
+				const error = new Error("fatal: could not connect to github.com") as Error & { code?: number };
+				error.code = 1;
+				throw error;
+			}
+			if (args[0] === "rev-parse" && args[1] === "origin/yolomatic/issue-42") {
+				return { stdout: "\n", stderr: "" };
+			}
+			if (args[0] === "push") {
+				pushAttempts += 1;
+				const error = new Error("failed to push some refs") as Error & { stderr?: string };
+				error.stderr = "! [rejected] yolomatic/issue-42 -> yolomatic/issue-42 (non-fast-forward)";
+				throw error;
+			}
+			return { stdout: "", stderr: "" };
+		});
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(
+			manager.commitAndPushPath(worktreePath, "yolomatic/issue-42", "fix: Resolve feedback"),
+		).rejects.toThrow("failed to push some refs");
+
+		expect(pushAttempts).toBe(1);
+		const forceLeaseCalls = ((runCommand as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>)
+			.filter(([_cmd, args]) => args[0] === "push" && args[1]?.includes("--force-with-lease"));
+		expect(forceLeaseCalls).toHaveLength(0);
+	});
+
 	it("surfaces a rejected lease instead of overwriting a concurrently updated branch", async () => {
 		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-stale-push-lease-"));
 		const worktreePath = path.join(root, "custom-worktree");
@@ -852,6 +961,28 @@ describe("WorkspaceManager", () => {
 		const hasChanges = await manager.hasChanges(root, true);
 		expect(hasChanges).toBe(false);
 		expect(runCommand).toHaveBeenCalledWith("git", ["diff", "--cached", "--quiet"], { cwd: root });
+	});
+
+	it("delegates getGitStatus to the worktree path with porcelain status", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-status-"));
+		const worktreePath = path.join(root, "mbrooks-yolomatic", ".worktrees", "issue-42");
+		const status = " M src/file.ts\n?? untracked.txt\n";
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: status, stderr: "" }));
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.getGitStatus("mbrooks", "yolomatic", 42)).resolves.toBe(status);
+		expect(runCommand).toHaveBeenCalledWith("git", ["status", "--porcelain"], { cwd: worktreePath });
+	});
+
+	it("delegates getGitDiff to the worktree path with a diff", async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), "yolomatic-diff-"));
+		const worktreePath = path.join(root, "mbrooks-yolomatic", ".worktrees", "issue-42");
+		const diff = "diff --git a/src/file.ts b/src/file.ts\n--- a/src/file.ts\n+++ b/src/file.ts\n";
+		const runCommand: CommandRunner = vi.fn(async () => ({ stdout: diff, stderr: "" }));
+		const manager = new WorkspaceManager(createConfig(root), runCommand);
+
+		await expect(manager.getGitDiff("mbrooks", "yolomatic", 42)).resolves.toBe(diff);
+		expect(runCommand).toHaveBeenCalledWith("git", ["diff"], { cwd: worktreePath });
 	});
 
 	it("evicts oldest worktree when limit is reached with FIFO", async () => {
