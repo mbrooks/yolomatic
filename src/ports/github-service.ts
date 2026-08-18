@@ -115,6 +115,13 @@ export interface GitHubService {
 		repo: string,
 		options: { head: string; base: string; state: string },
 	): Promise<CreatedPR[]>;
+	/**
+	 * List the numbers of all currently open pull requests in a repository
+	 * (state `open` only; merged and closed PRs are excluded). Used to restrict
+	 * candidate enumeration to unmerged PRs without a per-PR `getPullRequest`
+	 * round-trip. Paginates `per_page: 100` up to a safety cap of 500 PRs.
+	 */
+	listOpenPullRequests(owner: string, repo: string): Promise<number[]>;
 	getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; title?: string; body?: string } | null>;
 	createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<CreatedIssue>;
 	initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void>;
