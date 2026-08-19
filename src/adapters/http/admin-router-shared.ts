@@ -189,6 +189,27 @@ export interface AdminRouterDeps {
 	adminPath?: string;
 	adminDefaultPage?: string;
 	ollamaSignInService?: import("../../ollama/signin-status.js").OllamaSignInService;
+	/**
+	 * Factory for the GitHub service used by onboarding token verification
+	 * and repository listing. Defaults to constructing a
+	 * {@link import("../../adapters/github/github-service-adapter.js").GitHubServiceAdapter};
+	 * the composition root injects the real factory and tests inject a fake
+	 * so the routes no longer construct the adapter inline.
+	 */
+	githubFactory?: (githubToken: string) => import("../../ports/github-service.js").GitHubService;
+	/**
+	 * Factory for the workspace service used by onboarding workspace
+	 * initialization. Defaults to constructing a
+	 * {@link import("../../workspace/manager.js").WorkspaceManager}; the
+	 * composition root injects the real factory and tests inject a fake so
+	 * the routes no longer construct the manager inline.
+	 */
+	workspaceFactory?: (options: {
+		workspacesDir: string;
+		githubUsername: string;
+		githubToken: string;
+		defaultBranch: string;
+	}) => { initializeRepo(owner: string, repo: string): Promise<void> };
 }
 
 export function resolveAdminPath(deps: AdminRouterDeps): string {

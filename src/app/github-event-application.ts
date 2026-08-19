@@ -1,13 +1,10 @@
-import path from "node:path";
-
-import type { ExecutionService } from "../ports/execution-service.js";
+import type { ExecutionService, RefinementExecutionService } from "../ports/execution-service.js";
 import type { SessionRepository } from "../ports/session-repository.js";
 import type { WorkspaceService } from "../ports/workspace-service.js";
 import type { GitHubService } from "../ports/github-service.js";
 import type { TaskControlService } from "../ports/task-control-service.js";
 import type { Clock } from "../ports/clock.js";
 import type { MetricsRecorder } from "../ports/metrics-recorder.js";
-import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 
 import { systemClock } from "../ports/clock.js";
 import { HandleIssueEvent } from "./commands/handle-issue-event.js";
@@ -20,7 +17,7 @@ import { ResumeInterruptedSession } from "./commands/resume-interrupted-session.
 import { GitHubEventDispatcher } from "../github-events/dispatcher.js";
 import type { GitHubEventStateStore } from "../github-events/model.js";
 import type { RepoGitHubEventMode } from "../repos/repository.js";
-import { RefinementStore } from "../refinement/store.js";
+import type { RefinementStore } from "../refinement/store.js";
 import { RepositoryStore } from "../repos/repository-store.js";
 import { GitHubIssueHandlers } from "../webhook/handlers.js";
 
@@ -34,7 +31,7 @@ import { GitHubIssueHandlers } from "../webhook/handlers.js";
 export interface GitHubEventApplicationDeps {
 	sessions: SessionRepository;
 	workspaces: WorkspaceService;
-	executor: ExecutionService;
+	executor: ExecutionService & RefinementExecutionService;
 	github: GitHubService;
 	tasks: TaskControlService;
 	clock?: Clock;
@@ -45,9 +42,7 @@ export interface GitHubEventApplicationDeps {
 	resolveGitHubEventMode?: (owner: string, repo: string) => RepoGitHubEventMode;
 	selfReportEnabled: boolean;
 	eventStore?: GitHubEventStateStore;
-	refinementStore?: RefinementStore;
-	/** Fallback directory used to construct a RefinementStore when one is not injected. */
-	memoryDir?: string;
+	refinementStore: RefinementStore;
 	repositoryStore?: RepositoryStore;
 	issueNewCommentEnabled?: boolean;
 	issueAdminLinkInCommentsEnabled?: boolean;
@@ -77,11 +72,7 @@ export function createGitHubEventApplication(
 	const github = deps.github;
 	const clock = deps.clock ?? systemClock;
 
-	const refinementStore =
-		deps.refinementStore ??
-		(deps.memoryDir
-			? new RefinementStore(path.join(deps.memoryDir, "bot-state.sqlite"))
-			: new RefinementStore(path.join(process.cwd(), "memory", "bot-state.sqlite")));;
+	const refinementStore = deps.refinementStore;
 	const isRepoManaged = (owner: string, repo: string) => {
 		if (!deps.repositoryStore) return true;
 		return !!deps.repositoryStore.getSync(owner, repo);
@@ -92,7 +83,7 @@ export function createGitHubEventApplication(
 		github,
 		tasks,
 		workspaces,
-		executor: deps.executor as DockerWorkerExecutor,
+		executor,
 		clock,
 		eventStore: deps.eventStore,
 		adminGithubUsername: deps.adminGithubUsername,

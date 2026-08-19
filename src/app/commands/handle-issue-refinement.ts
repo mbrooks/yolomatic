@@ -3,7 +3,7 @@ import type { TaskControlService } from "../../ports/task-control-service.js";
 import type { WorkspaceService } from "../../ports/workspace-service.js";
 import type { Clock } from "../../ports/clock.js";
 import type { SessionRepository } from "../../ports/session-repository.js";
-import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
+import type { RefinementExecutionService } from "../../ports/execution-service.js";
 import type { GitHubEventStateStore } from "../../github-events/model.js";
 import type { RefinementStore } from "../../refinement/store.js";
 import { fingerprintBody } from "../../refinement/fingerprint.js";
@@ -86,7 +86,7 @@ export class HandleIssueRefinement {
 			github: GitHubService;
 			tasks: TaskControlService;
 			workspaces: WorkspaceService;
-			executor: DockerWorkerExecutor;
+			executor: RefinementExecutionService;
 			clock: Clock;
 			eventStore?: GitHubEventStateStore;
 			adminGithubUsername?: string;

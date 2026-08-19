@@ -64,6 +64,15 @@ export interface WebhookServerOptions {
 	sessionAuth?: AdminSessionAuth;
 	/** SQLite-backed metrics store used to serve the admin metrics API. */
 	metricsStore?: MetricsStore;
+	/** Onboarding GitHub adapter factory; defaults to constructing a GitHubServiceAdapter. */
+	githubFactory?: (githubToken: string) => GitHubService;
+	/** Onboarding workspace manager factory; defaults to constructing a WorkspaceManager. */
+	workspaceFactory?: (options: {
+		workspacesDir: string;
+		githubUsername: string;
+		githubToken: string;
+		defaultBranch: string;
+	}) => { initializeRepo(owner: string, repo: string): Promise<void> };
 }
 
 export { readBody, verifySignature } from "./http-utils.js";
@@ -95,6 +104,8 @@ export function createWebhookServer(options: WebhookServerOptions) {
 		userStore,
 		sessionAuth,
 		metricsStore,
+		githubFactory,
+		workspaceFactory,
 	} = options;
 	const serverDeps = createWebhookServerDeps(
 		sessionStore,
@@ -116,6 +127,8 @@ export function createWebhookServer(options: WebhookServerOptions) {
 		sessionAuth,
 		metricsStore,
 		restartRefinement,
+		githubFactory,
+		workspaceFactory,
 	);
 
 	serverDeps.skillStore = skillStore;

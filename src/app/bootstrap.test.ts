@@ -17,6 +17,8 @@ import {
 	type RuntimeServices,
 } from "./bootstrap.js";
 import { DEFAULT_WORKER_TEMPLATE } from "../worker/templates.js";
+import { DockerWorkerExecutor } from "../executor/docker-worker.js";
+import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.js";
 import type { AppConfig } from "../config.js";
 import type { RepoGitHubEventMode, Repository } from "../repos/repository.js";
 import type { SessionState } from "../session/store.js";
@@ -305,6 +307,12 @@ describe("defaultRuntimeFactory", () => {
 			expect(services.repoSkillService).toBeDefined();
 			expect(services.githubPolling).toBeDefined();
 			expect(services.startIssueSession).toBeDefined();
+
+			// Runtime composition wires the production Docker executor and the
+			// GitHub gateway/adapter constructed at the composition boundary.
+			expect(services.executor).toBeInstanceOf(DockerWorkerExecutor);
+			expect(services.github).toBeInstanceOf(GitHubServiceAdapter);
+			expect(services.githubGateway).toBeDefined();
 		} finally {
 			await rm(memoryDir, { recursive: true, force: true });
 		}
