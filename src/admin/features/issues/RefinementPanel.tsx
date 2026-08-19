@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRefinementLog } from "../../hooks/useRefinementLog.js";
-import { formatRelative } from "../../lib/format.js";
+import { formatRelative, formatMs } from "../../lib/format.js";
 
 /**
  * Shows all durable issue-refinement activity for an issue in the admin UI,
@@ -73,6 +73,16 @@ export function RefinementPanel({
 							) : (
 								<span className="refinement-attempt-source">built-in</span>
 							)}
+							<span className="refinement-attempt-runtime" title="refinement runtime">
+								{formatMs(attempt.runtimeMs ?? null)}
+							</span>
+							<span className="refinement-attempt-tokens" title="token usage">
+								{attempt.tokenUsage
+									? attempt.tokenUsage.available
+										? attempt.tokenUsage.totalTokens.toLocaleString()
+										: "unknown"
+									: "unknown"}
+							</span>
 							{attempt.summary ? <div className="refinement-attempt-summary">{attempt.summary}</div> : null}
 							{attempt.failureReason ? (
 								<div className="refinement-attempt-reason">{attempt.failureReason}</div>

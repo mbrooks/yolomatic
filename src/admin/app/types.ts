@@ -39,6 +39,16 @@ export type RefinementAttempt = {
 	failureReason?: string;
 	summary?: string;
 	investigation?: string;
+	/** Refinement runtime in milliseconds, or undefined when not recorded. */
+	runtimeMs?: number;
+	/** Token usage for the attempt, or undefined when not recorded. */
+	tokenUsage?: {
+		available: boolean;
+		input: number;
+		output: number;
+		totalTokens: number;
+		cost: number;
+	};
 	createdAt: string;
 	updatedAt: string;
 };

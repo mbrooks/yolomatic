@@ -10,6 +10,10 @@ export interface RefinementAttemptView {
 	failureReason?: string;
 	summary?: string;
 	investigation?: string;
+	/** Refinement runtime in milliseconds, or undefined when not recorded. */
+	runtimeMs?: number;
+	/** Token usage for the attempt, or undefined when not recorded. */
+	tokenUsage?: import("../../refinement/store.js").RefinementTokenUsage;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -43,6 +47,8 @@ function toView(attempt: RefinementAttempt): RefinementAttemptView {
 		failureReason: attempt.failureReason,
 		summary: attempt.summary,
 		investigation: attempt.investigation,
+		runtimeMs: attempt.runtimeMs,
+		tokenUsage: attempt.tokenUsage,
 		createdAt: attempt.createdAt,
 		updatedAt: attempt.updatedAt,
 	};

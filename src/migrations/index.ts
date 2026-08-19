@@ -357,6 +357,27 @@ export const MIGRATIONS: Migration[] = [
 			migrateRefinementStoreIntoBotState(db);
 		},
 	},
+	{
+		id: 17,
+		name: "add_refinement_attempts_usage_runtime",
+		up(db) {
+			// Track per-attempt token usage and runtime on the durable refinement
+			// record so the per-issue refinement history can report them alongside
+			// the dashboard metrics aggregates (migration 15 / `session_metrics`).
+			const columns = db.prepare("PRAGMA table_info(refinement_attempts)").all() as Array<{ name: string }>;
+			const addColumn = (name: string, definition: string) => {
+				if (!columns.some((column) => column.name === name)) {
+					db.exec(`ALTER TABLE refinement_attempts ADD COLUMN ${name} ${definition}`);
+				}
+			};
+			addColumn("runtime_ms", "INTEGER");
+			addColumn("tokens_available", "INTEGER");
+			addColumn("input_tokens", "INTEGER");
+			addColumn("output_tokens", "INTEGER");
+			addColumn("total_tokens", "INTEGER");
+			addColumn("cost", "REAL");
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

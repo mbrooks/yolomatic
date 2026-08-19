@@ -1803,6 +1803,16 @@ a:hover {
 	padding: 0.05rem 0.3rem;
 }
 
+.refinement-attempt-runtime {
+	color: var(--muted);
+	font-size: 0.72rem;
+}
+
+.refinement-attempt-tokens {
+	color: var(--muted);
+	font-size: 0.72rem;
+}
+
 .refinement-attempt-summary {
 	flex-basis: 100%;
 	font-size: 0.8rem;
