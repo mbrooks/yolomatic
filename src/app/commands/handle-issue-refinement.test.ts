@@ -6,7 +6,7 @@ import { HandleIssueRefinement, buildNewIssueComment, ISSUE_REFINEMENT_STARTING_
 import { RefinementStore } from "../../refinement/store.js";
 import { SettingsStore } from "../../settings/store.js";
 import { getSessionLogs, _resetSessionLogs } from "../../logging/session-log-store.js";
-import type { DockerWorkerExecutor } from "../../executor/docker-worker.js";
+import type { RefinementExecutionService } from "../../ports/execution-service.js";
 import type { GitHubService } from "../../ports/github-service.js";
 import { sessionStorageKey, type SessionKind, type SessionState } from "../../session/store.js";
 
@@ -37,7 +37,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -90,6 +90,36 @@ describe("HandleIssueRefinement", () => {
 		};
 	}
 
+	it("drives refinement through a non-Docker fake satisfying the refinement execution port", async () => {
+		const portFake: RefinementExecutionService = {
+			executeRefinement: vi.fn(async () => ({
+				proposedTaskBody: "Port-refined body",
+				summary: "Summary",
+				investigation: "Investigation",
+			})),
+		};
+		const portHandler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: portFake,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+
+		await portHandler.execute(createCommandPayload() as never);
+
+		expect(portFake.executeRefinement).toHaveBeenCalled();
+		expect(github.updateIssueBody).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "Port-refined body");
+	});
+
 	it("posts instructions for an eligible opened issue", async () => {
 		await handler.postInstructions(createInstructionPayload() as never);
 		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, buildNewIssueComment("yolomatic-bot", undefined));
@@ -106,7 +136,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -137,7 +167,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -187,7 +217,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "custom-yolo-bot",
@@ -217,7 +247,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -240,7 +270,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -269,7 +299,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -305,7 +335,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -744,7 +774,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -763,7 +793,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -990,7 +1020,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -1017,7 +1047,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
@@ -1039,7 +1069,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
@@ -1061,7 +1091,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
@@ -1083,7 +1113,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			eventStore: eventStore as never,
 			adminGithubUsername: "admin",
@@ -1278,7 +1308,7 @@ describe("HandleIssueRefinement", () => {
 
 	function createExecutorMock() {
 		return {
-			executeRefinement: vi.fn<DockerWorkerExecutor["executeRefinement"]>(async () => ({
+			executeRefinement: vi.fn<RefinementExecutionService["executeRefinement"]>(async () => ({
 				proposedTaskBody: "Body",
 				summary: "Summary",
 				investigation: "Investigation",
@@ -1294,7 +1324,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",
@@ -1336,7 +1366,7 @@ describe("HandleIssueRefinement", () => {
 			github: github as never,
 			tasks: tasks as never,
 			workspaces: workspaces as never,
-			executor: executor as unknown as DockerWorkerExecutor,
+			executor: executor as unknown as RefinementExecutionService,
 			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
 			adminGithubUsername: "admin",
 			githubUsername: "yolomatic-bot",

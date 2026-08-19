@@ -27,6 +27,8 @@ import { DefaultOllamaSignInService } from "../ollama/signin-status.js";
 import type { UserStore } from "../users/store.js";
 import type { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 import type { MetricsStore } from "../metrics/store.js";
+import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.js";
+import { WorkspaceManager } from "../workspace/manager.js";
 
 const fallbackTaskController = {
 	cancel: () => false,
@@ -73,6 +75,13 @@ export function createWebhookServerDeps(
 	sessionAuth?: AdminSessionAuth,
 	metricsStore?: MetricsStore,
 	restartRefinement?: RestartSessionDispatcher,
+	githubFactory?: (githubToken: string) => GitHubService,
+	workspaceFactory?: (options: {
+		workspacesDir: string;
+		githubUsername: string;
+		githubToken: string;
+		defaultBranch: string;
+	}) => { initializeRepo(owner: string, repo: string): Promise<void> },
 ): AdminRouterDeps & {
 	cleanupCommand: CleanupOldSessions;
 } {
@@ -110,5 +119,13 @@ export function createWebhookServerDeps(
 		adminDefaultPage,
 		ollamaSignInService: settingsStore ? new DefaultOllamaSignInService(settingsStore) : undefined,
 		getMetrics: metricsStore ? new GetMetrics(metricsStore) : undefined,
+		// Onboarding factories: the composition boundary owns construction of
+		// the GitHub adapter and workspace manager so the onboarding routes no
+		// longer build concrete implementations inline. Defaults wrap the real
+		// constructors; tests inject fakes to observe the calls.
+		githubFactory: githubFactory ?? ((token) => new GitHubServiceAdapter({ githubToken: token })),
+		workspaceFactory:
+			workspaceFactory ??
+			((options) => new WorkspaceManager(options)),
 	};
 }

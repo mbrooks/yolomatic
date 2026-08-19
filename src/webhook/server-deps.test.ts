@@ -225,4 +225,61 @@ describe("createWebhookServerDeps", () => {
 		expect(deps.userStore).toBe(userStore);
 		expect(deps.sessionAuth).toBe(sessionAuth);
 	});
+
+	it("builds refinement-log, refinement-attempts, ollama, and metrics deps when their stores are provided", () => {
+		const refinementStore = {
+			getLatestAttempt: vi.fn(() => null),
+		} as never;
+		const settingsStore = {
+			get: vi.fn(() => undefined),
+			getBoolean: vi.fn((_k: string, d?: boolean) => d ?? false),
+		} as never;
+		const metricsStore = {} as never;
+		const deps = createWebhookServerDeps(
+			createSessionStore(),
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			settingsStore,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			refinementStore,
+			undefined,
+			undefined,
+			undefined,
+			metricsStore,
+		);
+
+		expect(deps.getRefinementLog).toBeDefined();
+		expect(deps.listRefinementAttempts).toBeDefined();
+		expect(deps.ollamaSignInService).toBeDefined();
+		expect(deps.getMetrics).toBeDefined();
+	});
+
+	it("defaults the onboarding factories to real constructor wrappers when not injected", () => {
+		const deps = createWebhookServerDeps(createSessionStore());
+
+		expect(deps.githubFactory).toBeDefined();
+		expect(deps.workspaceFactory).toBeDefined();
+		// The default githubFactory builds a GitHubServiceAdapter-shaped object
+		// exposing the account/port methods without performing network calls.
+		const gh = deps.githubFactory!("ghp_token");
+		expect(typeof gh.getAuthenticatedUser).toBe("function");
+		expect(typeof gh.listAccessibleRepositories).toBe("function");
+		// The default workspaceFactory builds a WorkspaceManager exposing
+		// initializeRepo for onboarding workspace initialization.
+		const ws = deps.workspaceFactory!({
+			workspacesDir: "./workspaces",
+			githubUsername: "user",
+			githubToken: "tok",
+			defaultBranch: "main",
+		});
+		expect(typeof ws.initializeRepo).toBe("function");
+	});
 });

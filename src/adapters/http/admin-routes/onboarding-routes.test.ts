@@ -4,6 +4,7 @@ import { handleOnboardingRoutes } from "./onboarding-routes.js";
 import { SettingsStore } from "../../../settings/store.js";
 import { RepositoryStore } from "../../../repos/repository-store.js";
 import { WorkspaceManager } from "../../../workspace/manager.js";
+import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -94,6 +95,13 @@ function makeDeps(store?: SettingsStore, repoStore?: RepositoryStore) {
 			register: vi.fn(),
 			unregister: vi.fn(),
 		},
+		githubFactory: (token: string) => new GitHubServiceAdapter({ githubToken: token }),
+		workspaceFactory: (options: {
+			workspacesDir: string;
+			githubUsername: string;
+			githubToken: string;
+			defaultBranch: string;
+		}) => new WorkspaceManager(options),
 	} as never;
 }
 
@@ -283,6 +291,31 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.error).toBeDefined();
 		});
 
+		it("verifies the token through the injected GitHub factory instead of constructing an adapter", async () => {
+			const getAuthenticatedUser = vi.fn(async () => ({ login: "injected-user" }));
+			const githubFactory = vi.fn(() => ({ getAuthenticatedUser } as never));
+			const req = mockRequest({
+				url: "/api/onboarding/verify-token",
+				method: "POST",
+				body: JSON.stringify({ token: "ghp_test" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(
+				req,
+				res,
+				{ ...(makeDeps() as object), githubFactory } as never,
+				"/api/onboarding/verify-token",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(githubFactory).toHaveBeenCalledWith("ghp_test");
+			expect(getAuthenticatedUser).toHaveBeenCalled();
+			const body = JSON.parse(String(res.body));
+			expect(body.username).toBe("injected-user");
+		});
+
 		it("rejects missing token", async () => {
 			const req = mockRequest({
 				url: "/api/onboarding/verify-token",
@@ -402,6 +435,36 @@ describe("handleOnboardingRoutes", () => {
 			expect(body.configured).toEqual([{ owner: "mbrooks", repo: "yolomatic" }]);
 		});
 
+		it("lists repositories through the injected GitHub factory instead of constructing an adapter", async () => {
+			const listAccessibleRepositories = vi.fn(async () => [
+				{ owner: "mbrooks", repo: "injected", fullName: "mbrooks/injected", visibility: "public" } as never,
+			]);
+			const githubFactory = vi.fn(() => ({ listAccessibleRepositories } as never));
+			const store = await tmpStore();
+			const req = mockRequest({
+				url: "/api/onboarding/repos",
+				method: "POST",
+				body: JSON.stringify({ token: "ghp_test" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(
+				req,
+				res,
+				{ ...(makeDeps(store) as object), githubFactory } as never,
+				"/api/onboarding/repos",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(githubFactory).toHaveBeenCalledWith("ghp_test");
+			expect(listAccessibleRepositories).toHaveBeenCalled();
+			const body = JSON.parse(String(res.body));
+			expect(body.repositories).toEqual([
+				{ owner: "mbrooks", repo: "injected", fullName: "mbrooks/injected", visibility: "public" },
+			]);
+		});
+
 		it("returns an empty configured list when repositoryStore is absent", async () => {
 			const store = await tmpStore();
 			const req = mockRequest({
@@ -457,7 +520,8 @@ describe("handleOnboardingRoutes", () => {
 		});
 
 		it("attempts to initialize provided repos and persists them to the repositories table", async () => {
-			const initializeRepo = vi.spyOn(WorkspaceManager.prototype, "initializeRepo").mockResolvedValue();
+			const initializeRepo = vi.fn(async () => undefined);
+			const workspaceFactory = vi.fn(() => ({ initializeRepo } as never));
 			const stores = await tmpStores();
 			const req = mockRequest({
 				url: "/api/onboarding/init-workspaces",
@@ -470,7 +534,12 @@ describe("handleOnboardingRoutes", () => {
 			});
 			const res = mockResponse();
 
-			const handled = await handleOnboardingRoutes(req, res, makeDeps(stores.settings, stores.repository), "/api/onboarding/init-workspaces");
+			const handled = await handleOnboardingRoutes(
+				req,
+				res,
+				{ ...(makeDeps(stores.settings, stores.repository) as object), workspaceFactory } as never,
+				"/api/onboarding/init-workspaces",
+			);
 
 			expect(handled).toBe(true);
 			expect(res.statusCode).toBe(200);
@@ -480,6 +549,41 @@ describe("handleOnboardingRoutes", () => {
 			const managed = await stores.repository.list();
 			expect(managed).toHaveLength(1);
 			expect(managed[0]).toMatchObject({ owner: "mbrooks", repo: "yolomatic" });
+		});
+
+		it("initializes workspaces through the injected workspace factory instead of constructing a WorkspaceManager", async () => {
+			const initializeRepo = vi.fn(async () => undefined);
+			const workspaceFactory = vi.fn(() => ({ initializeRepo } as never));
+			const stores = await tmpStores();
+			const req = mockRequest({
+				url: "/api/onboarding/init-workspaces",
+				method: "POST",
+				body: JSON.stringify({
+					token: "ghp_fake",
+					username: "user",
+					repos: [{ owner: "mbrooks", repo: "yolomatic" }],
+				}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(
+				req,
+				res,
+				{ ...(makeDeps(stores.settings, stores.repository) as object), workspaceFactory } as never,
+				"/api/onboarding/init-workspaces",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(workspaceFactory).toHaveBeenCalledWith(expect.objectContaining({
+				workspacesDir: "./workspaces",
+				githubUsername: "user",
+				githubToken: "ghp_fake",
+				defaultBranch: "main",
+			}));
+			expect(initializeRepo).toHaveBeenCalledWith("mbrooks", "yolomatic");
+			const body = JSON.parse(String(res.body));
+			expect(body.initialized).toEqual(["mbrooks/yolomatic"]);
 		});
 
 		it("returns 500 when settingsStore is missing", async () => {

@@ -11,8 +11,6 @@ import {
 	resolveAdminPath,
 	type AdminRouterDeps,
 } from "../admin-router-shared.js";
-import { GitHubServiceAdapter } from "../../../adapters/github/github-service-adapter.js";
-import { WorkspaceManager } from "../../../workspace/manager.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
 import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
 import type { User } from "../../../users/store.js";
@@ -253,7 +251,7 @@ const registry = new AdminRouteRegistry()
 			if (!token) {
 				throw new ValidationError("Token is required");
 			}
-			const gh = new GitHubServiceAdapter({ githubToken: token });
+			const gh = ctx.deps.githubFactory!(token);
 			const user = await gh.getAuthenticatedUser();
 			if (!user) {
 				sendJson(ctx.response, 400, {
@@ -286,7 +284,7 @@ const registry = new AdminRouteRegistry()
 			if (!token) {
 				throw new ValidationError("Token is required");
 			}
-			const gh = new GitHubServiceAdapter({ githubToken: token });
+			const gh = ctx.deps.githubFactory!(token);
 			const repos = await gh.listAccessibleRepositories();
 			let configured: Array<{ owner: string; repo: string }> = [];
 			if (ctx.deps.repositoryStore) {
@@ -328,7 +326,7 @@ const registry = new AdminRouteRegistry()
 
 			const workspacesDir = settingsDeps.settingsStore.getString("workspaces_dir", "./workspaces");
 			const defaultBranch = settingsDeps.settingsStore.getString("default_branch", "main");
-			const manager = new WorkspaceManager({
+			const manager = ctx.deps.workspaceFactory!({
 				workspacesDir,
 				githubUsername: username,
 				githubToken: token,
