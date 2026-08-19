@@ -16,72 +16,53 @@ import type {
 	GitHubGatewayService,
 } from "../../ports/github-gateway-service.js";
 import { createOctokit } from "./octokit.js";
+import { AccountRepositoryDelegate } from "./delegates/account-repository-delegate.js";
+import { IssueDelegate } from "./delegates/issue-delegate.js";
+import { PullRequestDelegate } from "./delegates/pull-request-delegate.js";
 
+/**
+ * Public façade for the GitHub adapter. Implements both {@link GitHubService}
+ * and {@link GitHubGatewayService} by composing three focused internal
+ * delegates (account/repository, issues, pull requests). The delegates own the
+ * Octokit calls, response mappers, and method-specific fallbacks; this class
+ * only wires and orchestrates them. Neither the delegates nor Octokit are
+ * exposed through the public ports.
+ */
 export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService {
 	private readonly octokit: Octokit;
+	private readonly accounts: AccountRepositoryDelegate;
+	private readonly issues: IssueDelegate;
+	private readonly pullRequests: PullRequestDelegate;
 
 	constructor(options: { githubToken: string; octokit?: Octokit }) {
 		this.octokit = options.octokit ?? createOctokit(options.githubToken);
+		this.accounts = new AccountRepositoryDelegate(this.octokit);
+		this.issues = new IssueDelegate(this.octokit);
+		this.pullRequests = new PullRequestDelegate(this.octokit);
 	}
 
 	async postComment(owner: string, repo: string, issueNumber: number, body: string): Promise<number> {
-		const response = await this.octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body });
-		return response.data.id;
+		return this.issues.postComment(owner, repo, issueNumber, body);
 	}
 
 	async postPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<number> {
-		const response = await this.octokit.issues.createComment({ owner, repo, issue_number: prNumber, body });
-		return response.data.id;
+		return this.pullRequests.postPRComment(owner, repo, prNumber, body);
 	}
 
 	async addLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
-		await this.octokit.issues.addLabels({ owner, repo, issue_number: issueNumber, labels });
+		return this.issues.addLabels(owner, repo, issueNumber, labels);
 	}
 
 	async removeLabel(owner: string, repo: string, issueNumber: number, label: string): Promise<void> {
-		try {
-			await this.octokit.issues.removeLabel({ owner, repo, issue_number: issueNumber, name: label });
-		} catch (error) {
-			const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
-			if (status !== 404) throw error;
-		}
+		return this.issues.removeLabel(owner, repo, issueNumber, label);
 	}
 
 	async getPullRequest(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo | null> {
-		try {
-			const { data } = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
-			return {
-				head: data.head,
-				base: { ref: data.base?.ref ?? "" },
-				state: data.state,
-				merged: data.merged ?? false,
-				mergeable: data.mergeable ?? null,
-				mergeableState: data.mergeable_state ?? "unknown",
-				draft: data.draft ?? false,
-			};
-		} catch {
-			return null;
-		}
+		return this.pullRequests.getPullRequest(owner, repo, prNumber);
 	}
 
 	async updatePullRequestBranch(owner: string, repo: string, prNumber: number, expectedHeadSha?: string): Promise<void> {
-		try {
-			await this.octokit.pulls.updateBranch({
-				owner,
-				repo,
-				pull_number: prNumber,
-				...(expectedHeadSha ? { expected_head_sha: expectedHeadSha } : {}),
-			});
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (/(merge conflict|422|409|cannot be merged|non-fast-forward|unresolvable)/i.test(message)) {
-				throw new Error(
-					`[github] update-branch failed for ${owner}/${repo}#${prNumber}: ${message}. ` +
-						`Resolve the conflict manually before relaunching the worker.`,
-				);
-			}
-			throw error;
-		}
+		return this.pullRequests.updatePullRequestBranch(owner, repo, prNumber, expectedHeadSha);
 	}
 
 	async createPullRequest(
@@ -93,52 +74,11 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		base: string,
 		draft?: boolean,
 	): Promise<CreatedPR | null> {
-		try {
-			const pr = await this.octokit.pulls.create({
-				owner,
-				repo,
-				title,
-				body,
-				head,
-				base,
-				...(draft !== undefined ? { draft } : {}),
-			});
-			return { number: pr.data.number, html_url: pr.data.html_url };
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (message.includes("No commits between")) {
-				return null;
-			}
-			throw error;
-		}
+		return this.pullRequests.createPullRequest(owner, repo, title, body, head, base, draft);
 	}
 
 	async markPullRequestReadyForReview(owner: string, repo: string, prNumber: number): Promise<void> {
-		// GitHub exposes "ready for review" only as the GraphQL
-		// `markPullRequestReadyForReview` mutation. The REST
-		// `POST /repos/{owner}/{repo}/pulls/{pull_number}/ready-for-review`
-		// route does not exist and returns 404, which previously left draft PRs
-		// stuck after creation. Resolve the PR's global node id, then flip it.
-		const nodeQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) { id }
-  }
-}`;
-		const nodeResult = await this.octokit.graphql<{ repository?: { pullRequest?: { id?: string } } }>(nodeQuery, {
-			owner,
-			repo,
-			number: prNumber,
-		});
-		const pullRequestId = nodeResult?.repository?.pullRequest?.id;
-		if (!pullRequestId) {
-			throw new Error(`Could not resolve GitHub node id for pull request #${prNumber} in ${owner}/${repo}.`);
-		}
-		const mutation = `mutation MarkPullRequestReadyForReview($input: MarkPullRequestReadyForReviewInput!) {
-  markPullRequestReadyForReview(input: $input) {
-    pullRequest { id isDraft }
-  }
-}`;
-		await this.octokit.graphql(mutation, { input: { pullRequestId } });
+		return this.pullRequests.markPullRequestReadyForReview(owner, repo, prNumber);
 	}
 
 	async listPullRequests(
@@ -146,254 +86,87 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		repo: string,
 		options: { head: string; base: string; state: string },
 	): Promise<CreatedPR[]> {
-		const { data } = await this.octokit.pulls.list({
-			owner,
-			repo,
-			head: options.head,
-			base: options.base,
-			state: options.state as "open" | "closed" | "all",
-		});
-		return data.map((pr) => ({ number: pr.number, html_url: pr.html_url }));
+		return this.pullRequests.listPullRequests(owner, repo, options);
 	}
 
 	async listOpenPullRequests(owner: string, repo: string): Promise<number[]> {
-		const numbers: number[] = [];
-		const perPage = 100;
-		const maxPrs = 500;
-		let page = 1;
-		try {
-			while (true) {
-				const { data } = await this.octokit.pulls.list({
-					owner,
-					repo,
-					state: "open",
-					per_page: perPage,
-					page,
-				});
-				for (const pr of data) {
-					numbers.push(pr.number);
-					if (numbers.length >= maxPrs) return numbers;
-				}
-				if (data.length < perPage) return numbers;
-				page += 1;
-			}
-		} catch {
-			return numbers;
-		}
+		return this.pullRequests.listOpenPullRequests(owner, repo);
 	}
 
 	async getIssue(owner: string, repo: string, issueNumber: number): Promise<{ state: string; title?: string; body?: string } | null> {
-		try {
-			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });
-			return { state: data.state, title: data.title ?? undefined, body: data.body ?? undefined };
-		} catch {
-			return null;
-		}
+		return this.issues.getIssue(owner, repo, issueNumber);
 	}
 
 	async createIssue(owner: string, repo: string, title: string, body: string, labels?: string[], assignees?: string[]): Promise<{ number: number; html_url: string }> {
-		const { data } = await this.octokit.issues.create({ owner, repo, title, body, labels, assignees });
-		return { number: data.number, html_url: data.html_url };
+		return this.issues.createIssue(owner, repo, title, body, labels, assignees);
 	}
 
 	async initializeEmptyRepo(owner: string, repo: string, defaultBranch: string): Promise<void> {
-		const { data } = await this.octokit.repos.get({ owner, repo });
-		const branch = data.default_branch ?? defaultBranch;
-
-		await this.octokit.repos.createOrUpdateFileContents({
-			owner,
-			repo,
-			path: "README.md",
-			message: "Initial commit",
-			content: Buffer.from(`# ${repo}\n\nAuto-initialized by Yolomatic.\n`).toString("base64"),
-			branch,
-		});
+		return this.accounts.initializeEmptyRepo(owner, repo, defaultBranch);
 	}
 
 	async fileSelfReport(title: string, body: string, labels: string[]): Promise<string> {
-		const { SelfMonitor } = await import("../../self-monitor/index.js");
-		const { owner, repo } = SelfMonitor.getTargetRepo();
-		const response = await this.octokit.issues.create({ owner, repo, title, body, labels });
-		return response.data.html_url;
+		return this.issues.fileSelfReport(title, body, labels);
 	}
 
 	async listReviewComments(owner: string, repo: string, prNumber: number, reviewId: number): Promise<ReviewComment[]> {
-		try {
-			const { data } = await this.octokit.pulls.listReviewComments({
-				owner,
-				repo,
-				pull_number: prNumber,
-				review_id: reviewId,
-			});
-			return data.map((rc) => ({
-				id: rc.id,
-				body: rc.body ?? "",
-				user: rc.user ? { login: rc.user.login } : undefined,
-				path: rc.path,
-				line: rc.line,
-			}));
-		} catch {
-			return [];
-		}
+		return this.pullRequests.listReviewComments(owner, repo, prNumber, reviewId);
 	}
 
 	async listLabels(owner: string, repo: string): Promise<string[]> {
-		try {
-			const { data } = await this.octokit.issues.listLabelsForRepo({ owner, repo });
-			return data.map((l) => l.name);
-		} catch {
-			return [];
-		}
+		return this.issues.listLabels(owner, repo);
 	}
 
 	async getIssueTemplates(owner: string, repo: string): Promise<IssueTemplate[]> {
-		try {
-			const { data } = await this.octokit.repos.getContent({
-				owner,
-				repo,
-				path: ".github/ISSUE_TEMPLATE",
-			});
-			if (!Array.isArray(data)) return [];
-			const templates: IssueTemplate[] = [];
-			for (const item of data) {
-				if (item.type !== "file") continue;
-				const name = item.name.replace(/\.md$/, "").replace(/\.yaml$/, "").replace(/\.yml$/, "");
-				try {
-					const { data: fileData } = await this.octokit.repos.getContent({
-						owner,
-						repo,
-						path: item.path,
-					});
-					if ("content" in fileData && typeof fileData.content === "string") {
-						const body = Buffer.from(fileData.content, "base64").toString("utf8");
-						templates.push({ name, body });
-					}
-				} catch {
-					// skip unreadable templates
-				}
-			}
-			return templates;
-		} catch {
-			return [];
-		}
+		return this.issues.getIssueTemplates(owner, repo);
 	}
 
-	async listRecentCommits(owner: string, repo: string, limit = 10): Promise<string[]> {
-		try {
-			const { data } = await this.octokit.repos.listCommits({ owner, repo, per_page: limit });
-			return data.map((c) => `${c.sha.slice(0, 7)}: ${c.commit.message.split("\n")[0]}`);
-		} catch {
-			return [];
-		}
+	async listRecentCommits(owner: string, repo: string, limit?: number): Promise<string[]> {
+		return this.accounts.listRecentCommits(owner, repo, limit);
 	}
 
-	async listRelatedIssues(owner: string, repo: string, query: string, limit = 10): Promise<Array<{ number: number; title: string; state: string }>> {
-		try {
-			const { data } = await this.octokit.request("GET /search/issues", {
-				q: `repo:${owner}/${repo} is:issue ${query} in:title`,
-				per_page: limit,
-			});
-			return data.items.map((i) => ({ number: i.number, title: i.title, state: i.state }));
-		} catch {
-			return [];
-		}
+	async listRelatedIssues(owner: string, repo: string, query: string, limit?: number): Promise<Array<{ number: number; title: string; state: string }>> {
+		return this.issues.listRelatedIssues(owner, repo, query, limit);
 	}
 
 	async listOpenIssues(owner: string, repo: string): Promise<import("../../ports/github-service.js").OpenIssue[]> {
-		try {
-			const { data } = await this.octokit.issues.listForRepo({ owner, repo, state: "open" });
-			return data.map((i) => ({
-				number: i.number,
-				title: i.title,
-				body: i.body ?? "",
-				state: i.state,
-				labels: i.labels.map((l) => (typeof l === "string" ? l : l.name ?? "")).filter(Boolean),
-				assignees: i.assignees?.map((a) => a.login).filter(Boolean) ?? [],
-				html_url: i.html_url,
-			}));
-		} catch {
-			return [];
-		}
+		return this.issues.listOpenIssues(owner, repo);
 	}
 
 	async listPendingInvitations(): Promise<import("../../ports/github-service.js").PendingInvitation[]> {
-		try {
-			const { data } = await this.octokit.repos.listInvitationsForAuthenticatedUser();
-			return data.map((inv) => ({
-				id: inv.id,
-				repository: {
-					full_name: inv.repository?.full_name ?? "",
-					name: inv.repository?.name ?? "",
-					owner: { login: inv.repository?.owner?.login ?? "" },
-				},
-				inviter: inv.inviter ? { login: inv.inviter.login } : null,
-				permissions: inv.permissions ?? "read",
-				created_at: inv.created_at,
-				html_url: inv.html_url ?? "",
-			}));
-		} catch {
-			return [];
-		}
+		return this.accounts.listPendingInvitations();
 	}
 
 	async acceptInvitation(invitationId: number): Promise<void> {
-		await this.octokit.repos.acceptInvitationForAuthenticatedUser({ invitation_id: invitationId });
+		return this.accounts.acceptInvitation(invitationId);
 	}
 
 	async updateIssueAssignees(owner: string, repo: string, issueNumber: number, assignees: string[]): Promise<void> {
-		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, assignees });
+		return this.issues.updateIssueAssignees(owner, repo, issueNumber, assignees);
 	}
 
 	async closeIssue(owner: string, repo: string, issueNumber: number): Promise<void> {
-		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, state: "closed" });
+		return this.issues.closeIssue(owner, repo, issueNumber);
 	}
 
 	async updateIssueBody(owner: string, repo: string, issueNumber: number, body: string): Promise<void> {
-		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, body });
+		return this.issues.updateIssueBody(owner, repo, issueNumber, body);
 	}
 
 	async updateIssueTitle(owner: string, repo: string, issueNumber: number, title: string): Promise<void> {
-		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, title });
+		return this.issues.updateIssueTitle(owner, repo, issueNumber, title);
 	}
 
 	async getAuthenticatedUser(): Promise<{ login: string } | null> {
-		try {
-			const { data } = await this.octokit.users.getAuthenticated();
-			if (data.login) {
-				return { login: data.login };
-			}
-			return null;
-		} catch {
-			return null;
-		}
+		return this.accounts.getAuthenticatedUser();
 	}
 
 	async listAccessibleRepositories(): Promise<import("../../ports/github-service.js").AccessibleRepo[]> {
-		try {
-			const { data } = await this.octokit.repos.listForAuthenticatedUser({ per_page: 100, sort: "updated" });
-			return data.map((repo) => ({
-				owner: repo.owner?.login ?? "",
-				repo: repo.name ?? "",
-				fullName: repo.full_name ?? "",
-				visibility: this.normalizeVisibility(repo.visibility, repo.private),
-			}));
-		} catch {
-			return [];
-		}
+		return this.accounts.listAccessibleRepositories();
 	}
 
 	async getRepository(owner: string, repo: string): Promise<import("../../ports/github-service.js").RepositoryInfo | null> {
-		try {
-			const { data } = await this.octokit.repos.get({ owner, repo });
-			return {
-				owner: data.owner?.login ?? owner,
-				repo: data.name ?? repo,
-				fullName: data.full_name ?? `${owner}/${repo}`,
-				visibility: this.normalizeVisibility(data.visibility, data.private),
-			};
-		} catch {
-			return null;
-		}
+		return this.accounts.getRepository(owner, repo);
 	}
 
 	async getCollaboratorPermissionLevel(
@@ -401,73 +174,19 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		repo: string,
 		username: string,
 	): Promise<import("../../ports/github-service.js").CollaboratorPermission | null> {
-		try {
-			const { data } = await this.octokit.repos.getCollaboratorPermissionLevel({ owner, repo, username });
-			const permission = data?.permission;
-			if (
-				permission === "admin" ||
-				permission === "maintain" ||
-				permission === "write" ||
-				permission === "triage" ||
-				permission === "read"
-			) {
-				return permission;
-			}
-			return null;
-		} catch {
-			return null;
-		}
+		return this.accounts.getCollaboratorPermissionLevel(owner, repo, username);
 	}
 
 	async isCollaborator(owner: string, repo: string, username: string): Promise<boolean> {
-		try {
-			const response = await this.octokit.repos.checkCollaborator({ owner, repo, username });
-			return response?.status === 204;
-		} catch {
-			return false;
-		}
+		return this.accounts.isCollaborator(owner, repo, username);
 	}
 
 	async getIssueDetail(owner: string, repo: string, issueNumber: number): Promise<GatewayIssueDetail | null> {
-		try {
-			const { data } = await this.octokit.issues.get({ owner, repo, issue_number: issueNumber });
-			return {
-				number: data.number,
-				title: data.title,
-				body: data.body ?? "",
-				state: data.state === "closed" ? "closed" : "open",
-				labels: data.labels
-					.map((label) => (typeof label === "string" ? label : label.name ?? ""))
-					.filter(Boolean),
-				assignees: data.assignees?.map((a) => a.login).filter(Boolean) ?? [],
-				html_url: data.html_url,
-				created_at: data.created_at,
-				updated_at: data.updated_at,
-			};
-		} catch {
-			return null;
-		}
+		return this.issues.getIssueDetail(owner, repo, issueNumber);
 	}
 
 	async listIssueComments(owner: string, repo: string, issueNumber: number): Promise<GatewayIssueComment[]> {
-		try {
-			const { data } = await this.octokit.issues.listComments({
-				owner,
-				repo,
-				issue_number: issueNumber,
-				per_page: 100,
-			});
-			return data.map((comment) => ({
-				id: comment.id,
-				body: comment.body ?? "",
-				author: comment.user?.login ?? "unknown",
-				created_at: comment.created_at,
-				updated_at: comment.updated_at,
-				html_url: comment.html_url,
-			}));
-		} catch {
-			return [];
-		}
+		return this.issues.listIssueComments(owner, repo, issueNumber);
 	}
 
 	async updateIssue(
@@ -476,71 +195,24 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		issueNumber: number,
 		fields: GatewayIssueUpdateFields,
 	): Promise<void> {
-		const update: Record<string, unknown> = {};
-		if (fields.title !== undefined) update.title = fields.title;
-		if (fields.body !== undefined) update.body = fields.body;
-		if (fields.state !== undefined) update.state = fields.state;
-		if (fields.assignees !== undefined) update.assignees = fields.assignees;
-		if (fields.labels !== undefined) update.labels = fields.labels;
-		if (Object.keys(update).length === 0) return;
-		await this.octokit.issues.update({ owner, repo, issue_number: issueNumber, ...update });
+		return this.issues.updateIssue(owner, repo, issueNumber, fields);
 	}
 
 	async setLabels(owner: string, repo: string, issueNumber: number, labels: string[]): Promise<void> {
-		try {
-			await this.octokit.issues.setLabels({ owner, repo, issue_number: issueNumber, labels });
-		} catch (error) {
-			const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
-			if (status === 404 && labels.length === 0) {
-				// Setting an empty label list on an unlabeled issue 404s; treat as success.
-				return;
-			}
-			throw error;
-		}
+		return this.issues.setLabels(owner, repo, issueNumber, labels);
 	}
 
 	async getPullRequestDetail(owner: string, repo: string, prNumber: number): Promise<GatewayPullRequestDetail | null> {
-		try {
-			const { data } = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
-			return {
-				number: data.number,
-				title: data.title,
-				body: data.body ?? "",
-				state: data.state === "closed" ? "closed" : "open",
-				merged: data.merged ?? false,
-				head_ref: data.head?.ref ?? "",
-				base_ref: data.base?.ref ?? "",
-				html_url: data.html_url,
-				created_at: data.created_at,
-				updated_at: data.updated_at,
-			};
-		} catch {
-			return null;
-		}
+		return this.pullRequests.getPullRequestDetail(owner, repo, prNumber);
 	}
 
 	async listPullRequestComments(owner: string, repo: string, prNumber: number): Promise<GatewayIssueComment[]> {
-		return this.listIssueComments(owner, repo, prNumber);
+		// PRs share the issue comment API; reuse the issue delegate's mapping.
+		return this.issues.listIssueComments(owner, repo, prNumber);
 	}
 
 	async listPullRequestReviewComments(owner: string, repo: string, prNumber: number): Promise<ReviewComment[]> {
-		try {
-			const { data } = await this.octokit.pulls.listReviewComments({
-				owner,
-				repo,
-				pull_number: prNumber,
-				per_page: 100,
-			});
-			return data.map((rc) => ({
-				id: rc.id,
-				body: rc.body ?? "",
-				user: rc.user ? { login: rc.user.login } : undefined,
-				path: rc.path,
-				line: rc.line,
-			}));
-		} catch {
-			return [];
-		}
+		return this.pullRequests.listPullRequestReviewComments(owner, repo, prNumber);
 	}
 
 	async listPullRequestsForHead(
@@ -549,28 +221,7 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		head: string,
 		state: "open" | "closed" | "all",
 	): Promise<GatewayPullRequestSummary[]> {
-		try {
-			const { data } = await this.octokit.pulls.list({
-				owner,
-				repo,
-				head,
-				state,
-				per_page: 100,
-			});
-			return data.map((pr) => ({
-				number: pr.number,
-				title: pr.title,
-				html_url: pr.html_url,
-				head_ref: pr.head?.ref ?? "",
-				base_ref: pr.base?.ref ?? "",
-				state: pr.state,
-				// The list endpoint does not return `merged`; use state as a proxy. The
-				// gateway only uses these summaries for scoping, not for merged status.
-				merged: false,
-			}));
-		} catch {
-			return [];
-		}
+		return this.pullRequests.listPullRequestsForHead(owner, repo, head, state);
 	}
 
 	async updatePullRequest(
@@ -579,26 +230,11 @@ export class GitHubServiceAdapter implements GitHubService, GitHubGatewayService
 		prNumber: number,
 		fields: GatewayPullRequestUpdateFields,
 	): Promise<void> {
-		const update: Record<string, unknown> = {};
-		if (fields.title !== undefined) update.title = fields.title;
-		if (fields.body !== undefined) update.body = fields.body;
-		if (fields.state !== undefined) update.state = fields.state;
-		if (Object.keys(update).length > 0) {
-			await this.octokit.pulls.update({ owner, repo, pull_number: prNumber, ...update });
+		const { labels, ...metadata } = fields;
+		await this.pullRequests.updatePullRequestMetadata(owner, repo, prNumber, metadata);
+		if (labels !== undefined) {
+			// PR labels use the issues API and share the empty-label 404 handling.
+			await this.issues.setLabels(owner, repo, prNumber, labels);
 		}
-		if (fields.labels !== undefined) {
-			await this.setLabels(owner, repo, prNumber, fields.labels);
-		}
-	}
-
-	private normalizeVisibility(
-		visibility: unknown,
-		isPrivate: unknown,
-	): "public" | "private" | "internal" {
-		const normalized = String(visibility ?? "").toLowerCase();
-		if (normalized === "public" || normalized === "private" || normalized === "internal") {
-			return normalized;
-		}
-		return isPrivate ? "private" : "public";
 	}
 }
