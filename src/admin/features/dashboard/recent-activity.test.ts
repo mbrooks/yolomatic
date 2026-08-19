@@ -153,4 +153,68 @@ describe("buildRecentActivity", () => {
 		expect(result).toHaveLength(1);
 		expect(result[0].activity).toBe("2026-08-02T03:00:00.000Z");
 	});
+
+	it("populates runtimeMs and tokenUsage on a metrics-only row from the metric", () => {
+		const recent = [
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-2-implementation",
+				issueNumber: 2,
+				durationMs: 42000,
+				tokenUsage: { available: true, input: 100, output: 50, totalTokens: 150, cost: 0.1 },
+			}),
+		];
+
+		const result = buildRecentActivity([], recent);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].runtimeMs).toBe(42000);
+		expect(result[0].tokenUsage).toEqual({ available: true, totalTokens: 150 });
+	});
+
+	it("keeps tokenUsage.available === false on a metrics-only row", () => {
+		const recent = [
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-2-implementation",
+				issueNumber: 2,
+				tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 },
+			}),
+		];
+
+		const result = buildRecentActivity([], recent);
+
+		expect(result[0].tokenUsage).toEqual({ available: false, totalTokens: 0 });
+	});
+
+	it("populates runtimeMs from the live session and tokenUsage from the matching metric on a live row", () => {
+		const sessions = [
+			makeSession({ issueNumber: 1, totalExecutionTimeMs: 90000, lastActivity: "2026-08-01T12:00:00.000Z" }),
+		];
+		const recent = [
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-1-implementation",
+				issueNumber: 1,
+				durationMs: 123456,
+				tokenUsage: { available: true, input: 10, output: 5, totalTokens: 15, cost: 0.3 },
+			}),
+		];
+
+		const result = buildRecentActivity(sessions, recent);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].session).not.toBeNull();
+		// Runtime comes from the live session, not the metric.
+		expect(result[0].runtimeMs).toBe(90000);
+		// Tokens come from the matching metric.
+		expect(result[0].tokenUsage).toEqual({ available: true, totalTokens: 15 });
+	});
+
+	it("sets tokenUsage to null on a live row with no matching metric", () => {
+		const sessions = [makeSession({ issueNumber: 1, totalExecutionTimeMs: null })];
+
+		const result = buildRecentActivity(sessions, []);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].runtimeMs).toBeNull();
+		expect(result[0].tokenUsage).toBeNull();
+	});
 });

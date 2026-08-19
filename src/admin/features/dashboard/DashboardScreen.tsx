@@ -2,7 +2,7 @@ import React from "react";
 import type { AgentStatus, MetricsResponse, RepoSummary, Session } from "../../app/types.js";
 import { StatusBadge } from "../../components/StatusBadge.js";
 import { MetricsSection } from "./MetricsSection.js";
-import { formatRelative } from "../../lib/format.js";
+import { formatRelative, formatMs } from "../../lib/format.js";
 import { buildRecentActivity, type ActivityItem } from "./recent-activity.js";
 
 export function DashboardScreen({
@@ -94,6 +94,8 @@ export function DashboardScreen({
 							<div className="activity-type">Type</div>
 							<div className="activity-status">Status</div>
 							<div className="activity-time">Activity</div>
+							<div className="activity-runtime">Runtime</div>
+							<div className="activity-tokens">Tokens</div>
 						</div>
 						{recentSessions.map((item) => {
 							const isRefinement = item.kind === "refinement";
@@ -153,6 +155,8 @@ function ActivityCells({
 				<span className={`status-badge ${item.status}`}>{item.status}</span>
 			</div>
 			<div className="activity-time">{formatRelative(item.activity)}</div>
+			<div className="activity-runtime">{formatMs(item.runtimeMs)}</div>
+			<div className="activity-tokens">{item.tokenUsage ? (item.tokenUsage.available ? item.tokenUsage.totalTokens.toLocaleString() : "unknown") : "unknown"}</div>
 		</>
 	);
 }

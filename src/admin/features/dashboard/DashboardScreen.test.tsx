@@ -87,6 +87,8 @@ describe("DashboardScreen", () => {
 		expect(headers[2].textContent).toBe("Type");
 		expect(headers[3].textContent).toBe("Status");
 		expect(headers[4].textContent).toBe("Activity");
+		expect(headers[5].textContent).toBe("Runtime");
+		expect(headers[6].textContent).toBe("Tokens");
 	});
 
 	it("renders recent session rows", () => {
@@ -355,5 +357,81 @@ describe("DashboardScreen", () => {
 
 		expect(onSelectSession).toHaveBeenCalledTimes(1);
 		expect(onSelectSession).toHaveBeenCalledWith(session);
+	});
+
+	it("renders a metrics-only row with formatted runtime and localized token total", () => {
+		const metrics = metricsWith([
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-2-implementation",
+				issueNumber: 2,
+				durationMs: 65000,
+				tokenUsage: { available: true, input: 1200, output: 300, totalTokens: 1500, cost: 0.4 },
+			}),
+		]);
+
+		render(<DashboardScreen {...defaultProps} sessions={[]} metrics={metrics} />);
+
+		const row = document.querySelector(".activity-row");
+		expect(row).not.toBeNull();
+		expect(row!.querySelector(".activity-runtime")?.textContent).toBe("1m");
+		expect(row!.querySelector(".activity-tokens")?.textContent).toBe((1500).toLocaleString());
+	});
+
+	it("renders unknown for Tokens on a metrics-only row when token usage is unavailable", () => {
+		const metrics = metricsWith([
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-2-implementation",
+				issueNumber: 2,
+				durationMs: 30000,
+				tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 },
+			}),
+		]);
+
+		render(<DashboardScreen {...defaultProps} sessions={[]} metrics={metrics} />);
+
+		const row = document.querySelector(".activity-row");
+		expect(row).not.toBeNull();
+		expect(row!.querySelector(".activity-tokens")?.textContent).toBe("unknown");
+		expect(row!.querySelector(".activity-runtime")?.textContent).toBe("30s");
+	});
+
+	it("renders the live session runtime and the matching metric's tokens on a live row", () => {
+		const session = makeSession({
+			issueNumber: 1,
+			totalExecutionTimeMs: 120000,
+			lastActivity: "2026-08-01T12:00:00.000Z",
+		});
+		const metrics = metricsWith([
+			makeMetric({
+				sessionKey: "github-mbrooks-yolomatic-issue-1-implementation",
+				issueNumber: 1,
+				durationMs: 999999,
+				tokenUsage: { available: true, input: 2000, output: 500, totalTokens: 2500, cost: 0.5 },
+			}),
+		]);
+
+		render(<DashboardScreen {...defaultProps} sessions={[session]} metrics={metrics} />);
+
+		const row = document.querySelector(".activity-row");
+		expect(row).not.toBeNull();
+		// Runtime comes from the live session, not the metric.
+		expect(row!.querySelector(".activity-runtime")?.textContent).toBe("2m");
+		// Tokens come from the matching metric.
+		expect(row!.querySelector(".activity-tokens")?.textContent).toBe((2500).toLocaleString());
+	});
+
+	it("renders empty runtime and unknown tokens for a live row with no runtime and no matching metric", () => {
+		const session = makeSession({
+			issueNumber: 1,
+			totalExecutionTimeMs: null,
+			lastActivity: "2026-08-01T12:00:00.000Z",
+		});
+
+		render(<DashboardScreen {...defaultProps} sessions={[session]} metrics={null} />);
+
+		const row = document.querySelector(".activity-row");
+		expect(row).not.toBeNull();
+		expect(row!.querySelector(".activity-runtime")?.textContent).toBe("–");
+		expect(row!.querySelector(".activity-tokens")?.textContent).toBe("unknown");
 	});
 });

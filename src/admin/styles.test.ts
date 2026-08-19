@@ -57,7 +57,7 @@ function ruleInMedia(css: string, query: string, selector: string): string {
 describe("admin table layouts", () => {
 	it("uses the same fixed grid columns for dashboard headers and activity rows", async () => {
 		const css = await readFile(stylesPath, "utf-8");
-		const expectedColumns = "minmax(0, 2fr) 3.5rem 5.25rem 7rem minmax(4rem, 1fr)";
+		const expectedColumns = "minmax(0, 2fr) 3.5rem 5.25rem 7rem minmax(4rem, 1fr) 4.5rem 5.5rem";
 
 		for (const selector of [".activity-list-header", ".activity-row"]) {
 			const body = rule(css, selector);
