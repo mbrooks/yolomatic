@@ -10,6 +10,7 @@ import { DockerWorkerExecutor } from "../executor/docker-worker.js";
 import { WorkerRpcServer } from "../worker/rpc-server.js";
 import { WorkerGitHubGateway } from "../worker/github-gateway.js";
 import { GitHubIssueHandlers, type WebhookHandlers } from "../webhook/handlers.js";
+import { createGitHubEventApplication } from "./github-event-application.js";
 import { cleanupOldSessions, createWebhookServer } from "../webhook/server.js";
 import { SkillStore } from "../skills/store.js";
 import { RepoSkillService } from "../skills/repo-skill-service.js";
@@ -226,21 +227,20 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
 	const metricsStore = new MetricsStore(new DatabaseSync(path.join(config.memoryDir, "bot-state.sqlite")));
 	const refinementStore = new RefinementStore(path.join(config.memoryDir, "bot-state.sqlite"));
-	const handlers = new GitHubIssueHandlers({
-		sessionManager,
-		workspaceManager,
+	const handlers = createGitHubEventApplication({
+		sessions: sessionManager,
+		workspaces: workspaceManager,
 		executor,
-		githubToken: config.githubToken,
+		github,
+		tasks: taskController,
 		githubUsername: config.githubUsername,
+		adminGithubUsername: config.adminGithubUsername,
 		resolveDefaultBranch,
 		resolveGitHubEventMode,
 		selfReportEnabled: config.selfReportEnabled,
-		taskController,
-		adminGithubUsername: config.adminGithubUsername,
 		eventStore,
-		memoryDir: config.memoryDir,
-		repositoryStore,
 		refinementStore,
+		repositoryStore,
 		issueNewCommentEnabled: config.issueNewCommentEnabled,
 		issueAdminLinkInCommentsEnabled: config.issueAdminLinkInCommentsEnabled,
 		adminBaseUrl: config.adminBaseUrl,
