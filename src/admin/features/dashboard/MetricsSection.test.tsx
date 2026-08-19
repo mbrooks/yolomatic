@@ -85,20 +85,13 @@ describe("MetricsSection", () => {
 		expect(container.querySelector('[data-testid="metrics-token-chart"] .metrics-line')).toBeNull();
 	});
 
-	it("renders the recent executions table with unknown tokens for unavailable usage", () => {
+	it("does not render the recent executions table even when recent metrics are present", () => {
 		const recent = [
 			{ ...recentMetric, issueNumber: 1, tokenUsage: { available: true, input: 10, output: 5, totalTokens: 15, cost: 0.3 } },
 			{ ...recentMetric, sessionKey: "github-mbrooks-yolomatic-issue-2-implementation", issueNumber: 2, tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 } },
 		];
 		const { container } = render(<MetricsSection metrics={response([bucket()], recent)} />);
-		const rows = container.querySelectorAll(".metrics-recent-row");
-		expect(rows).toHaveLength(2);
-		expect(rows[0].textContent).toContain("15");
-		expect(rows[1].textContent).toContain("unknown");
-	});
-
-	it("omits the recent executions table when there are no recent metrics", () => {
-		const { container } = render(<MetricsSection metrics={response([bucket()], [])} />);
 		expect(container.querySelector(".metrics-recent")).toBeNull();
+		expect(container.textContent).not.toContain("Recent Executions");
 	});
 });

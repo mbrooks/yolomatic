@@ -1,5 +1,5 @@
 import React from "react";
-import type { MetricsBucket, MetricsResponse, SessionMetric } from "../../app/types.js";
+import type { MetricsBucket, MetricsResponse } from "../../app/types.js";
 import { formatMs } from "../../lib/format.js";
 
 /**
@@ -63,8 +63,6 @@ export function MetricsSection({ metrics }: { metrics: MetricsResponse | null })
 				<RuntimeChart buckets={buckets} />
 				<OutcomesChart buckets={buckets} />
 			</div>
-
-			<RecentMetricsTable recent={Array.isArray(metrics.recent) ? metrics.recent : []} />
 		</div>
 	);
 }
@@ -216,36 +214,4 @@ function OutcomesChart({ buckets }: ChartProps): React.ReactElement {
 
 function AxisLine({ y }: { y: number }): React.ReactElement {
 	return <line x1={CHART_PADDING} y1={y} x2={CHART_WIDTH - CHART_PADDING} y2={y} className="metrics-axis" />;
-}
-
-function RecentMetricsTable({ recent }: { recent: SessionMetric[] }): React.ReactElement | null {
-	if (recent.length === 0) {
-		return null;
-	}
-	return (
-		<div className="metrics-recent">
-			<div className="metrics-recent-title">Recent Executions</div>
-			<div className="metrics-recent-header">
-				<div>Repo</div>
-				<div>Issue</div>
-				<div>Type</div>
-				<div>Status</div>
-				<div>Runtime</div>
-				<div>Tokens</div>
-			</div>
-			{recent.map((metric) => (
-				<div
-					key={`${metric.sessionKey}:${metric.startedAt}`}
-					className={`metrics-recent-row ${metric.status}`}
-				>
-					<div>{metric.owner}/{metric.repo}</div>
-					<div>#{metric.issueNumber}</div>
-					<div>{metric.kind === "refinement" ? "Refinement" : "Issue"}</div>
-					<div>{metric.status}</div>
-					<div>{formatMs(metric.durationMs)}</div>
-					<div>{metric.tokenUsage.available ? metric.tokenUsage.totalTokens.toLocaleString() : "unknown"}</div>
-				</div>
-			))}
-		</div>
-	);
 }

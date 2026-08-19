@@ -3,6 +3,7 @@ import type { AgentStatus, MetricsResponse, RepoSummary, Session } from "../../a
 import { StatusBadge } from "../../components/StatusBadge.js";
 import { MetricsSection } from "./MetricsSection.js";
 import { formatRelative } from "../../lib/format.js";
+import { buildRecentActivity, type ActivityItem } from "./recent-activity.js";
 
 export function DashboardScreen({
 	agentStatus,
@@ -28,9 +29,7 @@ export function DashboardScreen({
 	const feedbackCount = sessions.filter((s) => s.status === "waiting-feedback").length;
 	const workingCount = sessions.filter((s) => s.status === "working").length;
 
-	const recentSessions = [...sessions]
-		.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
-		.slice(0, 10);
+	const recentSessions = buildRecentActivity(sessions, metrics?.recent ?? []);
 
 	return (
 		<div className="dashboard">
@@ -96,37 +95,32 @@ export function DashboardScreen({
 							<div className="activity-status">Status</div>
 							<div className="activity-time">Activity</div>
 						</div>
-						{recentSessions.map((session) => {
-							const isRefinement = session.kind === "refinement";
+						{recentSessions.map((item) => {
+							const isRefinement = item.kind === "refinement";
+							const key = `${item.owner}/${item.repo}#${item.issueNumber}/${item.kind}`;
+							if (item.session) {
+								const session = item.session;
+								return (
+									<div
+										key={key}
+										className="activity-row"
+										onClick={() => onSelectSession(session)}
+										tabIndex={0}
+										role="button"
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												onSelectSession(session);
+											}
+										}}
+									>
+										<ActivityCells item={item} isRefinement={isRefinement} />
+									</div>
+								);
+							}
 							return (
-								<div
-									key={`${session.owner}/${session.repo}#${session.issueNumber}/${session.kind}`}
-									className="activity-row"
-									onClick={() => onSelectSession(session)}
-									tabIndex={0}
-									role="button"
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											e.preventDefault();
-											onSelectSession(session);
-										}
-									}}
-								>
-									<div className="activity-repo">
-										{session.owner}/{session.repo}
-									</div>
-									<div className="activity-issue">
-										#{session.issueNumber}
-									</div>
-									<div className="activity-type">
-										<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>
-											{isRefinement ? "Refinement" : "Issue"}
-										</span>
-									</div>
-									<div className={`activity-status ${session.status}`}>
-										<span className={`status-badge ${session.status}`}>{session.status}</span>
-									</div>
-									<div className="activity-time">{formatRelative(session.lastActivity)}</div>
+								<div key={key} className="activity-row activity-row-static" aria-disabled="true">
+									<ActivityCells item={item} isRefinement={isRefinement} />
 								</div>
 							);
 						})}
@@ -134,5 +128,31 @@ export function DashboardScreen({
 				)}
 			</div>
 		</div>
+	);
+}
+
+function ActivityCells({
+	item,
+	isRefinement,
+}: {
+	item: ActivityItem;
+	isRefinement: boolean;
+}): React.ReactElement {
+	return (
+		<>
+			<div className="activity-repo">
+				{item.owner}/{item.repo}
+			</div>
+			<div className="activity-issue">#{item.issueNumber}</div>
+			<div className="activity-type">
+				<span className={`type-badge ${isRefinement ? "refinement" : "implementation"}`}>
+					{isRefinement ? "Refinement" : "Issue"}
+				</span>
+			</div>
+			<div className={`activity-status ${item.status}`}>
+				<span className={`status-badge ${item.status}`}>{item.status}</span>
+			</div>
+			<div className="activity-time">{formatRelative(item.activity)}</div>
+		</>
 	);
 }
