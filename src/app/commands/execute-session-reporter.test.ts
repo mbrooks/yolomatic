@@ -185,6 +185,71 @@ describe("ExecuteSessionReporter", () => {
 		);
 	});
 
+	it("uses the default cancelled summary for issues when none is provided", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.handleExecutionResult({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			sessionIssueNumber: 1,
+			target: { kind: "issue", number: 1 },
+			result: { status: "cancelled", summary: "", rawResponse: "" },
+			context: "Processing issue",
+			state: {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 1,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			},
+		});
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "cancelled");
+		expect(deps.github.addLabels).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, ["yolomatic-cancelled"]);
+		expect(deps.github.postComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			1,
+			expect.stringContaining("Yolomatic has stopped working on this issue."),
+		);
+	});
+
+	it("uses the default cancelled summary for PRs when none is provided", async () => {
+		const deps = makeDeps();
+		const reporter = new ExecuteSessionReporter(deps as never);
+		await reporter.handleExecutionResult({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			sessionIssueNumber: 1,
+			target: { kind: "pull_request", number: 7 },
+			result: { status: "cancelled", summary: "", rawResponse: "" },
+			context: "Processing issue",
+			state: {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 1,
+				title: "Issue",
+				body: "Body",
+				status: "working",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/ws",
+				lastActivity: new Date().toISOString(),
+				seeded: true,
+			},
+		});
+		expect(deps.sessions.updateStatus).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, "cancelled");
+		expect(deps.github.postPRComment).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			7,
+			expect.stringContaining("Yolomatic has stopped working on this review."),
+		);
+	});
+
 	it("handles complete results for PR targets", async () => {
 		const deps = makeDeps();
 		const reporter = new ExecuteSessionReporter(deps as never);

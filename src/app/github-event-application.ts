@@ -48,7 +48,8 @@ export interface GitHubEventApplicationDeps {
 	issueAdminLinkInCommentsEnabled?: boolean;
 	adminBaseUrl?: string;
 	resolveAdminBaseUrl?: () => string | undefined;
-	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+	resolveIssueNewCommentEnabled?: (owner: string, repo: string) => boolean | undefined;
+	resolveIssueAdminLinkInCommentsEnabled?: (owner: string, repo: string) => boolean | undefined;
 	maxConflictAttempts?: number;
 	mergeabilityPollDelayMs?: number;
 	mergeabilityPollMaxAttempts?: number;
@@ -95,6 +96,7 @@ export function createGitHubEventApplication(
 		issueAdminLinkInCommentsEnabled: deps.issueAdminLinkInCommentsEnabled,
 		adminBaseUrl: deps.adminBaseUrl,
 		resolveAdminBaseUrl: deps.resolveAdminBaseUrl,
+		resolveIssueNewCommentEnabled: deps.resolveIssueNewCommentEnabled,
 		resolveIssueAdminLinkInCommentsEnabled: deps.resolveIssueAdminLinkInCommentsEnabled,
 		metrics: deps.metrics,
 	});

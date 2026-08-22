@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+	normalizeRepoBooleanOverride,
 	normalizeRepoGitHubEventMode,
 	repoKey,
 	repoModeIncludesPolling,
 	repoModeIncludesWebhook,
 	resolveRepoDefaultBranch,
 	resolveRepoGitHubEventMode,
+	resolveRepoIssueAdminLinkInCommentsEnabled,
+	resolveRepoIssueNewCommentEnabled,
 	resolveRepoWorkerTemplate,
 	type RepoGitHubEventMode,
 } from "./repository.js";
@@ -107,6 +110,69 @@ describe("repository helpers", () => {
 		it("inherits the default template when the repository has no override", () => {
 			expect(resolveRepoWorkerTemplate({ workerTemplate: null }, "rust")).toBe("rust");
 			expect(resolveRepoWorkerTemplate(null, "php")).toBe("php");
+		});
+	});
+
+	describe("resolveRepoIssueNewCommentEnabled", () => {
+		it("returns the per-repo override when set, regardless of the global value", () => {
+			expect(resolveRepoIssueNewCommentEnabled({ issueNewCommentEnabled: false }, true)).toBe(false);
+			expect(resolveRepoIssueNewCommentEnabled({ issueNewCommentEnabled: true }, false)).toBe(true);
+		});
+
+		it("inherits the global value when the override is null", () => {
+			expect(resolveRepoIssueNewCommentEnabled({ issueNewCommentEnabled: null }, false)).toBe(false);
+			expect(resolveRepoIssueNewCommentEnabled({ issueNewCommentEnabled: null }, true)).toBe(true);
+		});
+
+		it("inherits the global value when no repository is provided", () => {
+			expect(resolveRepoIssueNewCommentEnabled(null, true)).toBe(true);
+			expect(resolveRepoIssueNewCommentEnabled(undefined, false)).toBe(false);
+		});
+	});
+
+	describe("resolveRepoIssueAdminLinkInCommentsEnabled", () => {
+		it("returns the per-repo override when set, regardless of the global value", () => {
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled({ issueAdminLinkInCommentsEnabled: false }, true)).toBe(false);
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled({ issueAdminLinkInCommentsEnabled: true }, false)).toBe(true);
+		});
+
+		it("inherits the global value when the override is null", () => {
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled({ issueAdminLinkInCommentsEnabled: null }, false)).toBe(false);
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled({ issueAdminLinkInCommentsEnabled: null }, true)).toBe(true);
+		});
+
+		it("inherits the global value when no repository is provided", () => {
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled(null, true)).toBe(true);
+			expect(resolveRepoIssueAdminLinkInCommentsEnabled(undefined, false)).toBe(false);
+		});
+	});
+
+	describe("normalizeRepoBooleanOverride", () => {
+		it("maps truthy 'true' strings to true after trimming and lowercasing", () => {
+			expect(normalizeRepoBooleanOverride("true")).toBe(true);
+			expect(normalizeRepoBooleanOverride("  TRUE  ")).toBe(true);
+			expect(normalizeRepoBooleanOverride("True")).toBe(true);
+		});
+
+		it("maps 'false' strings to false", () => {
+			expect(normalizeRepoBooleanOverride("false")).toBe(false);
+			expect(normalizeRepoBooleanOverride(" False ")).toBe(false);
+		});
+
+		it("maps empty/whitespace strings to null (inherit)", () => {
+			expect(normalizeRepoBooleanOverride("")).toBeNull();
+			expect(normalizeRepoBooleanOverride("   ")).toBeNull();
+		});
+
+		it("rejects unknown values as null rather than coercing them", () => {
+			expect(normalizeRepoBooleanOverride("maybe")).toBeNull();
+			expect(normalizeRepoBooleanOverride(undefined)).toBeNull();
+			expect(normalizeRepoBooleanOverride(1)).toBeNull();
+		});
+
+		it("passes through actual booleans", () => {
+			expect(normalizeRepoBooleanOverride(true)).toBe(true);
+			expect(normalizeRepoBooleanOverride(false)).toBe(false);
 		});
 	});
 

@@ -277,6 +277,7 @@ describe("defaultRuntimeFactory", () => {
 				resolveWorkerTemplate: vi.fn(() => DEFAULT_WORKER_TEMPLATE),
 				resolveAdminBaseUrl: vi.fn(() => undefined),
 				resolveIssueAdminLinkInCommentsEnabled: vi.fn(() => true),
+			resolveIssueNewCommentEnabled: vi.fn(() => true),
 			};
 			const deps = makeDeps();
 			const ctx: RuntimeBuildContext = {
@@ -408,17 +409,66 @@ describe("buildRuntimeGraph", () => {
 
 		const { resolvers } = factory.mock.calls[0][0];
 		expect(resolvers.resolveAdminBaseUrl()).toBe("http://host:6767/old/admin");
-		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled()).toBe(true);
+		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled("mbrooks", "yolomatic")).toBe(true);
 
 		// Operator changes the settings in the admin UI without a restart.
 		settingsValues.admin_base_url = "http://host:6767/new/admin";
 		settingsValues.issue_admin_link_in_comments_enabled = "false";
 		expect(resolvers.resolveAdminBaseUrl()).toBe("http://host:6767/new/admin");
-		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled()).toBe(false);
+		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled("mbrooks", "yolomatic")).toBe(false);
 
 		// Empty/whitespace base URL resolves to undefined (link omitted).
 		settingsValues.admin_base_url = "   ";
 		expect(resolvers.resolveAdminBaseUrl()).toBeUndefined();
+	});
+
+	it("honors a per-repo comment-setting override read live from the RepositoryStore", () => {
+		const settingsValues: Record<string, string> = {
+			issue_new_comment_enabled: "true",
+			issue_admin_link_in_comments_enabled: "true",
+		};
+		const settingsStore = {
+			get: vi.fn((k: string) => settingsValues[k]),
+			getString: vi.fn((_k: string, fallback?: string) => fallback ?? ""),
+			getBoolean: vi.fn((k: string, d?: boolean) =>
+				settingsValues[k] === undefined ? (d ?? false) : settingsValues[k] === "true",
+			),
+		} as never;
+		const repoStore = makeDeps().repositoryStore as unknown as Record<string, unknown>;
+		const getSync = vi.fn((owner: string, repo: string): {
+			issueNewCommentEnabled: boolean | null;
+			issueAdminLinkInCommentsEnabled: boolean | null;
+		} | null =>
+			owner === "mbrooks" && repo === "yolomatic"
+			? { issueNewCommentEnabled: false, issueAdminLinkInCommentsEnabled: false }
+			: null,
+		);
+		const deps = makeDeps({
+			settingsStore,
+			repositoryStore: { ...repoStore, getSync } as never,
+		});
+		const factory = vi.fn((ctx: RuntimeBuildContext) => makeFakeFactory()(ctx));
+		buildRuntimeGraph(baseConfig, deps, { factory, createWebhookServer: captureServer().create });
+		
+		const { resolvers } = factory.mock.calls[0][0];
+		// Per-repo override wins over the global true default.
+		expect(resolvers.resolveIssueNewCommentEnabled("mbrooks", "yolomatic")).toBe(false);
+		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled("mbrooks", "yolomatic")).toBe(false);
+		// Repos without an override inherit the global value.
+		expect(resolvers.resolveIssueNewCommentEnabled("other", "repo")).toBe(true);
+		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled("other", "repo")).toBe(true);
+		
+		// Flipping the global default changes inherited repos but not overridden ones.
+		settingsValues.issue_new_comment_enabled = "false";
+		settingsValues.issue_admin_link_in_comments_enabled = "false";
+		expect(resolvers.resolveIssueNewCommentEnabled("other", "repo")).toBe(false);
+		expect(resolvers.resolveIssueAdminLinkInCommentsEnabled("other", "repo")).toBe(false);
+		expect(resolvers.resolveIssueNewCommentEnabled("mbrooks", "yolomatic")).toBe(false);
+		
+		// Clearing the override returns the repo to inheriting the global value.
+		getSync.mockImplementation(() => ({ issueNewCommentEnabled: null, issueAdminLinkInCommentsEnabled: null }));
+
+		expect(resolvers.resolveIssueNewCommentEnabled("mbrooks", "yolomatic")).toBe(false);
 	});
 
 	it("threads the session auth provider from the factory into the server options", () => {

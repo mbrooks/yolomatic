@@ -30,7 +30,7 @@ export interface StartIssueSessionDeps {
 	issueAdminLinkInCommentsEnabled?: boolean;
 	adminBaseUrl?: string;
 	resolveAdminBaseUrl?: () => string | undefined;
-	resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+	resolveIssueAdminLinkInCommentsEnabled?: (owner: string, repo: string) => boolean | undefined;
 	/** Optional recorder for per-execution metrics (runtime + token usage). */
 	metrics?: MetricsRecorder;
 }
@@ -50,7 +50,7 @@ export class StartIssueSession {
 			adminBaseUrl?: string;
 			resolveAdminBaseUrl?: () => string | undefined;
 			issueAdminLinkInCommentsEnabled?: boolean;
-			resolveIssueAdminLinkInCommentsEnabled?: () => boolean | undefined;
+			resolveIssueAdminLinkInCommentsEnabled?: (owner: string, repo: string) => boolean | undefined;
 		} = {},
 		private readonly metrics?: MetricsRecorder,
 	) {}
@@ -147,7 +147,7 @@ export class StartIssueSession {
 	private adminSessionUrl(owner: string, repo: string, issueNumber: number): string | undefined {
 		const adminBaseUrl = this.adminLink.resolveAdminBaseUrl?.() ?? this.adminLink.adminBaseUrl;
 		const issueAdminLinkInCommentsEnabled =
-			this.adminLink.resolveIssueAdminLinkInCommentsEnabled?.() ?? this.adminLink.issueAdminLinkInCommentsEnabled;
+			this.adminLink.resolveIssueAdminLinkInCommentsEnabled?.(owner, repo) ?? this.adminLink.issueAdminLinkInCommentsEnabled;
 		return resolveAdminSessionUrl(
 			adminBaseUrl,
 			issueAdminLinkInCommentsEnabled,

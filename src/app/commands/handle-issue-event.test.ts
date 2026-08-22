@@ -469,6 +469,45 @@ describe("HandleIssueEvent", () => {
 		);
 	});
 
+	it("filters falsy label names when preparing the session for an opened issue", async () => {
+		const deps = createDeps();
+		let getCallCount = 0;
+		deps.sessions.get = vi.fn<SessionRepository["get"]>(async () => {
+			getCallCount++;
+			if (getCallCount <= 2) return null;
+			return {
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 1,
+				status: "working",
+				seeded: true,
+				title: "Test issue",
+				body: "Issue body",
+				sessionPath: "/tmp/session.jsonl",
+				workspacePath: "/tmp/workspaces/mbrooks-yolomatic/.worktrees/issue-1",
+				lastActivity: new Date().toISOString(),
+				labels: [],
+			};
+		});
+		const prepareSpy = vi.spyOn(
+			await import("./workflow-helpers.js"),
+			"prepareIssueSession",
+		);
+		const handler = new HandleIssueEvent(deps as any);
+		const payload = createPayload({
+			issue: {
+				...createPayload().issue,
+				labels: [{ name: "yolomatic" }, { name: "" }, { name: "feature" }],
+			},
+		});
+
+		await handler.execute(payload);
+
+		expect(prepareSpy).toHaveBeenCalled();
+		const preparedArg = prepareSpy.mock.calls[0][1] as { labels?: string[] };
+		expect(preparedArg.labels).toEqual(["yolomatic", "feature"]);
+	});
+
 	it("appends an admin session link to the pickup comment when enabled", async () => {
 		const deps = createDeps();
 		let getCallCount = 0;

@@ -61,6 +61,11 @@ describe("handleRepoRoutes", () => {
 			if (key === "default_worker_template") return "node";
 			return fallback ?? "";
 		}),
+		getBoolean: vi.fn((key: string, fallback?: boolean) => {
+			if (key === "issue_new_comment_enabled") return true;
+			if (key === "issue_admin_link_in_comments_enabled") return true;
+			return fallback ?? false;
+		}),
 		set: vi.fn(),
 	};
 
@@ -94,6 +99,12 @@ describe("handleRepoRoutes", () => {
 				githubEventMode: input.githubEventMode !== undefined ? input.githubEventMode : existing?.githubEventMode ?? null,
 				defaultBranch: input.defaultBranch !== undefined ? input.defaultBranch : existing?.defaultBranch ?? null,
 				workerTemplate: input.workerTemplate !== undefined ? input.workerTemplate : existing?.workerTemplate ?? null,
+				issueNewCommentEnabled:
+					input.issueNewCommentEnabled !== undefined ? input.issueNewCommentEnabled : existing?.issueNewCommentEnabled ?? null,
+				issueAdminLinkInCommentsEnabled:
+					input.issueAdminLinkInCommentsEnabled !== undefined
+						? input.issueAdminLinkInCommentsEnabled
+						: existing?.issueAdminLinkInCommentsEnabled ?? null,
 				createdAt: existing?.createdAt ?? "2026-01-01T00:00:00.000Z",
 				updatedAt: "2026-01-01T00:00:00.000Z",
 			};
@@ -286,6 +297,8 @@ describe("handleRepoRoutes", () => {
 				expect.objectContaining({ key: "github_event_mode", value: "polling", override: "polling" }),
 				expect.objectContaining({ key: "default_branch", value: "master", override: "master" }),
 				expect.objectContaining({ key: "worker_template", value: "node", override: null, inherited: true }),
+				expect.objectContaining({ key: "issue_new_comment_enabled", value: "true", override: null, inherited: true }),
+				expect.objectContaining({ key: "issue_admin_link_in_comments_enabled", value: "true", override: null, inherited: true }),
 			]);
 		});
 
@@ -319,6 +332,8 @@ describe("handleRepoRoutes", () => {
 						rust: "Rust (workers/rust.Dockerfile)",
 					},
 				}),
+				expect.objectContaining({ key: "issue_new_comment_enabled", value: "true", override: null, inherited: true }),
+				expect.objectContaining({ key: "issue_admin_link_in_comments_enabled", value: "true", override: null, inherited: true }),
 			]);
 		});
 
@@ -440,6 +455,154 @@ describe("handleRepoRoutes", () => {
 			expect(res.statusCode).toBe(500);
 			const body = JSON.parse(String(res.body));
 			expect(body.error).toBe("Repository store not configured");
+		});
+
+		it("exposes the comment-setting boolean views with the global default", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			const newComment = body.settings.find((s: any) => s.key === "issue_new_comment_enabled");
+			expect(newComment).toEqual(expect.objectContaining({
+				value: "true",
+				default: "true",
+				override: null,
+				inherited: true,
+				requiresRestart: false,
+				options: ["true", "false"],
+				optionLabels: { true: "Enabled", false: "Disabled" },
+			}));
+			const adminLink = body.settings.find((s: any) => s.key === "issue_admin_link_in_comments_enabled");
+			expect(adminLink).toEqual(expect.objectContaining({
+				value: "true",
+				default: "true",
+				override: null,
+				inherited: true,
+				requiresRestart: false,
+				options: ["true", "false"],
+				optionLabels: { true: "Enabled", false: "Disabled" },
+			}));
+		});
+
+		it("reflects a per-repo boolean override and the inherited global value", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([
+				managedRepo("mbrooks", "yolomatic", {
+					issueNewCommentEnabled: false,
+					issueAdminLinkInCommentsEnabled: true,
+				}),
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			const newComment = body.settings.find((s: any) => s.key === "issue_new_comment_enabled");
+			expect(newComment).toEqual(expect.objectContaining({
+				value: "false",
+				override: "false",
+				inherited: false,
+			}));
+			const adminLink = body.settings.find((s: any) => s.key === "issue_admin_link_in_comments_enabled");
+			expect(adminLink).toEqual(expect.objectContaining({
+				value: "true",
+				override: "true",
+				inherited: false,
+			}));
+		});
+
+		it("persist true/false/empty boolean overrides without requiring a restart", async () => {
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request(
+					"/api/repos/mbrooks/yolomatic/settings",
+					"PATCH",
+					JSON.stringify({
+						issue_new_comment_enabled: "false",
+						issue_admin_link_in_comments_enabled: "true",
+					}),
+				),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.requiresRestart).not.toContain("issue_new_comment_enabled");
+			expect(body.requiresRestart).not.toContain("issue_admin_link_in_comments_enabled");
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
+				issueNewCommentEnabled: false,
+				issueAdminLinkInCommentsEnabled: true,
+			}));
+		});
+
+		it("clears a boolean override when an empty value is submitted", async () => {
+			const repoStore = makeRepoStore([
+				managedRepo("mbrooks", "yolomatic", {
+					issueNewCommentEnabled: false,
+					issueAdminLinkInCommentsEnabled: true,
+				}),
+			]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request(
+					"/api/repos/mbrooks/yolomatic/settings",
+					"PATCH",
+					JSON.stringify({
+						issue_new_comment_enabled: "",
+						issue_admin_link_in_comments_enabled: "",
+					}),
+				),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
+				issueNewCommentEnabled: null,
+				issueAdminLinkInCommentsEnabled: null,
+			}));
+		});
+
+		it("rejects an unrecognized boolean override value", async () => {
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request(
+					"/api/repos/mbrooks/yolomatic/settings",
+					"PATCH",
+					JSON.stringify({ issue_new_comment_enabled: "maybe" }),
+				),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			const body = JSON.parse(String(res.body));
+			expect(body.error).toBe("issue_new_comment_enabled must be true or false");
+			expect(repoStore.upsert).not.toHaveBeenCalled();
 		});
 	});
 

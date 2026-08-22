@@ -63,6 +63,28 @@ describe("RepoSettingsScreen", () => {
 								rust: "Rust (workers/rust.Dockerfile)",
 							},
 						},
+					{
+						key: "issue_new_comment_enabled",
+						value: "false",
+						default: "true",
+						override: "false",
+						inherited: false,
+						requiresRestart: false,
+						description: "Post an automatic comment on newly opened issues.",
+						options: ["true", "false"],
+						optionLabels: { true: "Enabled", false: "Disabled" },
+					},
+					{
+						key: "issue_admin_link_in_comments_enabled",
+						value: "true",
+						default: "true",
+						override: null,
+						inherited: true,
+						requiresRestart: false,
+						description: "Include a link to the admin UI in status comments.",
+						options: ["true", "false"],
+						optionLabels: { true: "Enabled", false: "Disabled" },
+					},
 					],
 				});
 			}
@@ -107,6 +129,39 @@ describe("RepoSettingsScreen", () => {
 		});
 		expect(screen.getByText("A restart is required for repository event-mode or worker-template changes to take effect.")).toBeDefined();
 	});
+
+		it("renders the comment-setting boolean overrides as true/false/inherit selects", async () => {
+			render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+			await waitFor(() => {
+				expect(screen.getByText("Repository Settings")).toBeDefined();
+			});
+			const newCommentSelect = screen.getByRole("combobox", { name: /issue_new_comment_enabled/ }) as HTMLSelectElement;
+			expect(Array.from(newCommentSelect.options, (o) => o.value)).toEqual(["", "true", "false"]);
+			expect(newCommentSelect.value).toBe("false");
+			expect(Array.from(newCommentSelect.options, (o) => o.textContent)).toContain("Disabled");
+			const adminLinkSelect = screen.getByRole("combobox", { name: /issue_admin_link_in_comments_enabled/ }) as HTMLSelectElement;
+			expect(adminLinkSelect.value).toBe("");
+			expect(screen.getAllByText(/Effective:/).length).toBeGreaterThan(0);
+		});
+
+		it("saves a cleared comment-setting override back to inherit", async () => {
+			render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+			await waitFor(() => {
+				expect(screen.getByText("Repository Settings")).toBeDefined();
+			});
+			const newCommentSelect = screen.getByRole("combobox", { name: /issue_new_comment_enabled/ }) as HTMLSelectElement;
+			fireEvent.change(newCommentSelect, { target: { value: "" } });
+			fireEvent.click(screen.getByText("Save Changes"));
+			await waitFor(() => {
+				expect(fetchSpy).toHaveBeenCalledWith(
+				"/api/repos/mbrooks/yolomatic/settings",
+				expect.objectContaining({ method: "PATCH" }),
+				);
+			});
+			const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/repos/mbrooks/yolomatic/settings" && c[1]?.method === "PATCH");
+			const body = JSON.parse((call as any)[1].body);
+			expect(body.issue_new_comment_enabled).toBe("");
+		});
 
 	it("removes the repository after confirmation and navigates to repos", async () => {
 		const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);

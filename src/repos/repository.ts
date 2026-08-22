@@ -19,6 +19,8 @@ export interface Repository {
 	githubEventMode: RepoGitHubEventMode | null;
 	defaultBranch: string | null;
 	workerTemplate?: string | null;
+	issueNewCommentEnabled?: boolean | null;
+	issueAdminLinkInCommentsEnabled?: boolean | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -31,6 +33,8 @@ export type RepositoryInput = {
 	githubEventMode?: RepoGitHubEventMode | null;
 	defaultBranch?: string | null;
 	workerTemplate?: string | null;
+	issueNewCommentEnabled?: boolean | null;
+	issueAdminLinkInCommentsEnabled?: boolean | null;
 };
 
 export function repoModeIncludesWebhook(mode: RepoGitHubEventMode): boolean {
@@ -69,6 +73,46 @@ export function resolveRepoWorkerTemplate(
 	defaultTemplate: string,
 ): string {
 	return repository?.workerTemplate ?? defaultTemplate;
+}
+
+/**
+ * Resolve the effective `issue_new_comment_enabled` for a repository, falling
+ * back to the global value when no per-repo override is set.
+ */
+export function resolveRepoIssueNewCommentEnabled(
+	repository: Pick<Repository, "issueNewCommentEnabled"> | null | undefined,
+	globalValue: boolean,
+): boolean {
+	return repository?.issueNewCommentEnabled ?? globalValue;
+}
+
+/**
+ * Resolve the effective `issue_admin_link_in_comments_enabled` for a
+ * repository, falling back to the global value when no per-repo override is
+ * set.
+ */
+export function resolveRepoIssueAdminLinkInCommentsEnabled(
+	repository: Pick<Repository, "issueAdminLinkInCommentsEnabled"> | null | undefined,
+	globalValue: boolean,
+): boolean {
+	return repository?.issueAdminLinkInCommentsEnabled ?? globalValue;
+}
+
+/**
+ * Normalize a per-repo boolean override body value into `true`/`false`/`null`.
+ * Accepts actual booleans and the strings "true"/"false" (case-insensitive,
+ * trimmed). Empty/whitespace strings and unknown values resolve to `null`,
+ * which clears the override and returns the repository to inheriting the
+ * global default.
+ */
+export function normalizeRepoBooleanOverride(value: unknown): boolean | null {
+	if (typeof value === "boolean") return value;
+	if (typeof value !== "string") return null;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === "") return null;
+	if (normalized === "true") return true;
+	if (normalized === "false") return false;
+	return null;
 }
 
 export function normalizeRepoGitHubEventMode(value: unknown): RepoGitHubEventMode | null {
