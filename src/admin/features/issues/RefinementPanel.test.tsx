@@ -95,4 +95,52 @@ describe("RefinementPanel", () => {
 		await waitFor(() => expect(screen.getByText("failed")).toBeDefined());
 		expect(screen.getByText("worker crashed")).toBeDefined();
 	});
+
+	it("renders runtime and token usage for an attempt", async () => {
+		mockFetchRefinementAttempts.mockResolvedValue({
+			attempts: [
+				{
+					id: "a3",
+					requester: "admin",
+					instructionSource: "repository-skill",
+					state: "applied",
+					summary: "Clarified requirements",
+					runtimeMs: 90_000,
+					tokenUsage: { available: true, input: 100, output: 40, totalTokens: 140, cost: 0.9 },
+					createdAt: new Date(Date.now() - 60_000).toISOString(),
+					updatedAt: new Date().toISOString(),
+				},
+			],
+		});
+		mockFetchRefinementLog.mockResolvedValue({ available: true, logs: [] });
+
+		render(<RefinementPanel owner="mbrooks" repo="yolomatic" issueNumber={4} />);
+
+		await waitFor(() => expect(screen.getByText("applied")).toBeDefined());
+		expect(screen.getByText("1m")).toBeDefined();
+		expect(screen.getByText("140")).toBeDefined();
+	});
+
+	it("renders unknown token usage when usage is unavailable", async () => {
+		mockFetchRefinementAttempts.mockResolvedValue({
+			attempts: [
+				{
+					id: "a4",
+					requester: "admin",
+					instructionSource: "prompt-defaults",
+					state: "failed",
+					runtimeMs: 5_000,
+					tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 },
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				},
+			],
+		});
+		mockFetchRefinementLog.mockResolvedValue({ available: true, logs: [] });
+
+		render(<RefinementPanel owner="mbrooks" repo="yolomatic" issueNumber={5} />);
+
+		await waitFor(() => expect(screen.getByText("failed")).toBeDefined());
+		expect(screen.getByText("unknown")).toBeDefined();
+	});
 });

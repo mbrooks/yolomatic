@@ -476,6 +476,7 @@ export class HandleIssueRefinement {
 		} finally {
 			if (sessionStarted) {
 				this.recordRefinementMetric(owner, repo, issueNumber, taskStartedAtMs, metricStatus, refinementResult);
+				this.recordAttemptUsage(attemptId, taskStartedAtMs, refinementResult);
 				await this.ensureTerminalSession(owner, repo, issueNumber);
 			}
 			this.deps.tasks.unregister(key, registration);
@@ -530,6 +531,40 @@ export class HandleIssueRefinement {
 		} catch (error) {
 			process.stdout.write(
 				`[refinement] metrics record failed for ${owner}/${repo}#${issueNumber}: ${error instanceof Error ? error.message : String(error)}\n`,
+			);
+		}
+	}
+
+	/**
+	 * Persist the refinement runtime and token usage on the durable refinement
+	 * attempt so the per-issue refinement history can report them. Called from
+	 * the `finally` for any attempt that was created, regardless of outcome.
+	 * Token usage comes from the refinement result when the worker returned one;
+	 * otherwise it is recorded as unavailable. Best-effort: a failure here must
+	 * not regress the refinement outcome.
+	 */
+	private recordAttemptUsage(
+		attemptId: string | undefined,
+		taskStartedAtMs: number,
+		result: { usage?: import("../../executor/usage.js").TokenUsage } | undefined,
+	): void {
+		if (!attemptId) return;
+		const durationMs = this.deps.clock.now().getTime() - taskStartedAtMs;
+		const usage = result?.usage;
+		const tokenUsage: import("../../refinement/store.js").RefinementTokenUsage = usage
+			? {
+					available: usage.available,
+					input: usage.input,
+					output: usage.output,
+					totalTokens: usage.totalTokens,
+					cost: usage.cost,
+				}
+			: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 };
+		try {
+			this.deps.refinementStore.updateAttempt(attemptId, { runtimeMs: durationMs, tokenUsage });
+		} catch (error) {
+			process.stdout.write(
+				`[refinement] attempt usage record failed for ${attemptId}: ${error instanceof Error ? error.message : String(error)}\n`,
 			);
 		}
 	}

@@ -76,6 +76,37 @@ describe("ListRefinementAttempts", () => {
 		}
 	});
 
+	it("exposes runtime and token usage recorded on an attempt", async () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 4,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "repository-skill",
+			state: "applied",
+		});
+		store.updateAttempt(created.id, {
+			runtimeMs: 90_000,
+			tokenUsage: { available: true, input: 100, output: 40, totalTokens: 140, cost: 0.9 },
+		});
+
+		const result = await query.execute("mbrooks", "yolomatic", 4);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.attempts[0].runtimeMs).toBe(90_000);
+			expect(result.data.attempts[0].tokenUsage).toEqual({
+				available: true,
+				input: 100,
+				output: 40,
+				totalTokens: 140,
+				cost: 0.9,
+			});
+		}
+	});
+
 	it("exposes failure reason for failed attempts", async () => {
 		store.createAttempt({
 			owner: "mbrooks",

@@ -7,6 +7,20 @@ import { runMigrations } from "../migrations/index.js";
 export type RefinementState = "instructed" | "running" | "applied" | "stale" | "failed";
 export type InstructionSource = "repository-skill" | "prompt-defaults";
 
+/**
+ * Token usage persisted on a refinement attempt. Mirrors the subset of
+ * {@link TokenUsage} that is durably stored (matching `session_metrics`):
+ * `available` flags whether the provider reported any usage; the numeric
+ * fields are zero when unavailable.
+ */
+export interface RefinementTokenUsage {
+	available: boolean;
+	input: number;
+	output: number;
+	totalTokens: number;
+	cost: number;
+}
+
 export interface RefinementAttempt {
 	id: string;
 	owner: string;
@@ -28,6 +42,10 @@ export interface RefinementAttempt {
 	failureReason?: string;
 	deliveryId?: string;
 	steeringPrompt?: string;
+	/** Refinement runtime in milliseconds, set after the run finishes. */
+	runtimeMs?: number;
+	/** Aggregated token usage for the run, set after the run finishes. */
+	tokenUsage?: RefinementTokenUsage;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -60,6 +78,8 @@ export interface RefinementAttemptCreate {
 	failureReason?: string;
 	deliveryId?: string;
 	steeringPrompt?: string;
+	runtimeMs?: number;
+	tokenUsage?: RefinementTokenUsage;
 }
 
 export class RefinementStore {
@@ -86,8 +106,9 @@ export class RefinementStore {
 				id, owner, repo, issue_number, instruction_comment_id, command_comment_id, requester,
 				original_title, original_body, original_body_fingerprint, proposed_task_body, proposed_title,
 				summary, investigation, instruction_source, repo_commit, state, failure_reason, delivery_id,
-				steering_prompt, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				steering_prompt, runtime_ms, tokens_available, input_tokens, output_tokens, total_tokens, cost,
+				created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 		stmt.run(
 			attempt.id,
@@ -110,6 +131,12 @@ export class RefinementStore {
 			attempt.failureReason ?? null,
 			attempt.deliveryId ?? null,
 			attempt.steeringPrompt ?? null,
+			attempt.runtimeMs ?? null,
+			attempt.tokenUsage ? (attempt.tokenUsage.available ? 1 : 0) : null,
+			attempt.tokenUsage ? attempt.tokenUsage.input : null,
+			attempt.tokenUsage ? attempt.tokenUsage.output : null,
+			attempt.tokenUsage ? attempt.tokenUsage.totalTokens : null,
+			attempt.tokenUsage ? attempt.tokenUsage.cost : null,
 			attempt.createdAt,
 			attempt.updatedAt,
 		);
@@ -137,10 +164,31 @@ export class RefinementStore {
 			"state",
 			"failureReason",
 			"deliveryId",
+			"runtimeMs",
+			"tokenUsage",
 		]);
 		const sets: string[] = [];
 		const values: (string | number | null)[] = [];
 		for (const [key, value] of Object.entries(updates)) {
+			if (key === "runtimeMs") {
+				sets.push("runtime_ms = ?");
+				values.push((value as number | undefined) ?? null);
+				continue;
+			}
+			if (key === "tokenUsage") {
+				const usage = value as RefinementTokenUsage | undefined;
+				sets.push("tokens_available = ?");
+				values.push(usage ? (usage.available ? 1 : 0) : null);
+				sets.push("input_tokens = ?");
+				values.push(usage ? usage.input : null);
+				sets.push("output_tokens = ?");
+				values.push(usage ? usage.output : null);
+				sets.push("total_tokens = ?");
+				values.push(usage ? usage.totalTokens : null);
+				sets.push("cost = ?");
+				values.push(usage ? usage.cost : null);
+				continue;
+			}
 			if (!allowed.has(key)) continue;
 			const column = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 			sets.push(`${column} = ?`);
@@ -231,6 +279,16 @@ export class RefinementStore {
 			failureReason: row.failure_reason == null ? undefined : String(row.failure_reason),
 			deliveryId: row.delivery_id == null ? undefined : String(row.delivery_id),
 			steeringPrompt: row.steering_prompt == null ? undefined : String(row.steering_prompt),
+			runtimeMs: row.runtime_ms == null ? undefined : Number(row.runtime_ms),
+			tokenUsage: row.tokens_available == null
+				? undefined
+				: {
+					available: row.tokens_available === 1,
+					input: Number(row.input_tokens),
+					output: Number(row.output_tokens),
+					totalTokens: Number(row.total_tokens),
+					cost: Number(row.cost),
+				},
 			createdAt: String(row.created_at),
 			updatedAt: String(row.updated_at),
 		};

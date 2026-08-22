@@ -1356,9 +1356,20 @@ describe("HandleIssueRefinement", () => {
 		expect(typeof metric.durationMs).toBe("number");
 		expect(metric.tokenUsage.available).toBe(true);
 		expect(metric.tokenUsage.totalTokens).toBe(70);
+
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1)!;
+		expect(attempt.state).toBe("applied");
+		expect(typeof attempt.runtimeMs).toBe("number");
+		expect(attempt.tokenUsage).toEqual({
+			available: true,
+			input: 50,
+			output: 20,
+			totalTokens: 70,
+			cost: 0.4,
+		});
 	});
 
-	it("records a failed refinement metric when the worker throws", async () => {
+	it("records runtime and unavailable token usage on the attempt when the worker throws", async () => {
 		const metrics = { record: vi.fn() };
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
@@ -1385,5 +1396,48 @@ describe("HandleIssueRefinement", () => {
 		expect(metric.kind).toBe("refinement");
 		expect(metric.status).toBe("failed");
 		expect(metric.tokenUsage.available).toBe(false);
+
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1)!;
+		expect(attempt.state).toBe("failed");
+		expect(typeof attempt.runtimeMs).toBe("number");
+		expect(attempt.tokenUsage).toEqual({ available: false, input: 0, output: 0, totalTokens: 0, cost: 0 });
+	});
+
+	it("records a positive runtime on the attempt when the clock advances", async () => {
+		let nowMs = Date.parse("2026-08-01T00:00:00Z");
+		const clock = {
+			now: () => new Date(nowMs),
+			uptime: () => 0,
+		};
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as RefinementExecutionService,
+			clock,
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+		});
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockImplementation(async () => {
+			nowMs += 15_000;
+			return {
+				proposedTaskBody: "Refined body",
+				summary: "Summary",
+				investigation: "Investigation",
+				usage: { available: true, input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15, cost: 0.1 },
+			};
+		});
+
+		await handler.execute(createCommandPayload() as never);
+
+		const attempt = store.getLatestAttempt("mbrooks", "yolomatic", 1)!;
+		expect(attempt.runtimeMs).toBeGreaterThanOrEqual(15_000);
+		expect(attempt.tokenUsage!.totalTokens).toBe(15);
 	});
 });

@@ -344,6 +344,11 @@ The durable record includes:
 - state, failure reason, and timestamps; and
 - the GitHub delivery ID used for deduplication.
 
+The durable record also tracks per-attempt runtime and token usage
+(`runtime_ms` plus `tokens_available`/`input_tokens`/`output_tokens`/`total_tokens`/`cost`)
+so the per-issue refinement history can report them alongside the dashboard
+metrics aggregates.
+
 Repeated delivery of one command event cannot launch another run or update the
 issue twice. A later authenticated command may refine the body again and
 creates a new attempt linked to the prior one.

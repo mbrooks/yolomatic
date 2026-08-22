@@ -262,4 +262,120 @@ describe("RefinementStore", () => {
 	it("returns null when no instruction comment is recorded", () => {
 		expect(store.getInstructionComment("unknown", "repo", 1)).toBeNull();
 	});
+
+	it("creates attempts without runtime or token usage", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 30,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+		expect(created.runtimeMs).toBeUndefined();
+		expect(created.tokenUsage).toBeUndefined();
+		expect(store.getAttempt(created.id)!.runtimeMs).toBeUndefined();
+		expect(store.getAttempt(created.id)!.tokenUsage).toBeUndefined();
+	});
+
+	it("round-trips runtime and token usage supplied at create time", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 34,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "applied",
+			runtimeMs: 12_000,
+			tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 },
+		});
+		expect(created.runtimeMs).toBe(12_000);
+		expect(created.tokenUsage!.available).toBe(false);
+
+		const fetched = store.getAttempt(created.id)!;
+		expect(fetched.runtimeMs).toBe(12_000);
+		expect(fetched.tokenUsage).toEqual({ available: false, input: 0, output: 0, totalTokens: 0, cost: 0 });
+	});
+
+	it("persists runtimeMs and available token usage through updateAttempt and reads", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 31,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+
+		const updated = store.updateAttempt(created.id, {
+			runtimeMs: 42_000,
+			tokenUsage: { available: true, input: 50, output: 20, totalTokens: 70, cost: 0.4 },
+		});
+
+		expect(updated.runtimeMs).toBe(42_000);
+		expect(updated.tokenUsage).toEqual({ available: true, input: 50, output: 20, totalTokens: 70, cost: 0.4 });
+
+		expect(store.getAttempt(created.id)!.runtimeMs).toBe(42_000);
+		expect(store.getAttempt(created.id)!.tokenUsage).toEqual({ available: true, input: 50, output: 20, totalTokens: 70, cost: 0.4 });
+		expect(store.getLatestAttempt("mbrooks", "yolomatic", 31)!.runtimeMs).toBe(42_000);
+		expect(store.listAttemptsByIssue("mbrooks", "yolomatic", 31)[0]!.tokenUsage!.totalTokens).toBe(70);
+	});
+
+	it("persists unavailable token usage and zero runtime", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 32,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+			deliveryId: "delivery-32",
+		});
+
+		store.updateAttempt(created.id, {
+			runtimeMs: 0,
+			tokenUsage: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 },
+		});
+
+		const byId = store.getAttempt(created.id)!;
+		expect(byId.runtimeMs).toBe(0);
+		expect(byId.tokenUsage).toEqual({ available: false, input: 0, output: 0, totalTokens: 0, cost: 0 });
+
+		const byDelivery = store.getAttemptByDeliveryId("delivery-32")!;
+		expect(byDelivery.tokenUsage!.available).toBe(false);
+	});
+
+	it("updates runtimeMs without touching token usage and vice versa", () => {
+		const created = store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 33,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "fp",
+			instructionSource: "prompt-defaults",
+			state: "running",
+		});
+
+		store.updateAttempt(created.id, { runtimeMs: 1_000 });
+		expect(store.getAttempt(created.id)!.runtimeMs).toBe(1_000);
+		expect(store.getAttempt(created.id)!.tokenUsage).toBeUndefined();
+
+		store.updateAttempt(created.id, { tokenUsage: { available: true, input: 1, output: 2, totalTokens: 3, cost: 0 } });
+		expect(store.getAttempt(created.id)!.tokenUsage!.totalTokens).toBe(3);
+		expect(store.getAttempt(created.id)!.runtimeMs).toBe(1_000);
+	});
 });
