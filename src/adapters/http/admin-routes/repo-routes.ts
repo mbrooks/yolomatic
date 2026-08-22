@@ -10,12 +10,18 @@ import { mapResultToStatus } from "../admin-router-shared.js";
 import {
 	type RepoGitHubEventMode,
 	type Repository,
+	normalizeRepoBooleanOverride,
 } from "../../../repos/repository.js";
 import { NotFoundError } from "../admin-router-shared.js";
 import { getWorkerTemplate, listWorkerTemplates } from "../../../worker/templates.js";
 
 interface RepoSettingView {
-	key: "github_event_mode" | "default_branch" | "worker_template";
+	key:
+		| "github_event_mode"
+		| "default_branch"
+		| "worker_template"
+		| "issue_new_comment_enabled"
+		| "issue_admin_link_in_comments_enabled";
 	value: string;
 	default: string;
 	override: string | null;
@@ -31,6 +37,12 @@ function normalizeGlobalEventMode(raw: string): RepoGitHubEventMode {
 	return mode === "polling" || mode === "both" ? mode : "webhook";
 }
 
+/** Render a nullable boolean override as the string the admin UI exchanges. */
+function booleanOverrideString(value: boolean | null | undefined): string | null {
+	if (value === null || value === undefined) return null;
+	return value ? "true" : "false";
+}
+
 function buildRepoSettingViews(
 	deps: AdminRouterDeps,
 	owner: string,
@@ -40,6 +52,8 @@ function buildRepoSettingViews(
 	const globalEventMode = normalizeGlobalEventMode(deps.settingsStore!.getString("github_event_mode", "webhook"));
 	const globalDefaultBranch = deps.settingsStore!.getString("default_branch", "main");
 	const globalWorkerTemplate = deps.settingsStore!.getString("default_worker_template", "node");
+	const globalNewComment = deps.settingsStore!.getBoolean("issue_new_comment_enabled", true);
+	const globalAdminLink = deps.settingsStore!.getBoolean("issue_admin_link_in_comments_enabled", true);
 	return [
 		{
 			key: "github_event_mode",
@@ -75,6 +89,28 @@ function buildRepoSettingViews(
 					`${template.label} (${template.dockerfile})`,
 				]),
 			),
+		},
+		{
+			key: "issue_new_comment_enabled",
+			value: (configured?.issueNewCommentEnabled ?? globalNewComment) ? "true" : "false",
+			default: globalNewComment ? "true" : "false",
+			override: booleanOverrideString(configured?.issueNewCommentEnabled ?? null),
+			inherited: configured?.issueNewCommentEnabled == null,
+			requiresRestart: false,
+			description: "Post an automatic comment on newly opened issues explaining available Yolomatic commands.",
+			options: ["true", "false"],
+			optionLabels: { true: "Enabled", false: "Disabled" },
+		},
+		{
+			key: "issue_admin_link_in_comments_enabled",
+			value: (configured?.issueAdminLinkInCommentsEnabled ?? globalAdminLink) ? "true" : "false",
+			default: globalAdminLink ? "true" : "false",
+			override: booleanOverrideString(configured?.issueAdminLinkInCommentsEnabled ?? null),
+			inherited: configured?.issueAdminLinkInCommentsEnabled == null,
+			requiresRestart: false,
+			description: "Include a link to the admin UI in the status comments Yolomatic posts on issues.",
+			options: ["true", "false"],
+			optionLabels: { true: "Enabled", false: "Disabled" },
 		},
 	];
 }
@@ -171,6 +207,8 @@ const registry = new AdminRouteRegistry()
 		github_event_mode?: string;
 		default_branch?: string;
 		worker_template?: string;
+		issue_new_comment_enabled?: string;
+		issue_admin_link_in_comments_enabled?: string;
 	}>({
 		method: "PATCH",
 		pattern: /^\/api\/repos\/([^/]+)\/([^/]+)\/settings$/u,
@@ -179,11 +217,19 @@ const registry = new AdminRouteRegistry()
 		handler: async (ctx) => {
 			const { repositoryStore } = getRequiredDeps(ctx.deps, ["repositoryStore"]);
 			const [owner, repo] = ctx.params;
-			const body = ctx.body as { github_event_mode?: string; default_branch?: string; worker_template?: string };
+			const body = ctx.body as {
+				github_event_mode?: string;
+				default_branch?: string;
+				worker_template?: string;
+				issue_new_comment_enabled?: string;
+				issue_admin_link_in_comments_enabled?: string;
+			};
 			const existing = await repositoryStore.get(owner, repo);
 			let nextGithubEventMode = existing?.githubEventMode ?? null;
 			let nextDefaultBranch = existing?.defaultBranch ?? null;
 			let nextWorkerTemplate = existing?.workerTemplate ?? null;
+			let nextIssueNewCommentEnabled = existing?.issueNewCommentEnabled ?? null;
+			let nextIssueAdminLinkInCommentsEnabled = existing?.issueAdminLinkInCommentsEnabled ?? null;
 			const requiresRestart: string[] = [];
 
 			if ("github_event_mode" in body) {
@@ -215,6 +261,32 @@ const registry = new AdminRouteRegistry()
 				}
 			}
 
+			if ("issue_new_comment_enabled" in body) {
+				const normalized = normalizeRepoBooleanOverride(body.issue_new_comment_enabled);
+				if (
+					body.issue_new_comment_enabled !== undefined &&
+					body.issue_new_comment_enabled !== "" &&
+					body.issue_new_comment_enabled !== null &&
+					normalized === null
+				) {
+					throw new ValidationError("issue_new_comment_enabled must be true or false");
+				}
+				nextIssueNewCommentEnabled = normalized;
+			}
+
+			if ("issue_admin_link_in_comments_enabled" in body) {
+				const normalized = normalizeRepoBooleanOverride(body.issue_admin_link_in_comments_enabled);
+				if (
+					body.issue_admin_link_in_comments_enabled !== undefined &&
+					body.issue_admin_link_in_comments_enabled !== "" &&
+					body.issue_admin_link_in_comments_enabled !== null &&
+					normalized === null
+				) {
+					throw new ValidationError("issue_admin_link_in_comments_enabled must be true or false");
+				}
+				nextIssueAdminLinkInCommentsEnabled = normalized;
+			}
+
 			if (existing) {
 				await repositoryStore.upsert({
 					owner: existing.owner,
@@ -224,6 +296,8 @@ const registry = new AdminRouteRegistry()
 					githubEventMode: nextGithubEventMode,
 					defaultBranch: nextDefaultBranch,
 					workerTemplate: nextWorkerTemplate,
+					issueNewCommentEnabled: nextIssueNewCommentEnabled,
+					issueAdminLinkInCommentsEnabled: nextIssueAdminLinkInCommentsEnabled,
 				});
 			} else {
 				await repositoryStore.upsert({
@@ -232,9 +306,11 @@ const registry = new AdminRouteRegistry()
 					githubEventMode: nextGithubEventMode,
 					defaultBranch: nextDefaultBranch,
 					workerTemplate: nextWorkerTemplate,
+					issueNewCommentEnabled: nextIssueNewCommentEnabled,
+					issueAdminLinkInCommentsEnabled: nextIssueAdminLinkInCommentsEnabled,
 				});
 			}
-			return { status: 200, body: { updated: ["github_event_mode", "default_branch", "worker_template"], requiresRestart } };
+			return { status: 200, body: { updated: ["github_event_mode", "default_branch", "worker_template", "issue_new_comment_enabled", "issue_admin_link_in_comments_enabled"], requiresRestart } };
 		},
 	})
 	.route({

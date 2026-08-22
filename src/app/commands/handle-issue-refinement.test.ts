@@ -263,6 +263,50 @@ describe("HandleIssueRefinement", () => {
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(false);
 	});
 
+	it("suppresses the automatic comment when a per-repo override resolves to false", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as RefinementExecutionService,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			// Global default is true; the per-repo resolver overrides it to false.
+			resolveIssueNewCommentEnabled: (owner, repo) =>
+				owner === "mbrooks" && repo === "yolomatic" ? false : true,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		expect(github.postComment).not.toHaveBeenCalled();
+		expect(store.getInstructionComment("mbrooks", "yolomatic", 1)).toBeNull();
+	});
+
+	it("posts the automatic comment when a per-repo override resolves to true against a false global", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as RefinementExecutionService,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueNewCommentEnabled: false,
+			resolveIssueNewCommentEnabled: () => true,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		expect(github.postComment).toHaveBeenCalledWith("mbrooks", "yolomatic", 1, buildNewIssueComment("yolomatic-bot", undefined));
+	});
+
 	it("still runs the refinement command when issueNewCommentEnabled is false", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
@@ -357,6 +401,54 @@ describe("HandleIssueRefinement", () => {
 		const startingCall = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>).find((c) => c[3].startsWith(ISSUE_REFINEMENT_STARTING_COMMENT))!;
 		expect(startingCall[3]).toBe(ISSUE_REFINEMENT_STARTING_COMMENT);
 		expect(startingCall[3]).not.toContain("Track status:");
+	});
+
+	it("omits the admin link for a repo whose per-repo override is false even when the global toggle is true", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as RefinementExecutionService,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueAdminLinkInCommentsEnabled: true,
+			adminBaseUrl: "http://host:6767/yolomatic/admin",
+			resolveIssueAdminLinkInCommentsEnabled: (owner, repo) =>
+			owner === "mbrooks" && repo === "yolomatic" ? false : true,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		const posted = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3];
+		expect(posted).not.toContain("Track status:");
+	});
+
+	it("includes the admin link for a repo whose per-repo override is true even when the global toggle is false", async () => {
+		handler = new HandleIssueRefinement({
+			refinementStore: store,
+			sessions: sessions as never,
+			github: github as never,
+			tasks: tasks as never,
+			workspaces: workspaces as never,
+			executor: executor as unknown as RefinementExecutionService,
+			clock: { now: () => new Date("2026-08-01T00:00:00Z"), uptime: () => 0 },
+			adminGithubUsername: "admin",
+			githubUsername: "yolomatic-bot",
+			defaultBranch: "main",
+			isRepoManaged: () => true,
+			refinementEnabled: true,
+			issueAdminLinkInCommentsEnabled: false,
+			adminBaseUrl: "http://host:6767/yolomatic/admin",
+			resolveIssueAdminLinkInCommentsEnabled: (owner, repo) =>
+			owner === "mbrooks" && repo === "yolomatic" ? true : false,
+		});
+		await handler.postInstructions(createInstructionPayload() as never);
+		const posted = (github.postComment.mock.calls as unknown as Array<[string, string, number, string]>)[0][3];
+		expect(posted).toContain("Track status: http://host:6767/yolomatic/admin#/repos/mbrooks/yolomatic/issues/1");
 	});
 
 	it("does not post instructions twice for the same issue", async () => {

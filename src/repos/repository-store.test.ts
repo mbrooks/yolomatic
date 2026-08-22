@@ -146,6 +146,36 @@ describe("RepositoryStore", () => {
 		expect(found!.workerTemplate).toBe("python");
 	});
 
+	it("round-trips the comment-setting boolean overrides", async () => {
+		const repo = await store.upsert({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNewCommentEnabled: false,
+			issueAdminLinkInCommentsEnabled: true,
+		});
+		expect(repo.issueNewCommentEnabled).toBe(false);
+		expect(repo.issueAdminLinkInCommentsEnabled).toBe(true);
+
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.issueNewCommentEnabled).toBe(false);
+		expect(found!.issueAdminLinkInCommentsEnabled).toBe(true);
+	});
+
+	it("defaults the comment-setting overrides to null when not provided", async () => {
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic" });
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.issueNewCommentEnabled).toBeNull();
+		expect(found!.issueAdminLinkInCommentsEnabled).toBeNull();
+	});
+
+	it("clears a comment-setting override back to null on a subsequent upsert", async () => {
+		await store.upsert({
+			owner: "mbrooks", repo: "yolomatic", issueNewCommentEnabled: false });
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic", issueNewCommentEnabled: null });
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.issueNewCommentEnabled).toBeNull();
+	});
+
 	it("throws when upserting without owner or repo", async () => {
 		await expect(store.upsert({ owner: "", repo: "x" })).rejects.toThrow();
 		await expect(store.upsert({ owner: "x", repo: "" })).rejects.toThrow();

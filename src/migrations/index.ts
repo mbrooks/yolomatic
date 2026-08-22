@@ -378,6 +378,19 @@ export const MIGRATIONS: Migration[] = [
 			addColumn("cost", "REAL");
 		},
 	},
+	{
+		id: 18,
+		name: "add_repositories_comment_setting_overrides",
+		up(db) {
+			const columns = db.prepare("PRAGMA table_info(repositories)").all() as Array<{ name: string }>;
+			if (!columns.some((column) => column.name === "issue_new_comment_enabled")) {
+				db.exec("ALTER TABLE repositories ADD COLUMN issue_new_comment_enabled TEXT");
+			}
+			if (!columns.some((column) => column.name === "issue_admin_link_in_comments_enabled")) {
+				db.exec("ALTER TABLE repositories ADD COLUMN issue_admin_link_in_comments_enabled TEXT");
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

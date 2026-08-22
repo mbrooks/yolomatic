@@ -23,6 +23,8 @@ import {
 	resolveRepoDefaultBranch,
 	resolveRepoGitHubEventMode,
 	resolveRepoWorkerTemplate,
+	resolveRepoIssueNewCommentEnabled,
+	resolveRepoIssueAdminLinkInCommentsEnabled,
 	type RepoGitHubEventMode,
 	type Repository,
 } from "../repos/repository.js";
@@ -134,7 +136,8 @@ export interface RuntimeResolvers {
 	resolveGitHubEventMode: (owner: string, repo: string) => RepoGitHubEventMode;
 	resolveWorkerTemplate: (owner: string, repo: string) => string;
 	resolveAdminBaseUrl: () => string | undefined;
-	resolveIssueAdminLinkInCommentsEnabled: () => boolean;
+	resolveIssueNewCommentEnabled: (owner: string, repo: string) => boolean;
+	resolveIssueAdminLinkInCommentsEnabled: (owner: string, repo: string) => boolean;
 }
 
 export interface RuntimeBuildContext {
@@ -187,6 +190,7 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 		resolveGitHubEventMode,
 		resolveWorkerTemplate,
 		resolveAdminBaseUrl,
+		resolveIssueNewCommentEnabled,
 		resolveIssueAdminLinkInCommentsEnabled,
 	} = resolvers;
 
@@ -245,6 +249,7 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 		issueAdminLinkInCommentsEnabled: config.issueAdminLinkInCommentsEnabled,
 		adminBaseUrl: config.adminBaseUrl,
 		resolveAdminBaseUrl,
+		resolveIssueNewCommentEnabled,
 		resolveIssueAdminLinkInCommentsEnabled,
 		metrics: metricsStore,
 	});
@@ -354,13 +359,24 @@ export function buildRuntimeGraph(
 	// bootstrap-time config value. This lets operators toggle
 	// issue_admin_link_in_comments_enabled / admin_base_url in the admin UI
 	// and see the Track status footer update on subsequently posted comments
-	// without restarting the process.
+	// without restarting the process. The two comment settings are also
+	// overridable per managed repository, so the resolver reads the live
+	// RepositoryStore (rather than the startup snapshot) to pick up overrides
+	// applied through the admin UI without a restart.
 	const resolveAdminBaseUrl = () => {
 		const raw = settingsStore.get("admin_base_url")?.trim();
 		return raw || undefined;
 	};
-	const resolveIssueAdminLinkInCommentsEnabled = () =>
-		settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true);
+	const resolveIssueAdminLinkInCommentsEnabled = (owner: string, repo: string) =>
+		resolveRepoIssueAdminLinkInCommentsEnabled(
+			repositoryStore.getSync(owner, repo),
+			settingsStore.getBoolean("issue_admin_link_in_comments_enabled", true),
+		);
+	const resolveIssueNewCommentEnabled = (owner: string, repo: string) =>
+		resolveRepoIssueNewCommentEnabled(
+			repositoryStore.getSync(owner, repo),
+			settingsStore.getBoolean("issue_new_comment_enabled", true),
+		);
 
 	const services = factory({
 		config,
@@ -374,6 +390,7 @@ export function buildRuntimeGraph(
 			resolveGitHubEventMode,
 			resolveWorkerTemplate,
 			resolveAdminBaseUrl,
+			resolveIssueNewCommentEnabled,
 			resolveIssueAdminLinkInCommentsEnabled,
 		},
 		findManaged,

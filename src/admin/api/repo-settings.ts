@@ -1,7 +1,12 @@
 import { apiGet } from "./client.js";
 
 export interface RepoSettingView {
-	key: "github_event_mode" | "default_branch" | "worker_template";
+	key:
+		| "github_event_mode"
+		| "default_branch"
+		| "worker_template"
+		| "issue_new_comment_enabled"
+		| "issue_admin_link_in_comments_enabled";
 	value: string;
 	default: string;
 	override: string | null;
