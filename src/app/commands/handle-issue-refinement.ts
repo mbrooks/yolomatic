@@ -10,12 +10,20 @@ import { fingerprintBody } from "../../refinement/fingerprint.js";
 import { recordSessionLog, type SessionLogEntry } from "../../logging/session-log-store.js";
 import { issueSessionKey } from "./workflow-helpers.js";
 import { appendAdminLink, resolveAdminIssueUrl, resolveAdminSessionUrl } from "./comment-links.js";
-import { isAdmin, parseIssueRefinementCommand } from "../../domain/workflow/policy.js";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { statSync } from "node:fs";
+import { isAdmin } from "../../domain/workflow/policy.js";
+import {
+	evaluateRefinementRequest,
+	evaluateRefinementPreConflict,
+	evaluateRefinementSessionConflict,
+	evaluateRefinementRegistrationConflict,
+	type RefinementConflictDecision,
+} from "./refinement/admission.js";
+import { evaluateProposalApplicability } from "./refinement/proposal-policy.js";
+import { FilesystemSkillResolver, type RefinementSkillInfo, type RefinementSkillResolver } from "./refinement/skill-resolver.js";
+import { RefinementLifecycle } from "./refinement/lifecycle.js";
 import { sessionStorageKey } from "../../session/store.js";
 import type { MetricsRecorder } from "../../ports/metrics-recorder.js";
+import type { RefinementResult } from "../../executor/index.js";
 
 export interface IssueRefinementEventPayload {
 	source?: "webhook" | "polling";
@@ -78,6 +86,8 @@ export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: str
 
 export class HandleIssueRefinement {
 	private readonly inFlight = new Set<string>();
+	private readonly lifecycle: RefinementLifecycle;
+	private readonly skillResolver: RefinementSkillResolver;
 
 	constructor(
 		private readonly deps: {
@@ -103,8 +113,18 @@ export class HandleIssueRefinement {
 			resolveIssueAdminLinkInCommentsEnabled?: (owner: string, repo: string) => boolean | undefined;
 			/** Optional recorder for per-execution metrics (runtime + token usage). */
 			metrics?: MetricsRecorder;
+			/** Optional boundary for resolving the repository skill and commit. */
+			skillResolver?: RefinementSkillResolver;
 		},
-	) {}
+	) {
+		this.lifecycle = new RefinementLifecycle({
+			refinementStore: deps.refinementStore,
+			sessions: deps.sessions,
+			clock: deps.clock,
+			metrics: deps.metrics,
+		});
+		this.skillResolver = deps.skillResolver ?? new FilesystemSkillResolver();
+	}
 
 	isInFlight(owner: string, repo: string, issueNumber: number): boolean {
 		return this.inFlight.has(issueSessionKey(owner, repo, issueNumber));
@@ -187,92 +207,70 @@ export class HandleIssueRefinement {
 	async execute(payload: IssueRefinementEventPayload, steeringPrompt?: string): Promise<void> {
 		const { owner, repo, issueNumber, key } = this.resolveContext(payload);
 
-		if (payload.action !== "created") {
-			process.stdout.write(`[refinement] ignored: action is ${payload.action}\n`);
+		const request = evaluateRefinementRequest({
+			action: payload.action,
+			commentBody: payload.comment.body,
+			commentUserLogin: payload.comment.user.login,
+			commentUserType: payload.comment.user.type,
+			issuePullRequest: payload.issue.pull_request,
+			issueState: payload.issue.state,
+			isRepoManaged: this.deps.isRepoManaged ? this.deps.isRepoManaged(owner, repo) : true,
+			refinementEnabled: this.deps.refinementEnabled,
+			githubUsername: this.deps.githubUsername,
+			senderLogin: payload.sender.login,
+			owner,
+			repo,
+			issueNumber,
+		});
+
+		const steering = steeringPrompt ?? request.steeringPrompt;
+		const commandLogDetails = steering ? { steeringPrompt: steering } : undefined;
+
+		if (request.outcome === "ignore") {
+			if (request.commandStdout) process.stdout.write(`${request.commandStdout}\n`);
+			if (request.commandLog) {
+				this.log(owner, repo, issueNumber, request.commandLog.level, request.commandLog.message, commandLogDetails);
+			}
+			if (request.stdout) process.stdout.write(`${request.stdout}\n`);
 			return;
 		}
 
-		const parsed = parseIssueRefinementCommand(payload.comment.body);
-		if (!parsed.matched) {
-			return;
-		}
-		const steering = steeringPrompt ?? parsed.steeringPrompt;
-
-		process.stdout.write(`[refinement] command received for ${owner}/${repo}#${issueNumber}\n`);
+		process.stdout.write(`${request.commandStdout}\n`);
 		this.log(
 			owner,
 			repo,
 			issueNumber,
-			"info",
-			`Refinement command received from @${payload.sender.login}`,
-			steering ? { steeringPrompt: steering } : undefined,
+			request.commandLog!.level,
+			request.commandLog!.message,
+			commandLogDetails,
 		);
-
-		if (payload.comment.user.login === this.deps.githubUsername) {
-			process.stdout.write(`[refinement] ignored: comment from ${this.deps.githubUsername}\n`);
-			return;
-		}
-
-		if (payload.comment.user.type === "Bot") {
-			process.stdout.write(`[refinement] ignored: bot comment\n`);
-			return;
-		}
-
-		if (payload.issue.pull_request) {
-			process.stdout.write(`[refinement] ignored: comment is on a pull request\n`);
-			return;
-		}
-
-		if (payload.issue.state === "closed") {
-			process.stdout.write(`[refinement] ignored: issue is closed\n`);
-			return;
-		}
-
-		if (this.deps.isRepoManaged && !this.deps.isRepoManaged(owner, repo)) {
-			process.stdout.write(`[refinement] ignored: repository not managed\n`);
-			return;
-		}
-
-		if (this.deps.refinementEnabled === false) {
-			process.stdout.write(`[refinement] ignored: refinement disabled\n`);
-			return;
-		}
 
 		const authorized =
 			isAdmin(payload.sender.login, this.deps.adminGithubUsername) ||
 			(await this.deps.github.isCollaborator(owner, repo, payload.sender.login));
-		if (!authorized) {
-			process.stdout.write(`[refinement] ignored: ${payload.sender.login} is not a repository collaborator\n`);
-			this.log(owner, repo, issueNumber, "warn", `Refinement rejected: @${payload.sender.login} is not a repository collaborator`);
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Only repository collaborators can run issue refinement."));
-			return;
-		}
 
-		if (this.inFlight.has(key)) {
-			process.stdout.write(`[refinement] ignored: ${key} is already being refined\n`);
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement is already running for this issue."));
-			return;
-		}
-
-		if (this.deps.tasks.isActive(key)) {
-			process.stdout.write(`[refinement] ignored: ${key} has an active implementation task\n`);
-			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: an implementation task is active");
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently working on this issue. Refinement cannot overlap with implementation."));
+		const preConflict = evaluateRefinementPreConflict({
+			authorized,
+			alreadyInFlight: this.inFlight.has(key),
+			taskActive: this.deps.tasks.isActive(key),
+			senderLogin: payload.sender.login,
+			key,
+		});
+		if (preConflict.outcome === "reject") {
+			this.emitConflict(owner, repo, issueNumber, preConflict);
 			return;
 		}
 
 		const activeImplementation = await this.deps.sessions.get(owner, repo, issueNumber, "implementation");
 		const activeRefinement = await this.deps.sessions.get(owner, repo, issueNumber, "refinement");
 		const activeSession = [activeImplementation, activeRefinement].find((session) => session?.status === "working");
-		if (activeSession) {
-			process.stdout.write(`[refinement] ignored: ${key} has an active ${activeSession.kind ?? "implementation"} session\n`);
-			this.log(owner, repo, issueNumber, "warn", `Refinement skipped: an active ${activeSession.kind ?? "implementation"} session exists`);
-			await this.deps.github.postComment(
-				owner,
-				repo,
-				issueNumber,
-				this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently working on this issue. Refinement cannot overlap with implementation."),
-			);
+
+		const sessionConflict = evaluateRefinementSessionConflict({
+			activeSessionKind: activeSession?.kind,
+			key,
+		});
+		if (sessionConflict.outcome === "reject") {
+			this.emitConflict(owner, repo, issueNumber, sessionConflict);
 			return;
 		}
 
@@ -284,16 +282,15 @@ export class HandleIssueRefinement {
 		);
 		if (registration === null) {
 			this.inFlight.delete(key);
-			process.stdout.write(`[refinement] ignored: ${key} task key is already claimed\n`);
-			this.log(owner, repo, issueNumber, "warn", "Refinement skipped: task key is already claimed");
-			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Yolomatic is currently active on this issue. Refinement cannot overlap with implementation."));
+			const regConflict = evaluateRefinementRegistrationConflict({ taskRegistered: false, key });
+			this.emitConflict(owner, repo, issueNumber, regConflict);
 			return;
 		}
 
 		let attemptId: string | undefined;
 		let worktreePath: string | undefined;
 		let sessionStarted = false;
-		let refinementResult: import("../../executor/index.js").RefinementResult | undefined;
+		let refinementResult: RefinementResult | undefined;
 		let metricStatus: string = "failed";
 		let taskStartedAtMs = 0;
 
@@ -342,7 +339,7 @@ export class HandleIssueRefinement {
 			const issue = await this.deps.github.getIssue(owner, repo, issueNumber);
 			if (!issue || issue.state === "closed") {
 				process.stdout.write(`[refinement] ignored: issue is no longer open\n`);
-				await this.failSession(owner, repo, issueNumber, "issue is no longer open");
+				await this.lifecycle.failSession(owner, repo, issueNumber, "issue is no longer open");
 				return;
 			}
 
@@ -366,11 +363,8 @@ export class HandleIssueRefinement {
 			worktreePath = await this.deps.workspaces.createRefinementWorktree!(owner, repo, issueNumber);
 			this.log(owner, repo, issueNumber, "info", "Prepared refinement worktree", { worktreePath });
 
-			const skillInfo = await this.resolveSkill(owner, repo, worktreePath);
-			this.deps.refinementStore.updateAttempt(attemptId, {
-				instructionSource: skillInfo.source,
-				repoCommit: skillInfo.commit,
-			});
+			const skillInfo: RefinementSkillInfo = await this.skillResolver.resolveSkill(worktreePath);
+			this.lifecycle.setAttemptSource(attemptId, skillInfo);
 			this.log(
 				owner,
 				repo,
@@ -385,78 +379,44 @@ export class HandleIssueRefinement {
 			}, "refinement");
 			const result = await this.deps.executor.executeRefinement(state, skillInfo.content, steering);
 			refinementResult = result;
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "working", { summary: result.summary }, "refinement");
+			await this.lifecycle.setSessionSummary(owner, repo, issueNumber, result.summary);
 
-			this.deps.refinementStore.updateAttempt(attemptId, {
-				proposedTaskBody: result.proposedTaskBody,
-				proposedTitle: result.proposedTitle,
-				summary: result.summary,
-				investigation: result.investigation,
-			});
+			this.lifecycle.recordAttemptResult(attemptId, result);
 			this.log(owner, repo, issueNumber, "info", "Refinement worker returned a proposed task", {
 				summary: result.summary,
 				bodyLength: result.proposedTaskBody.length,
 			});
 
 			const currentIssue = await this.deps.github.getIssue(owner, repo, issueNumber);
-			if (!currentIssue || currentIssue.state === "closed") {
-				const reason = "issue closed during refinement";
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
-				await this.failSession(owner, repo, issueNumber, reason);
-				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue closed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue changed during refinement. Please run `/yolomatic issue-refinement` again."));
-				return;
-			}
-			const currentFingerprint = fingerprintBody(currentIssue.body ?? "");
-			if (currentFingerprint !== fingerprint) {
-				const reason = "issue body changed during refinement";
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
-				await this.failSession(owner, repo, issueNumber, reason);
-				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue body changed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue body changed during refinement. Please run `/yolomatic issue-refinement` again."));
-				return;
-			}
-			if (currentIssue.title !== undefined && currentIssue.title !== title) {
-				const reason = "issue title changed during refinement";
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "stale", failureReason: reason });
-				await this.failSession(owner, repo, issueNumber, reason);
-				this.log(owner, repo, issueNumber, "warn", "Refinement marked stale: issue title changed during refinement");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "The issue title changed during refinement. Please run `/yolomatic issue-refinement` again."));
-				return;
-			}
+			const proposal = evaluateProposalApplicability({
+				currentIssue,
+				originalTitle: title,
+				originalBodyFingerprint: fingerprint,
+				proposedTaskBody: result.proposedTaskBody,
+				proposedTitle: result.proposedTitle,
+			});
 
-			if (result.proposedTaskBody.length > 65535) {
-				const reason = "proposed task body exceeds GitHub size limit";
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: reason });
-				await this.failSession(owner, repo, issueNumber, reason);
-				this.log(owner, repo, issueNumber, "warn", "Refinement failed: proposed task body exceeds GitHub size limit");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement produced a body that is too large for GitHub. Please run the command again with a narrower request."));
-				return;
-			}
-
-			const proposedTitle = result.proposedTitle?.trim() ?? "";
-			const applyTitle = proposedTitle.length > 0 && proposedTitle !== title;
-			if (applyTitle && proposedTitle.length > 256) {
-				const reason = "proposed title exceeds GitHub size limit";
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: reason });
-				await this.failSession(owner, repo, issueNumber, reason);
-				this.log(owner, repo, issueNumber, "warn", "Refinement failed: proposed title exceeds GitHub size limit");
-				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, "Refinement produced a title that is too long for GitHub. Please run the command again with a narrower request."));
+			if (proposal.outcome === "stale" || proposal.outcome === "failed") {
+				if (proposal.outcome === "stale") {
+					this.lifecycle.markAttemptStale(attemptId, proposal.reason);
+				} else {
+					this.lifecycle.markAttemptFailed(attemptId, proposal.reason);
+				}
+				await this.lifecycle.failSession(owner, repo, issueNumber, proposal.reason);
+				this.log(owner, repo, issueNumber, "warn", proposal.logMessage);
+				await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, proposal.comment));
 				return;
 			}
 
 			await this.deps.github.updateIssueBody(owner, repo, issueNumber, result.proposedTaskBody);
-			if (applyTitle) {
-				await this.deps.github.updateIssueTitle(owner, repo, issueNumber, proposedTitle);
+			if (proposal.applyTitle) {
+				await this.deps.github.updateIssueTitle(owner, repo, issueNumber, proposal.proposedTitle);
 			}
-			this.deps.refinementStore.updateAttempt(attemptId, { state: "applied" });
-			await this.deps.sessions.updateStatus(owner, repo, issueNumber, "complete", {
-				summary: result.summary,
-				taskFinishedAt: this.deps.clock.now().toISOString(),
-			}, "refinement");
+			this.lifecycle.markAttemptApplied(attemptId);
+			await this.lifecycle.completeSession(owner, repo, issueNumber, result.summary);
 			metricStatus = "complete";
 			this.log(owner, repo, issueNumber, "info", "Applied refined issue body");
-			const completionBody = applyTitle
+			const completionBody = proposal.applyTitle
 				? `Issue refined at the request of @${payload.sender.login}. The issue title and body now contain the Proposed Task. No implementation session was started.`
 				: `Issue refined at the request of @${payload.sender.login}. The issue body now contains the Proposed Task. No implementation session was started.`;
 			await this.deps.github.postComment(
@@ -469,18 +429,24 @@ export class HandleIssueRefinement {
 			const message = error instanceof Error ? error.message : String(error);
 			process.stdout.write(`[refinement] failed for ${key}: ${message}\n`);
 			if (attemptId) {
-				this.deps.refinementStore.updateAttempt(attemptId, { state: "failed", failureReason: message });
+				this.lifecycle.markAttemptFailed(attemptId, message);
 			}
 			if (sessionStarted) {
-				await this.failSession(owner, repo, issueNumber, message);
+				await this.lifecycle.failSession(owner, repo, issueNumber, message);
 			}
 			this.log(owner, repo, issueNumber, "error", `Refinement failed: ${message}`);
 			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, `Refinement failed: ${message}`));
 		} finally {
 			if (sessionStarted) {
-				this.recordRefinementMetric(owner, repo, issueNumber, taskStartedAtMs, metricStatus, refinementResult);
-				this.recordAttemptUsage(attemptId, taskStartedAtMs, refinementResult);
-				await this.ensureTerminalSession(owner, repo, issueNumber);
+				await this.lifecycle.cleanup({
+					owner,
+					repo,
+					issueNumber,
+					attemptId,
+					taskStartedAtMs,
+					metricStatus,
+					result: refinementResult,
+				});
 			}
 			this.deps.tasks.unregister(key, registration);
 			this.inFlight.delete(key);
@@ -489,86 +455,6 @@ export class HandleIssueRefinement {
 				this.log(owner, repo, issueNumber, "info", "Removed refinement worktree");
 			}
 			this.log(owner, repo, issueNumber, "info", "Refinement finished");
-		}
-	}
-
-	/**
-	 * Record a per-refinement metric when a recorder is configured. Called from
-	 * the `finally` so runtime is captured for both successful and failed
-	 * refinements. Token usage comes from the refinement result when the
-	 * worker returned one; otherwise usage is recorded as unavailable.
-	 */
-	private recordRefinementMetric(
-		owner: string,
-		repo: string,
-		issueNumber: number,
-		taskStartedAtMs: number,
-		status: string,
-		result: { usage?: import("../../executor/usage.js").TokenUsage } | undefined,
-	): void {
-		const recorder = this.deps.metrics;
-		if (!recorder) return;
-		const durationMs = this.deps.clock.now().getTime() - taskStartedAtMs;
-		const usage = result?.usage ?? {
-			available: false,
-			input: 0,
-			output: 0,
-			cacheRead: 0,
-			cacheWrite: 0,
-			totalTokens: 0,
-			cost: 0,
-		};
-		try {
-			recorder.record({
-				sessionKey: sessionStorageKey(owner, repo, issueNumber, "refinement"),
-				owner,
-				repo,
-				issueNumber,
-				kind: "refinement",
-				status,
-				startedAt: new Date(taskStartedAtMs).toISOString(),
-				finishedAt: new Date(taskStartedAtMs + durationMs).toISOString(),
-				durationMs,
-				tokenUsage: usage,
-			});
-		} catch (error) {
-			process.stdout.write(
-				`[refinement] metrics record failed for ${owner}/${repo}#${issueNumber}: ${error instanceof Error ? error.message : String(error)}\n`,
-			);
-		}
-	}
-
-	/**
-	 * Persist the refinement runtime and token usage on the durable refinement
-	 * attempt so the per-issue refinement history can report them. Called from
-	 * the `finally` for any attempt that was created, regardless of outcome.
-	 * Token usage comes from the refinement result when the worker returned one;
-	 * otherwise it is recorded as unavailable. Best-effort: a failure here must
-	 * not regress the refinement outcome.
-	 */
-	private recordAttemptUsage(
-		attemptId: string | undefined,
-		taskStartedAtMs: number,
-		result: { usage?: import("../../executor/usage.js").TokenUsage } | undefined,
-	): void {
-		if (!attemptId) return;
-		const durationMs = this.deps.clock.now().getTime() - taskStartedAtMs;
-		const usage = result?.usage;
-		const tokenUsage: import("../../refinement/store.js").RefinementTokenUsage = usage
-			? {
-					available: usage.available,
-					input: usage.input,
-					output: usage.output,
-					totalTokens: usage.totalTokens,
-					cost: usage.cost,
-				}
-			: { available: false, input: 0, output: 0, totalTokens: 0, cost: 0 };
-		try {
-			this.deps.refinementStore.updateAttempt(attemptId, { runtimeMs: durationMs, tokenUsage });
-		} catch (error) {
-			process.stdout.write(
-				`[refinement] attempt usage record failed for ${attemptId}: ${error instanceof Error ? error.message : String(error)}\n`,
-			);
 		}
 	}
 
@@ -612,6 +498,15 @@ export class HandleIssueRefinement {
 		return appendAdminLink(body, this.adminIssueUrl(owner, repo, issueNumber));
 	}
 
+	private async emitConflict(owner: string, repo: string, issueNumber: number, decision: RefinementConflictDecision): Promise<void> {
+		if (decision.outcome !== "reject") return;
+		if (decision.stdout) process.stdout.write(`${decision.stdout}\n`);
+		if (decision.log) this.log(owner, repo, issueNumber, decision.log.level, decision.log.message);
+		if (decision.comment) {
+			await this.deps.github.postComment(owner, repo, issueNumber, this.withAdminLink(owner, repo, issueNumber, decision.comment));
+		}
+	}
+
 	private isEligibleForInstructions(payload: IssueRefinementInstructionPayload): boolean {
 		const { owner, repo, issueNumber } = this.resolveContext(payload);
 		const issue = payload.issue;
@@ -648,53 +543,5 @@ export class HandleIssueRefinement {
 		}
 
 		return true;
-	}
-
-	private async resolveSkill(owner: string, repo: string, worktreePath: string): Promise<{
-		source: "repository-skill" | "prompt-defaults";
-		content?: string;
-		commit?: string;
-	}> {
-		const skillPath = path.join(worktreePath, ".pi/skills/issue-refinement/SKILL.md");
-		try {
-			statSync(skillPath);
-			const content = readFileSync(skillPath, "utf-8");
-			const commit = await this.getCommit(worktreePath);
-			return { source: "repository-skill", content, commit };
-		} catch {
-			return { source: "prompt-defaults", commit: await this.getCommit(worktreePath) };
-		}
-	}
-
-	private async getCommit(worktreePath: string): Promise<string | undefined> {
-		const { execFile } = await import("node:child_process");
-		const { promisify } = await import("node:util");
-		const execFileAsync = promisify(execFile);
-		try {
-			const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: worktreePath });
-			return stdout.trim();
-		} catch {
-			return undefined;
-		}
-	}
-
-	private async failSession(
-		owner: string,
-		repo: string,
-		issueNumber: number,
-		reason: string,
-	): Promise<void> {
-		await this.deps.sessions.updateStatus(owner, repo, issueNumber, "failed", {
-			summary: reason,
-			staleReason: reason,
-			taskFinishedAt: this.deps.clock.now().toISOString(),
-		}, "refinement");
-	}
-
-	private async ensureTerminalSession(owner: string, repo: string, issueNumber: number): Promise<void> {
-		const session = await this.deps.sessions.get(owner, repo, issueNumber, "refinement");
-		if (session?.kind === "refinement" && session.status === "working") {
-			await this.failSession(owner, repo, issueNumber, "refinement ended without a terminal outcome");
-		}
 	}
 }
