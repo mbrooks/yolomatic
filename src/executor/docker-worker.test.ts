@@ -292,6 +292,42 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("reports a worker exit when Docker provides only a signal", async () => {
+		const harness = await createHarness(479);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		spawnMock.mockImplementation(() => {
+			const child = makeChildProcess();
+			queueMicrotask(() => child.emit("exit", null, "SIGTERM"));
+			return child;
+		});
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(479, harness.workspacePath))).rejects.toThrow(
+				"Worker container exited before completion (code=null, signal=SIGTERM).",
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("normalizes a non-Error Docker spawn rejection", async () => {
+		const harness = await createHarness(478);
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
+		spawnMock.mockImplementation(() => {
+			const child = makeChildProcess();
+			queueMicrotask(() => child.emit("error", "docker unavailable"));
+			return child;
+		});
+
+		try {
+			await expect(harness.executor.execute(makeSessionState(478, harness.workspacePath))).rejects.toThrow(
+				"docker unavailable",
+			);
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("logs an info-level build notice before the first image build", async () => {
 		const harness = await createHarness(480);
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
@@ -1380,6 +1416,197 @@ describe("DockerWorkerExecutor", () => {
 			await harness.executor.execute(makeSessionState(701, harness.workspacePath));
 			expect(execFileMock.mock.calls.filter((call) => call[1][0] === "build")).toHaveLength(0);
 		} finally {
+			await harness.close();
+		}
+	});
+
+	it("rebuilds a cached worker template when Docker no longer has its image", async () => {
+		const harness = await createHarness(703, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const images = new Set<string>();
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "image" && args[1] === "inspect") {
+				if (images.has(args[2])) callback(null, "[]", "");
+				else callback(new Error(`No such image: ${args[2]}`), "", "");
+				return;
+			}
+			if (args[0] === "build") {
+				images.add(args[args.indexOf("-t") + 1]);
+			}
+			callback(null, "", "");
+		});
+
+		try {
+			const template = (harness.executor as any).resolveTemplate();
+			await harness.executor.prebuildWorkerImage();
+			images.delete("yolomatic-worker-node:latest");
+
+			await (harness.executor as any).ensureWorkerImage(template, "test-session");
+
+			const builtImages = execFileMock.mock.calls
+				.filter((call) => call[1][0] === "build")
+				.map((call) => call[1][call[1].indexOf("-t") + 1]);
+			expect(builtImages).toEqual([
+				"yolomatic-worker-base:latest",
+				"yolomatic-worker-node:latest",
+				"yolomatic-worker-node:latest",
+			]);
+			expect(images.has("yolomatic-worker-node:latest")).toBe(true);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("rebuilds pruned base and template images once for concurrent recovery requests", async () => {
+		const harness = await createHarness(704, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const images = new Set<string>();
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			queueMicrotask(() => {
+				if (args[0] === "image" && args[1] === "inspect") {
+					if (images.has(args[2])) callback(null, "[]", "");
+					else callback(new Error(`No such image: ${args[2]}`), "", "");
+					return;
+				}
+				if (args[0] === "build") {
+					images.add(args[args.indexOf("-t") + 1]);
+				}
+				callback(null, "", "");
+			});
+		});
+
+		try {
+			const template = (harness.executor as any).resolveTemplate();
+			await harness.executor.prebuildWorkerImage();
+			images.clear();
+
+			await Promise.all([
+				(harness.executor as any).ensureWorkerImage(template, "test-session-1"),
+				(harness.executor as any).ensureWorkerImage(template, "test-session-2"),
+			]);
+			images.delete("yolomatic-worker-base:latest");
+			await Promise.all([
+				(harness.executor as any).ensureWorkerBaseImage(),
+				(harness.executor as any).ensureWorkerBaseImage(),
+			]);
+
+			const builtImages = execFileMock.mock.calls
+				.filter((call) => call[1][0] === "build")
+				.map((call) => call[1][call[1].indexOf("-t") + 1]);
+			expect(builtImages).toEqual([
+				"yolomatic-worker-base:latest",
+				"yolomatic-worker-node:latest",
+				"yolomatic-worker-base:latest",
+				"yolomatic-worker-node:latest",
+				"yolomatic-worker-base:latest",
+			]);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("stops worker image revalidation after three concurrent cache replacements", async () => {
+		const harness = await createHarness(707, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const executor = harness.executor as any;
+		const template = executor.resolveTemplate();
+		let inspections = 0;
+		executor.imageReady.set(template.id, Promise.resolve());
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "image" && args[1] === "inspect") {
+				inspections += 1;
+				if (inspections <= 3) {
+					// Simulate another concurrent request replacing the cached promise
+					// before this request can invalidate the stale entry.
+					executor.imageReady.set(template.id, Promise.resolve());
+					callback(new Error(`No such image: ${args[2]}`), "", "");
+					return;
+				}
+				callback(null, "[]", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+
+		try {
+			await expect(executor.ensureWorkerImage(template, "test-session")).rejects.toThrow(
+				"Worker image yolomatic-worker-node:latest remained unavailable after 3 cache revalidation attempts.",
+			);
+			expect(inspections).toBe(3);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("stops base image revalidation after three concurrent cache replacements", async () => {
+		const harness = await createHarness(708, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const executor = harness.executor as any;
+		let inspections = 0;
+		executor.baseImageReady = Promise.resolve();
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "image" && args[1] === "inspect") {
+				inspections += 1;
+				if (inspections <= 3) {
+					executor.baseImageReady = Promise.resolve();
+					callback(new Error(`No such image: ${args[2]}`), "", "");
+					return;
+				}
+				callback(null, "[]", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+
+		try {
+			await expect(executor.ensureWorkerBaseImage()).rejects.toThrow(
+				"Worker base image yolomatic-worker-base:latest remained unavailable after 3 cache revalidation attempts.",
+			);
+			expect(inspections).toBe(3);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("falls back to the default template when no configured or legacy image resolves", async () => {
+		const harness = await createHarness(705, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "missing",
+		});
+
+		try {
+			expect((harness.executor as any).resolveTemplate()).toMatchObject({
+				id: "node",
+				image: "yolomatic-worker-node:latest",
+			});
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("reports a non-Error prebuild rejection and clears the cached build", async () => {
+		const harness = await createHarness(706);
+		execFileMock.mockImplementationOnce((_cmd, _args, _options, callback) =>
+			callback("prebuild rejected" as unknown as Error, "", ""),
+		);
+		const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+		try {
+			await expect(harness.executor.prebuildWorkerImage()).resolves.toBeUndefined();
+			expect(stdoutSpy).toHaveBeenCalledWith(
+				"[startup] worker image prebuild failed: prebuild rejected\n",
+			);
+			expect((harness.executor as any).imageReady.size).toBe(0);
+		} finally {
+			stdoutSpy.mockRestore();
 			await harness.close();
 		}
 	});

@@ -41,6 +41,7 @@ const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.yolomatic.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 const MAX_WORKER_LAUNCH_RETRIES = 3;
+const MAX_IMAGE_REVALIDATIONS = 3;
 const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
 /** Matches userinfo credentials embedded in a URL (e.g. https://user:token@host). */
 const CREDENTIAL_URL_PATTERN = /^[a-z]+:\/\/[^/]*@/i;
@@ -849,8 +850,21 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private async ensureWorkerImage(workerTemplate: WorkerTemplate, sessionKey: string): Promise<void> {
-		let ready = this.imageReady.get(workerTemplate.id);
-		if (!ready) {
+		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
+			const cached = this.imageReady.get(workerTemplate.id);
+			if (cached) {
+				await cached;
+				if (await this.dockerImageExists(workerTemplate.image)) return;
+
+				// A host-side cleanup may remove an image while this process still
+				// holds its completed build promise. Only invalidate the promise we
+				// inspected so concurrent recovery requests share one replacement.
+				if (this.imageReady.get(workerTemplate.id) === cached) {
+					this.imageReady.delete(workerTemplate.id);
+				}
+				continue;
+			}
+
 			// Rebuild once per control-plane process so deployments cannot reuse a
 			// worker image built from older source. Docker caches unchanged layers.
 			recordSessionLog(sessionKey, {
@@ -858,7 +872,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 				message: "Building worker container image; this may take a couple of minutes.",
 				details: { type: "worker_image_build", image: workerTemplate.image, template: workerTemplate.id },
 			});
-			ready = workerTemplate.id === "legacy"
+			const ready = workerTemplate.id === "legacy"
 				? execFileAsync(
 					"docker",
 					["build", "--target", "worker", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", workerTemplate.image, this.options.projectRoot],
@@ -872,20 +886,50 @@ export class DockerWorkerExecutor implements ExecutionService {
 					).then(() => undefined),
 				);
 			this.imageReady.set(workerTemplate.id, ready);
+			await ready;
+			return;
 		}
 
-		await ready;
+		throw new Error(
+			`Worker image ${workerTemplate.image} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
+		);
 	}
 
 	private async ensureWorkerBaseImage(): Promise<void> {
-		if (!this.baseImageReady) {
-			this.baseImageReady = execFileAsync(
+		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
+			const cached = this.baseImageReady;
+			if (cached) {
+				await cached;
+				if (await this.dockerImageExists(BASE_WORKER_IMAGE)) return;
+
+				if (this.baseImageReady === cached) {
+					this.baseImageReady = undefined;
+				}
+				continue;
+			}
+
+			const ready = execFileAsync(
 				"docker",
 				["build", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", BASE_WORKER_IMAGE, "-f", path.join(this.options.projectRoot, BASE_WORKER_DOCKERFILE), this.options.projectRoot],
 				{ cwd: this.options.projectRoot },
 			).then(() => undefined);
+			this.baseImageReady = ready;
+			await ready;
+			return;
 		}
-		await this.baseImageReady;
+
+		throw new Error(
+			`Worker base image ${BASE_WORKER_IMAGE} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
+		);
+	}
+
+	private async dockerImageExists(image: string): Promise<boolean> {
+		try {
+			await execFileAsync("docker", ["image", "inspect", image], { cwd: this.options.projectRoot });
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	private buildContainerName(state: SessionState, kind?: string): string {
