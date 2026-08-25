@@ -1509,6 +1509,73 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("stops worker image revalidation after three concurrent cache replacements", async () => {
+		const harness = await createHarness(707, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const executor = harness.executor as any;
+		const template = executor.resolveTemplate();
+		let inspections = 0;
+		executor.imageReady.set(template.id, Promise.resolve());
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "image" && args[1] === "inspect") {
+				inspections += 1;
+				if (inspections <= 3) {
+					// Simulate another concurrent request replacing the cached promise
+					// before this request can invalidate the stale entry.
+					executor.imageReady.set(template.id, Promise.resolve());
+					callback(new Error(`No such image: ${args[2]}`), "", "");
+					return;
+				}
+				callback(null, "[]", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+
+		try {
+			await expect(executor.ensureWorkerImage(template, "test-session")).rejects.toThrow(
+				"Worker image yolomatic-worker-node:latest remained unavailable after 3 cache revalidation attempts.",
+			);
+			expect(inspections).toBe(3);
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("stops base image revalidation after three concurrent cache replacements", async () => {
+		const harness = await createHarness(708, {
+			workerImage: undefined,
+			defaultWorkerTemplate: "node",
+		});
+		const executor = harness.executor as any;
+		let inspections = 0;
+		executor.baseImageReady = Promise.resolve();
+		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
+			if (args[0] === "image" && args[1] === "inspect") {
+				inspections += 1;
+				if (inspections <= 3) {
+					executor.baseImageReady = Promise.resolve();
+					callback(new Error(`No such image: ${args[2]}`), "", "");
+					return;
+				}
+				callback(null, "[]", "");
+				return;
+			}
+			callback(null, "", "");
+		});
+
+		try {
+			await expect(executor.ensureWorkerBaseImage()).rejects.toThrow(
+				"Worker base image yolomatic-worker-base:latest remained unavailable after 3 cache revalidation attempts.",
+			);
+			expect(inspections).toBe(3);
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("falls back to the default template when no configured or legacy image resolves", async () => {
 		const harness = await createHarness(705, {
 			workerImage: undefined,

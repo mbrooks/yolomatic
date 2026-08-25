@@ -41,6 +41,7 @@ const execFileAsync = promisify(execFile);
 const WORKER_IMAGE_TRANSPORT_LABEL = "io.yolomatic.worker.transport";
 const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
 const MAX_WORKER_LAUNCH_RETRIES = 3;
+const MAX_IMAGE_REVALIDATIONS = 3;
 const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
 /** Matches userinfo credentials embedded in a URL (e.g. https://user:token@host). */
 const CREDENTIAL_URL_PATTERN = /^[a-z]+:\/\/[^/]*@/i;
@@ -849,7 +850,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 	}
 
 	private async ensureWorkerImage(workerTemplate: WorkerTemplate, sessionKey: string): Promise<void> {
-		for (;;) {
+		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
 			const cached = this.imageReady.get(workerTemplate.id);
 			if (cached) {
 				await cached;
@@ -888,10 +889,14 @@ export class DockerWorkerExecutor implements ExecutionService {
 			await ready;
 			return;
 		}
+
+		throw new Error(
+			`Worker image ${workerTemplate.image} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
+		);
 	}
 
 	private async ensureWorkerBaseImage(): Promise<void> {
-		for (;;) {
+		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
 			const cached = this.baseImageReady;
 			if (cached) {
 				await cached;
@@ -912,6 +917,10 @@ export class DockerWorkerExecutor implements ExecutionService {
 			await ready;
 			return;
 		}
+
+		throw new Error(
+			`Worker base image ${BASE_WORKER_IMAGE} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
+		);
 	}
 
 	private async dockerImageExists(image: string): Promise<boolean> {
