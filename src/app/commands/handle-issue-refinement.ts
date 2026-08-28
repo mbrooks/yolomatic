@@ -76,6 +76,8 @@ export function buildNewIssueComment(githubUsername: string, adminIssueUrl?: str
 	const body = [
 		"Yolomatic is available to work on this issue.",
 		"",
+		"Learn more: https://github.com/mbrooks/yolomatic",
+		"",
 		"- Assign the issue to `" + githubUsername + "` to start an implementation session and open a pull request.",
 		"- `/yolomatic feedback` — once a session is active, steer it by posting a comment with this command (or by @-mentioning `" + githubUsername + "`). Prior non-trigger comments on the issue are gathered as background context for the next feedback pass.",
 		"- `/yolomatic issue-refinement` — have an authorized maintainer ask Yolomatic to refine the issue body into a Proposed Task (no implementation or PR). Trailing text after the command is treated as a steering prompt that shapes the refinement pass.",
