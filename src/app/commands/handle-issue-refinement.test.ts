@@ -1308,6 +1308,71 @@ describe("HandleIssueRefinement", () => {
 		);
 	});
 
+	it("reports in-flight as false before any run", () => {
+		expect(handler.isInFlight("mbrooks", "yolomatic", 1)).toBe(false);
+	});
+
+	it("persists issue labels on the refinement session", async () => {
+		github.getIssue.mockResolvedValue({ state: "open", body: "Body" });
+		executor.executeRefinement.mockResolvedValue({
+			proposedTaskBody: "Refined body",
+			summary: "Summary",
+			investigation: "Investigation",
+		});
+
+		await handler.execute(
+			createCommandPayload({ issue: { number: 1, state: "open", title: "Test", body: "Body", labels: [{ name: "bug" }, { name: "" }, { name: "refinement" }] } }) as never,
+		);
+
+		expect(sessions.createSession).toHaveBeenCalledWith(
+			"mbrooks",
+			"yolomatic",
+			1,
+			"Test",
+			"Body",
+			expect.anything(),
+			"refinement",
+			["bug", "refinement"],
+		);
+		expect(executor.executeRefinement).toHaveBeenCalled();
+	});
+
+	it("restart throws when no previous attempt exists", async () => {
+		await expect(handler.restart("mbrooks", "yolomatic", 1)).rejects.toThrow(/No refinement attempt exists/);
+	});
+
+	it("restart throws when the issue is not found", async () => {
+		store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 1,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "f",
+			instructionSource: "prompt-defaults",
+			state: "failed",
+		});
+		github.getIssue.mockResolvedValue(null);
+		await expect(handler.restart("mbrooks", "yolomatic", 1)).rejects.toThrow(/was not found/);
+	});
+
+	it("restart throws when the issue is closed", async () => {
+		store.createAttempt({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			issueNumber: 1,
+			requester: "admin",
+			originalTitle: "T",
+			originalBody: "B",
+			originalBodyFingerprint: "f",
+			instructionSource: "prompt-defaults",
+			state: "failed",
+		});
+		github.getIssue.mockResolvedValue({ state: "closed", title: "T", body: "B" });
+		await expect(handler.restart("mbrooks", "yolomatic", 1)).rejects.toThrow(/Cannot restart refinement for closed issue/);
+	});
+
 	function createGitHubMock() {
 		return {
 			postComment: vi.fn(async () => 1),
