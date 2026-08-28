@@ -1,5 +1,6 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { ModelLookup, ModelReference } from "./model-selection.js";
+import { fetchOllamaModels, resolveOllamaHost } from "../llm/fetch-models.js";
 
 /** Base URL for the OpenAI platform API (pay-as-you-go API key access). */
 export const OPENAI_PROVIDER_BASE_URL = "https://api.openai.com/v1";
@@ -32,6 +33,17 @@ interface RegisteredProviderModel {
  */
 export interface YolomaticModelRegistry extends ModelLookup<ModelReference> {
 	runtime: ModelRuntime;
+	/** Best-effort diagnostics about how provider models were discovered. */
+	diagnostics?: {
+		ollama?: {
+			/** The resolved Ollama host root used for /api/tags (no /v1 suffix). */
+			host: string;
+			/** Models discovered from Ollama's /api/tags endpoint (names include tags). */
+			taggedModels: string[];
+			/** Error message when /api/tags could not be queried. */
+			error?: string;
+		};
+	};
 }
 
 function resolveOllamaBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
@@ -121,38 +133,45 @@ export async function createYolomaticModelRegistry(options: ModelRegistryOptions
 	const runtime = await ModelRuntime.create({ refreshOnCreate: false });
 
 	const ollamaEnv = options.ollamaHost ? { OLLAMA_HOST: options.ollamaHost } : undefined;
+	const ollamaHostRoot = resolveOllamaHost(ollamaEnv ?? process.env);
+
+	const curatedOllamaModelIds = ["kimi-k2.7-code:cloud", "glm-5.2:cloud"] as const;
+	const fetchWithTimeout: typeof fetch = async (input, init) => {
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), 1500);
+		try {
+			return await globalThis.fetch(input, { ...init, signal: controller.signal });
+		} finally {
+			clearTimeout(timeout);
+		}
+	};
+
+	const tagsResult = await fetchOllamaModels(fetchWithTimeout, ollamaEnv ?? process.env);
+	const taggedModels = tagsResult.models;
+	const combinedOllamaModelIds = Array.from(
+		new Set([
+			...curatedOllamaModelIds,
+			...taggedModels,
+		]),
+	).sort((a, b) => a.localeCompare(b));
+
 	runtime.registerProvider("ollama", {
 		baseUrl: resolveOllamaBaseUrl(ollamaEnv),
 		api: "openai-completions",
 		apiKey: "ollama",
-		models: [
-			{
-				id: "kimi-k2.7-code:cloud",
-				name: "kimi-k2.7-code:cloud",
-				api: "openai-completions",
-				reasoning: true,
-				input: ["text", "image"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 1_048_576,
-				maxTokens: 16_384,
-				compat: {
-					supportsDeveloperRole: false,
-				},
+		models: combinedOllamaModelIds.map((id) => ({
+			id,
+			name: id,
+			api: "openai-completions",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 1_048_576,
+			maxTokens: 16_384,
+			compat: {
+				supportsDeveloperRole: false,
 			},
-			{
-				id: "glm-5.2:cloud",
-				name: "glm-5.2:cloud",
-				api: "openai-completions",
-				reasoning: true,
-				input: ["text", "image"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 1_048_576,
-				maxTokens: 16_384,
-				compat: {
-					supportsDeveloperRole: false,
-				},
-			},
-		],
+		})),
 	});
 
 	const openaiApiKey = options.openaiApiKey?.trim();
@@ -167,6 +186,13 @@ export async function createYolomaticModelRegistry(options: ModelRegistryOptions
 
 	return {
 		runtime,
+		diagnostics: {
+			ollama: {
+				host: ollamaHostRoot,
+				taggedModels,
+				error: tagsResult.error,
+			},
+		},
 		find(provider, modelId) {
 			const model = runtime.getModel(provider, modelId);
 			if (!model) return undefined;
