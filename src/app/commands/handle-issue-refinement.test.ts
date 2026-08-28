@@ -129,6 +129,10 @@ describe("HandleIssueRefinement", () => {
 		expect(logs.some((l) => l.message === "Posted issue-refinement instructions")).toBe(true);
 	});
 
+	it("includes a link to the Yolomatic GitHub repo in the new-issue comment", () => {
+		expect(buildNewIssueComment("yolomatic-bot", undefined)).toContain("https://github.com/mbrooks/yolomatic");
+	});
+
 	it("appends an admin status link to the new-issue comment when enabled", async () => {
 		handler = new HandleIssueRefinement({
 			refinementStore: store,
