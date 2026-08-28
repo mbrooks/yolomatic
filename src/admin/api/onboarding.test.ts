@@ -8,6 +8,7 @@ import {
 	initializeWorkspaces,
 	submitOnboarding,
 	fetchOnboardingOllamaSignInStatus,
+	pullOnboardingOllamaModel,
 	fetchOnboardingLlmModels,
 	isSecretField,
 } from "./onboarding.js";
@@ -208,6 +209,31 @@ describe("onboarding API", () => {
 				});
 			});
 			await expect(fetchOnboardingOllamaSignInStatus()).rejects.toThrow("HTTP 500");
+		});
+	});
+
+	describe("pullOnboardingOllamaModel", () => {
+		it("POSTs the model identifier to /api/onboarding/ollama/pull", async () => {
+			fetchSpy.mockImplementation(async () => mockOkResponse({ ok: true }));
+
+			const result = await pullOnboardingOllamaModel("llama3:8b");
+
+			expect(result).toEqual({ ok: true });
+			const calls = fetchSpy.mock.calls as [string, RequestInit | undefined][];
+			expect(calls[0][0]).toBe("/api/onboarding/ollama/pull");
+			expect(calls[0][1]?.method).toBe("POST");
+			expect(JSON.parse(String(calls[0][1]?.body))).toEqual({ model: "llama3:8b" });
+		});
+
+		it("returns a failed pull result from the API payload", async () => {
+			fetchSpy.mockImplementation(async () =>
+				mockOkResponse({ ok: false, error: "daemon unreachable" }),
+			);
+
+			const result = await pullOnboardingOllamaModel("nope");
+
+			expect(result.ok).toBe(false);
+			expect(result.error).toBe("daemon unreachable");
 		});
 	});
 

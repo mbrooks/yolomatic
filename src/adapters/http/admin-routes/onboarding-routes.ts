@@ -13,6 +13,7 @@ import {
 } from "../admin-router-shared.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../../../ollama/signin-status.js";
 import { fetchOpenAiModels, fetchOllamaModels } from "../../../llm/fetch-models.js";
+import { pullOllamaModel } from "../../../ollama/pull-model.js";
 import type { User } from "../../../users/store.js";
 import {
 	VALID_EVENT_MODES,
@@ -214,6 +215,21 @@ const registry = new AdminRouteRegistry()
 			}
 			sendJson(ctx.response, 400, { error: `Unsupported LLM provider: ${provider}` });
 			return;
+		},
+	})
+	.route<{ model?: string; name?: string }>({
+		method: "POST",
+		pattern: /^\/api\/onboarding\/ollama\/pull$/u,
+		auth: false,
+		parseBody: true,
+		handler: async (ctx) => {
+			const body = (ctx.body ?? {}) as { model?: string; name?: string };
+			const model = body.model?.trim() || body.name?.trim() || "";
+			if (!model) {
+				sendJson(ctx.response, 400, { error: "Missing required field: model" });
+				return;
+			}
+			return { status: 200, body: await pullOllamaModel(model) };
 		},
 	})
 	.route({

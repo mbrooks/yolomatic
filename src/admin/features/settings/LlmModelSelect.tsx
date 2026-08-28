@@ -8,11 +8,15 @@ export type LlmModelFetcher = (
 	apiKey?: string,
 ) => Promise<LlmModelListResult>;
 
+export type LlmModelPullResult = { ok: boolean; error?: string };
+export type LlmModelPuller = (model: string) => Promise<LlmModelPullResult>;
+
 interface LlmModelSelectProps {
 	provider: string;
 	value: string;
 	onChange: (value: string) => void;
 	fetcher: LlmModelFetcher;
+	puller?: LlmModelPuller;
 	apiKey?: string;
 	label?: string;
 	id?: string;
@@ -32,6 +36,7 @@ export function LlmModelSelect({
 	value,
 	onChange,
 	fetcher,
+	puller,
 	apiKey,
 	label = "LLM Model",
 	id = "pi_agent_model",
@@ -42,6 +47,7 @@ export function LlmModelSelect({
 	const [models, setModels] = useState<string[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [pullWarning, setPullWarning] = useState<string | null>(null);
 	const [privateValue, setPrivateValue] = useState(value);
 	const [privateActive, setPrivateActive] = useState(false);
 
@@ -49,6 +55,33 @@ export function LlmModelSelect({
 		const trimmed = provider.trim();
 		return trimmed === "openai" || trimmed === "ollama" ? trimmed : null;
 	}, [provider]);
+
+	const pullSequence = useRef(0);
+	const triggerPull = useCallback(
+		(model: string) => {
+			if (normalizedProvider !== "ollama" || !puller) return;
+			const trimmed = model.trim();
+			if (!trimmed) return;
+			const sequence = ++pullSequence.current;
+			void puller(trimmed)
+				.then((result) => {
+					if (sequence !== pullSequence.current) return;
+					if (result.ok) {
+						setPullWarning(null);
+						return;
+					}
+					setPullWarning(
+						`Could not pull Ollama model: ${result.error?.trim() || "unknown error"}`,
+					);
+				})
+				.catch((err) => {
+					if (sequence !== pullSequence.current) return;
+					const message = err instanceof Error ? err.message : String(err);
+					setPullWarning(`Could not pull Ollama model: ${message}`);
+				});
+		},
+		[normalizedProvider, puller],
+	);
 
 	// Load the model list whenever the provider or supplied API key changes.
 	useEffect(() => {
@@ -120,19 +153,23 @@ export function LlmModelSelect({
 		(selected: string) => {
 			if (selected === PRIVATE_MODEL_VALUE) {
 				setPrivateActive(true);
+				setPullWarning(null);
 				onChange(privateValue);
+				triggerPull(privateValue);
 				return;
 			}
 			setPrivateActive(false);
+			setPullWarning(null);
 			onChange(selected);
 		},
-		[onChange, privateValue],
+		[onChange, privateValue, triggerPull],
 	);
 
 	const handlePrivateChange = useCallback(
 		(input: string) => {
 			setPrivateValue(input);
 			setPrivateActive(true);
+			setPullWarning(null);
 			onChange(input);
 		},
 		[onChange],
@@ -152,6 +189,12 @@ export function LlmModelSelect({
 	}, [loading, error, models.length]);
 
 	const showPrivateInput = privateActive;
+
+	useEffect(() => {
+		if (!privateActive && pullWarning !== null) {
+			setPullWarning(null);
+		}
+	}, [privateActive, pullWarning]);
 
 	return (
 		<div className="llm-model-select">
@@ -176,10 +219,16 @@ export function LlmModelSelect({
 					type="text"
 					value={privateValue}
 					onChange={(e) => handlePrivateChange(e.target.value)}
+					onBlur={() => triggerPull(privateValue)}
 					placeholder="custom model identifier"
 					disabled={disabled}
 					aria-label={`${label} (custom identifier)`}
 				/>
+			)}
+			{pullWarning && (
+				<span id={`${id}-warning`} className="setting-description" role="alert">
+					{pullWarning}
+				</span>
 			)}
 			{error && (
 				<span id={`${id}-error`} className="setting-description" role="alert">

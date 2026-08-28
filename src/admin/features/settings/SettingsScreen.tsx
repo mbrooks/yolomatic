@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { fetchLlmModels, fetchSettings, updateSettings } from "../../api/settings.js";
-import { fetchOllamaSignInStatus, type OllamaSignInStatus } from "../../api/ollama.js";
+import { fetchOllamaSignInStatus, pullOllamaModel, type OllamaSignInStatus } from "../../api/ollama.js";
 import { navigate, SETTINGS_CATEGORY_TABS, DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
 import type { SettingView } from "../../../settings/model.js";
 import { RestartBanner } from "../../components/RestartBanner.js";
@@ -8,7 +8,7 @@ import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
-import { LlmModelSelect, type LlmModelFetcher } from "./LlmModelSelect.js";
+import { LlmModelSelect, type LlmModelFetcher, type LlmModelPuller } from "./LlmModelSelect.js";
 import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 import { listWorkerTemplates } from "../../../worker/templates.js";
@@ -78,6 +78,7 @@ export function SettingsScreen({
 	}, []);
 
 	const llmModelFetcher = useCallback<LlmModelFetcher>((provider) => fetchLlmModels(provider), []);
+	const llmModelPuller = useCallback<LlmModelPuller>((model) => pullOllamaModel(model), []);
 
 	const handleSave = useCallback(async () => {
 		if (changedKeys.size === 0) return;
@@ -211,6 +212,7 @@ export function SettingsScreen({
 									onChange={handleChange}
 									llmProvider={effectiveProvider}
 									llmModelFetcher={llmModelFetcher}
+									llmModelPuller={llmModelPuller}
 								/>
 							))
 						) : (
@@ -221,6 +223,7 @@ export function SettingsScreen({
 								onChange={handleChange}
 								llmProvider={effectiveProvider}
 								llmModelFetcher={llmModelFetcher}
+								llmModelPuller={llmModelPuller}
 							/>
 						)}
 					</div>
@@ -256,6 +259,7 @@ function SettingsSection({
 	onChange,
 	llmProvider,
 	llmModelFetcher,
+	llmModelPuller,
 }: {
 	title: string;
 	settings: SettingView[];
@@ -264,6 +268,7 @@ function SettingsSection({
 	onChange: (key: string, value: string | number | boolean) => void;
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
+	llmModelPuller?: LlmModelPuller;
 }): React.ReactElement {
 	return (
 		<section className="settings-section">
@@ -275,6 +280,7 @@ function SettingsSection({
 				onChange={onChange}
 				llmProvider={llmProvider}
 				llmModelFetcher={llmModelFetcher}
+				llmModelPuller={llmModelPuller}
 			/>
 		</section>
 	);
@@ -287,6 +293,7 @@ function SettingsRows({
 	onChange,
 	llmProvider,
 	llmModelFetcher,
+	llmModelPuller,
 }: {
 	settings: SettingView[];
 	edited: Record<string, string | number | boolean>;
@@ -294,6 +301,7 @@ function SettingsRows({
 	onChange: (key: string, value: string | number | boolean) => void;
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
+	llmModelPuller?: LlmModelPuller;
 }): React.ReactElement {
 	return (
 		<>
@@ -305,6 +313,7 @@ function SettingsRows({
 					onChange={onChange}
 					llmProvider={llmProvider}
 					llmModelFetcher={llmModelFetcher}
+					llmModelPuller={llmModelPuller}
 				/>
 			))}
 		</>
@@ -366,12 +375,14 @@ function SettingRow({
 	onChange,
 	llmProvider,
 	llmModelFetcher,
+	llmModelPuller,
 }: {
 	setting: SettingView;
 	editedValue: string | number | boolean | undefined;
 	onChange: (key: string, value: string | number | boolean) => void;
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
+	llmModelPuller?: LlmModelPuller;
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
@@ -393,6 +404,7 @@ function SettingRow({
 					value={String(displayValue)}
 					onChange={(val) => onChange(setting.key, val)}
 					fetcher={llmModelFetcher!}
+					puller={llmProvider === "ollama" ? llmModelPuller : undefined}
 					id={`setting-${setting.key}`}
 					label={setting.key}
 					hideLabel

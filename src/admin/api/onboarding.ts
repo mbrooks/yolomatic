@@ -6,6 +6,11 @@ export interface LlmModelListResult {
 	error?: string;
 }
 
+export interface OllamaPullResult {
+	ok: boolean;
+	error?: string;
+}
+
 export interface OnboardingStatus {
 	complete: boolean;
 	missing: string[];
@@ -96,6 +101,10 @@ export type { OllamaSignInStatus };
  */
 export function fetchOnboardingOllamaSignInStatus(): Promise<OllamaSignInStatus> {
 	return apiGet<OllamaSignInStatus>("/api/onboarding/ollama-signin");
+}
+
+export function pullOnboardingOllamaModel(model: string): Promise<OllamaPullResult> {
+	return apiPost<OllamaPullResult>("/api/onboarding/ollama/pull", { model });
 }
 
 export function fetchOnboardingLlmModels(
