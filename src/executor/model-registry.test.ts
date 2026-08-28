@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createYolomaticModelRegistry,
 	resolveOllamaBaseUrl,
 	OPENAI_PROVIDER_BASE_URL,
 	OPENAI_PROVIDER_ID,
 } from "./model-registry.js";
+
+const fetchSpy = vi.fn();
+vi.stubGlobal("fetch", fetchSpy);
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
 	ModelRuntime: {
@@ -27,6 +30,17 @@ function stubRuntime(mock: ReturnType<typeof mockRuntime>) {
 }
 
 describe("createYolomaticModelRegistry", () => {
+	beforeEach(() => {
+		fetchSpy.mockReset();
+		// Default: Ollama tag listing unavailable, so the registry falls back
+		// to its built-in curated list.
+		fetchSpy.mockResolvedValue({
+			ok: false,
+			status: 500,
+			json: async () => ({}),
+		});
+	});
+
 	afterEach(() => {
 		vi.unstubAllEnvs();
 		vi.restoreAllMocks();
@@ -112,6 +126,27 @@ describe("createYolomaticModelRegistry", () => {
 		expect(mock.registerProvider).toHaveBeenCalledWith(
 			"ollama",
 			expect.objectContaining({ baseUrl: "http://ollama.internal:11434/v1" }),
+		);
+	});
+
+	it("registers locally installed ollama models returned by /api/tags", async () => {
+		fetchSpy.mockResolvedValue({
+			ok: true,
+			json: async () => ({ models: [{ name: "glm-5.3-flash:cloud" }] }),
+		});
+
+		const mock = mockRuntime();
+		stubRuntime(mock);
+
+		await createYolomaticModelRegistry();
+
+		expect(mock.registerProvider).toHaveBeenCalledWith(
+			"ollama",
+			expect.objectContaining({
+				models: expect.arrayContaining([
+					expect.objectContaining({ id: "glm-5.3-flash:cloud" }),
+				]),
+			}),
 		);
 	});
 

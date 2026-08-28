@@ -182,10 +182,26 @@ export class PiAgentExecutor implements ExecutionService {
 			? modelRegistry.runtime.getModel(configuredModelRef.provider, configuredModelRef.id)
 			: undefined;
 		const configuredModelName = configuredModelOverride?.model?.trim() ?? settings.model.piAgentModel?.trim();
-		if (configuredModelName && !configuredModel) {
-			process.stderr.write(
-				`Warning: configured Pi model ${configuredModelName} did not resolve; falling back to Pi defaults.\n`,
-			);
+		const configuredProviderName = configuredModelOverride?.provider?.trim() ?? settings.model.piAgentProvider?.trim();
+		const configuredModelSpec = configuredModelName
+			? (configuredProviderName && !configuredModelName.includes("/")
+				? `${configuredProviderName}/${configuredModelName}`
+				: configuredModelName)
+			: undefined;
+
+		let configuredModelWarning: string | undefined;
+		if (configuredModelSpec && !configuredModel) {
+			if (configuredProviderName === "ollama") {
+				const ollamaDiagnostics = modelRegistry.diagnostics?.ollama;
+				if (ollamaDiagnostics?.error) {
+					configuredModelWarning = `Configured model ${configuredModelSpec} did not resolve: could not load Ollama models from ${ollamaDiagnostics.host}/api/tags (${ollamaDiagnostics.error}); using pi defaults`;
+				} else {
+					configuredModelWarning = `Configured model ${configuredModelSpec} did not resolve: not found in local Ollama models; using pi defaults`;
+				}
+			} else {
+				configuredModelWarning = `Configured model ${configuredModelSpec} did not resolve; using pi defaults`;
+			}
+			process.stderr.write(`Warning: ${configuredModelWarning}.\n`);
 		}
 
 		const resolvedModelId = configuredModel
@@ -193,14 +209,13 @@ export class PiAgentExecutor implements ExecutionService {
 			: "(pi defaults)";
 		recordSessionLog(key, {
 			level: "info",
-			message:
-				`Using model: ${resolvedModelId}` +
-				(configuredModelName && !configuredModel ? " (configured model unresolved, fell back)" : ""),
+			message: `Using model: ${resolvedModelId}` + (configuredModelWarning ? ` (${configuredModelWarning})` : ""),
 			details: {
 				type: "model",
 				provider: configuredModel?.provider,
 				modelId: configuredModel?.id,
-				configured: configuredModelName ?? null,
+				configured: configuredModelSpec ?? null,
+				modelRegistryDiagnostics: modelRegistry.diagnostics ?? null,
 			},
 		});
 

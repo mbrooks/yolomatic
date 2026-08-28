@@ -42,6 +42,7 @@ import { PiAgentExecutor, preferTrustedExtension } from "./index.js";
 
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { createYolomaticModelRegistry } from "./model-registry.js";
+import { recordSessionLog } from "../logging/session-log-store.js";
 
 describe("PiAgentExecutor", () => {
 	afterEach(() => {
@@ -563,7 +564,8 @@ describe("PiAgentExecutor", () => {
 		});
 		await executor.execute(makeState(10));
 
-		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("configured Pi model missing-model did not resolve"));
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Configured model missing-model did not resolve"));
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("using pi defaults"));
 	});
 
 	it("logs non-rate assistant errors without overriding the parsed result", async () => {
@@ -953,6 +955,43 @@ describe("PiAgentExecutor runtime settings injection", () => {
 		await executor.execute(makeState(502));
 
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
+	});
+
+	it("logs the resolved ollama model id (including tags)", async () => {
+		const soulPath = await makeSoulPath();
+		const configuredModel = { provider: "ollama", id: "glm-5.3-flash:cloud" };
+		const registry = {
+			runtime: {
+				getModel: vi.fn((provider: string, id: string) => (provider === "ollama" && id === configuredModel.id ? configuredModel : undefined)),
+				getModels: vi.fn(() => [configuredModel]),
+			},
+			find: vi.fn((provider: string, id: string) => (provider === "ollama" && id === configuredModel.id ? configuredModel : undefined)),
+			getAll: vi.fn(() => [configuredModel]),
+		};
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(registry);
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+			session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
+		});
+
+		const stderrSpy = vi.spyOn(process.stderr, "write");
+
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: {
+				model: { piAgentModel: configuredModel.id, piAgentProvider: "ollama" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			},
+		});
+
+		await executor.execute(makeState(600));
+
+		expect(stderrSpy).not.toHaveBeenCalled();
+
+		const modelLogCall = (recordSessionLog as ReturnType<typeof vi.fn>).mock.calls
+			.map((call) => call[1])
+			.find((entry: { details?: { type?: string } }) => entry.details?.type === "model") as { message: string } | undefined;
+		expect(modelLogCall?.message).toContain("Using model: ollama/glm-5.3-flash:cloud");
+		expect(modelLogCall?.message).not.toContain("configured model unresolved");
 	});
 
 	it("reads the runtime settings provider fresh on each execution", async () => {
