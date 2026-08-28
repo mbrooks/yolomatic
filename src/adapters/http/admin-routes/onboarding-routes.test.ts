@@ -894,6 +894,96 @@ describe("handleOnboardingRoutes", () => {
 			});
 	});
 
+	describe("POST /api/onboarding/ollama/pull", () => {
+		it("returns ok=true after successfully pulling a model", async () => {
+			vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(JSON.stringify({ status: "success" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			const req = mockRequest({
+				url: "/api/onboarding/ollama/pull",
+				method: "POST",
+				body: JSON.stringify({ model: "llama3" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama/pull");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.ok).toBe(true);
+		});
+
+		it("returns 400 when no model identifier is provided", async () => {
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			const req = mockRequest({
+				url: "/api/onboarding/ollama/pull",
+				method: "POST",
+				body: JSON.stringify({}),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama/pull");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(400);
+			expect(JSON.parse(String(res.body)).error).toBe("Missing required field: model");
+		});
+
+		it("accepts a `name` field as a fallback for the model identifier", async () => {
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(JSON.stringify({ status: "success" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			const req = mockRequest({
+				url: "/api/onboarding/ollama/pull",
+				method: "POST",
+				body: JSON.stringify({ name: "llama3" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama/pull");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(JSON.parse(String(res.body)).ok).toBe(true);
+			const body = JSON.parse(
+				String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body),
+			) as Record<string, unknown>;
+			expect(body.model).toBe("llama3");
+		});
+
+		it("returns ok=false when the daemon is unreachable", async () => {
+			vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("connection refused"));
+			const store = await tmpStore();
+			const deps = makeDeps(store);
+			const req = mockRequest({
+				url: "/api/onboarding/ollama/pull",
+				method: "POST",
+				body: JSON.stringify({ model: "llama3" }),
+			});
+			const res = mockResponse();
+
+			const handled = await handleOnboardingRoutes(req, res, deps, "/api/onboarding/ollama/pull");
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.ok).toBe(false);
+			expect(body.error).toContain("connection refused");
+		});
+	});
+
 	describe("POST /api/onboarding", () => {
 		it("returns success when all fields provided", async () => {
 			const store = await tmpStore();

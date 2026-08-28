@@ -204,6 +204,61 @@ describe("LlmModelSelect", () => {
 		});
 	});
 
+	it("attempts to pull a custom Ollama model and shows a non-blocking warning when pulling fails", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const puller = vi.fn(async () => ({ ok: false, error: "pull model manifest: file does not exist" }));
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value="llama2"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+
+		const select = (await screen.findByLabelText("LLM Model")) as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+		fireEvent.change(select, { target: { value: PRIVATE_MODEL_VALUE } });
+
+		await waitFor(() => expect(puller).toHaveBeenCalledWith("llama2"));
+		const warning = await screen.findByText(/Could not pull Ollama model/i);
+		expect(warning.textContent).toContain("pull model manifest");
+
+		// Warning is informational; the input remains usable.
+		const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+		expect(input.disabled).toBe(false);
+	});
+
+	it("clears the pull warning once a later pull attempt succeeds", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const puller = vi
+			.fn()
+			.mockResolvedValueOnce({ ok: false, error: "manifest missing" })
+			.mockResolvedValueOnce({ ok: true });
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value="llama2"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+
+		const select = (await screen.findByLabelText("LLM Model")) as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+		fireEvent.change(select, { target: { value: PRIVATE_MODEL_VALUE } });
+
+		await screen.findByText(/Could not pull Ollama model/i);
+
+		const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+		fireEvent.blur(input);
+
+		await waitFor(() => expect(puller).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(screen.queryByText(/Could not pull Ollama model/i)).toBeNull());
+	});
+
 	it("does not fetch for an unsupported provider", async () => {
 		render(
 			<LlmModelSelect

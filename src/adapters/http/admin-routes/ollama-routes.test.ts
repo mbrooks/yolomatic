@@ -1,14 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type http from "node:http";
 import { handleOllamaRoutes } from "./ollama-routes.js";
 import type { OllamaSignInService, OllamaSignInResult } from "../../../ollama/signin-status.js";
 
-function request(url: string, method = "GET"): http.IncomingMessage {
+function request(url: string, method = "GET", body?: string): http.IncomingMessage {
+	const chunks = body ? [Buffer.from(body)] : [];
 	return {
 		url,
 		method,
 		headers: {
 			cookie: "yolomatic_admin_session=valid",
+		},
+		async *[Symbol.asyncIterator]() {
+			for (const chunk of chunks) {
+				yield chunk;
+			}
 		},
 	} as http.IncomingMessage;
 }
@@ -47,6 +53,9 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe("handleOllamaRoutes", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 	it("returns false for unrelated paths", async () => {
 		const handled = await handleOllamaRoutes(
 			request("/api/other"),
@@ -123,6 +132,114 @@ describe("handleOllamaRoutes", () => {
 		expect(handled).toBe(true);
 		expect(res.statusCode).toBe(500);
 		expect(JSON.parse(res.body).error).toBe("Ollama sign-in service not configured");
+	});
+
+	it("returns ok=true after successfully pulling a model", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(JSON.stringify({ status: "success" }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const res = response();
+		const handled = await handleOllamaRoutes(
+			request("/api/ollama/pull", "POST", JSON.stringify({ model: "llama3" })),
+			res,
+			makeDeps(),
+			"/api/ollama/pull",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(res.body);
+		expect(body.ok).toBe(true);
+		expect(body.error).toBeUndefined();
+		expect(fetchSpy).toHaveBeenCalledWith(
+			"http://127.0.0.1:11434/api/pull",
+			expect.objectContaining({ method: "POST" }),
+		);
+	});
+
+	it("returns ok=false with the upstream error payload when the pull fails", async () => {
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(JSON.stringify({ error: "pull model manifest: file does not exist" }), {
+				status: 404,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const res = response();
+		const handled = await handleOllamaRoutes(
+			request("/api/ollama/pull", "POST", JSON.stringify({ model: "bad-model" })),
+			res,
+			makeDeps(),
+			"/api/ollama/pull",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(res.body);
+		expect(body.ok).toBe(false);
+		expect(body.error).toContain("pull model manifest");
+	});
+
+	it("returns ok=false when the daemon is unreachable", async () => {
+		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("connection refused"));
+		const res = response();
+		const handled = await handleOllamaRoutes(
+			request("/api/ollama/pull", "POST", JSON.stringify({ model: "llama3" })),
+			res,
+			makeDeps(),
+			"/api/ollama/pull",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		const body = JSON.parse(res.body);
+		expect(body.ok).toBe(false);
+		expect(body.error).toContain("connection refused");
+	});
+
+	it("returns 400 when no model identifier is provided", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch");
+		const res = response();
+		const handled = await handleOllamaRoutes(
+			request("/api/ollama/pull", "POST", JSON.stringify({})),
+			res,
+			makeDeps(),
+			"/api/ollama/pull",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(400);
+		expect(JSON.parse(res.body).error).toBe("Missing required field: model");
+		expect(fetchSpy).not.toHaveBeenCalled();
+	});
+
+	it("accepts a `name` field as a fallback for the model identifier", async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(
+				new Response(JSON.stringify({ status: "success" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+		const res = response();
+		const handled = await handleOllamaRoutes(
+			request("/api/ollama/pull", "POST", JSON.stringify({ name: "llama3" })),
+			res,
+			makeDeps(),
+			"/api/ollama/pull",
+		);
+
+		expect(handled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		expect(JSON.parse(res.body).ok).toBe(true);
+		const body = JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body)) as Record<
+			string,
+			unknown
+		>;
+		expect(body.model).toBe("llama3");
 	});
 
 	it("rejects unauthorized requests", async () => {

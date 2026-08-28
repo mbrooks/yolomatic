@@ -5,6 +5,7 @@ import { LlmModelSelect } from "../../settings/LlmModelSelect.js";
 import {
 	fetchOnboardingLlmModels,
 	fetchOnboardingOllamaSignInStatus,
+	pullOnboardingOllamaModel,
 } from "../../../api/onboarding.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../wizard-state.js";
 import type { UpdateField, WizardState } from "../wizard-state.js";
@@ -93,6 +94,7 @@ export function StepFourAiLlm({
 					value={state.piAgentModel}
 					onChange={(val) => updateField("piAgentModel", val)}
 					fetcher={fetchOnboardingLlmModels}
+					puller={isOllama ? pullOnboardingOllamaModel : undefined}
 					apiKey={isOpenAi ? state.openaiApiKey.trim() : undefined}
 					id="pi_agent_model"
 					label="LLM Model"
