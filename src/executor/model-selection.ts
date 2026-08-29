@@ -56,3 +56,40 @@ export function resolveConfiguredModel<TModel extends ModelReference>(
 
 	return undefined;
 }
+
+/**
+ * Prompt kinds the control plane can launch a worker session for. Mirrors the
+ * `prompt.kind` union used by the worker protocol minus the in-process-only
+ * `override` kind, which never reaches a container launch.
+ */
+export type WorkerPromptKind = "issue" | "comment" | "pr-review" | "issue-refinement";
+
+/**
+ * The model-settings slice consumed by {@link resolveLaunchModel}: the default
+ * `pi_agent_model` plus the per-session build and refinement overrides.
+ */
+export interface LaunchModelSettings {
+	piAgentModel?: string;
+	piAgentBuildModel?: string;
+	piAgentRefinementModel?: string;
+}
+
+/**
+ * Resolve the model identifier to forward to a worker container as
+ * `PI_AGENT_MODEL` for a launch of the given kind.
+ *
+ * Refinement launches use the refinement model; every other launch (initial
+ * issue builds, feedback passes, PR-review passes, and launches that do not
+ * report a kind) is a build session and uses the build model. Each falls back
+ * to the default model when its specialized value is unset, and to
+ * `undefined` when nothing is configured so workers keep pi-defaults
+ * behavior.
+ */
+export function resolveLaunchModel(
+	models: LaunchModelSettings,
+	kind?: WorkerPromptKind,
+): string | undefined {
+	const specialized =
+		kind === "issue-refinement" ? models.piAgentRefinementModel?.trim() : models.piAgentBuildModel?.trim();
+	return specialized || models.piAgentModel?.trim() || undefined;
+}

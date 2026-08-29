@@ -46,6 +46,8 @@ const baseConfig: AppConfig = {
 	maxWorktrees: 10,
 	evictionStrategy: "lru",
 	piAgentModel: "kimi",
+	piAgentBuildModel: undefined,
+	piAgentRefinementModel: undefined,
 	piAgentProvider: "ollama",
 	logLevel: "debug",
 	logPrompts: true,

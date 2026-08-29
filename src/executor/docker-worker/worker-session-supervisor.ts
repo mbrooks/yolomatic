@@ -61,6 +61,7 @@ export class WorkerSessionSupervisor {
 			workerSessionUrl,
 			containerName: params.containerName,
 			workerTemplate: params.workerTemplate,
+			promptKind: params.prompt.kind,
 		});
 
 		let connection: WorkerRpcConnection | undefined;

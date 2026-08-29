@@ -37,6 +37,8 @@ const baseConfig: AppConfig = {
 	maxWorktrees: 10,
 	evictionStrategy: "lru",
 	piAgentModel: undefined,
+	piAgentBuildModel: undefined,
+	piAgentRefinementModel: undefined,
 	piAgentProvider: undefined,
 	logLevel: "info",
 	logPrompts: true,

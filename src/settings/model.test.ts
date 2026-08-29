@@ -163,6 +163,33 @@ describe("settings/model", () => {
       expect(provider?.description).not.toContain("The only supported provider");
     });
 
+    it("defines per-session model overrides in the ai-llm category", () => {
+      const build = getSettingDefinition("pi_agent_build_model");
+      expect(build).toBeDefined();
+      expect(build?.type).toBe("string");
+      expect(build?.envVar).toBe("PI_AGENT_BUILD_MODEL");
+      expect(build?.category).toBe("ai-llm");
+      expect(build?.requiresRestart).toBe(false);
+      expect(build?.sensitive).toBe(false);
+      expect(build?.default).toBeUndefined();
+
+      const refinement = getSettingDefinition("pi_agent_refinement_model");
+      expect(refinement).toBeDefined();
+      expect(refinement?.type).toBe("string");
+      expect(refinement?.envVar).toBe("PI_AGENT_REFINEMENT_MODEL");
+      expect(refinement?.category).toBe("ai-llm");
+      expect(refinement?.requiresRestart).toBe(false);
+      expect(refinement?.sensitive).toBe(false);
+      expect(refinement?.default).toBeUndefined();
+    });
+
+    it("coerces the per-session model env values", () => {
+      expect(coerceEnvValue("pi_agent_build_model", "  glm-build  ")).toBe("glm-build");
+      expect(coerceEnvValue("pi_agent_build_model", "  ")).toBeUndefined();
+      expect(coerceEnvValue("pi_agent_refinement_model", "  glm-refine  ")).toBe("glm-refine");
+      expect(coerceEnvValue("pi_agent_refinement_model", "")).toBeUndefined();
+    });
+
     it("defines the sensitive openai_api_key setting in the ai-llm category", () => {
       const apiKey = getSettingDefinition("openai_api_key");
       expect(apiKey).toBeDefined();

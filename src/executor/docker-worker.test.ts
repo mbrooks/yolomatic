@@ -655,6 +655,126 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("forwards the build model for build launches and the refinement model for refinement launches", async () => {
+		const harness = await createHarness(510, {
+			runtimeSettings: () => ({
+				model: {
+					piAgentProvider: "ollama",
+					piAgentModel: "default-model",
+					piAgentBuildModel: "build-model",
+					piAgentRefinementModel: "refinement-model",
+				},
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
+		});
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
+
+		const spawnedArgs: string[][] = [];
+		spawnMock.mockImplementation((_cmd, args, options) => {
+			spawnedArgs.push(args as string[]);
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, `ack-${sessionKey}`, { ackMessageId: message.messageId }),
+					);
+					const isRefinement = sessionKey.endsWith("-refinement");
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, `complete-${sessionKey}`, {
+							result: isRefinement
+								? {
+										proposedTaskBody: "## Summary\nRefined.",
+										summary: "Better description.",
+										investigation: "Read the code.",
+									}
+									: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
+							}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			// Initial issue build.
+			await harness.executor.execute(makeSessionState(510, harness.workspacePath));
+			// Feedback pass.
+			await harness.executor.execute(makeSessionState(511, harness.workspacePath), "Please retry.");
+			// PR-review pass.
+			await harness.executor.executePRReview(makeSessionState(512, harness.workspacePath), {
+				comments: [{ body: "nit", user: "reviewer", path: "a.ts", line: 1 }],
+			});
+			// Issue refinement.
+			await harness.executor.executeRefinement(makeSessionState(513, harness.workspacePath), undefined);
+
+			expect(spawnedArgs).toHaveLength(4);
+			expect(spawnedArgs[0]).toContain("PI_AGENT_MODEL=build-model");
+			expect(spawnedArgs[1]).toContain("PI_AGENT_MODEL=build-model");
+			expect(spawnedArgs[2]).toContain("PI_AGENT_MODEL=build-model");
+			expect(spawnedArgs[3]).toContain("PI_AGENT_MODEL=refinement-model");
+			for (const args of spawnedArgs) {
+				expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+				expect(args).not.toContain("PI_AGENT_MODEL=default-model");
+			}
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("falls back to the default model per session type and forwards no model when nothing is configured", async () => {
+		const workerRpcServer = createFakeWorkerRpcServer();
+		const executor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			runtimeSettings: () => ({
+				model: { piAgentProvider: "ollama", piAgentModel: "default-model" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
+			soulPath: "/app/SOUL.md",
+		});
+
+		const launcher = (executor as any).launcher;
+		const template = launcher.resolveTemplate();
+		// Build and refinement models unset: every session type uses the default model.
+		expect(await launcher.buildDockerRunArgs("worker-build", template, "issue")).toContain(
+			"PI_AGENT_MODEL=default-model",
+		);
+		expect(await launcher.buildDockerRunArgs("worker-refine", template, "issue-refinement")).toContain(
+			"PI_AGENT_MODEL=default-model",
+		);
+
+		const emptyExecutor = new DockerWorkerExecutor({
+			projectRoot: "/repo",
+			workspacesDir: "/workspace-root",
+			workerImage: "yolomatic-worker:latest",
+			workerWorkspaceMountSource: "/workspace-root",
+			workerControlBaseUrl: "http://control-plane.test",
+			workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
+			soulPath: "/app/SOUL.md",
+		});
+		const emptyLauncher = (emptyExecutor as any).launcher;
+		const priorModel = process.env.PI_AGENT_MODEL;
+		delete process.env.PI_AGENT_MODEL;
+		try {
+			// Nothing configured: no model is forwarded and the worker keeps pi defaults.
+			for (const kind of [undefined, "issue", "comment", "pr-review", "issue-refinement"] as const) {
+				const args = await emptyLauncher.buildDockerRunArgs("worker-empty", template, kind);
+				expect(args.some((arg: string) => arg.startsWith("PI_AGENT_MODEL="))).toBe(false);
+			}
+		} finally {
+			if (priorModel === undefined) delete process.env.PI_AGENT_MODEL;
+			else process.env.PI_AGENT_MODEL = priorModel;
+		}
+	});
+
 	it("forwards OPENAI_API_KEY from injected runtime settings when configured", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
@@ -1865,7 +1985,9 @@ describe("DockerWorkerExecutor", () => {
 
 async function createHarness(
 	issueNumber: number,
-	workerOptions: Partial<Pick<DockerWorkerExecutorOptions, "workerImage" | "defaultWorkerTemplate" | "resolveWorkerTemplate">> = {},
+	workerOptions: Partial<
+		Pick<DockerWorkerExecutorOptions, "workerImage" | "defaultWorkerTemplate" | "resolveWorkerTemplate" | "runtimeSettings">
+	> = {},
 ): Promise<{
 	executor: DockerWorkerExecutor;
 	projectRoot: string;

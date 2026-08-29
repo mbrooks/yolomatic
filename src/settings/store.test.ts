@@ -99,6 +99,26 @@ describe("SettingsStore", () => {
 		expect(views.find((v) => v.key === "admin_base_url")?.category).toBe("server");
 	});
 
+	it("round-trips the per-session model override settings", () => {
+		store.set("pi_agent_build_model", "glm-build");
+		store.set("pi_agent_refinement_model", "glm-refine");
+		expect(store.get("pi_agent_build_model")).toBe("glm-build");
+		expect(store.get("pi_agent_refinement_model")).toBe("glm-refine");
+		const views = store.getAllViews();
+		expect(views.find((v) => v.key === "pi_agent_build_model")).toMatchObject({
+			value: "glm-build",
+			category: "ai-llm",
+			requiresRestart: false,
+			sensitive: false,
+		});
+		expect(views.find((v) => v.key === "pi_agent_refinement_model")).toMatchObject({
+			value: "glm-refine",
+			category: "ai-llm",
+			requiresRestart: false,
+			sensitive: false,
+		});
+	});
+
 	it("getBoolean returns false for unknown keys", () => {
 		expect(store.getBoolean("nonexistent_key")).toBe(false);
 	});

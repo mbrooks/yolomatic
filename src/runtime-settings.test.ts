@@ -35,6 +35,8 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 		maxWorktrees: 10,
 		evictionStrategy: "lru",
 		piAgentModel: undefined,
+		piAgentBuildModel: undefined,
+		piAgentRefinementModel: undefined,
 		piAgentProvider: undefined,
 		logLevel: "info",
 		logPrompts: true,
@@ -72,6 +74,8 @@ describe("getRuntimeSettings", () => {
 	it("maps AppConfig model and logging fields into runtime settings", () => {
 		const config = baseConfig({
 			piAgentModel: "kimi",
+			piAgentBuildModel: "glm-build",
+			piAgentRefinementModel: "glm-refine",
 			piAgentProvider: "ollama",
 			openaiApiKey: "sk-test",
 			workerOllamaHost: "http://ollama.internal:11434",
@@ -85,6 +89,8 @@ describe("getRuntimeSettings", () => {
 		expect(getRuntimeSettings(config)).toEqual({
 			model: {
 				piAgentModel: "kimi",
+				piAgentBuildModel: "glm-build",
+				piAgentRefinementModel: "glm-refine",
 				piAgentProvider: "ollama",
 				openaiApiKey: "sk-test",
 				ollamaHost: "http://ollama.internal:11434",
@@ -108,6 +114,8 @@ describe("getRuntimeSettings", () => {
 		const settings = getRuntimeSettings(baseConfig());
 		expect(settings.model).toEqual({
 			piAgentModel: undefined,
+			piAgentBuildModel: undefined,
+			piAgentRefinementModel: undefined,
 			piAgentProvider: undefined,
 			openaiApiKey: undefined,
 			ollamaHost: undefined,

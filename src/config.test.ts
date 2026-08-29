@@ -314,6 +314,48 @@ describe("issue comment and admin-link settings", () => {
 		expect(config.issueAdminLinkInCommentsEnabled).toBe(false);
 		expect(config.adminBaseUrl).toBe("http://host:6767/admin");
 	});
+
+	it("exposes undefined for unset per-session model settings", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		delete process.env.PI_AGENT_MODEL;
+		delete process.env.PI_AGENT_BUILD_MODEL;
+		delete process.env.PI_AGENT_REFINEMENT_MODEL;
+
+		const config = getConfig(createStore());
+		expect(config.piAgentModel).toBeUndefined();
+		expect(config.piAgentBuildModel).toBeUndefined();
+		expect(config.piAgentRefinementModel).toBeUndefined();
+	});
+
+	it("reads stored per-session model settings", () => {
+		const store = createStore();
+		store.set("pi_agent_model", "default-model");
+		store.set("pi_agent_build_model", "build-model");
+		store.set("pi_agent_refinement_model", "refinement-model");
+
+		const config = getConfig(store);
+		expect(config.piAgentModel).toBe("default-model");
+		expect(config.piAgentBuildModel).toBe("build-model");
+		expect(config.piAgentRefinementModel).toBe("refinement-model");
+	});
+
+	it("seeds the per-session model settings from their env vars", () => {
+		try {
+			unlinkSync(TEST_DB);
+		} catch {
+			// ignore
+		}
+		const store = new SettingsStore(TEST_DB);
+		store.seedFromEnv({
+			PI_AGENT_BUILD_MODEL: "  build-model  ",
+			PI_AGENT_REFINEMENT_MODEL: "refinement-model",
+		});
+
+		expect(store.get("pi_agent_build_model")).toBe("build-model");
+		expect(store.get("pi_agent_refinement_model")).toBe("refinement-model");
+	});
 });
 
 describe("admin config settings", () => {

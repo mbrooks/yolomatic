@@ -171,7 +171,29 @@ const MOCK_SETTINGS = [
 	{
 		key: "pi_agent_model",
 		value: "kimi-k2.7-code:cloud",
-		description: "LLM model identifier",
+		description: "Default LLM model identifier",
+		type: "string",
+		default: undefined,
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
+		key: "pi_agent_build_model",
+		value: "",
+		description: "LLM model used for issue build sessions",
+		type: "string",
+		default: undefined,
+		requiresRestart: false,
+		sensitive: false,
+		updatedAt: "2026-07-23T00:00:00.000Z",
+		category: "ai-llm",
+	},
+	{
+		key: "pi_agent_refinement_model",
+		value: "",
+		description: "LLM model used for issue refinement sessions",
 		type: "string",
 		default: undefined,
 		requiresRestart: false,
@@ -829,6 +851,101 @@ describe("SettingsScreen", () => {
 		await waitFor(() => expect(patchCalls).toHaveLength(1));
 		expect(patchCalls[0].body).toEqual({ pi_agent_provider: "openai", pi_agent_model: "custom-openai-model" });
 		expect(pullCalls).toHaveLength(0);
+	});
+
+	it("renders model selects for the build and refinement model settings", async () => {
+		mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const buildSelect = (await screen.findByLabelText(/pi_agent_build_model/)) as HTMLSelectElement;
+		const refinementSelect = (await screen.findByLabelText(/pi_agent_refinement_model/)) as HTMLSelectElement;
+
+		await waitFor(() => {
+			expect(Array.from(buildSelect.options).some((option) => option.value === "llama2")).toBe(true);
+			expect(Array.from(refinementSelect.options).some((option) => option.value === "llama2")).toBe(true);
+		});
+		// Both selects offer the private/custom identifier entry like the default model select.
+		expect(Array.from(buildSelect.options).some((option) => option.value === "private")).toBe(true);
+		expect(Array.from(refinementSelect.options).some((option) => option.value === "private")).toBe(true);
+	});
+
+	it("saves build and refinement model selections in the settings PATCH body", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const buildSelect = (await screen.findByLabelText(/pi_agent_build_model/)) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(buildSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		fireEvent.change(buildSelect, { target: { value: "llama2" } });
+
+		const refinementSelect = (await screen.findByLabelText(/pi_agent_refinement_model/)) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(refinementSelect.options).some((option) => option.value === "kimi-k2.7-code:cloud")).toBe(true),
+		);
+		fireEvent.change(refinementSelect, { target: { value: "kimi-k2.7-code:cloud" } });
+
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(patchCalls).toHaveLength(1));
+		expect(patchCalls[0].body).toEqual({
+			pi_agent_build_model: "llama2",
+			pi_agent_refinement_model: "kimi-k2.7-code:cloud",
+		});
+		expect(pullCalls).toHaveLength(0);
+	});
+
+	it("blocks saving when a custom build model identifier fails to pull", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const buildSelect = (await screen.findByLabelText(/pi_agent_build_model/)) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(buildSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		fireEvent.change(buildSelect, { target: { value: "private" } });
+		const input = (await screen.findByLabelText("pi_agent_build_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-build-model" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(pullCalls).toContain("bad-build-model"));
+		await waitFor(() => {
+			const banner = screen.getByText(/Check the model identifier you entered and retry/);
+			expect(banner.textContent).toContain("bad-build-model");
+		});
+		expect(patchCalls).toHaveLength(0);
+	});
+
+	it("clears a failed build-model pull after the identifier is corrected and saves", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace([
+			// The save-time validation pull fails for the invalid identifier.
+			{ ok: false, error: "pull model manifest: file does not exist" },
+			// Corrected identifiers pull successfully.
+			{ ok: true },
+			{ ok: true },
+		]);
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const buildSelect = (await screen.findByLabelText(/pi_agent_build_model/)) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(buildSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		fireEvent.change(buildSelect, { target: { value: "private" } });
+		const input = (await screen.findByLabelText("pi_agent_build_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-build-model" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+		await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/)).not.toBeNull());
+		expect(patchCalls).toHaveLength(0);
+
+		// Correct the identifier; the blur re-pull succeeds and the error clears.
+		fireEvent.change(input, { target: { value: "good-build-model" } });
+		fireEvent.blur(input);
+		await waitFor(() => expect(pullCalls).toContain("good-build-model"));
+		await waitFor(() => expect(screen.queryByText(/Check the model identifier you entered and retry/)).toBeNull());
+
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+		await waitFor(() => expect(patchCalls).toHaveLength(1));
+		expect(patchCalls[0].body).toEqual({ pi_agent_build_model: "good-build-model" });
 	});
 
 	it("renders an error with a retry control when the Ollama container cannot be reached", async () => {

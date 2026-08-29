@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveConfiguredModel } from "./model-selection.js";
+import {
+	resolveConfiguredModel,
+	resolveLaunchModel,
+	type LaunchModelSettings,
+} from "./model-selection.js";
 
 interface TestModel {
 	provider: string;
@@ -117,4 +121,66 @@ describe("resolveConfiguredModel", () => {
 		expect(resolveConfiguredModel(registry, undefined)).toBeUndefined();
 	});
 
+});
+
+describe("resolveLaunchModel", () => {
+	const allModels: LaunchModelSettings = {
+		piAgentModel: "default-model",
+		piAgentBuildModel: "build-model",
+		piAgentRefinementModel: "refinement-model",
+	};
+
+	it("resolves the build model for issue build launch kinds", () => {
+		expect(resolveLaunchModel(allModels, "issue")).toBe("build-model");
+		expect(resolveLaunchModel(allModels, "comment")).toBe("build-model");
+		expect(resolveLaunchModel(allModels, "pr-review")).toBe("build-model");
+	});
+
+	it("resolves the refinement model for issue-refinement launches", () => {
+		expect(resolveLaunchModel(allModels, "issue-refinement")).toBe("refinement-model");
+	});
+
+	it("falls back to the default model when the build model is unset", () => {
+		expect(
+			resolveLaunchModel(
+				{ piAgentModel: "default-model", piAgentRefinementModel: "refinement-model" },
+				"comment",
+			),
+		).toBe("default-model");
+	});
+
+	it("falls back to the default model when the refinement model is unset", () => {
+		expect(
+			resolveLaunchModel(
+				{ piAgentModel: "default-model", piAgentBuildModel: "build-model" },
+				"issue-refinement",
+			),
+		).toBe("default-model");
+	});
+
+	it("returns undefined when no model is configured", () => {
+		expect(resolveLaunchModel({}, "issue")).toBeUndefined();
+		expect(resolveLaunchModel({}, "issue-refinement")).toBeUndefined();
+		expect(resolveLaunchModel({}, undefined)).toBeUndefined();
+	});
+
+	it("treats blank specialized values as unset", () => {
+		expect(
+			resolveLaunchModel({ piAgentModel: "default-model", piAgentBuildModel: "   " }, "issue"),
+		).toBe("default-model");
+		expect(
+			resolveLaunchModel({ piAgentModel: "default-model", piAgentRefinementModel: "" }, "issue-refinement"),
+		).toBe("default-model");
+	});
+
+	it("trims the resolved model identifier", () => {
+		expect(resolveLaunchModel({ piAgentBuildModel: "  build-model  " }, "pr-review")).toBe("build-model");
+		expect(resolveLaunchModel({ piAgentRefinementModel: " refinement-model " }, "issue-refinement")).toBe(
+			"refinement-model",
+		);
+	});
+
+	it("treats a launch with no known kind as a build launch", () => {
+		expect(resolveLaunchModel(allModels, undefined)).toBe("build-model");
+	});
 });
