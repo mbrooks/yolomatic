@@ -75,6 +75,7 @@ function makeManagedRepo(overrides: Partial<Repository> = {}): Repository {
 		visibility: null,
 		githubEventMode: null,
 		defaultBranch: null,
+		piAgentBuildModel: null,
 		createdAt: "",
 		updatedAt: "",
 		...overrides,
@@ -282,7 +283,8 @@ describe("defaultRuntimeFactory", () => {
 				resolveWorkerTemplate: vi.fn(() => DEFAULT_WORKER_TEMPLATE),
 				resolveAdminBaseUrl: vi.fn(() => undefined),
 				resolveIssueAdminLinkInCommentsEnabled: vi.fn(() => true),
-			resolveIssueNewCommentEnabled: vi.fn(() => true),
+				resolveIssueNewCommentEnabled: vi.fn(() => true),
+				resolveRepoBuildModel: vi.fn(() => undefined),
 			};
 			const deps = makeDeps();
 			const ctx: RuntimeBuildContext = {
@@ -474,6 +476,34 @@ describe("buildRuntimeGraph", () => {
 		getSync.mockImplementation(() => ({ issueNewCommentEnabled: null, issueAdminLinkInCommentsEnabled: null }));
 
 		expect(resolvers.resolveIssueNewCommentEnabled("mbrooks", "yolomatic")).toBe(false);
+	});
+
+	it("passes a live per-repo build-model resolver that reads the RepositoryStore per call", () => {
+		let buildModel: string | null = null;
+		const managedRepo = makeManagedRepo({ piAgentBuildModel: buildModel });
+		const deps = makeDeps({
+			repositoryStore: {
+				...makeDeps().repositoryStore,
+				getSync: vi.fn((owner: string, repo: string) =>
+					owner === "mbrooks" && repo === "yolomatic" ? { ...managedRepo, piAgentBuildModel: buildModel } : null),
+			} as never,
+		});
+		const factory = vi.fn((ctx: RuntimeBuildContext) => makeFakeFactory()(ctx));
+		const { create } = captureServer();
+		buildRuntimeGraph(baseConfig, deps, { factory, createWebhookServer: create });
+
+		const { resolvers } = factory.mock.calls[0][0];
+		// No override: the repository inherits the global model (undefined override).
+		expect(resolvers.resolveRepoBuildModel("mbrooks", "yolomatic")).toBeUndefined();
+		expect(resolvers.resolveRepoBuildModel("other", "repo")).toBeUndefined();
+
+		// An override configured in the admin UI applies to subsequent sessions
+		// without a restart: the resolver re-reads the live store each call.
+		buildModel = "openai/gpt-4.1";
+		expect(resolvers.resolveRepoBuildModel("mbrooks", "yolomatic")).toBe("openai/gpt-4.1");
+		// Clearing the override returns the repository to the global default.
+		buildModel = null;
+		expect(resolvers.resolveRepoBuildModel("mbrooks", "yolomatic")).toBeUndefined();
 	});
 
 	it("threads the session auth provider from the factory into the server options", () => {

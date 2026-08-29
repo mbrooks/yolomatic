@@ -241,6 +241,124 @@ describe("DockerWorkerLauncher", () => {
 		}
 	});
 
+	const globalModelSettings = () => ({
+		model: {
+			piAgentProvider: "ollama",
+			piAgentModel: "default-model",
+			piAgentBuildModel: "build-model",
+			piAgentRefinementModel: "refinement-model",
+		},
+		logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+	});
+
+	it("applies a per-repository build-model override to build launches and omits the global provider for slash-form models", async () => {
+		const resolveRepoBuildModel = vi.fn((owner: string, repo: string) =>
+			owner === "mbrooks" && repo === "yolomatic" ? "openai/gpt-4.1" : undefined);
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel,
+		});
+
+		execFileSuccess();
+
+		// Build session for the overridden repository: repo model wins and, being
+		// slash-form, suppresses the global PI_AGENT_PROVIDER across providers.
+		const args = await launcher.buildDockerRunArgs("worker-1", LEGACY_TEMPLATE, "comment", {
+			owner: "mbrooks",
+			repo: "yolomatic",
+		});
+		expect(args).toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+		expect(args).not.toContain("PI_AGENT_MODEL=build-model");
+		expect(args).not.toContain("PI_AGENT_MODEL=default-model");
+		expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
+		expect(resolveRepoBuildModel).toHaveBeenCalledWith("mbrooks", "yolomatic");
+	});
+
+	it("applies a bare per-repository model and keeps the global provider forwarded", async () => {
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel: () => "qwen3-coder:30b",
+		});
+
+		execFileSuccess();
+
+		const args = await launcher.buildDockerRunArgs("worker-1", LEGACY_TEMPLATE, "issue", {
+			owner: "mbrooks",
+			repo: "yolomatic",
+		});
+		expect(args).toContain("PI_AGENT_MODEL=qwen3-coder:30b");
+		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+	});
+
+	it("keeps the global build model and provider for a repository without an override", async () => {
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel: () => undefined,
+		});
+
+		execFileSuccess();
+
+		const args = await launcher.buildDockerRunArgs("worker-1", LEGACY_TEMPLATE, "pr-review", {
+			owner: "mbrooks",
+			repo: "other-repo",
+		});
+		expect(args).toContain("PI_AGENT_MODEL=build-model");
+		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+	});
+
+	it("keeps the global behavior for launches without a repository", async () => {
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel: () => "openai/gpt-4.1",
+		});
+
+		execFileSuccess();
+
+		const args = await launcher.buildDockerRunArgs("worker-1", LEGACY_TEMPLATE, "issue");
+		expect(args).toContain("PI_AGENT_MODEL=build-model");
+		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+	});
+
+	it("keeps the global refinement model and provider for a refinement launch of an overridden repository", async () => {
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel: () => "openai/gpt-4.1",
+		});
+
+		execFileSuccess();
+
+		const args = await launcher.buildDockerRunArgs("worker-refine", LEGACY_TEMPLATE, "issue-refinement", {
+			owner: "mbrooks",
+			repo: "yolomatic",
+		});
+		// Refinements always use the global refinement model, and the slash-form
+		// override must not suppress the global provider for refinement launches.
+		expect(args).toContain("PI_AGENT_MODEL=refinement-model");
+		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
+		expect(args).not.toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+	});
+
+	it("threads the repository into the launch plan model env", async () => {
+		const launcher = createLauncher({
+			runtimeSettings: globalModelSettings,
+			resolveRepoBuildModel: () => "openai/gpt-4.1",
+		});
+
+		execFileSuccess();
+
+		const plan = await launcher.createLaunchPlan({
+			sessionKey: "session-repo-override",
+			workerSessionUrl: "ws://control-plane.test/rpc?sessionKey=session-repo-override&token=token-1",
+			containerName: "yolomatic-session-x",
+			workerTemplate: LEGACY_TEMPLATE,
+			promptKind: "issue",
+			repo: { owner: "mbrooks", repo: "yolomatic" },
+		});
+
+		expect(plan.args).toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+		expect(plan.args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
+	});
+
 	it("threads the prompt kind into the launch plan model env", async () => {
 		const launcher = createLauncher({
 			runtimeSettings: () => ({

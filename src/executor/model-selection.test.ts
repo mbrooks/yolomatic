@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	resolveConfiguredModel,
 	resolveLaunchModel,
+	resolveLaunchProvider,
 	type LaunchModelSettings,
 } from "./model-selection.js";
 
@@ -182,5 +183,55 @@ describe("resolveLaunchModel", () => {
 
 	it("treats a launch with no known kind as a build launch", () => {
 		expect(resolveLaunchModel(allModels, undefined)).toBe("build-model");
+	});
+
+	describe("with a per-repository build-model override", () => {
+		it("prefers the repository override over the global chain for build launches", () => {
+			for (const kind of ["issue", "comment", "pr-review", undefined] as const) {
+				expect(resolveLaunchModel(allModels, kind, "openai/gpt-4.1")).toBe("openai/gpt-4.1");
+			}
+		});
+
+		it("ignores the repository override for refinement launches", () => {
+			expect(resolveLaunchModel(allModels, "issue-refinement", "openai/gpt-4.1")).toBe("refinement-model");
+		});
+
+		it("falls back to the global build model when the repository override is unset", () => {
+			expect(resolveLaunchModel(allModels, "issue", undefined)).toBe("build-model");
+			expect(resolveLaunchModel(allModels, "issue", null as unknown as string)).toBe("build-model");
+		});
+
+		it("falls back through the global chain when neither an override nor a build model is set", () => {
+			expect(
+				resolveLaunchModel({ piAgentModel: "default-model" }, "comment", "  "),
+			).toBe("default-model");
+			expect(resolveLaunchModel({}, "comment", undefined)).toBeUndefined();
+		});
+
+		it("trims the repository override before applying it", () => {
+			expect(resolveLaunchModel(allModels, "issue", "  openai/gpt-4.1  ")).toBe("openai/gpt-4.1");
+		});
+	});
+});
+
+describe("resolveLaunchProvider", () => {
+	it("returns the trimmed global provider when no repository override applies", () => {
+		expect(resolveLaunchProvider("  ollama ", undefined)).toBe("ollama");
+		expect(resolveLaunchProvider("ollama", undefined)).toBe("ollama");
+	});
+
+	it("forwards the global provider for a bare repository model", () => {
+		expect(resolveLaunchProvider("ollama", "qwen3-coder:30b")).toBe("ollama");
+	});
+
+	it("omits the global provider for a slash-form repository model so it controls its own provider", () => {
+		expect(resolveLaunchProvider("ollama", "openai/gpt-4.1")).toBeUndefined();
+		expect(resolveLaunchProvider(undefined, "openai/gpt-4.1")).toBeUndefined();
+	});
+
+	it("returns undefined when the provider is missing or blank", () => {
+		expect(resolveLaunchProvider(undefined, "bare-model")).toBeUndefined();
+		expect(resolveLaunchProvider("   ", "bare-model")).toBeUndefined();
+		expect(resolveLaunchProvider(undefined, undefined)).toBeUndefined();
 	});
 });

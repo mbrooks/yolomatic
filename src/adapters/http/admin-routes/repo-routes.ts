@@ -11,6 +11,7 @@ import {
 	type RepoGitHubEventMode,
 	type Repository,
 	normalizeRepoBooleanOverride,
+	resolveRepoBuildModelOverride,
 } from "../../../repos/repository.js";
 import { NotFoundError } from "../admin-router-shared.js";
 import { getWorkerTemplate, listWorkerTemplates } from "../../../worker/templates.js";
@@ -21,7 +22,8 @@ interface RepoSettingView {
 		| "default_branch"
 		| "worker_template"
 		| "issue_new_comment_enabled"
-		| "issue_admin_link_in_comments_enabled";
+		| "issue_admin_link_in_comments_enabled"
+		| "pi_agent_build_model";
 	value: string;
 	default: string;
 	override: string | null;
@@ -54,6 +56,11 @@ function buildRepoSettingViews(
 	const globalWorkerTemplate = deps.settingsStore!.getString("default_worker_template", "node");
 	const globalNewComment = deps.settingsStore!.getBoolean("issue_new_comment_enabled", true);
 	const globalAdminLink = deps.settingsStore!.getBoolean("issue_admin_link_in_comments_enabled", true);
+	// Effective global build model: the build-model setting wins over the
+	// plain default model, mirroring the worker launch chain.
+	const globalBuildModel =
+		deps.settingsStore!.getString("pi_agent_build_model", "").trim()
+		|| deps.settingsStore!.getString("pi_agent_model", "").trim();
 	return [
 		{
 			key: "github_event_mode",
@@ -111,6 +118,17 @@ function buildRepoSettingViews(
 			description: "Include a link to the admin UI in the status comments Yolomatic posts on issues.",
 			options: ["true", "false"],
 			optionLabels: { true: "Enabled", false: "Disabled" },
+		},
+		{
+			key: "pi_agent_build_model",
+			value: resolveRepoBuildModelOverride(configured) ?? globalBuildModel,
+			default: globalBuildModel,
+			override: resolveRepoBuildModelOverride(configured) ?? null,
+			inherited: !resolveRepoBuildModelOverride(configured),
+			// Model settings take effect without a restart, matching the global
+			// pi_agent_model setting's no-restart contract.
+			requiresRestart: false,
+			description: "Build model used for this repository's implementation, feedback, and PR-review sessions. Use provider/model form to target a different provider, or leave empty to inherit the global model. Issue refinements always use the global model.",
 		},
 	];
 }
@@ -223,6 +241,7 @@ const registry = new AdminRouteRegistry()
 				worker_template?: string;
 				issue_new_comment_enabled?: string;
 				issue_admin_link_in_comments_enabled?: string;
+				pi_agent_build_model?: string;
 			};
 			const existing = await repositoryStore.get(owner, repo);
 			let nextGithubEventMode = existing?.githubEventMode ?? null;
@@ -230,6 +249,7 @@ const registry = new AdminRouteRegistry()
 			let nextWorkerTemplate = existing?.workerTemplate ?? null;
 			let nextIssueNewCommentEnabled = existing?.issueNewCommentEnabled ?? null;
 			let nextIssueAdminLinkInCommentsEnabled = existing?.issueAdminLinkInCommentsEnabled ?? null;
+			let nextPiAgentBuildModel = resolveRepoBuildModelOverride(existing) ?? null;
 			const requiresRestart: string[] = [];
 
 			if ("github_event_mode" in body) {
@@ -287,6 +307,13 @@ const registry = new AdminRouteRegistry()
 				nextIssueAdminLinkInCommentsEnabled = normalized;
 			}
 
+			// Free-text build-model override, mirroring the global pi_agent_model
+			// setting: no registry validation here. An unresolvable value is
+			// handled by the worker's resolve-and-warn-fallback path at launch.
+			if ("pi_agent_build_model" in body) {
+				nextPiAgentBuildModel = body.pi_agent_build_model?.trim() || null;
+			}
+
 			if (existing) {
 				await repositoryStore.upsert({
 					owner: existing.owner,
@@ -298,6 +325,7 @@ const registry = new AdminRouteRegistry()
 					workerTemplate: nextWorkerTemplate,
 					issueNewCommentEnabled: nextIssueNewCommentEnabled,
 					issueAdminLinkInCommentsEnabled: nextIssueAdminLinkInCommentsEnabled,
+					piAgentBuildModel: nextPiAgentBuildModel,
 				});
 			} else {
 				await repositoryStore.upsert({
@@ -308,9 +336,10 @@ const registry = new AdminRouteRegistry()
 					workerTemplate: nextWorkerTemplate,
 					issueNewCommentEnabled: nextIssueNewCommentEnabled,
 					issueAdminLinkInCommentsEnabled: nextIssueAdminLinkInCommentsEnabled,
+					piAgentBuildModel: nextPiAgentBuildModel,
 				});
 			}
-			return { status: 200, body: { updated: ["github_event_mode", "default_branch", "worker_template", "issue_new_comment_enabled", "issue_admin_link_in_comments_enabled"], requiresRestart } };
+			return { status: 200, body: { updated: ["github_event_mode", "default_branch", "worker_template", "issue_new_comment_enabled", "issue_admin_link_in_comments_enabled", "pi_agent_build_model"], requiresRestart } };
 		},
 	})
 	.route({

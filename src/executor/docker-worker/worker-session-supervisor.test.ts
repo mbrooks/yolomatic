@@ -395,6 +395,20 @@ describe("WorkerSessionSupervisor", () => {
 		expect(harness.launchPlanRequests[0]).toMatchObject({ promptKind: "comment" });
 	});
 
+	it("forwards the session's repository identity into the launch plan", async () => {
+		const harness = createHarness(612);
+		const { sessionKey, params } = makeRunParams(612);
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, { status: "complete", summary: "done", rawResponse: "" });
+		await workerConnection.send(createWorkerMessage("hello", sessionKey, "hello-1", { workerVersion: "test", pid: 123 }));
+		await sessionPromise;
+
+		expect(harness.launchPlanRequests).toHaveLength(1);
+		expect(harness.launchPlanRequests[0]).toMatchObject({ repo: { owner: "mbrooks", repo: "yolomatic" } });
+	});
+
 	it("passes issue-refinement as the prompt kind for refinement sessions", async () => {
 		const harness = createHarness(611);
 		const { sessionKey, params } = makeRunParams(611, "issue-refinement");

@@ -88,8 +88,35 @@ export interface LaunchModelSettings {
 export function resolveLaunchModel(
 	models: LaunchModelSettings,
 	kind?: WorkerPromptKind,
+	repoBuildModel?: string,
 ): string | undefined {
+	// A per-repository build-model override applies only to build sessions;
+	// issue refinements always run on the global model chain.
+	const repoModel = kind === "issue-refinement" ? undefined : repoBuildModel?.trim() || undefined;
 	const specialized =
 		kind === "issue-refinement" ? models.piAgentRefinementModel?.trim() : models.piAgentBuildModel?.trim();
-	return specialized || models.piAgentModel?.trim() || undefined;
+	return repoModel || specialized || models.piAgentModel?.trim() || undefined;
+}
+
+/**
+ * Resolve the provider to forward to a worker container as
+ * `PI_AGENT_PROVIDER` for a launch honoring a per-repository build-model
+ * override.
+ *
+ * The global provider is forwarded when there is no repo override or when the
+ * override is a bare model id (resolved within the instance-wide provider).
+ * A slash-form override (`provider/model`) carries its own provider, so the
+ * global provider must NOT be forwarded: an explicit provider takes
+ * precedence over `provider/model` parsing and would break resolution across
+ * providers (e.g. global Ollama with a repo `openai/gpt-4.1`).
+ */
+export function resolveLaunchProvider(
+	provider: string | undefined,
+	repoBuildModel?: string,
+): string | undefined {
+	const repoModel = repoBuildModel?.trim();
+	if (repoModel && repoModel.indexOf("/") > 0) {
+		return undefined;
+	}
+	return provider?.trim() || undefined;
 }

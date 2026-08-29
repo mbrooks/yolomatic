@@ -959,6 +959,35 @@ describe("PiAgentExecutor runtime settings injection", () => {
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});
 
+	it("warns and falls back to pi defaults for an unresolvable per-repository model", async () => {
+		// A repository selects e.g. openai/gpt-4.1 but the registry cannot resolve
+		// it: the session must keep running on pi defaults with a warning, not throw.
+		const soulPath = await makeSoulPath();
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue({
+			runtime: { getModel: vi.fn(), getModels: vi.fn(() => []) },
+			find: vi.fn(),
+			getAll: vi.fn(() => []),
+			diagnostics: null,
+		});
+		const mockSession = { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] };
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+		// Mirrors the forwarded env of a slash-form repo override: model set, no
+		// PI_AGENT_PROVIDER forwarded.
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: { model: { piAgentModel: "openai/missing-model" }, logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true } },
+		});
+		const result = await executor.execute(makeState(503));
+
+		expect(result.status).toBe("complete");
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Configured model openai/missing-model did not resolve"));
+		expect(stderr).toHaveBeenCalledWith(expect.stringContaining("using pi defaults"));
+		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: undefined }));
+		stderr.mockRestore();
+	});
+
 	function mockFullSession(content = "YOLO_STATUS: complete\nDone.", extra: Record<string, unknown> = {}) {
 		const unsubscribe = vi.fn();
 		const mockSession = {

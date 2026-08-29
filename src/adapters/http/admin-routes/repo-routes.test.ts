@@ -59,6 +59,7 @@ describe("handleRepoRoutes", () => {
 			if (key === "github_event_mode") return "webhook";
 			if (key === "default_branch") return "main";
 			if (key === "default_worker_template") return "node";
+			if (key === "pi_agent_model") return "kimi-k2.7-code:cloud";
 			return fallback ?? "";
 		}),
 		getBoolean: vi.fn((key: string, fallback?: boolean) => {
@@ -105,6 +106,8 @@ describe("handleRepoRoutes", () => {
 					input.issueAdminLinkInCommentsEnabled !== undefined
 						? input.issueAdminLinkInCommentsEnabled
 						: existing?.issueAdminLinkInCommentsEnabled ?? null,
+				piAgentBuildModel:
+					input.piAgentBuildModel !== undefined ? input.piAgentBuildModel : existing?.piAgentBuildModel ?? null,
 				createdAt: existing?.createdAt ?? "2026-01-01T00:00:00.000Z",
 				updatedAt: "2026-01-01T00:00:00.000Z",
 			};
@@ -140,6 +143,7 @@ describe("handleRepoRoutes", () => {
 			visibility: null,
 			githubEventMode: null,
 			defaultBranch: null,
+			piAgentBuildModel: null,
 			createdAt: "2026-01-01T00:00:00.000Z",
 			updatedAt: "2026-01-01T00:00:00.000Z",
 			...overrides,
@@ -299,6 +303,7 @@ describe("handleRepoRoutes", () => {
 				expect.objectContaining({ key: "worker_template", value: "node", override: null, inherited: true }),
 				expect.objectContaining({ key: "issue_new_comment_enabled", value: "true", override: null, inherited: true }),
 				expect.objectContaining({ key: "issue_admin_link_in_comments_enabled", value: "true", override: null, inherited: true }),
+				expect.objectContaining({ key: "pi_agent_build_model", value: "kimi-k2.7-code:cloud", override: null, inherited: true }),
 			]);
 		});
 
@@ -334,7 +339,179 @@ describe("handleRepoRoutes", () => {
 				}),
 				expect.objectContaining({ key: "issue_new_comment_enabled", value: "true", override: null, inherited: true }),
 				expect.objectContaining({ key: "issue_admin_link_in_comments_enabled", value: "true", override: null, inherited: true }),
+				expect.objectContaining({ key: "pi_agent_build_model", value: "kimi-k2.7-code:cloud", override: null, inherited: true, requiresRestart: false }),
 			]);
+		});
+
+		it("exposes the build-model view with the global build model as the default", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const globalSettingsStore = {
+				get: vi.fn(() => undefined),
+				getString: vi.fn((key: string, fallback?: string) => {
+					if (key === "github_event_mode") return "webhook";
+					if (key === "default_branch") return "main";
+					if (key === "default_worker_template") return "node";
+					if (key === "pi_agent_build_model") return "ollama/build-model";
+					return fallback ?? "";
+				}),
+				getBoolean: vi.fn((_key: string, fallback?: boolean) => fallback ?? false),
+				set: vi.fn(),
+			};
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({
+					repositoryStore: repoStore,
+					settingsStore: globalSettingsStore as unknown as AdminRouterDeps["settingsStore"],
+				}),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			// Without an override the repo inherits the global build model.
+			const buildView = body.settings.find((s: any) => s.key === "pi_agent_build_model");
+			expect(buildView).toEqual(expect.objectContaining({
+				key: "pi_agent_build_model",
+				value: "ollama/build-model",
+				default: "ollama/build-model",
+				override: null,
+				inherited: true,
+				requiresRestart: false,
+			}));
+			// Free-text field (only the global model setting exists), so no options.
+			expect(buildView.options).toBeUndefined();
+		});
+
+		it("exposes the global default model (not the build model) as the view default when no build model is set", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			const body = JSON.parse(String(res.body));
+			const model = body.settings.find((s: any) => s.key === "pi_agent_build_model");
+			expect(model).toEqual(expect.objectContaining({
+				value: "kimi-k2.7-code:cloud",
+				default: "kimi-k2.7-code:cloud",
+				override: null,
+				inherited: true,
+				requiresRestart: false,
+			}));
+		});
+
+		it("reports a stored build-model override with its effective value", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([
+				managedRepo("mbrooks", "yolomatic", { piAgentBuildModel: "openai/gpt-4.1" }),
+			]);
+
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			const model = body.settings.find((s: any) => s.key === "pi_agent_build_model");
+			expect(model).toEqual(expect.objectContaining({
+				value: "openai/gpt-4.1",
+				default: "kimi-k2.7-code:cloud",
+				override: "openai/gpt-4.1",
+				inherited: false,
+				requiresRestart: false,
+			}));
+		});
+
+		it("persists a trimmed build-model override without requiring a restart", async () => {
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request(
+					"/api/repos/mbrooks/yolomatic/settings",
+					"PATCH",
+					JSON.stringify({ pi_agent_build_model: "  openai/gpt-4.1  " }),
+				),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			expect(body.requiresRestart).not.toContain("pi_agent_build_model");
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({ piAgentBuildModel: "openai/gpt-4.1" }));
+		});
+
+		it("clears the build-model override when an empty value is submitted", async () => {
+			const repoStore = makeRepoStore([
+				managedRepo("mbrooks", "yolomatic", { piAgentBuildModel: "openai/gpt-4.1" }),
+			]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "PATCH", JSON.stringify({ pi_agent_build_model: "" })),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({ piAgentBuildModel: null }));
+		});
+
+		it("preserves the build-model override when patching an unrelated setting", async () => {
+			const repoStore = makeRepoStore([
+				managedRepo("mbrooks", "yolomatic", { piAgentBuildModel: "openai/gpt-4.1" }),
+			]);
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "PATCH", JSON.stringify({ default_branch: "master" })),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
+				defaultBranch: "master",
+				piAgentBuildModel: "openai/gpt-4.1",
+			}));
+		});
+
+		it("creates an unmanaged repository row when persisting a build-model override", async () => {
+			const repoStore = makeRepoStore();
+			const res = response();
+			const handled = await handleRepoRoutes(
+				request(
+					"/api/repos/mbrooks/yolomatic/settings",
+					"PATCH",
+					JSON.stringify({ pi_agent_build_model: "openai/gpt-4.1" }),
+				),
+				res,
+				makeDeps({ repositoryStore: repoStore }),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			expect(repoStore.upsert).toHaveBeenCalledWith(expect.objectContaining({
+				owner: "mbrooks",
+				repo: "yolomatic",
+				piAgentBuildModel: "openai/gpt-4.1",
+			}));
 		});
 
 		it("updates a project worker-template override and rejects unknown templates", async () => {

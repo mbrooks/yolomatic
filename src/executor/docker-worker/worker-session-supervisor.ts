@@ -62,6 +62,7 @@ export class WorkerSessionSupervisor {
 			containerName: params.containerName,
 			workerTemplate: params.workerTemplate,
 			promptKind: params.prompt.kind,
+			repo: { owner: params.state.owner, repo: params.state.repo },
 		});
 
 		let connection: WorkerRpcConnection | undefined;
