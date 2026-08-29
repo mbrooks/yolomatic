@@ -146,6 +146,12 @@
       "reason": "Persistent session log storage boundary; mocking isolates worker tests from filesystem I/O."
     },
     {
+      "testFile": "src/executor/docker-worker/worker-session-supervisor.test.ts",
+      "module": "../../logging/session-log-store.js",
+      "category": "external-adapter",
+      "reason": "Persistent session log storage boundary; mocking isolates supervisor tests from filesystem I/O."
+    },
+    {
       "testFile": "src/worker/runtime.test.ts",
       "module": "../executor/index.js",
       "category": "legacy",
