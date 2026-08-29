@@ -11,12 +11,33 @@ export type LlmModelFetcher = (
 export type LlmModelPullResult = { ok: boolean; error?: string };
 export type LlmModelPuller = (model: string) => Promise<LlmModelPullResult>;
 
+/** A settled pull outcome for a specific model identifier, reported upward. */
+export interface LlmModelPullUpdate {
+	model: string;
+	ok: boolean;
+	error?: string;
+}
+
+/** Callback invoked whenever a pull settles (or a listed model is selected). */
+export type OnLlmModelPullResult = (update: LlmModelPullUpdate) => void;
+
+/**
+ * Builds the user-facing failure message for a model identifier whose Ollama
+ * pull failed, including the underlying error and retry guidance. Shared by
+ * the Settings save gate and the onboarding wizard step gate.
+ */
+export function describePullFailure(model: string, error?: string): string {
+	return `Could not pull Ollama model "${model}": ${error?.trim() || "unknown error"}. Check the model identifier you entered and retry.`;
+}
+
 interface LlmModelSelectProps {
 	provider: string;
 	value: string;
 	onChange: (value: string) => void;
 	fetcher: LlmModelFetcher;
 	puller?: LlmModelPuller;
+	/** Reports settled pull outcomes so parents can gate save/advance on them. */
+	onPullResult?: OnLlmModelPullResult;
 	apiKey?: string;
 	label?: string;
 	id?: string;
@@ -37,6 +58,7 @@ export function LlmModelSelect({
 	onChange,
 	fetcher,
 	puller,
+	onPullResult,
 	apiKey,
 	label = "LLM Model",
 	id = "pi_agent_model",
@@ -68,19 +90,26 @@ export function LlmModelSelect({
 					if (sequence !== pullSequence.current) return;
 					if (result.ok) {
 						setPullWarning(null);
+						onPullResult?.({ model: trimmed, ok: true });
 						return;
 					}
 					setPullWarning(
 						`Could not pull Ollama model: ${result.error?.trim() || "unknown error"}`,
 					);
+					onPullResult?.({
+						model: trimmed,
+						ok: false,
+						error: result.error?.trim() || undefined,
+					});
 				})
 				.catch((err) => {
 					if (sequence !== pullSequence.current) return;
 					const message = err instanceof Error ? err.message : String(err);
 					setPullWarning(`Could not pull Ollama model: ${message}`);
+					onPullResult?.({ model: trimmed, ok: false, error: message });
 				});
 		},
-		[normalizedProvider, puller],
+		[normalizedProvider, puller, onPullResult],
 	);
 
 	// Load the model list whenever the provider or supplied API key changes.
@@ -161,8 +190,13 @@ export function LlmModelSelect({
 			setPrivateActive(false);
 			setPullWarning(null);
 			onChange(selected);
+			// A model from the fetched list needs no pull; report it as valid so
+			// a parent gating on pull outcomes supersedes any earlier failure.
+			if (normalizedProvider === "ollama" && puller) {
+				onPullResult?.({ model: selected, ok: true });
+			}
 		},
-		[onChange, privateValue, triggerPull],
+		[onChange, privateValue, triggerPull, normalizedProvider, puller, onPullResult],
 	);
 
 	const handlePrivateChange = useCallback(
@@ -190,11 +224,15 @@ export function LlmModelSelect({
 
 	const showPrivateInput = privateActive;
 
+	// A failed-pull warning must survive transient re-renders where the parent
+	// briefly shows a stale listed value (e.g. the refresh after saving); only
+	// a provider without pull capability makes the warning meaningless.
 	useEffect(() => {
-		if (!privateActive && pullWarning !== null) {
+		if (pullWarning === null) return;
+		if (normalizedProvider !== "ollama" || !puller) {
 			setPullWarning(null);
 		}
-	}, [privateActive, pullWarning]);
+	}, [normalizedProvider, puller, pullWarning]);
 
 	return (
 		<div className="llm-model-select">

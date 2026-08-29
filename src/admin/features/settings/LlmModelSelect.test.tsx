@@ -259,6 +259,144 @@ describe("LlmModelSelect", () => {
 		await waitFor(() => expect(screen.queryByText(/Could not pull Ollama model/i)).toBeNull());
 	});
 
+	it("reports settled pull outcomes upstream for listed selections and custom pulls", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const puller = vi
+			.fn()
+			.mockResolvedValueOnce({ ok: true })
+			.mockResolvedValueOnce({ ok: false, error: "pull model manifest: file does not exist" });
+		const onPullResult = vi.fn();
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value="llama2"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+				onPullResult={onPullResult}
+			/>,
+		);
+
+		const select = (await screen.findByLabelText("LLM Model")) as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+
+		// Re-selecting the listed model reports ok without any pull call.
+		fireEvent.change(select, { target: { value: "llama2" } });
+		expect(puller).not.toHaveBeenCalled();
+		expect(onPullResult).toHaveBeenCalledWith({ model: "llama2", ok: true });
+
+		// Selecting private triggers a pull of the current value that succeeds.
+		fireEvent.change(select, { target: { value: PRIVATE_MODEL_VALUE } });
+		await waitFor(() => expect(puller).toHaveBeenCalledWith("llama2"));
+		await waitFor(() => expect(onPullResult).toHaveBeenNthCalledWith(2, { model: "llama2", ok: true }));
+
+		// Blurring a failed custom identifier reports the failure with the error.
+		const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "custom:tag" } });
+		fireEvent.blur(input);
+		await waitFor(() => expect(puller).toHaveBeenNthCalledWith(2, "custom:tag"));
+		await screen.findByText(/Could not pull Ollama model/i);
+		await waitFor(() =>
+			expect(onPullResult).toHaveBeenNthCalledWith(3, {
+				model: "custom:tag",
+				ok: false,
+				error: "pull model manifest: file does not exist",
+			}),
+		);
+	});
+
+	it("does not pull or report outcomes when no puller is wired", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const onPullResult = vi.fn();
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value="llama2"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				onPullResult={onPullResult}
+			/>,
+		);
+		const select = (await screen.findByLabelText("LLM Model")) as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+		fireEvent.change(select, { target: { value: "llama2" } });
+		expect(onPullResult).not.toHaveBeenCalled();
+	});
+
+	it("keeps a failed-pull warning when the parent value round-trips through a stale listed value", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const puller = vi.fn(async () => ({ ok: false, error: "pull model manifest: file does not exist" }));
+		const { rerender } = render(
+			<LlmModelSelect
+				provider="ollama"
+				value="custom-model"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+
+		const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+		fireEvent.blur(input);
+		await screen.findByText(/Could not pull Ollama model/i);
+
+		// A parent refresh briefly renders a stale listed value: the private
+		// input hides, but the warning must not be discarded.
+		rerender(
+			<LlmModelSelect
+				provider="ollama"
+				value="llama2"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+		await waitFor(() => expect(screen.queryByLabelText("LLM Model (custom identifier)")).toBeNull());
+
+		// When the parent returns to the custom value, the warning is still there.
+		rerender(
+			<LlmModelSelect
+				provider="ollama"
+				value="custom-model"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+		await waitFor(() => expect(screen.getByLabelText("LLM Model (custom identifier)")).not.toBeNull());
+		expect(screen.getByText(/Could not pull Ollama model/i)).not.toBeNull();
+	});
+
+	it("clears a failed-pull warning when the provider changes away from ollama", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const puller = vi.fn(async () => ({ ok: false, error: "pull model manifest: file does not exist" }));
+		const { rerender } = render(
+			<LlmModelSelect
+				provider="ollama"
+				value="custom-model"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				puller={puller}
+			/>,
+		);
+
+		const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+		fireEvent.blur(input);
+		await screen.findByText(/Could not pull Ollama model/i);
+
+		fetcher.mockResolvedValue({ models: ["gpt-5.2-codex"] });
+		rerender(
+			<LlmModelSelect
+				provider="openai"
+				value="gpt-5.2-codex"
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				apiKey="sk-test"
+			/>,
+		);
+		await waitFor(() => expect(screen.queryByText(/Could not pull Ollama model/i)).toBeNull());
+	});
+
 	it("does not fetch for an unsupported provider", async () => {
 		render(
 			<LlmModelSelect

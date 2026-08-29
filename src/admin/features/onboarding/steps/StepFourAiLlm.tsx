@@ -1,27 +1,37 @@
 import React from "react";
 import { LLM_PROVIDER_OPTIONS } from "../../../../domain/onboarding/policy.js";
 import { OllamaSignInPanel } from "../../settings/OllamaSignInPanel.js";
-import { LlmModelSelect } from "../../settings/LlmModelSelect.js";
+import { LlmModelSelect, describePullFailure } from "../../settings/LlmModelSelect.js";
 import {
 	fetchOnboardingLlmModels,
 	fetchOnboardingOllamaSignInStatus,
 	pullOnboardingOllamaModel,
 } from "../../../api/onboarding.js";
 import { DEFAULT_OLLAMA_CONTAINER_NAME } from "../wizard-state.js";
-import type { UpdateField, WizardState } from "../wizard-state.js";
+import { isAiLlmPullBlocked } from "../wizard-validation.js";
+import type { PiAgentModelPullOutcome, UpdateField, WizardState } from "../wizard-state.js";
 
 export interface StepFourAiLlmProps {
 	state: WizardState;
 	updateField: UpdateField;
+	/** Reports settled Ollama pull outcomes so the wizard can gate advancing. */
+	onPullResult?: (outcome: PiAgentModelPullOutcome) => void;
 }
 
 export function StepFourAiLlm({
 	state,
 	updateField,
+	onPullResult,
 }: StepFourAiLlmProps): React.ReactElement {
 	const provider = state.piAgentProvider.trim();
 	const isOllama = provider === "ollama";
 	const isOpenAi = provider === "openai";
+	const modelPullBlocked = isAiLlmPullBlocked(
+		state.piAgentProvider,
+		state.piAgentModel,
+		state.piAgentModelPullOutcome,
+	);
+	const modelPullOutcome = state.piAgentModelPullOutcome;
 	return (
 		<div className="onboarding-form">
 			<div className="form-group">
@@ -95,10 +105,16 @@ export function StepFourAiLlm({
 					onChange={(val) => updateField("piAgentModel", val)}
 					fetcher={fetchOnboardingLlmModels}
 					puller={isOllama ? pullOnboardingOllamaModel : undefined}
+					onPullResult={isOllama ? onPullResult : undefined}
 					apiKey={isOpenAi ? state.openaiApiKey.trim() : undefined}
 					id="pi_agent_model"
 					label="LLM Model"
 				/>
+				{modelPullBlocked && modelPullOutcome && (
+					<div className="error-banner" role="alert">
+						{describePullFailure(modelPullOutcome.model, modelPullOutcome.error)}
+					</div>
+				)}
 				<span className="setting-description">
 					The model identifier worker containers use when invoking the LLM. This
 					matches the free-text field on Settings → AI / LLM.

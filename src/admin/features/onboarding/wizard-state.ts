@@ -55,11 +55,23 @@ export interface WizardState {
 	webhookSecretProtected: boolean;
 	piAgentProvider: string;
 	piAgentModel: string;
+	piAgentModelPullOutcome: PiAgentModelPullOutcome | null;
 	ollamaContainerName: string;
 	openaiApiKey: string;
 	openaiApiKeyProtected: boolean;
 	repositories: ManagedRepo[];
 	error: string | null;
+}
+
+/**
+ * The latest settled Ollama pull outcome for a model identifier, reported by
+ * the AI / LLM step's model selector. A failed outcome for the identifier
+ * currently in the wizard blocks advancing past the step.
+ */
+export interface PiAgentModelPullOutcome {
+	model: string;
+	ok: boolean;
+	error?: string;
 }
 
 /** Updates a single wizard state field. */
@@ -95,6 +107,7 @@ export function getDefaultState(): WizardState {
 		webhookSecretProtected: false,
 		piAgentProvider: "ollama",
 		piAgentModel: "",
+		piAgentModelPullOutcome: null,
 		ollamaContainerName: DEFAULT_OLLAMA_CONTAINER_NAME,
 		openaiApiKey: "",
 		openaiApiKeyProtected: false,

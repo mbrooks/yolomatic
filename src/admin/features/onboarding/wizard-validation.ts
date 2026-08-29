@@ -11,6 +11,7 @@ import {
 	isWebhookMode,
 	parsePollIntervalMs,
 } from "../../../domain/onboarding/policy.js";
+import type { PiAgentModelPullOutcome } from "./wizard-state.js";
 
 /**
  * Validates the GitHub event-mode wizard step.
@@ -61,4 +62,23 @@ export function isAiLlmStepValid(
 		return false;
 	}
 	return true;
+}
+
+/**
+ * Determines whether advancing past the AI / LLM step is blocked because the
+ * most recent settled Ollama pull for the wizard's current model identifier
+ * failed. Only applies to the `ollama` provider (no puller is wired for
+ * `openai`) and only while the failed identifier is still the one being
+ * committed; editing the model supersedes the stale failure until the next
+ * pull settles.
+ */
+export function isAiLlmPullBlocked(
+	provider: string,
+	model: string,
+	outcome: PiAgentModelPullOutcome | null,
+): boolean {
+	if (!outcome || outcome.ok) {
+		return false;
+	}
+	return provider.trim() === "ollama" && outcome.model === model.trim();
 }
