@@ -21,7 +21,7 @@
     "guardrail:test": "npm run preflight && NODE_ENV=development npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "@earendil-works/pi-coding-agent": "^0.84.4",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@octokit/rest": "^22.0.1",
@@ -33,18 +33,18 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/react": "^16.3.2",
-    "@types/node": "^26.2.0",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.5",
     "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/coverage-v8": "^4.1.10",
-    "happy-dom": "^20.11.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "happy-dom": "^20.11.15",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }
