@@ -20,6 +20,7 @@ import {
 	type RuntimeSettingsProvider,
 } from "../runtime-settings.js";
 import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, buildRefinementJsonCorrectionPrompt, buildStatusCorrectionPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
+import { describeModelRun } from "./model-log.js";
 import { detectStatusMarker, getLastAssistantText, isExecutionEnvironmentBlocker, isRateLimitError, parseExecutionResult, parseRefinementResult, type ExecutionResult, type RefinementResult } from "./results.js";
 import { extractTokenUsage, mergeUsage, type TokenUsage } from "./usage.js";
 import { loadSoulContent } from "./soul-loader.js";
@@ -204,20 +205,21 @@ export class PiAgentExecutor implements ExecutionService {
 			process.stderr.write(`Warning: ${configuredModelWarning}.\n`);
 		}
 
-		const resolvedModelId = configuredModel
-			? `${configuredModel.provider}/${configuredModel.id}`
-			: "(pi defaults)";
-		recordSessionLog(key, {
-			level: "info",
-			message: `Using model: ${resolvedModelId}` + (configuredModelWarning ? ` (${configuredModelWarning})` : ""),
-			details: {
-				type: "model",
-				provider: configuredModel?.provider,
-				modelId: configuredModel?.id,
-				configured: configuredModelSpec ?? null,
-				modelRegistryDiagnostics: modelRegistry.diagnostics ?? null,
-			},
-		});
+		if (!configuredModel) {
+			// Pi defaults (or an unresolved configuration): no model details are
+			// available, so keep the legacy model-log entry and warning text.
+			recordSessionLog(key, {
+				level: "info",
+				message: `Using model: (pi defaults)` + (configuredModelWarning ? ` (${configuredModelWarning})` : ""),
+				details: {
+					type: "model",
+					provider: undefined,
+					modelId: undefined,
+					configured: configuredModelSpec ?? null,
+					modelRegistryDiagnostics: modelRegistry.diagnostics ?? null,
+				},
+			});
+		}
 
 		const { session } = await createAgentSession({
 			cwd: state.workspacePath,
@@ -229,6 +231,33 @@ export class PiAgentExecutor implements ExecutionService {
 		onSessionCreated?.({
 			steer: (message: string) => session.steer(message),
 		});
+
+		if (configuredModel) {
+			// The session clamped the thinking level to the model's capabilities,
+			// so read the effective effort back from the session. Pi defaults to
+			// "medium" when neither settings nor the session specify a level.
+			const thinkingLevel = typeof session.thinkingLevel === "string" && session.thinkingLevel.length > 0
+				? session.thinkingLevel
+				: "medium";
+			const modelSummary = describeModelRun(configuredModel, thinkingLevel);
+			logger.logModel(modelSummary);
+			recordSessionLog(key, {
+				level: "info",
+				message: modelSummary,
+				details: {
+					type: "model",
+					provider: configuredModel.provider,
+					modelId: configuredModel.id,
+					api: configuredModel.api,
+					reasoning: configuredModel.reasoning,
+					thinkingLevel,
+					contextWindow: configuredModel.contextWindow,
+					maxTokens: configuredModel.maxTokens,
+					configured: configuredModelSpec ?? null,
+					modelRegistryDiagnostics: modelRegistry.diagnostics ?? null,
+				},
+			});
+		}
 
 		const selfMonitor = new SelfMonitor(state.workspacePath);
 

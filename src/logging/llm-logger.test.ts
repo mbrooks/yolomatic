@@ -150,6 +150,40 @@ describe("LlmLogger", () => {
 		}
 	});
 
+	it("logs the model run summary", () => {
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const logger = new LlmLogger("yolomatic", 42, "worker-abc");
+			logger.logModel(
+				"Running on deepseek-v4-flash:0731-cloud, served through Ollama (openai-completions API). " +
+				"Reasoning is enabled at medium effort, with a 1M-token context window and 64K max output tokens.",
+			);
+
+			const lines = (stdout.mock.calls as unknown as [string][]).map((c) => c[0]);
+			expect(lines.some((l) => l.includes("[model] Running on deepseek-v4-flash:0731-cloud"))).toBe(true);
+			expect(lines.some((l) => l.includes("1M-token context window"))).toBe(true);
+		} finally {
+			vi.restoreAllMocks();
+		}
+	});
+
+	it("suppresses the model summary at logLevel=error", () => {
+		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const logger = new LlmLogger("yolomatic", 42, undefined, {
+				loggingSettings: { ...DEFAULT_LOGGING_SETTINGS, logLevel: "error" },
+			});
+			logger.logModel("Running on test-model, served through Ollama.");
+			logger.logError(new Error("Bad"), "Oops");
+
+			const lines = (stdout.mock.calls as unknown as [string][]).map((c) => c[0]);
+			expect(lines.some((l) => l.includes("[model]"))).toBe(false);
+			expect(lines.some((l) => l.includes("[error]"))).toBe(true);
+		} finally {
+			vi.restoreAllMocks();
+		}
+	});
+
 	it("logs errors", () => {
 		const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 		try {

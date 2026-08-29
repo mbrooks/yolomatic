@@ -30,6 +30,7 @@ vi.mock("../logging/llm-logger.js", () => ({
 			logToolResult: vi.fn(),
 			logResponse: vi.fn(),
 			logError: vi.fn(),
+			logModel: vi.fn(),
 		};
 	}),
 }));
@@ -43,6 +44,7 @@ import { PiAgentExecutor, preferTrustedExtension } from "./index.js";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { createYolomaticModelRegistry } from "./model-registry.js";
 import { recordSessionLog } from "../logging/session-log-store.js";
+import { LlmLogger } from "../logging/llm-logger.js";
 
 describe("PiAgentExecutor", () => {
 	afterEach(() => {
@@ -957,43 +959,196 @@ describe("PiAgentExecutor runtime settings injection", () => {
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});
 
-	it("logs the resolved ollama model id (including tags)", async () => {
+	function mockFullSession(content = "YOLO_STATUS: complete\nDone.", extra: Record<string, unknown> = {}) {
+		const unsubscribe = vi.fn();
+		const mockSession = {
+			subscribe: vi.fn(() => unsubscribe),
+			prompt: vi.fn(),
+			steer: vi.fn(),
+			messages: [
+				{ role: "assistant", content },
+			],
+			...extra,
+		};
+		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({ session: mockSession });
+		return { mockSession, unsubscribe };
+	}
+
+	function makeModelSpec(provider: string, id: string, overrides: Record<string, unknown> = {}) {
+		return {
+			provider,
+			id,
+			name: id,
+			api: "openai-completions",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 1_048_576,
+			maxTokens: 65_536,
+			baseUrl: "http://localhost:11434/v1",
+			...overrides,
+		};
+	}
+
+	function modelLogEntries() {
+		return (recordSessionLog as ReturnType<typeof vi.fn>).mock.calls
+			.map((call) => call[1] as { message: string; details?: { type?: string } })
+			.filter((entry) => entry.details?.type === "model");
+	}
+
+	async function prepareExecutor(
+		issueNumber: number,
+		model: Record<string, unknown>,
+		sessionExtras: Record<string, unknown> = {},
+	) {
 		const soulPath = await makeSoulPath();
-		const configuredModel = { provider: "ollama", id: "glm-5.3-flash:cloud" };
 		const registry = {
 			runtime: {
-				getModel: vi.fn((provider: string, id: string) => (provider === "ollama" && id === configuredModel.id ? configuredModel : undefined)),
-				getModels: vi.fn(() => [configuredModel]),
+				getModel: vi.fn((p: string, id: string) => (p === model.provider && id === model.id ? model : undefined)),
+				getModels: vi.fn(() => [model]),
 			},
-			find: vi.fn((provider: string, id: string) => (provider === "ollama" && id === configuredModel.id ? configuredModel : undefined)),
-			getAll: vi.fn(() => [configuredModel]),
+			find: vi.fn((p: string, id: string) => (p === model.provider && id === model.id ? model : undefined)),
+			getAll: vi.fn(() => [model]),
 		};
 		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(registry);
-		(createAgentSession as ReturnType<typeof vi.fn>).mockResolvedValue({
-			session: { subscribe: vi.fn(() => vi.fn()), prompt: vi.fn(), messages: [{ role: "assistant", content: "YOLO_STATUS: complete\nDone." }] },
-		});
-
-		const stderrSpy = vi.spyOn(process.stderr, "write");
-
-		const executor = new PiAgentExecutor({
+		mockFullSession("YOLO_STATUS: complete\nDone.", sessionExtras);
+		return new PiAgentExecutor({
 			soulPath,
 			runtimeSettings: {
-				model: { piAgentModel: configuredModel.id, piAgentProvider: "ollama" },
+				model: { piAgentModel: model.id as string, piAgentProvider: model.provider as string },
 				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
 			},
 		});
+	}
+
+	it("logs full model details for issue builds", async () => {
+		const executor = await prepareExecutor(
+			600,
+			makeModelSpec("ollama", "glm-5.3-flash:cloud"),
+			{ thinkingLevel: "medium" },
+		);
+		const stderrSpy = vi.spyOn(process.stderr, "write");
 
 		await executor.execute(makeState(600));
 
 		expect(stderrSpy).not.toHaveBeenCalled();
 
-		const modelLogCall = (recordSessionLog as ReturnType<typeof vi.fn>).mock.calls
-			.map((call) => call[1])
-			.find((entry: { details?: { type?: string } }) => entry.details?.type === "model") as { message: string } | undefined;
-		expect(modelLogCall?.message).toContain("Using model: ollama/glm-5.3-flash:cloud");
-		expect(modelLogCall?.message).not.toContain("configured model unresolved");
+		const entries = modelLogEntries();
+		expect(entries).toHaveLength(1);
+		expect(entries[0].message).toBe(
+			"Running on glm-5.3-flash:cloud, served through Ollama (openai-completions API). " +
+			"Reasoning is enabled at medium effort, with a 1M-token context window and 64K max output tokens.",
+		);
+		expect(entries[0].details).toMatchObject({
+			type: "model",
+			provider: "ollama",
+			modelId: "glm-5.3-flash:cloud",
+			api: "openai-completions",
+			reasoning: true,
+			thinkingLevel: "medium",
+			contextWindow: 1_048_576,
+			maxTokens: 65_536,
+		});
+
+		const logModel = (LlmLogger as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value as { logModel: ReturnType<typeof vi.fn> };
+		expect(logModel.logModel).toHaveBeenCalledWith(entries[0].message);
 	});
 
+	it("logs full model details for issue refinements", async () => {
+		const executor = await prepareExecutor(
+			601,
+			makeModelSpec("ollama", "kimi-k2.7-code:cloud", { maxTokens: 16_384 }),
+			{ thinkingLevel: "high" },
+		);
+
+		await executor.executeRefinement(
+			{ ...makeState(601), kind: "refinement" } as never,
+			"Refine this issue.",
+		);
+
+		const entries = modelLogEntries();
+		expect(entries).toHaveLength(1);
+		expect(entries[0].message).toBe(
+			"Running on kimi-k2.7-code:cloud, served through Ollama (openai-completions API). " +
+			"Reasoning is enabled at high effort, with a 1M-token context window and 16K max output tokens.",
+		);
+		expect(entries[0].details).toMatchObject({
+			type: "model",
+			provider: "ollama",
+			modelId: "kimi-k2.7-code:cloud",
+			thinkingLevel: "high",
+			maxTokens: 16_384,
+		});
+	});
+
+	it("falls back to the pi default effort when the session omits thinkingLevel", async () => {
+		const executor = await prepareExecutor(602, makeModelSpec("ollama", "glm-5.2:cloud"));
+
+		await executor.execute(makeState(602));
+
+		const entries = modelLogEntries();
+		expect(entries).toHaveLength(1);
+		expect(entries[0].message).toContain("Reasoning is enabled at medium effort");
+		expect(entries[0].details).toMatchObject({ thinkingLevel: "medium" });
+	});
+
+	it("reports reasoning as disabled for non-reasoning models", async () => {
+		const executor = await prepareExecutor(
+			603,
+			makeModelSpec("ollama", "tiny-local:8b", { reasoning: false, maxTokens: 16_384 }),
+			{ thinkingLevel: "high" },
+		);
+
+		await executor.execute(makeState(603));
+
+		const entries = modelLogEntries();
+		expect(entries).toHaveLength(1);
+		expect(entries[0].message).toContain("Reasoning is disabled");
+		expect(entries[0].message).toContain("with a 1M-token context window and 16K max output tokens.");
+	});
+
+	it("keeps the unresolved-model warning entry when no model resolves", async () => {
+		const soulPath = await makeSoulPath();
+		const registry = {
+			runtime: {
+				getModel: vi.fn(() => undefined),
+				getModels: vi.fn(() => []),
+			},
+			find: vi.fn(() => undefined),
+			getAll: vi.fn(() => []),
+			diagnostics: { ollama: { host: "http://127.0.0.1:11434", taggedModels: [] } },
+		};
+		(createYolomaticModelRegistry as ReturnType<typeof vi.fn>).mockResolvedValue(registry);
+		mockFullSession();
+		const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+		const executor = new PiAgentExecutor({
+			soulPath,
+			runtimeSettings: {
+				model: { piAgentModel: "missing-model", piAgentProvider: "ollama" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			},
+		});
+		await executor.execute(makeState(604));
+
+		expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Configured model ollama/missing-model did not resolve"));
+		const entries = modelLogEntries();
+		expect(entries).toHaveLength(1);
+		expect(entries[0].message).toContain("Using model: (pi defaults)");
+		expect(entries[0].message).toContain("did not resolve");
+		stderrSpy.mockRestore();
+	});
+
+	it("keeps the resolved-model log message free of unresolved-model notices", async () => {
+		const executor = await prepareExecutor(605, makeModelSpec("ollama", "glm-5.3-flash:cloud"), { thinkingLevel: "medium" });
+
+		await executor.execute(makeState(605));
+
+		const entries = modelLogEntries();
+		expect(entries[0].message).not.toContain("configured model unresolved");
+		expect(entries[0].message).toContain("Running on glm-5.3-flash:cloud");
+	});
+	
 	it("reads the runtime settings provider fresh on each execution", async () => {
 		const soulPath = await makeSoulPath();
 		const configuredModelA = { provider: "ollama", id: "kimi-k2.7-code:cloud" };
