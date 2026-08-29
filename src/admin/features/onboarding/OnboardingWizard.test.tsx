@@ -42,6 +42,7 @@ vi.mock("../../api/onboarding.js", async (importOriginal) => {
 		})),
 		initializeWorkspaces: vi.fn(async () => ({ initialized: ["mbrooks/yolomatic"] })),
 		fetchOnboardingLlmModels: vi.fn(async () => ({ models: ["test-model", "kimi-k2.7-code:cloud", "gpt-5.2-codex"] })),
+		pullOnboardingOllamaModel: vi.fn(async () => ({ ok: true })),
 		submitOnboarding: vi.fn(async () => ({ success: true, activated: true, requiresRestart: [] })),
 	};
 });
@@ -1234,6 +1235,77 @@ describe("OnboardingWizard", () => {
 			expect(keyInput.value).toBe("");
 			expect(keyInput.placeholder).toContain("Leave unchanged");
 			});
+
+		it("blocks advancing with an error when the custom model pull fails", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.pullOnboardingOllamaModel as ReturnType<typeof vi.fn>).mockResolvedValue({
+				ok: false,
+				error: "pull model manifest: file does not exist",
+			});
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			const modelSelect = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+			await waitFor(() => expect(Array.from(modelSelect.options).some((o) => o.value === "test-model")).toBe(true));
+			fireEvent.change(modelSelect, { target: { value: "private" } });
+			const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+			fireEvent.change(input, { target: { value: "bad-model" } });
+			fireEvent.blur(input);
+
+			await waitFor(() => expect(onboarding.pullOnboardingOllamaModel).toHaveBeenCalledWith("bad-model"));
+			await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/u)).not.toBeNull());
+			expect(screen.getByText(/Check the model identifier you entered and retry/u).textContent).toContain("bad-model");
+			expect(screen.getByText(/Check the model identifier you entered and retry/u).textContent).toContain("pull model manifest");
+			// Next stays on the AI / LLM step while the pull failed.
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+			expect(screen.queryByText("Step 4 of 5")).not.toBeNull();
+			expect(screen.queryByText("Step 5 of 5")).toBeNull();
+		});
+
+		it("allows advancing once the custom model pulls successfully", async () => {
+			const onboarding = await import("../../api/onboarding.js");
+			(onboarding.pullOnboardingOllamaModel as ReturnType<typeof vi.fn>).mockImplementation(
+				async (model: string) => (model === "bad-model"
+					? { ok: false, error: "pull model manifest: file does not exist" }
+					: { ok: true }),
+			);
+			render(<OnboardingWizard />);
+			await advanceThroughGitHubIntegration();
+			fireEvent.change(screen.getByLabelText("GitHub Event Mode"), { target: { value: "webhook" } });
+			await waitFor(() => {
+				expect((screen.getByLabelText("Webhook Secret") as HTMLInputElement).value.length).toBeGreaterThan(0);
+			});
+			fireEvent.click(screen.getByText("Next"));
+
+			await waitFor(() => expect(screen.queryByText("Step 4 of 5")).not.toBeNull());
+			const modelSelect = screen.getByLabelText("LLM Model") as HTMLSelectElement;
+			await waitFor(() => expect(Array.from(modelSelect.options).some((o) => o.value === "test-model")).toBe(true));
+			fireEvent.change(modelSelect, { target: { value: "private" } });
+			const input = (await screen.findByLabelText("LLM Model (custom identifier)")) as HTMLInputElement;
+
+			// A failing identifier first blocks the step...
+			fireEvent.change(input, { target: { value: "bad-model" } });
+			fireEvent.blur(input);
+			await waitFor(() => expect(onboarding.pullOnboardingOllamaModel).toHaveBeenCalledWith("bad-model"));
+			await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/u)).not.toBeNull());
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+
+			// ...then a corrected identifier that pulls successfully re-enables it.
+			fireEvent.change(input, { target: { value: "good-model" } });
+			fireEvent.blur(input);
+			await waitFor(() => expect(onboarding.pullOnboardingOllamaModel).toHaveBeenCalledWith("good-model"));
+			await waitFor(() => expect(screen.queryByText(/Check the model identifier you entered and retry/u)).toBeNull());
+			expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+
+			fireEvent.click(screen.getByText("Next"));
+			await waitFor(() => expect(screen.queryByText("Step 5 of 5")).not.toBeNull());
+		});
 
 		it("disables Next when the model field is empty for the openai provider", async () => {
 			const onboarding = await import("../../api/onboarding.js");

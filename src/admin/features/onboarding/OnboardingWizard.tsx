@@ -20,6 +20,7 @@ import {
 } from "./wizard-state.js";
 import {
 	isAiLlmStepValid,
+	isAiLlmPullBlocked,
 	isEventModeStepValid,
 } from "./wizard-validation.js";
 import { buildOnboardingBody } from "./wizard-submission.js";
@@ -29,6 +30,7 @@ import { StepThreeEventMode } from "./steps/StepThreeEventMode.js";
 import { StepFourAiLlm } from "./steps/StepFourAiLlm.js";
 import { StepFiveWorkspaceInit } from "./steps/StepFiveWorkspaceInit.js";
 import type { OnboardingConfig } from "../../api/onboarding.js";
+import type { PiAgentModelPullOutcome } from "./wizard-state.js";
 
 // Re-exported for callers (tests and the admin entrypoint) that depend on the
 // historical public surface of this module.
@@ -85,6 +87,14 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 	const setError = useCallback((error: string | null) => {
 		setState((prev) => ({ ...prev, error }));
 	}, []);
+
+	/** Records the latest settled Ollama pull outcome from the AI / LLM step. */
+	const handleModelPullResult = useCallback(
+		(outcome: PiAgentModelPullOutcome) => {
+			setState((prev) => ({ ...prev, piAgentModelPullOutcome: outcome }));
+		},
+		[],
+	);
 
 	const goToStep = useCallback((step: number) => {
 		setState((prev) => ({ ...prev, step: Math.max(1, Math.min(TOTAL_STEPS, step)), error: null }));
@@ -231,7 +241,8 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 			case 3:
 				return isEventModeStepValid(state.githubEventMode, state.githubPollIntervalMs, state.webhookSecret, state.webhookSecretProtected);
 			case 4:
-				return isAiLlmStepValid(state.piAgentProvider, state.piAgentModel, state.ollamaContainerName);
+				return isAiLlmStepValid(state.piAgentProvider, state.piAgentModel, state.ollamaContainerName)
+					&& !isAiLlmPullBlocked(state.piAgentProvider, state.piAgentModel, state.piAgentModelPullOutcome);
 			case 5:
 				return true;
 			default:
@@ -328,6 +339,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }): R
 					<StepFourAiLlm
 						state={state}
 						updateField={updateField}
+						onPullResult={handleModelPullResult}
 					/>
 				)}
 				{state.step === 5 && (

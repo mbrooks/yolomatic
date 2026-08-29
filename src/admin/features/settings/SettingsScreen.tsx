@@ -8,7 +8,14 @@ import { ServerSkillsScreen } from "../skills/ServerSkillsScreen.js";
 import { InvitationsSection } from "./InvitationsSection.js";
 import { RepositoriesSettingsSection } from "./RepositoriesSettingsSection.js";
 import { OllamaSignInPanel } from "./OllamaSignInPanel.js";
-import { LlmModelSelect, type LlmModelFetcher, type LlmModelPuller } from "./LlmModelSelect.js";
+import {
+	LlmModelSelect,
+	describePullFailure,
+	type LlmModelFetcher,
+	type LlmModelPuller,
+	type LlmModelPullResult,
+	type LlmModelPullUpdate,
+} from "./LlmModelSelect.js";
 import { UsersScreen } from "../users/UsersScreen.js";
 import type { SettingsCategoryTab } from "../../app/routes.js";
 import { listWorkerTemplates } from "../../../worker/templates.js";
@@ -53,6 +60,7 @@ export function SettingsScreen({
 	const [pendingRestart, setPendingRestart] = useState(false);
 	const [edited, setEdited] = useState<Record<string, string | number | boolean>>({});
 	const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
+	const [modelPullOutcome, setModelPullOutcome] = useState<LlmModelPullUpdate | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -79,12 +87,38 @@ export function SettingsScreen({
 
 	const llmModelFetcher = useCallback<LlmModelFetcher>((provider) => fetchLlmModels(provider), []);
 	const llmModelPuller = useCallback<LlmModelPuller>((model) => pullOllamaModel(model), []);
+	const handleModelPullResult = useCallback((outcome: LlmModelPullUpdate) => {
+		setModelPullOutcome(outcome);
+	}, []);
+
+	// Effective provider is derived before the save handler because the handler
+	// gates on it; it depends only on settings + edits.
+	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
+	const effectiveProviderValue =
+		edited.pi_agent_provider !== undefined
+			? edited.pi_agent_provider
+			: piAgentProviderSetting?.value ?? piAgentProviderSetting?.default ?? "";
+	const effectiveProvider = String(effectiveProviderValue);
 
 	const handleSave = useCallback(async () => {
 		if (changedKeys.size === 0) return;
 		setSaving(true);
 		setError(null);
 		try {
+			// A custom Ollama identifier whose pull failed (or has not settled)
+			// must not be persisted: validate it before sending anything.
+			if (changedKeys.has("pi_agent_model") && effectiveProvider === "ollama") {
+				const pending = String(edited["pi_agent_model"] ?? "").trim();
+				if (pending !== "") {
+					const settled =
+						modelPullOutcome !== null && modelPullOutcome.model === pending
+							? modelPullOutcome
+							: null;
+					const pullResult: LlmModelPullResult = settled ?? await llmModelPuller(pending);
+					setModelPullOutcome({ model: pending, ok: pullResult.ok, error: pullResult.error });
+					if (!pullResult.ok) return; // modelPullFailure banner surfaces the reason
+				}
+			}
 			const body: Record<string, string | number | boolean> = {};
 			for (const key of changedKeys) {
 				body[key] = edited[key];
@@ -101,7 +135,7 @@ export function SettingsScreen({
 		} finally {
 			setSaving(false);
 		}
-	}, [changedKeys, edited]);
+	}, [changedKeys, edited, effectiveProvider, modelPullOutcome, llmModelPuller]);
 
 	const handleRerunOnboarding = useCallback(async () => {
 		if (!window.confirm("Are you sure you want to rerun the on-boarding wizard?")) return;
@@ -125,12 +159,6 @@ export function SettingsScreen({
 	const categories = settingsSections
 		? new Set(settingsSections.map(({ category }) => category))
 		: new Set<string>([tab]);
-	const piAgentProviderSetting = settings?.find((setting) => setting.key === "pi_agent_provider");
-	const effectiveProviderValue =
-		edited.pi_agent_provider !== undefined
-			? edited.pi_agent_provider
-			: piAgentProviderSetting?.value ?? piAgentProviderSetting?.default ?? "";
-	const effectiveProvider = String(effectiveProviderValue);
 	const showOllamaPanel = tab === "ai-llm" && effectiveProvider === "ollama";
 	const showOpenAiApiKey = tab === "ai-llm" && effectiveProvider === "openai";
 	const showOllamaContainerName = tab === "ai-llm" && effectiveProvider === "ollama";
@@ -153,6 +181,21 @@ export function SettingsScreen({
 		(ollamaContainerSetting?.default !== undefined ? String(ollamaContainerSetting.default) : "yolomatic-ollama") ??
 		"yolomatic-ollama",
 	);
+
+	// Blocking model error: the identifier pending save has a settled failed
+	// pull. Derived from the outcome (not transient component state) so the
+	// save/refresh cycle cannot wipe it while it is still relevant.
+	const pendingModelIdentifier = changedKeys.has("pi_agent_model")
+		? String(edited["pi_agent_model"] ?? "").trim()
+		: "";
+	const modelPullFailure =
+		effectiveProvider === "ollama"
+			&& pendingModelIdentifier !== ""
+			&& modelPullOutcome !== null
+			&& !modelPullOutcome.ok
+			&& modelPullOutcome.model === pendingModelIdentifier
+			? describePullFailure(pendingModelIdentifier, modelPullOutcome.error)
+			: null;
 
 	if (loading) {
 		return (
@@ -187,6 +230,9 @@ export function SettingsScreen({
 				rerunningOnboarding={rerunningOnboarding}
 			/>
 			{error && <div className="error-banner">{error}</div>}
+			{modelPullFailure && (
+				<div className="error-banner" role="alert">{modelPullFailure}</div>
+			)}
 			{tab === "skills" ? (
 				<ServerSkillsScreen showBreadcrumb={false} />
 			) : tab === "invitations" ? (
@@ -213,6 +259,7 @@ export function SettingsScreen({
 									llmProvider={effectiveProvider}
 									llmModelFetcher={llmModelFetcher}
 									llmModelPuller={llmModelPuller}
+									onModelPullResult={handleModelPullResult}
 								/>
 							))
 						) : (
@@ -224,6 +271,7 @@ export function SettingsScreen({
 								llmProvider={effectiveProvider}
 								llmModelFetcher={llmModelFetcher}
 								llmModelPuller={llmModelPuller}
+								onModelPullResult={handleModelPullResult}
 							/>
 						)}
 					</div>
@@ -260,6 +308,7 @@ function SettingsSection({
 	llmProvider,
 	llmModelFetcher,
 	llmModelPuller,
+	onModelPullResult,
 }: {
 	title: string;
 	settings: SettingView[];
@@ -269,6 +318,7 @@ function SettingsSection({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
+	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	return (
 		<section className="settings-section">
@@ -281,6 +331,7 @@ function SettingsSection({
 				llmProvider={llmProvider}
 				llmModelFetcher={llmModelFetcher}
 				llmModelPuller={llmModelPuller}
+				onModelPullResult={onModelPullResult}
 			/>
 		</section>
 	);
@@ -294,6 +345,7 @@ function SettingsRows({
 	llmProvider,
 	llmModelFetcher,
 	llmModelPuller,
+	onModelPullResult,
 }: {
 	settings: SettingView[];
 	edited: Record<string, string | number | boolean>;
@@ -302,6 +354,7 @@ function SettingsRows({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
+	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -314,6 +367,7 @@ function SettingsRows({
 					llmProvider={llmProvider}
 					llmModelFetcher={llmModelFetcher}
 					llmModelPuller={llmModelPuller}
+					onModelPullResult={onModelPullResult}
 				/>
 			))}
 		</>
@@ -376,6 +430,7 @@ function SettingRow({
 	llmProvider,
 	llmModelFetcher,
 	llmModelPuller,
+	onModelPullResult,
 }: {
 	setting: SettingView;
 	editedValue: string | number | boolean | undefined;
@@ -383,6 +438,7 @@ function SettingRow({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
+	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
@@ -405,6 +461,7 @@ function SettingRow({
 					onChange={(val) => onChange(setting.key, val)}
 					fetcher={llmModelFetcher!}
 					puller={llmProvider === "ollama" ? llmModelPuller : undefined}
+					onPullResult={llmProvider === "ollama" ? onModelPullResult : undefined}
 					id={`setting-${setting.key}`}
 					label={setting.key}
 					hideLabel

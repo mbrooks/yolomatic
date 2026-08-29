@@ -1,6 +1,46 @@
 import { describe, expect, it } from "vitest";
 
-import { isEventModeStepValid, isAiLlmStepValid } from "./wizard-validation.js";
+import { isEventModeStepValid, isAiLlmStepValid, isAiLlmPullBlocked } from "./wizard-validation.js";
+
+describe("isAiLlmPullBlocked", () => {
+	it("is not blocked when no pull outcome has settled", () => {
+		expect(isAiLlmPullBlocked("ollama", "bad-model", null)).toBe(false);
+	});
+
+	it("is not blocked when the settled pull for the current model succeeded", () => {
+		expect(
+			isAiLlmPullBlocked("ollama", "good-model", { model: "good-model", ok: true }),
+		).toBe(false);
+	});
+
+	it("is blocked when the settled pull for the current model failed under ollama", () => {
+		expect(
+			isAiLlmPullBlocked("ollama", "bad-model", {
+				model: "bad-model",
+				ok: false,
+				error: "pull model manifest: file does not exist",
+			}),
+		).toBe(true);
+	});
+
+	it("is not blocked when the failure belongs to a stale identifier the user has since edited", () => {
+		expect(
+			isAiLlmPullBlocked("ollama", "good-model", { model: "bad-model", ok: false }),
+		).toBe(false);
+	});
+
+	it("is not blocked under a provider without a puller", () => {
+		expect(
+			isAiLlmPullBlocked("openai", "bad-model", { model: "bad-model", ok: false }),
+		).toBe(false);
+	});
+
+	it("trims the provider and model sides before comparing", () => {
+		expect(
+			isAiLlmPullBlocked(" ollama ", " bad-model ", { model: "bad-model", ok: false }),
+		).toBe(true);
+	});
+});
 
 describe("isEventModeStepValid", () => {
 	type Case = {

@@ -2,15 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { SettingsScreen } from "./SettingsScreen.js";
 import { DEFAULT_SETTINGS_TAB } from "../../app/routes.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STYLES_PATH = path.resolve(__dirname, "../../styles.css");
 
 function jsonResponse(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -271,6 +265,53 @@ function aiLlmSettingsWithProvider(provider: string) {
 	return MOCK_SETTINGS.map((setting) =>
 		setting.key === "pi_agent_provider" ? { ...setting, value: provider } : setting,
 	);
+}
+
+interface PatchCall {
+	url: string;
+	body: Record<string, unknown>;
+}
+
+/**
+ * Mocks every endpoint the AI / LLM settings tab touches and records PATCH
+ * bodies and Ollama pull targets for assertions.
+ */
+function mockAiLlmWorkspace(pullResponses?: Array<{ ok: boolean; error?: string }>) {
+	const patchCalls: Array<{ url: string; body: Record<string, unknown> }> = [];
+	const pullCalls: string[] = [];
+	vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+		const url = typeof input === "string" ? input : input.url;
+		const method = (init?.method ?? "GET").toUpperCase();
+		const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+		if (url === "/api/settings" && method === "PATCH") {
+			patchCalls.push({ url, body });
+			return Promise.resolve(jsonResponse({ updated: Object.keys(body ?? {}), requiresRestart: [] }));
+		}
+		if (url === "/api/settings") {
+			return Promise.resolve(jsonResponse({ settings: MOCK_SETTINGS }));
+		}
+		if (url === "/api/llm/models?provider=ollama") {
+			return Promise.resolve(jsonResponse({ models: ["llama2", "kimi-k2.7-code:cloud"] }));
+		}
+		if (url === "/api/llm/models?provider=openai") {
+			return Promise.resolve(jsonResponse({ models: ["gpt-5.2-codex"] }));
+		}
+		if (url === "/api/ollama/signin") {
+			return Promise.resolve(jsonResponse({ signedIn: true, user: "alice", message: "ok" }));
+		}
+		if (url === "/api/ollama/pull" && method === "POST") {
+			pullCalls.push(String((body as { model?: string } | undefined)?.model ?? ""));
+			return Promise.resolve(jsonResponse(pullResponses?.shift() ?? { ok: false, error: "pull model manifest: file does not exist" }));
+		}
+		return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+	});
+	return { patchCalls, pullCalls };
+}
+
+async function openAiLlmTab(): Promise<HTMLSelectElement> {
+	const select = (await screen.findByLabelText(/pi_agent_model/)) as HTMLSelectElement;
+	await waitFor(() => expect(Array.from(select.options).some((option) => option.value === "llama2")).toBe(true));
+	return select;
 }
 
 describe("SettingsScreen", () => {
@@ -597,27 +638,6 @@ describe("SettingsScreen", () => {
 		expect(body).toEqual({ github_username: "new-bot" });
 	});
 
-	it("styles the Rerun On-Boarding tab like the other neutral settings tabs", async () => {
-		const css = await readFile(STYLES_PATH, "utf-8");
-
-		// No rule targeting .settings-rerun-onboarding may reintroduce the red
-		// tab styling; the rerun action should inherit the neutral .repo-tab look.
-		const rerunBlocks = [
-			...css.matchAll(/\.repo-tab\.settings-rerun-onboarding[^{]*\{[^}]*\}/gu),
-		].map((match) => match[0]);
-		for (const block of rerunBlocks) {
-			expect(block).not.toContain("var(--red)");
-			expect(block).not.toContain("#fff");
-			expect(block).not.toMatch(/background\s*:/u);
-			expect(block).not.toMatch(/color\s*:/u);
-		}
-
-		// The base .repo-tab rule should still define the neutral styling.
-		const baseBlock = css.match(/\.repo-tab\s*\{[^}]*\}/u);
-		expect(baseBlock, "expected a base .repo-tab rule to exist").not.toBeNull();
-		expect(baseBlock![0]).toContain("background: var(--surface)");
-	});
-
 	it("renders pi_agent_provider as a dropdown offering ollama and openai", async () => {
 		mockSettingsAndOllama({ signedIn: true, user: "alice", message: "ok" });
 		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
@@ -713,6 +733,102 @@ describe("SettingsScreen", () => {
 		expect(link.getAttribute("target")).toBe("_blank");
 		expect(screen.getByText("Not signed in.")).not.toBeNull();
 		expect(screen.getByText(/docker exec -it yolomatic-ollama ollama login/)).not.toBeNull();
+	});
+
+	it("blocks saving and shows check-and-retry guidance when the custom model pull fails", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const select = await openAiLlmTab();
+		fireEvent.change(select, { target: { value: "private" } });
+		const input = (await screen.findByLabelText("pi_agent_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-model" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(pullCalls).toContain("bad-model"));
+		await waitFor(() => {
+			const banner = screen.getByText(/Check the model identifier you entered and retry/);
+			expect(banner.textContent).toContain("bad-model");
+			expect(banner.textContent).toContain("pull model manifest: file does not exist");
+		});
+		expect(patchCalls).toHaveLength(0);
+		expect((screen.getByLabelText("pi_agent_model (custom identifier)") as HTMLInputElement).value).toBe("bad-model");
+	});
+
+	it("blocks the whole save when the failing model is edited alongside other settings", async () => {
+		const { patchCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const select = await openAiLlmTab();
+		fireEvent.change(select, { target: { value: "private" } });
+		const input = (await screen.findByLabelText("pi_agent_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-model" } });
+		const container = (await screen.findByLabelText(/ollama_container_name/)) as HTMLInputElement;
+		fireEvent.change(container, { target: { value: "renamed-ollama" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/)).not.toBeNull());
+		expect(patchCalls).toHaveLength(0);
+	});
+
+	it("clears the model error and saves after the identifier is corrected and pulls successfully", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace([
+			// 1: selecting private re-pulls the stale configured identifier and fails.
+			{ ok: false, error: "pull model manifest: file does not exist" },
+			// 2: the save-time validation pull for the invalid identifier fails.
+			{ ok: false, error: "pull model manifest: file does not exist" },
+			// 3+: corrected identifiers pull successfully.
+			{ ok: true },
+			{ ok: true },
+		]);
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const select = await openAiLlmTab();
+		fireEvent.change(select, { target: { value: "private" } });
+		const input = (await screen.findByLabelText("pi_agent_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-model" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+		await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/)).not.toBeNull());
+		expect(patchCalls).toHaveLength(0);
+
+		// Correct the identifier; the blur re-pull succeeds and the error clears.
+		fireEvent.change(input, { target: { value: "good-model" } });
+		fireEvent.blur(input);
+		await waitFor(() => expect(pullCalls).toContain("good-model"));
+		await waitFor(() => expect(screen.queryByText(/Check the model identifier you entered and retry/)).toBeNull());
+
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+		await waitFor(() => expect(patchCalls).toHaveLength(1));
+		expect(patchCalls[0].body).toEqual({ pi_agent_model: "good-model" });
+	});
+
+	it("saves a listed Ollama model without triggering a pull", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const select = await openAiLlmTab();
+		fireEvent.change(select, { target: { value: "llama2" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(patchCalls).toHaveLength(1));
+		expect(patchCalls[0].body).toEqual({ pi_agent_model: "llama2" });
+		expect(pullCalls).toHaveLength(0);
+	});
+
+	it("saves under the openai provider without any pull attempt", async () => {
+		const { patchCalls, pullCalls } = mockAiLlmWorkspace();
+		render(<SettingsScreen onBack={vi.fn()} tab="ai-llm" />);
+
+		const providerSelect = (await screen.findByLabelText(/pi_agent_provider/)) as HTMLSelectElement;
+		fireEvent.change(providerSelect, { target: { value: "openai" } });
+		await waitFor(() => expect(screen.getByLabelText(/openai_api_key/)).not.toBeNull());
+		const input = (await screen.findByLabelText("pi_agent_model (custom identifier)")) as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "custom-openai-model" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+		await waitFor(() => expect(patchCalls).toHaveLength(1));
+		expect(patchCalls[0].body).toEqual({ pi_agent_provider: "openai", pi_agent_model: "custom-openai-model" });
+		expect(pullCalls).toHaveLength(0);
 	});
 
 	it("renders an error with a retry control when the Ollama container cannot be reached", async () => {

@@ -78,6 +78,8 @@ describe("getDefaultState", () => {
 		expect(state.ollamaContainerName).toBe(DEFAULT_OLLAMA_CONTAINER_NAME);
 		expect(state.repositories).toEqual([]);
 		expect(state.error).toBeNull();
+		// No pull attempt has settled for the planned model; nothing is blocking.
+		expect(state.piAgentModelPullOutcome).toBeNull();
 	});
 });
 
