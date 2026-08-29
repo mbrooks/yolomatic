@@ -307,6 +307,70 @@ describe("handleRepoRoutes", () => {
 			]);
 		});
 
+		it("exposes the global provider as the build-model providerDefault", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const globalSettingsStore = {
+				get: vi.fn(() => undefined),
+				getString: vi.fn((key: string, fallback?: string) => {
+					if (key === "github_event_mode") return "webhook";
+					if (key === "default_branch") return "main";
+					if (key === "default_worker_template") return "node";
+					if (key === "pi_agent_provider") return "openai";
+					return fallback ?? "";
+				}),
+				getBoolean: vi.fn((_key: string, fallback?: boolean) => fallback ?? false),
+				set: vi.fn(),
+			};
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({
+					repositoryStore: repoStore,
+					settingsStore: globalSettingsStore as unknown as AdminRouterDeps["settingsStore"],
+				}),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			const buildView = body.settings.find((s: any) => s.key === "pi_agent_build_model");
+			expect(buildView.providerDefault).toBe("openai");
+		});
+
+		it("falls back to ollama as the build-model providerDefault when the global provider is unset", async () => {
+			const res = response();
+			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);
+			const globalSettingsStore = {
+				get: vi.fn(() => undefined),
+				getString: vi.fn((key: string, fallback?: string) => {
+					if (key === "github_event_mode") return "webhook";
+					if (key === "default_branch") return "main";
+					if (key === "default_worker_template") return "node";
+					if (key === "pi_agent_provider") return "";
+					return fallback ?? "";
+				}),
+				getBoolean: vi.fn((_key: string, fallback?: boolean) => fallback ?? false),
+				set: vi.fn(),
+			};
+			const handled = await handleRepoRoutes(
+				request("/api/repos/mbrooks/yolomatic/settings", "GET"),
+				res,
+				makeDeps({
+					repositoryStore: repoStore,
+					settingsStore: globalSettingsStore as unknown as AdminRouterDeps["settingsStore"],
+				}),
+				"/api/repos/mbrooks/yolomatic/settings",
+			);
+
+			expect(handled).toBe(true);
+			expect(res.statusCode).toBe(200);
+			const body = JSON.parse(String(res.body));
+			const buildView = body.settings.find((s: any) => s.key === "pi_agent_build_model");
+			expect(buildView.providerDefault).toBe("ollama");
+		});
+
 		it("returns inherited settings when no overrides are set", async () => {
 			const res = response();
 			const repoStore = makeRepoStore([managedRepo("mbrooks", "yolomatic")]);

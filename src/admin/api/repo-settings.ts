@@ -16,6 +16,8 @@ export interface RepoSettingView {
 	description: string;
 	options?: string[];
 	optionLabels?: Record<string, string>;
+	/** Global provider the build model inherits when no slash-form override selects one. */
+	providerDefault?: string;
 }
 
 export function fetchRepoSettings(owner: string, repo: string): Promise<{ settings: RepoSettingView[] }> {

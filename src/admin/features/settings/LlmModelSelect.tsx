@@ -44,6 +44,12 @@ interface LlmModelSelectProps {
 	/** When true, omit the internal <label> so a parent can provide it. */
 	hideLabel?: boolean;
 	disabled?: boolean;
+	/**
+	 * When set, the empty entry becomes a selectable option with this label
+	 * instead of the disabled placeholder (e.g. an inherit-global-default
+	 * entry in per-scope override UIs). Selecting it reports an empty value.
+	 */
+	emptyOptionLabel?: string;
 }
 
 /**
@@ -64,6 +70,7 @@ export function LlmModelSelect({
 	id = "pi_agent_model",
 	hideLabel = false,
 	disabled = false,
+	emptyOptionLabel,
 }: LlmModelSelectProps): React.ReactElement {
 
 	const [models, setModels] = useState<string[]>([]);
@@ -245,7 +252,11 @@ export function LlmModelSelect({
 				aria-invalid={error ? "true" : undefined}
 				aria-describedby={error ? `${id}-error` : undefined}
 			>
-				<option value="" disabled>{placeholder}</option>
+				{emptyOptionLabel !== undefined ? (
+					<option value="">{emptyOptionLabel}</option>
+				) : (
+					<option value="" disabled>{placeholder}</option>
+				)}
 				{models.map((model) => (
 					<option key={model} value={model}>{model}</option>
 				))}

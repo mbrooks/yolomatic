@@ -32,6 +32,8 @@ interface RepoSettingView {
 	description: string;
 	options?: string[];
 	optionLabels?: Record<string, string>;
+	/** Global provider the build model resolves against when no slash-form override selects one. */
+	providerDefault?: string;
 }
 
 function normalizeGlobalEventMode(raw: string): RepoGitHubEventMode {
@@ -61,6 +63,9 @@ function buildRepoSettingViews(
 	const globalBuildModel =
 		deps.settingsStore!.getString("pi_agent_build_model", "").trim()
 		|| deps.settingsStore!.getString("pi_agent_model", "").trim();
+	// The global provider the repo UI's build-model dropdown resolves inherited
+	// and bare-id overrides against. pi_agent_provider's own default is ollama.
+	const globalProvider = deps.settingsStore!.getString("pi_agent_provider", "ollama").trim() || "ollama";
 	return [
 		{
 			key: "github_event_mode",
@@ -129,6 +134,7 @@ function buildRepoSettingViews(
 			// pi_agent_model setting's no-restart contract.
 			requiresRestart: false,
 			description: "Build model used for this repository's implementation, feedback, and PR-review sessions. Use provider/model form to target a different provider, or leave empty to inherit the global model. Issue refinements always use the global model.",
+			providerDefault: globalProvider,
 		},
 	];
 }

@@ -54,6 +54,52 @@ describe("LlmModelSelect", () => {
 		expect(screen.queryByLabelText("LLM Model (custom identifier)")).toBeNull();
 	});
 
+	it("keeps the empty placeholder disabled when no emptyOptionLabel is provided", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value=""
+				onChange={vi.fn()}
+				fetcher={fetcher}
+				/>,
+		);
+
+		const select = await screen.findByLabelText("LLM Model") as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+		expect(select.options[0].disabled).toBe(true);
+		expect(select.options[0].textContent).toBe("Select a model…");
+	});
+
+	it("renders an inherit option and calls onChange with an empty value when emptyOptionLabel is provided", async () => {
+		fetcher.mockResolvedValue({ models: ["llama2"] });
+		const onChange = vi.fn();
+		render(
+			<LlmModelSelect
+				provider="ollama"
+				value=""
+				onChange={onChange}
+				fetcher={fetcher}
+				emptyOptionLabel="Use global default (ollama)"
+				/>,
+		);
+
+		const select = await screen.findByLabelText("LLM Model") as HTMLSelectElement;
+		await waitFor(() => expect(select.disabled).toBe(false));
+		const options = Array.from(select.options);
+		expect(options.map((o) => o.value)).toEqual(["", "llama2", PRIVATE_MODEL_VALUE]);
+		expect(options[0].disabled).toBe(false);
+		expect(options[0].textContent).toBe("Use global default (ollama)");
+
+		// Re-selecting the inherit entry reports clearing the value upward.
+		fireEvent.change(select, { target: { value: "llama2" } });
+		expect(onChange).toHaveBeenCalledWith("llama2");
+		fireEvent.change(select, { target: { value: "" } });
+		expect(onChange).toHaveBeenLastCalledWith("");
+		// The custom identifier input must not appear for the inherit selection.
+		expect(screen.queryByLabelText("LLM Model (custom identifier)")).toBeNull();
+	});
+
 	it("renders tagged Ollama identifiers and pre-selects a tagged value", async () => {
 		fetcher.mockResolvedValue({ models: ["kimi-k2.7-code:cloud", "llama3.2:latest"] });
 		render(
