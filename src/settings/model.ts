@@ -270,6 +270,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 		category: "agent-behavior",
 	},
 	{
+		key: "idle_working_fail_ms",
+		type: "number",
+		description: "Idle time (ms) after which a working session with no activity is automatically failed (e.g. 3600000 for one hour)",
+		default: "3600000",
+		requiresRestart: false,
+		sensitive: false,
+		envVar: "IDLE_WORKING_FAIL_MS",
+		category: "agent-behavior",
+	},
+	{
 		key: "stale_threshold_ms",
 		type: "number",
 		description: "Age (ms) before a working session is considered stale",

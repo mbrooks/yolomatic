@@ -22,6 +22,7 @@ import { GitHubServiceAdapter } from "../adapters/github/github-service-adapter.
 import type { AppConfig } from "../config.js";
 import type { RepoGitHubEventMode, Repository } from "../repos/repository.js";
 import type { SessionState } from "../session/store.js";
+import { IDLE_WORKING_SWEEP_INTERVAL_MS } from "./bootstrap.js";
 
 // A fixed AppConfig literal. The old test mocked the config module to return a
 // canned object; the literal avoids that module mock entirely.
@@ -41,6 +42,7 @@ const baseConfig: AppConfig = {
 	adminGithubUsername: "admin",
 	cleanupRetentionDays: undefined,
 	staleThresholdMs: 14400000,
+	idleWorkingFailMs: 3600000,
 	maxWorktrees: 10,
 	evictionStrategy: "lru",
 	piAgentModel: "kimi",
@@ -123,6 +125,7 @@ function makeFakeFactory(services: Partial<RuntimeServices> = {}) {
 		sessionManager: {
 			markFailed: vi.fn(async () => undefined),
 			updateStatus: vi.fn(async () => undefined),
+			getAll: vi.fn(async () => []),
 		} as never,
 		workspaceManager: {} as never,
 		workerRpcServer: { attach: vi.fn(), close: vi.fn(async () => undefined) } as never,
@@ -865,5 +868,92 @@ describe("startRuntime", () => {
 			expect.anything(),
 			7,
 		);
+	});
+
+	it("arms a recurring idle-working sweep that fails stalled sessions without a restart", async () => {
+		vi.useFakeTimers();
+		try {
+			const markFailed = vi.fn(async () => undefined);
+			const idle = {
+				kind: "implementation",
+				owner: "mbrooks",
+				repo: "yolomatic",
+				issueNumber: 901,
+				status: "working",
+				lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+				seeded: false,
+			} as unknown as SessionState;
+			const fresh = { ...idle, issueNumber: 902, lastActivity: new Date().toISOString() };
+			const inFlight = { ...idle, issueNumber: 903 };
+			const factory = makeFakeFactory({
+				sessionManager: {
+					markFailed,
+					updateStatus: vi.fn(async () => undefined),
+					getAll: vi.fn(async () => [idle, fresh, inFlight]),
+				} as never,
+				handlers: {
+					handleGitHubEvent: vi.fn(async () => undefined),
+					isInFlight: vi.fn((_o: string, _r: string, issueNumber: number) => issueNumber === 903),
+					resumeInterruptedSession: vi.fn(async () => undefined),
+				} as never,
+			});
+			await startRuntime(baseConfig, makeDeps(), {
+				factory,
+				createWebhookServer: captureServer().create,
+				startPolling: vi.fn(),
+			});
+
+			// Armed after boot: no immediate tick.
+			expect(markFailed).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(IDLE_WORKING_SWEEP_INTERVAL_MS);
+
+			expect(markFailed).toHaveBeenCalledTimes(1);
+			expect(markFailed).toHaveBeenCalledWith(
+				"mbrooks",
+				"yolomatic",
+				901,
+				expect.stringContaining("no activity"),
+				"implementation",
+			);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("swallows idle-sweep errors so the runtime keeps ticking", async () => {
+		vi.useFakeTimers();
+		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+		try {
+			const getAll = vi.fn(async () => {
+				throw new Error("sweep get failed");
+			});
+			const factory = makeFakeFactory({
+				sessionManager: {
+					markFailed: vi.fn(async () => undefined),
+					updateStatus: vi.fn(async () => undefined),
+					getAll,
+				} as never,
+			});
+			await expect(
+				startRuntime(baseConfig, makeDeps(), {
+					factory,
+					createWebhookServer: captureServer().create,
+					startPolling: vi.fn(),
+				}),
+			).resolves.toBeDefined();
+
+			await vi.advanceTimersByTimeAsync(IDLE_WORKING_SWEEP_INTERVAL_MS);
+
+			expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("[idle-sweep] error: sweep get failed"));
+
+			// The interval keeps firing after an error.
+			const ticksAfterFirstTick = getAll.mock.calls.length;
+			await vi.advanceTimersByTimeAsync(IDLE_WORKING_SWEEP_INTERVAL_MS);
+			expect(getAll.mock.calls.length).toBeGreaterThan(ticksAfterFirstTick);
+		} finally {
+			writeSpy.mockRestore();
+			vi.useRealTimers();
+		}
 	});
 });

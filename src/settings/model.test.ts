@@ -143,6 +143,17 @@ describe("settings/model", () => {
       expect(getSettingDefinition("github_poll_interval_ms")?.default).toBe("60000");
     });
 
+    it("defines the idle-working fail timeout in the agent-behavior category", () => {
+      const def = getSettingDefinition("idle_working_fail_ms");
+      expect(def).toBeDefined();
+      expect(def?.type).toBe("number");
+      expect(def?.default).toBe("3600000");
+      expect(def?.envVar).toBe("IDLE_WORKING_FAIL_MS");
+      expect(def?.category).toBe("agent-behavior");
+      expect(def?.requiresRestart).toBe(false);
+      expect(def?.sensitive).toBe(false);
+    });
+
     it("defaults pi_agent_provider to ollama and keeps it in the ai-llm category", () => {
       const provider = getSettingDefinition("pi_agent_provider");
       expect(provider).toBeDefined();
