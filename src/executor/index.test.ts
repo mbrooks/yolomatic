@@ -1084,10 +1084,18 @@ describe("PiAgentExecutor runtime settings injection", () => {
 	});
 
 	it("logs full model details for issue refinements", async () => {
+		const refinementResult = JSON.stringify({
+			proposedTaskBody: "## Summary\nRefined.",
+			summary: "Clarified requirements.",
+			investigation: "Read the implementation.",
+		});
 		const executor = await prepareExecutor(
 			601,
 			makeModelSpec("ollama", "kimi-k2.7-code:cloud", { maxTokens: 16_384 }),
-			{ thinkingLevel: "high" },
+			{
+				thinkingLevel: "high",
+				messages: [{ role: "assistant", content: refinementResult }],
+			},
 		);
 
 		await executor.executeRefinement(

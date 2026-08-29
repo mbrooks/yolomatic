@@ -105,36 +105,46 @@ function parseRefinementJson(candidate: string): RefinementResult | null {
 }
 
 export function parseRefinementResult(rawResponse: string): RefinementResult | null {
-	let trimmed = rawResponse.trim();
+	const trimmed = rawResponse.trim();
 	if (!trimmed) return null;
 
-	for (const match of trimmed.matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/giu)) {
+	const fencedJsonMatches = [...trimmed.matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/giu)];
+	let fencedJsonResult: RefinementResult | null = null;
+	for (const match of fencedJsonMatches) {
 		const parsed = parseRefinementJson(match[1] ?? "");
-		if (parsed) return parsed;
+		if (!parsed) return null;
+		fencedJsonResult ??= parsed;
 	}
-
-	const fencedMatch = /^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/iu.exec(trimmed);
-	if (fencedMatch) {
-		trimmed = fencedMatch[1]!.trim();
+	if (fencedJsonResult) {
+		return fencedJsonResult;
 	}
 
 	const parsedJson = parseRefinementJson(trimmed);
 	if (parsedJson) {
 		return parsedJson;
 	}
-	if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+
+	const unlabeledJsonFenceMatch = /^```\s*\r?\n([\s\S]*?)\r?\n```\s*$/u.exec(trimmed);
+	if (unlabeledJsonFenceMatch) {
+		return parseRefinementJson(unlabeledJsonFenceMatch[1] ?? "");
+	}
+
+	if (trimmed.startsWith("{") || trimmed.endsWith("}")) {
 		return null;
 	}
 
-	const bodyMatch = /##\s*Proposed Task\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
-	const summaryMatch = /##\s*Summary\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
-	const investigationMatch = /##\s*Investigation\s*\n([\s\S]*?)(?=\n##\s|$)/u.exec(trimmed);
-	const proposedTaskBody = bodyMatch?.[1]?.trim() ?? trimmed;
-	if (!proposedTaskBody) return null;
+	const markdownMatch = /^##[ \t]+Proposed Task[ \t]*\r?\n([\s\S]*?)\r?\n##[ \t]+Summary[ \t]*\r?\n([\s\S]*?)\r?\n##[ \t]+Investigation[ \t]*\r?\n([\s\S]*)$/u.exec(trimmed);
+	if (!markdownMatch) return null;
+
+	const proposedTaskBody = markdownMatch[1]?.trim() ?? "";
+	const summary = markdownMatch[2]?.trim() ?? "";
+	const investigation = markdownMatch[3]?.trim() ?? "";
+	if (!proposedTaskBody || !summary || !investigation) return null;
+
 	return {
 		proposedTaskBody,
-		summary: summaryMatch?.[1]?.trim() ?? "Refined issue body.",
-		investigation: investigationMatch?.[1]?.trim() ?? "No investigation notes provided.",
+		summary,
+		investigation,
 	};
 }
 
