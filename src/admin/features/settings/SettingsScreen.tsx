@@ -43,6 +43,9 @@ const SETTING_OPTIONS: Readonly<Record<string, readonly (string | SettingOption)
 	})),
 };
 
+/** Settings rendered as provider-aware LLM model selects. */
+const LLM_MODEL_SETTING_KEYS = ["pi_agent_model", "pi_agent_build_model", "pi_agent_refinement_model"] as const;
+
 export function SettingsScreen({
 	onBack,
 	onRerunOnboarding,
@@ -60,7 +63,7 @@ export function SettingsScreen({
 	const [pendingRestart, setPendingRestart] = useState(false);
 	const [edited, setEdited] = useState<Record<string, string | number | boolean>>({});
 	const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
-	const [modelPullOutcome, setModelPullOutcome] = useState<LlmModelPullUpdate | null>(null);
+	const [modelPullOutcomes, setModelPullOutcomes] = useState<Record<string, LlmModelPullUpdate | null>>({});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -87,8 +90,8 @@ export function SettingsScreen({
 
 	const llmModelFetcher = useCallback<LlmModelFetcher>((provider) => fetchLlmModels(provider), []);
 	const llmModelPuller = useCallback<LlmModelPuller>((model) => pullOllamaModel(model), []);
-	const handleModelPullResult = useCallback((outcome: LlmModelPullUpdate) => {
-		setModelPullOutcome(outcome);
+	const handleModelPullResult = useCallback((key: string, outcome: LlmModelPullUpdate) => {
+		setModelPullOutcomes((prev) => ({ ...prev, [key]: outcome }));
 	}, []);
 
 	// Effective provider is derived before the save handler because the handler
@@ -106,16 +109,20 @@ export function SettingsScreen({
 		setError(null);
 		try {
 			// A custom Ollama identifier whose pull failed (or has not settled)
-			// must not be persisted: validate it before sending anything.
-			if (changedKeys.has("pi_agent_model") && effectiveProvider === "ollama") {
-				const pending = String(edited["pi_agent_model"] ?? "").trim();
-				if (pending !== "") {
+			// must not be persisted: validate every pending model setting before
+			// sending anything.
+			if (effectiveProvider === "ollama") {
+				for (const key of LLM_MODEL_SETTING_KEYS) {
+					if (!changedKeys.has(key)) continue;
+					const pending = String(edited[key] ?? "").trim();
+					if (pending === "") continue;
 					const settled =
-						modelPullOutcome !== null && modelPullOutcome.model === pending
-							? modelPullOutcome
-							: null;
+						modelPullOutcomes[key]?.model === pending ? modelPullOutcomes[key] : null;
 					const pullResult: LlmModelPullResult = settled ?? await llmModelPuller(pending);
-					setModelPullOutcome({ model: pending, ok: pullResult.ok, error: pullResult.error });
+					setModelPullOutcomes((prev) => ({
+						...prev,
+						[key]: { model: pending, ok: pullResult.ok, error: pullResult.error },
+					}));
 					if (!pullResult.ok) return; // modelPullFailure banner surfaces the reason
 				}
 			}
@@ -135,7 +142,7 @@ export function SettingsScreen({
 		} finally {
 			setSaving(false);
 		}
-	}, [changedKeys, edited, effectiveProvider, modelPullOutcome, llmModelPuller]);
+	}, [changedKeys, edited, effectiveProvider, modelPullOutcomes, llmModelPuller]);
 
 	const handleRerunOnboarding = useCallback(async () => {
 		if (!window.confirm("Are you sure you want to rerun the on-boarding wizard?")) return;
@@ -182,20 +189,22 @@ export function SettingsScreen({
 		"yolomatic-ollama",
 	);
 
-	// Blocking model error: the identifier pending save has a settled failed
-	// pull. Derived from the outcome (not transient component state) so the
-	// save/refresh cycle cannot wipe it while it is still relevant.
-	const pendingModelIdentifier = changedKeys.has("pi_agent_model")
-		? String(edited["pi_agent_model"] ?? "").trim()
-		: "";
-	const modelPullFailure =
-		effectiveProvider === "ollama"
-			&& pendingModelIdentifier !== ""
-			&& modelPullOutcome !== null
-			&& !modelPullOutcome.ok
-			&& modelPullOutcome.model === pendingModelIdentifier
-			? describePullFailure(pendingModelIdentifier, modelPullOutcome.error)
-			: null;
+	// Blocking model error: a pending model identifier with a settled failed
+	// pull. Derived from the per-key outcomes (not transient component state)
+	// so the save/refresh cycle cannot wipe it while it is still relevant.
+	const modelPullFailure = (() => {
+		if (effectiveProvider !== "ollama") return null;
+		for (const key of LLM_MODEL_SETTING_KEYS) {
+			if (!changedKeys.has(key)) continue;
+			const pending = String(edited[key] ?? "").trim();
+			if (pending === "") continue;
+			const outcome = modelPullOutcomes[key];
+			if (outcome && !outcome.ok && outcome.model === pending) {
+				return describePullFailure(pending, outcome.error);
+			}
+		}
+		return null;
+	})();
 
 	if (loading) {
 		return (
@@ -318,7 +327,7 @@ function SettingsSection({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
-	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
+	onModelPullResult?: (key: string, outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	return (
 		<section className="settings-section">
@@ -354,7 +363,7 @@ function SettingsRows({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
-	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
+	onModelPullResult?: (key: string, outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	return (
 		<>
@@ -438,13 +447,15 @@ function SettingRow({
 	llmProvider?: string;
 	llmModelFetcher?: LlmModelFetcher;
 	llmModelPuller?: LlmModelPuller;
-	onModelPullResult?: (outcome: LlmModelPullUpdate) => void;
+	onModelPullResult?: (key: string, outcome: LlmModelPullUpdate) => void;
 }): React.ReactElement {
 	const displayValue = editedValue !== undefined ? editedValue : setting.value;
 	const isDirty = editedValue !== undefined;
 	const options = SETTING_OPTIONS[setting.key];
 	const showLlmModelSelect =
-		setting.key === "pi_agent_model" && llmProvider !== undefined && llmModelFetcher !== undefined;
+		(LLM_MODEL_SETTING_KEYS as readonly string[]).includes(setting.key) &&
+		llmProvider !== undefined &&
+		llmModelFetcher !== undefined;
 
 	return (
 		<div className={`setting-row${isDirty ? " dirty" : ""}${setting.requiresRestart ? " requires-restart" : ""}`}>
@@ -461,7 +472,11 @@ function SettingRow({
 					onChange={(val) => onChange(setting.key, val)}
 					fetcher={llmModelFetcher!}
 					puller={llmProvider === "ollama" ? llmModelPuller : undefined}
-					onPullResult={llmProvider === "ollama" ? onModelPullResult : undefined}
+					onPullResult={
+						llmProvider === "ollama" && onModelPullResult
+							? (outcome) => onModelPullResult(setting.key, outcome)
+							: undefined
+					}
 					id={`setting-${setting.key}`}
 					label={setting.key}
 					hideLabel

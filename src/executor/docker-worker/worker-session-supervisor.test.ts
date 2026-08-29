@@ -185,25 +185,35 @@ interface SupervisorHarness {
 	gateway: { handle: ReturnType<typeof vi.fn> };
 	/** Handle for the fake launched container; emitting exit deterministically ends the session. */
 	containerHandles: Array<{ docker: EventEmitter }>;
+	/** Recorded createLaunchPlan params, for asserting launch-plan inputs. */
+	launchPlanRequests: Array<Record<string, unknown>>;
 }
 
-function createHarness(issueNumber: number, options: { withGateway?: boolean; outputTail?: string } = {}): SupervisorHarness {
+function createHarness(
+	issueNumber: number,
+	options: { withGateway?: boolean; outputTail?: string; controlBaseUrl?: string } = {},
+): SupervisorHarness {
 	const workerRpcServer = createFakeWorkerRpcServer();
 	let capturedUrl: string | undefined;
 	const gateway = { handle: vi.fn() };
 	const containerHandles: Array<{ docker: EventEmitter }> = [];
+	const launchPlanRequests: Array<Record<string, unknown>> = [];
 
 	const launcher = {
-		createLaunchPlan: vi.fn(async ({ sessionKey, workerSessionUrl, containerName }: any) => ({
-			containerName,
-			args: [],
-			env: {
-				...process.env,
-				YOLO_SESSION_KEY: sessionKey,
-				YOLO_SESSION_WS_URL: workerSessionUrl,
-			},
-			cwd: "/repo",
-		})),
+		createLaunchPlan: vi.fn(async (planParams: any) => {
+			launchPlanRequests.push(planParams);
+			const { sessionKey, workerSessionUrl, containerName } = planParams;
+			return {
+				containerName,
+				args: [],
+				env: {
+					...process.env,
+					YOLO_SESSION_KEY: sessionKey,
+					YOLO_SESSION_WS_URL: workerSessionUrl,
+				},
+				cwd: "/repo",
+			};
+		}),
 		launchContainer: vi.fn((plan: any) => {
 			capturedUrl = plan.env.YOLO_SESSION_WS_URL;
 			let rejectExit!: (error: Error) => void;
@@ -231,12 +241,12 @@ function createHarness(issueNumber: number, options: { withGateway?: boolean; ou
 
 	const supervisor = new WorkerSessionSupervisor({
 		workerRpcServer: workerRpcServer as unknown as WorkerRpcServer,
-		workerControlBaseUrl: "http://control-plane.test",
+		workerControlBaseUrl: options.controlBaseUrl ?? "http://control-plane.test",
 		launcher: launcher as any,
 		...(options.withGateway ? { githubGateway: () => gateway as any } : {}),
 	});
 
-	return { workerRpcServer, supervisor, capturedUrl: () => capturedUrl, gateway, containerHandles };
+	return { workerRpcServer, supervisor, capturedUrl: () => capturedUrl, gateway, containerHandles, launchPlanRequests };
 }
 
 function makeRunParams(issueNumber: number, kind: "issue" | "comment" | "pr-review" | "issue-refinement" = "issue") {
@@ -369,6 +379,38 @@ describe("WorkerSessionSupervisor", () => {
 
 		const result = await sessionPromise;
 		expect(result).toMatchObject({ status: "complete", summary: "done" });
+	});
+
+	it("passes the prompt kind to the launch plan for build sessions", async () => {
+		const harness = createHarness(610);
+		const { sessionKey, params } = makeRunParams(610, "comment");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, { status: "complete", summary: "done", rawResponse: "" });
+		await workerConnection.send(createWorkerMessage("hello", sessionKey, "hello-1", { workerVersion: "test", pid: 123 }));
+		await sessionPromise;
+
+		expect(harness.launchPlanRequests).toHaveLength(1);
+		expect(harness.launchPlanRequests[0]).toMatchObject({ promptKind: "comment" });
+	});
+
+	it("passes issue-refinement as the prompt kind for refinement sessions", async () => {
+		const harness = createHarness(611);
+		const { sessionKey, params } = makeRunParams(611, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: "## Summary\nRefined.",
+			summary: "Better description.",
+			investigation: "Read the code.",
+		});
+		await workerConnection.send(createWorkerMessage("hello", sessionKey, "hello-1", { workerVersion: "test", pid: 123 }));
+		await sessionPromise;
+
+		expect(harness.launchPlanRequests).toHaveLength(1);
+		expect(harness.launchPlanRequests[0]).toMatchObject({ promptKind: "issue-refinement" });
 	});
 
 	it("sends a launch_config with session state, prompt, and runtime limits on hello", async () => {
@@ -756,5 +798,205 @@ describe("WorkerSessionSupervisor", () => {
 			details: { path: "/p" },
 		});
 		expect(activity).toHaveBeenCalled();
+	});
+
+	it("signals activity on heartbeat messages", async () => {
+		const harness = createHarness(620);
+		const { sessionKey, params } = makeRunParams(620);
+		const activity = vi.fn();
+
+		const sessionPromise = harness.supervisor.runSession({ ...params, onActivity: activity });
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, { status: "complete", summary: "done", rawResponse: "" });
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await workerConnection.send(
+			createWorkerMessage("heartbeat", sessionKey, "beat-1", {
+				state: "running",
+				pid: 456,
+				timestamp: new Date().toISOString(),
+			}),
+		);
+		await vi.waitFor(() => expect(activity).toHaveBeenCalled());
+
+		await sessionPromise;
+	});
+
+	it("ignores acknowledgements for unknown message ids", async () => {
+		const harness = createHarness(621);
+		const { sessionKey, params } = makeRunParams(621);
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, { status: "complete", summary: "done", rawResponse: "" });
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await workerConnection.send(
+			createWorkerMessage("ack", sessionKey, "ack-unknown", { ackMessageId: "no-such-message" }),
+		);
+
+		// The stray ack must not settle or break the session.
+		await expect(sessionPromise).resolves.toMatchObject({ status: "complete" });
+	});
+
+	it("rejects steering after the worker connection has closed", async () => {
+		const harness = createHarness(622);
+		const { sessionKey, params } = makeRunParams(622);
+		const onSessionCreated = vi.fn();
+
+		const sessionPromise = harness.supervisor.runSession({ ...params, onSessionCreated });
+		const workerConnection = await connectWorker(harness);
+		ackingWorker(workerConnection);
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await vi.waitFor(() => expect(onSessionCreated).toHaveBeenCalledTimes(1));
+
+		workerConnection.close();
+		await expect(sessionPromise).rejects.toThrow("Worker connection closed unexpectedly");
+
+		const liveSession = onSessionCreated.mock.calls[0]![0];
+		await expect(liveSession.steer("too late")).rejects.toThrow(
+			"Worker RPC connection is not connected",
+		);
+	});
+
+	it("rejects an acknowledged send when the worker transport fails", async () => {
+		const harness = createHarness(623);
+		const { sessionKey, params } = makeRunParams(623);
+		const onSessionCreated = vi.fn();
+
+		const sessionPromise = harness.supervisor.runSession({ ...params, onSessionCreated });
+		const workerConnection = await connectWorker(harness);
+		ackingWorker(workerConnection);
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await vi.waitFor(() => expect(onSessionCreated).toHaveBeenCalledTimes(1));
+
+		// Drop only the worker side of the pair so the server-side connection is
+		// still open but its transport rejects sends.
+		(workerConnection as unknown as { open: boolean }).open = false;
+		const liveSession = onSessionCreated.mock.calls[0]![0];
+		await expect(liveSession.steer("broken transport")).rejects.toThrow(
+			"Worker RPC connection is not connected",
+		);
+
+		emitContainerExit(harness);
+		await expect(sessionPromise).rejects.toThrow("Worker container exited before completion");
+	});
+
+	it("falls back to docker stop when the stop control cannot be delivered", async () => {
+		vi.useFakeTimers();
+		// The stop exec itself fails; the supervisor must swallow the rejection.
+		execFileMock.mockImplementation((_cmd: string, _args: string[], _options: unknown, callback?: (error: Error | null) => void) => {
+			callback?.(new Error("stop failed"));
+		});
+		const harness = createHarness(624);
+		const { sessionKey, params } = makeRunParams(624);
+		const controller = new AbortController();
+
+		// Abort before any worker connects so the stop control has no transport;
+		// the supervisor must fall back to the docker stop timer.
+		const sessionPromise = harness.supervisor.runSession({ ...params, abortSignal: controller.signal });
+		await vi.advanceTimersByTimeAsync(0);
+		controller.abort();
+		await vi.advanceTimersByTimeAsync(5100);
+		expect(execFileMock).toHaveBeenCalledWith(
+			"docker",
+			["stop", params.containerName],
+			expect.objectContaining({ cwd: "/repo" }),
+			expect.any(Function),
+		);
+
+		emitContainerExit(harness);
+		await expect(sessionPromise).rejects.toThrow("Worker container exited before completion");
+	});
+
+	it("builds a wss control URL for https base URLs", async () => {
+		const harness = createHarness(625, { controlBaseUrl: "https://control-plane.test/base" });
+		const { sessionKey, params } = makeRunParams(625);
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, { status: "complete", summary: "done", rawResponse: "" });
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await expect(sessionPromise).resolves.toMatchObject({ status: "complete" });
+
+		expect(harness.capturedUrl()).toContain("wss://control-plane.test");
+		expect(harness.capturedUrl()).not.toContain("https://");
+	});
+
+	it("rejects a refinement result whose proposed task body is not a string", async () => {
+		const harness = createHarness(626);
+		const { sessionKey, params } = makeRunParams(626, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: 42,
+		} as never);
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await expect(sessionPromise).rejects.toThrow("Worker returned an invalid refinement result.");
+	});
+
+	it("rejects a refinement result with no summary or investigation", async () => {
+		const harness = createHarness(627);
+		const { sessionKey, params } = makeRunParams(627, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: "## Summary\nRefined.",
+		} as never);
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await expect(sessionPromise).rejects.toThrow("Worker returned an invalid refinement result.");
+	});
+
+	it("answers a failing gateway tool with an error tool response", async () => {
+		const harness = createHarness(628, { withGateway: true });
+		const { sessionKey, params } = makeRunParams(628);
+		(harness.gateway.handle as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, error: "boom" });
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		const received: AnyWorkerProtocolMessage[] = [];
+		toolAwareCompletingWorker(workerConnection, { status: "complete", summary: "done", rawResponse: "" });
+		workerConnection.onMessage((message) => received.push(message));
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await workerConnection.send(
+			createWorkerMessage("tool_request", sessionKey, "tool-1", { tool: "fetch_issue", params: {} }),
+		);
+
+		await expect(sessionPromise).resolves.toMatchObject({ status: "complete" });
+		const toolResponse = received.find((message) => message.type === "tool_response") as WorkerProtocolMessage<"tool_response">;
+		expect(toolResponse.payload).toMatchObject({ ok: false, error: "boom" });
+		expect(recordSessionLogMock).toHaveBeenCalledWith(
+			sessionKey,
+			expect.objectContaining({ message: "gateway fetch_issue failed" }),
+		);
+	});
+
+	it("answers a gateway error with an error tool response when the gateway throws", async () => {
+		const harness = createHarness(629, { withGateway: true });
+		const { sessionKey, params } = makeRunParams(629);
+		(harness.gateway.handle as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("gateway exploded"));
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		const received: AnyWorkerProtocolMessage[] = [];
+		toolAwareCompletingWorker(workerConnection, { status: "complete", summary: "done", rawResponse: "" });
+		workerConnection.onMessage((message) => received.push(message));
+
+		await workerConnection.send(helloMessage(sessionKey));
+		await workerConnection.send(
+			createWorkerMessage("tool_request", sessionKey, "tool-2", { tool: "fetch_issue", params: {} }),
+		);
+
+		await expect(sessionPromise).resolves.toMatchObject({ status: "complete" });
+		const toolResponse = received.find((message) => message.type === "tool_response") as WorkerProtocolMessage<"tool_response">;
+		expect(toolResponse.payload).toMatchObject({ ok: false, error: "gateway exploded" });
 	});
 });

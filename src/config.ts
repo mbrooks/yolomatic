@@ -50,6 +50,8 @@ export interface AppConfig {
 	maxWorktrees: number;
 	evictionStrategy: "fifo" | "lru";
 	piAgentModel: string | undefined;
+	piAgentBuildModel: string | undefined;
+	piAgentRefinementModel: string | undefined;
 	piAgentProvider: string | undefined;
 	logLevel: string;
 	logPrompts: boolean;
@@ -106,6 +108,8 @@ export function getConfig(store: SettingsStore): AppConfig {
 		maxWorktrees: Math.max(1, store.getNumber("max_worktrees", 10)),
 		evictionStrategy: store.getString("eviction_strategy", "lru").toLowerCase() === "fifo" ? "fifo" : "lru",
 		piAgentModel: store.get("pi_agent_model"),
+		piAgentBuildModel: store.get("pi_agent_build_model"),
+		piAgentRefinementModel: store.get("pi_agent_refinement_model"),
 		piAgentProvider: store.get("pi_agent_provider"),
 		logLevel: store.getString("log_level", "info").toLowerCase(),
 		logPrompts: store.getBoolean("log_prompts", true),

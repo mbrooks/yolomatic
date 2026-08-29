@@ -9,6 +9,7 @@ import {
 	type RuntimeSettings,
 	type RuntimeSettingsProvider,
 } from "../../runtime-settings.js";
+import { resolveLaunchModel, type WorkerPromptKind } from "../model-selection.js";
 import {
 	BASE_WORKER_DOCKERFILE,
 	BASE_WORKER_IMAGE,
@@ -324,7 +325,20 @@ export class DockerWorkerLauncher {
 		return this.getRuntimeSettings().model.openaiApiKey?.trim() || undefined;
 	}
 
-	async buildDockerRunArgs(containerName: string, workerTemplate: WorkerTemplate): Promise<string[]> {
+	/**
+	 * Build the `docker run` argument list for a worker launch.
+	 *
+	 * `promptKind` selects which configured model is forwarded as
+	 * `PI_AGENT_MODEL`: refinement launches use the refinement model, every
+	 * other launch uses the build model, and each falls back to the default
+	 * model when unset. Launches without a kind are treated as build
+	 * sessions.
+	 */
+	async buildDockerRunArgs(
+		containerName: string,
+		workerTemplate: WorkerTemplate,
+		promptKind?: WorkerPromptKind,
+	): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
 		const workerWorkspacesDir = this.getWorkerWorkspacesDir();
@@ -348,8 +362,9 @@ export class DockerWorkerLauncher {
 		if (modelSettings.piAgentProvider?.trim()) {
 			args.push("-e", `PI_AGENT_PROVIDER=${modelSettings.piAgentProvider.trim()}`);
 		}
-		if (modelSettings.piAgentModel?.trim()) {
-			args.push("-e", `PI_AGENT_MODEL=${modelSettings.piAgentModel.trim()}`);
+		const launchModel = resolveLaunchModel(modelSettings, promptKind);
+		if (launchModel) {
+			args.push("-e", `PI_AGENT_MODEL=${launchModel}`);
 		}
 		const initScript = process.env.YOLO_WORKER_INIT_SCRIPT?.trim();
 		if (initScript) {
@@ -438,10 +453,12 @@ export class DockerWorkerLauncher {
 		workerSessionUrl: string;
 		containerName: string;
 		workerTemplate: WorkerTemplate;
+		/** Prompt kind of the launching session; selects the forwarded model. */
+		promptKind?: WorkerPromptKind;
 	}): Promise<DockerWorkerLaunchPlan> {
 		return {
 			containerName: params.containerName,
-			args: await this.buildDockerRunArgs(params.containerName, params.workerTemplate),
+			args: await this.buildDockerRunArgs(params.containerName, params.workerTemplate, params.promptKind),
 			env: {
 				...process.env,
 				YOLO_SESSION_KEY: params.sessionKey,

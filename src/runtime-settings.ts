@@ -11,6 +11,10 @@ import type { AppConfig } from "./config.js";
  */
 export interface ModelSettings {
 	piAgentModel?: string;
+	/** Model override for issue build sessions; falls back to piAgentModel when unset. */
+	piAgentBuildModel?: string;
+	/** Model override for issue refinement sessions; falls back to piAgentModel when unset. */
+	piAgentRefinementModel?: string;
 	piAgentProvider?: string;
 	openaiApiKey?: string;
 	ollamaHost?: string;
@@ -79,6 +83,8 @@ export function getRuntimeSettings(config: AppConfig): RuntimeSettings {
 	return {
 		model: {
 			piAgentModel: config.piAgentModel,
+			piAgentBuildModel: config.piAgentBuildModel,
+			piAgentRefinementModel: config.piAgentRefinementModel,
 			piAgentProvider: config.piAgentProvider,
 			openaiApiKey: config.openaiApiKey || undefined,
 			ollamaHost: config.workerOllamaHost,
