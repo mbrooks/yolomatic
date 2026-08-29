@@ -202,9 +202,10 @@ describe("DockerWorkerExecutor", () => {
 		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, "", ""));
 
 		try {
-			const template = (harness.executor as any).resolveTemplate("mbrooks", "yolomatic");
+			const launcher = (harness.executor as any).launcher;
+			const template = launcher.resolveTemplate("mbrooks", "yolomatic");
 			expect(template).toMatchObject({ id: "python", image: "yolomatic-worker-python:latest" });
-			await (harness.executor as any).ensureWorkerImage(template, "test-session");
+			await launcher.ensureWorkerImage(template, "test-session");
 
 			expect(execFileMock).toHaveBeenNthCalledWith(
 				1,
@@ -220,7 +221,7 @@ describe("DockerWorkerExecutor", () => {
 				expect.any(Object),
 				expect.any(Function),
 			);
-			const args = await (harness.executor as any).buildDockerRunArgs("worker-python", template);
+			const args = await launcher.buildDockerRunArgs("worker-python", template);
 			expect(args.at(-1)).toBe("yolomatic-worker-python:latest");
 		} finally {
 			await harness.close();
@@ -503,13 +504,16 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
-		expect((executor as any).buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
-		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
-		expect((executor as any).appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
-		expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
+		const launcher = (executor as any).launcher;
+		const supervisor = (executor as any).supervisor;
+
+		expect(launcher.buildMountSpec("named-volume", "/workspaces")).toContain("type=volume");
+		expect(launcher.resolveWorkerOllamaHost()).toBe("http://custom-host:11434");
+		expect(launcher.appendOutput("a".repeat(3990), "b".repeat(50))).toHaveLength(4000);
+		expect(supervisor.buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
 			"wss://control.example.test/yolomatic-worker/ws?sessionKey=github-mbrooks-yolomatic-issue-1-implementation&token=token-1",
 		);
-		expect(() => (executor as any).resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
+		expect(() => launcher.resolveWorkerWorkspacePath("/other/place")).toThrow("outside configured WORKSPACES_DIR");
 	});
 
 	it("falls back to raw or translated OLLAMA_HOST values", async () => {
@@ -524,14 +528,16 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
+		const launcher = (executor as any).launcher;
+
 		delete process.env.OLLAMA_HOST;
-		expect((executor as any).resolveWorkerOllamaHost()).toBeUndefined();
+		expect(launcher.resolveWorkerOllamaHost()).toBeUndefined();
 
 		process.env.OLLAMA_HOST = "not-a-url";
-		expect((executor as any).resolveWorkerOllamaHost()).toBe("not-a-url");
+		expect(launcher.resolveWorkerOllamaHost()).toBe("not-a-url");
 
 		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
-		expect((executor as any).resolveWorkerOllamaHost()).toBe("http://host.docker.internal:11434/");
+		expect(launcher.resolveWorkerOllamaHost()).toBe("http://host.docker.internal:11434/");
 
 		delete process.env.OLLAMA_HOST;
 	});
@@ -552,12 +558,15 @@ describe("DockerWorkerExecutor", () => {
 		process.env.OLLAMA_HOST = "http://127.0.0.1:11434";
 
 		try {
-			expect((executor as any).resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
-			expect((executor as any).buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
+			const launcher = (executor as any).launcher;
+			const supervisor = (executor as any).supervisor;
+
+			expect(launcher.resolveWorkerOllamaHost()).toBe("http://127.0.0.1:11434/");
+			expect(supervisor.buildWorkerSessionUrl("github-mbrooks-yolomatic-issue-1-implementation", "token-1")).toBe(
 				"ws://127.0.0.1:6767/yolomatic-worker/ws?sessionKey=github-mbrooks-yolomatic-issue-1-implementation&token=token-1",
 			);
 
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 			expect(args).toContain("--network");
 			expect(args).toContain("container:yolomatic");
 			expect(args).not.toContain("--add-host");
@@ -592,7 +601,8 @@ describe("DockerWorkerExecutor", () => {
 		);
 
 		try {
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			const launcher = (executor as any).launcher;
+			const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 			expect(args).toContain("type=volume,src=yolomatic_yolomatic_workspaces,dst=/app/workspaces");
 			expect(execFileMock).toHaveBeenCalledWith(
 				"docker",
@@ -621,7 +631,8 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
-		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		const launcher = (executor as any).launcher;
+		const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 		expect(args).toContain("PI_AGENT_PROVIDER=ollama");
 		expect(args).toContain("PI_AGENT_MODEL=glm-test");
 		// Injected settings take precedence over any process.env value: set
@@ -631,7 +642,7 @@ describe("DockerWorkerExecutor", () => {
 		process.env.PI_AGENT_PROVIDER = "should-be-ignored-provider";
 		process.env.PI_AGENT_MODEL = "should-be-ignored-model";
 		try {
-			const args2 = await (executor as any).buildDockerRunArgs("worker-2");
+			const args2 = await launcher.buildDockerRunArgs("worker-2", launcher.resolveTemplate());
 			expect(args2).toContain("PI_AGENT_PROVIDER=ollama");
 			expect(args2).toContain("PI_AGENT_MODEL=glm-test");
 			expect(args2).not.toContain("PI_AGENT_PROVIDER=should-be-ignored-provider");
@@ -660,7 +671,8 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
-		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		const launcher = (executor as any).launcher;
+		const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 		expect(args).toContain("OPENAI_API_KEY=sk-injected");
 		expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
 		expect(args.some((arg: string) => arg.startsWith("OLLAMA_HOST="))).toBe(false);
@@ -683,7 +695,8 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
-		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		const launcher = (executor as any).launcher;
+		const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 		expect(args).toContain("OPENAI_API_KEY=sk-explicit");
 		expect(args).not.toContain("OPENAI_API_KEY=sk-injected");
 	});
@@ -700,8 +713,9 @@ describe("DockerWorkerExecutor", () => {
 			soulPath: "/app/SOUL.md",
 		});
 
+		const launcher = (executor as any).launcher;
 		delete process.env.OPENAI_API_KEY;
-		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 		expect(args.some((arg: string) => arg.startsWith("OPENAI_API_KEY="))).toBe(false);
 	});
 
@@ -722,7 +736,8 @@ describe("DockerWorkerExecutor", () => {
 		process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS = "600";
 
 		try {
-			const args = await (executor as any).buildDockerRunArgs("worker-1");
+			const launcher = (executor as any).launcher;
+			const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 			expect(args).toContain("YOLO_WORKER_INIT_SCRIPT=scripts/bootstrap.sh");
 			expect(args).toContain("YOLO_WORKER_INIT_SKIP=0");
 			expect(args).toContain("YOLO_WORKER_INIT_TIMEOUT_SECONDS=600");
@@ -749,7 +764,8 @@ describe("DockerWorkerExecutor", () => {
 		delete process.env.YOLO_WORKER_INIT_SKIP;
 		delete process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS;
 
-		const args = await (executor as any).buildDockerRunArgs("worker-1");
+		const launcher = (executor as any).launcher;
+		const args = await launcher.buildDockerRunArgs("worker-1", launcher.resolveTemplate());
 		expect(args.some((arg: string) => arg.startsWith("YOLO_WORKER_INIT_"))).toBe(false);
 	});
 
@@ -1439,11 +1455,12 @@ describe("DockerWorkerExecutor", () => {
 		});
 
 		try {
-			const template = (harness.executor as any).resolveTemplate();
+			const launcher = (harness.executor as any).launcher;
+			const template = launcher.resolveTemplate();
 			await harness.executor.prebuildWorkerImage();
 			images.delete("yolomatic-worker-node:latest");
 
-			await (harness.executor as any).ensureWorkerImage(template, "test-session");
+			await launcher.ensureWorkerImage(template, "test-session");
 
 			const builtImages = execFileMock.mock.calls
 				.filter((call) => call[1][0] === "build")
@@ -1480,18 +1497,19 @@ describe("DockerWorkerExecutor", () => {
 		});
 
 		try {
-			const template = (harness.executor as any).resolveTemplate();
+			const launcher = (harness.executor as any).launcher;
+			const template = launcher.resolveTemplate();
 			await harness.executor.prebuildWorkerImage();
 			images.clear();
 
 			await Promise.all([
-				(harness.executor as any).ensureWorkerImage(template, "test-session-1"),
-				(harness.executor as any).ensureWorkerImage(template, "test-session-2"),
+				launcher.ensureWorkerImage(template, "test-session-1"),
+				launcher.ensureWorkerImage(template, "test-session-2"),
 			]);
 			images.delete("yolomatic-worker-base:latest");
 			await Promise.all([
-				(harness.executor as any).ensureWorkerBaseImage(),
-				(harness.executor as any).ensureWorkerBaseImage(),
+				launcher.ensureWorkerBaseImage(),
+				launcher.ensureWorkerBaseImage(),
 			]);
 
 			const builtImages = execFileMock.mock.calls
@@ -1515,16 +1533,17 @@ describe("DockerWorkerExecutor", () => {
 			defaultWorkerTemplate: "node",
 		});
 		const executor = harness.executor as any;
-		const template = executor.resolveTemplate();
+		const launcher = executor.launcher;
+		const template = launcher.resolveTemplate();
 		let inspections = 0;
-		executor.imageReady.set(template.id, Promise.resolve());
+		launcher.imageReady.set(template.id, Promise.resolve());
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "image" && args[1] === "inspect") {
 				inspections += 1;
 				if (inspections <= 3) {
 					// Simulate another concurrent request replacing the cached promise
 					// before this request can invalidate the stale entry.
-					executor.imageReady.set(template.id, Promise.resolve());
+					launcher.imageReady.set(template.id, Promise.resolve());
 					callback(new Error(`No such image: ${args[2]}`), "", "");
 					return;
 				}
@@ -1535,7 +1554,7 @@ describe("DockerWorkerExecutor", () => {
 		});
 
 		try {
-			await expect(executor.ensureWorkerImage(template, "test-session")).rejects.toThrow(
+			await expect(launcher.ensureWorkerImage(template, "test-session")).rejects.toThrow(
 				"Worker image yolomatic-worker-node:latest remained unavailable after 3 cache revalidation attempts.",
 			);
 			expect(inspections).toBe(3);
@@ -1550,13 +1569,14 @@ describe("DockerWorkerExecutor", () => {
 			defaultWorkerTemplate: "node",
 		});
 		const executor = harness.executor as any;
+		const launcher = executor.launcher;
 		let inspections = 0;
-		executor.baseImageReady = Promise.resolve();
+		launcher.baseImageReady = Promise.resolve();
 		execFileMock.mockImplementation((_cmd, args, _options, callback) => {
 			if (args[0] === "image" && args[1] === "inspect") {
 				inspections += 1;
 				if (inspections <= 3) {
-					executor.baseImageReady = Promise.resolve();
+					launcher.baseImageReady = Promise.resolve();
 					callback(new Error(`No such image: ${args[2]}`), "", "");
 					return;
 				}
@@ -1567,7 +1587,7 @@ describe("DockerWorkerExecutor", () => {
 		});
 
 		try {
-			await expect(executor.ensureWorkerBaseImage()).rejects.toThrow(
+			await expect(launcher.ensureWorkerBaseImage()).rejects.toThrow(
 				"Worker base image yolomatic-worker-base:latest remained unavailable after 3 cache revalidation attempts.",
 			);
 			expect(inspections).toBe(3);
@@ -1583,7 +1603,8 @@ describe("DockerWorkerExecutor", () => {
 		});
 
 		try {
-			expect((harness.executor as any).resolveTemplate()).toMatchObject({
+			const launcher = (harness.executor as any).launcher;
+			expect(launcher.resolveTemplate()).toMatchObject({
 				id: "node",
 				image: "yolomatic-worker-node:latest",
 			});
@@ -1604,7 +1625,8 @@ describe("DockerWorkerExecutor", () => {
 			expect(stdoutSpy).toHaveBeenCalledWith(
 				"[startup] worker image prebuild failed: prebuild rejected\n",
 			);
-			expect((harness.executor as any).imageReady.size).toBe(0);
+			const launcher = (harness.executor as any).launcher;
+			expect(launcher.imageReady.size).toBe(0);
 		} finally {
 			stdoutSpy.mockRestore();
 			await harness.close();

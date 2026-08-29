@@ -1,61 +1,20 @@
-import { access } from "node:fs/promises";
-import { execFile, spawn } from "node:child_process";
-import path from "node:path";
-import { promisify } from "node:util";
-
 import type { ExecutionResult, RefinementResult } from "./results.js";
-import { buildFeedbackPrompt, buildIssuePrompt, buildIssueRefinementPrompt, buildPRReviewPrompt, type PRReviewComment, type PriorDiscussionComment } from "./prompts.js";
-import { parseRefinementResult } from "./results.js";
-import { recordSessionLog } from "../logging/session-log-store.js";
+import {
+	buildFeedbackPrompt,
+	buildIssuePrompt,
+	buildIssueRefinementPrompt,
+	buildPRReviewPrompt,
+	type PRReviewComment,
+	type PriorDiscussionComment,
+} from "./prompts.js";
 import type { ExecutionService, LiveExecutionSession } from "../ports/execution-service.js";
 import { sessionStorageKey, type SessionState } from "../session/store.js";
-import {
-	resolveRuntimeSettings,
-	type RuntimeSettings,
-	type RuntimeSettingsProvider,
-} from "../runtime-settings.js";
-import {
-	WORKER_PROTOCOL_VERSION,
-	createWorkerMessage,
-	type AnyWorkerProtocolMessage,
-	type WorkerAckPayload,
-	type WorkerCompletePayload,
-	type WorkerErrorPayload,
-	type WorkerControlPayload,
-	type WorkerEventBatchPayload,
-	type WorkerProtocolMessage,
-	type WorkerToolRequestPayload,
-	type WorkerToolResponsePayload,
-} from "../worker/protocol.js";
-import { WORKER_RPC_PATH, type WorkerRpcConnection, type WorkerRpcServer } from "../worker/rpc-server.js";
+import type { WorkerRpcServer } from "../worker/rpc-server.js";
 import type { WorkerGitHubGateway } from "../worker/github-gateway.js";
-import {
-	BASE_WORKER_DOCKERFILE,
-	BASE_WORKER_IMAGE,
-	DEFAULT_WORKER_TEMPLATE,
-	getWorkerTemplate,
-	type WorkerTemplate,
-} from "../worker/templates.js";
+import type { RuntimeSettings, RuntimeSettingsProvider } from "../runtime-settings.js";
 
-const execFileAsync = promisify(execFile);
-const WORKER_IMAGE_TRANSPORT_LABEL = "io.yolomatic.worker.transport";
-const WORKER_IMAGE_TRANSPORT_VERSION = "websocket-v1";
-const MAX_WORKER_LAUNCH_RETRIES = 3;
-const MAX_IMAGE_REVALIDATIONS = 3;
-const STOPPED_CONTAINER_STATES = new Set(["created", "dead", "exited"]);
-/** Matches userinfo credentials embedded in a URL (e.g. https://user:token@host). */
-const CREDENTIAL_URL_PATTERN = /^[a-z]+:\/\/[^/]*@/i;
-
-async function execFileText(command: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
-	const result = await execFileAsync(command, args, { cwd });
-	if (typeof result === "string") {
-		return { stdout: result, stderr: "" };
-	}
-	return {
-		stdout: String(result.stdout ?? ""),
-		stderr: String(result.stderr ?? ""),
-	};
-}
+import { DockerWorkerLauncher } from "./docker-worker/docker-worker-launcher.js";
+import { WorkerSessionSupervisor } from "./docker-worker/worker-session-supervisor.js";
 
 export interface DockerWorkerExecutorOptions {
 	projectRoot: string;
@@ -76,19 +35,37 @@ export interface DockerWorkerExecutorOptions {
 	githubGateway?: WorkerGitHubGateway;
 	/**
 	 * Runtime settings provider (or static snapshot) supplying the model
-	 * provider/model and OpenAI API key forwarded into worker containers. Read
-	 * fresh at each launch so live database-setting updates affect subsequent
-	 * sessions. When omitted, no model env vars are forwarded.
+	 * provider/model and OpenAI API key forwarded into worker containers.
 	 */
 	runtimeSettings?: RuntimeSettingsProvider | (() => RuntimeSettings);
 }
 
 export class DockerWorkerExecutor implements ExecutionService {
-	private readonly imageReady = new Map<string, Promise<void>>();
-	private baseImageReady?: Promise<void>;
-	private resolvedWorkerWorkspaceMountSource?: Promise<string>;
+	private readonly launcher: DockerWorkerLauncher;
+	private readonly supervisor: WorkerSessionSupervisor;
 
-	constructor(private readonly options: DockerWorkerExecutorOptions) {}
+	constructor(private readonly options: DockerWorkerExecutorOptions) {
+		this.launcher = new DockerWorkerLauncher({
+			projectRoot: options.projectRoot,
+			workspacesDir: options.workspacesDir,
+			workerImage: options.workerImage,
+			defaultWorkerTemplate: options.defaultWorkerTemplate,
+			resolveWorkerTemplate: options.resolveWorkerTemplate,
+			workerWorkspaceMountSource: options.workerWorkspaceMountSource,
+			workerDockerNetworkMode: options.workerDockerNetworkMode,
+			workerOllamaHost: options.workerOllamaHost,
+			workerOpenAiApiKey: options.workerOpenAiApiKey,
+			soulPath: options.soulPath,
+			runtimeSettings: options.runtimeSettings,
+		});
+
+		this.supervisor = new WorkerSessionSupervisor({
+			workerRpcServer: options.workerRpcServer,
+			workerControlBaseUrl: options.workerControlBaseUrl,
+			githubGateway: () => this.options.githubGateway,
+			launcher: this.launcher,
+		});
+	}
 
 	execute(
 		state: SessionState,
@@ -131,6 +108,15 @@ export class DockerWorkerExecutor implements ExecutionService {
 		) as Promise<RefinementResult>;
 	}
 
+	/**
+	 * Public startup hook that begins building the worker image eagerly.
+	 * The returned promise resolves when the build finishes, but callers should
+	 * generally fire it and forget it so startup is not blocked.
+	 */
+	async prebuildWorkerImage(): Promise<void> {
+		await this.launcher.prebuildWorkerImage();
+	}
+
 	private async runWorker(
 		state: SessionState,
 		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
@@ -139,811 +125,25 @@ export class DockerWorkerExecutor implements ExecutionService {
 		onActivity?: () => void,
 	): Promise<ExecutionResult | RefinementResult> {
 		const sessionKey = sessionStorageKey(state.owner, state.repo, state.issueNumber, state.kind ?? "implementation");
-		const workerTemplate = this.resolveTemplate(state.owner, state.repo);
-		await this.ensureWorkerImage(workerTemplate, sessionKey);
+		const workerTemplate = this.launcher.resolveTemplate(state.owner, state.repo);
+		await this.launcher.ensureWorkerImage(workerTemplate, sessionKey);
 
-		const containerName = this.buildContainerName(state, prompt.kind);
-		const workspacePathInWorker = this.resolveWorkerWorkspacePath(state.workspacePath);
-		await this.validateLaunch(state.workspacePath);
+		const containerName = this.launcher.buildContainerName(state, prompt.kind);
+		const workspacePathInWorker = this.launcher.resolveWorkerWorkspacePath(state.workspacePath);
+		await this.launcher.validateLaunch(state.workspacePath);
 
-		for (let retryCount = 0; ; retryCount += 1) {
-			try {
-				return await this.runWorkerAttempt(
-					state,
-					prompt,
-					sessionKey,
-					containerName,
-					workspacePathInWorker,
-					workerTemplate,
-					abortSignal,
-					onSessionCreated,
-					onActivity,
-				);
-			} catch (error) {
-				const launchError = error instanceof Error ? error : new Error(String(error));
-				if (!this.isContainerNameConflict(launchError)) {
-					throw launchError;
-				}
-
-				if (retryCount >= MAX_WORKER_LAUNCH_RETRIES) {
-					throw new Error(
-						`Worker container launch failed after ${retryCount + 1} attempts (${MAX_WORKER_LAUNCH_RETRIES} retries).\n${launchError.message}`,
-						{ cause: launchError },
-					);
-				}
-				const recovered = await this.removeStoppedConflictingContainer(containerName, sessionKey);
-				if (!recovered) {
-					throw launchError;
-				}
-			}
-		}
-	}
-
-	private async runWorkerAttempt(
-		state: SessionState,
-		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
-		sessionKey: string,
-		containerName: string,
-		workspacePathInWorker: string,
-		workerTemplate: WorkerTemplate,
-		abortSignal?: AbortSignal,
-		onSessionCreated?: (session: LiveExecutionSession) => void,
-		onActivity?: () => void,
-	): Promise<ExecutionResult | RefinementResult> {
-		const pendingConnection = this.options.workerRpcServer.createPendingConnection(sessionKey);
-		const workerSessionUrl = this.buildWorkerSessionUrl(sessionKey, pendingConnection.token);
-
-		recordSessionLog(sessionKey, {
-			level: "info",
-			message: `Launching worker container ${containerName}`,
-			details: { type: "worker_launch", image: workerTemplate.image, template: workerTemplate.id, containerName },
-		});
-
-		let connection: WorkerRpcConnection | undefined;
-		let dockerStdout = "";
-		let dockerStderr = "";
-		let settled = false;
-		let abortTimer: NodeJS.Timeout | undefined;
-		const pendingAcks = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
-		const nextMessageId = this.createMessageIdFactory();
-
-		const cleanupPendingAcks = (error: Error) => {
-			for (const pending of pendingAcks.values()) {
-				pending.reject(error);
-			}
-			pendingAcks.clear();
-		};
-
-		const sendMessage = (message: WorkerProtocolMessage, expectAck = false): Promise<void> => {
-			if (!connection?.isOpen()) {
-				return Promise.reject(new Error("Worker RPC connection is not connected"));
-			}
-
-			const sendPromise = connection.send(message);
-			if (!expectAck) {
-				return sendPromise;
-			}
-
-			return new Promise<void>((resolve, reject) => {
-				pendingAcks.set(message.messageId, { resolve, reject });
-				void sendPromise.catch((error) => {
-					pendingAcks.delete(message.messageId);
-					reject(error instanceof Error ? error : new Error(String(error)));
-				});
-			});
-		};
-
-		const sendControl = async (payload: WorkerControlPayload): Promise<void> => {
-			const message = createWorkerMessage("control", sessionKey, nextMessageId(), payload);
-			await sendMessage(message, true);
-		};
-
-		let executionResolve!: (result: ExecutionResult | RefinementResult) => void;
-		let executionReject!: (error: Error) => void;
-		const executionPromise = new Promise<ExecutionResult | RefinementResult>((resolve, reject) => {
-			executionResolve = resolve;
-			executionReject = reject;
-		});
-
-		const docker = spawn("docker", await this.buildDockerRunArgs(containerName, workerTemplate), {
-			cwd: this.options.projectRoot,
-			env: {
-				...process.env,
-				YOLO_SESSION_KEY: sessionKey,
-				YOLO_SESSION_WS_URL: workerSessionUrl,
-				YOLO_SOUL_PATH: this.options.soulPath,
-				YOLO_WORKER_OLLAMA_HOST: this.resolveWorkerOllamaHost(),
-			},
-			stdio: ["ignore", "pipe", "pipe"],
-		});
-
-		docker.stdout.on("data", (chunk: Buffer) => {
-			dockerStdout = this.appendOutput(dockerStdout, chunk.toString("utf8"));
-		});
-		docker.stderr.on("data", (chunk: Buffer) => {
-			dockerStderr = this.appendOutput(dockerStderr, chunk.toString("utf8"));
-		});
-
-		const dockerExitPromise = new Promise<never>((_resolve, reject) => {
-			docker.on("error", (error) => reject(error));
-			docker.on("exit", (code, signal) => {
-				if (settled) {
-					return;
-				}
-				const tail = [dockerStderr.trim(), dockerStdout.trim()].filter(Boolean).join("\n");
-				reject(
-					new Error(
-						[
-							`Worker container exited before completion (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
-							tail,
-						]
-							.filter(Boolean)
-							.join("\n"),
-					),
-				);
-			});
-		});
-
-		const requestStop = async (): Promise<void> => {
-			if (settled) return;
-			try {
-				await sendControl({ action: "stop" });
-			} catch {
-				// Fall through to docker stop below.
-			}
-			abortTimer = setTimeout(() => {
-				void execFileAsync("docker", ["stop", containerName], { cwd: this.options.projectRoot }).catch(() => undefined);
-			}, 5000);
-			abortTimer.unref?.();
-		};
-
-		const onAbort = () => {
-			void requestStop();
-		};
-		abortSignal?.addEventListener("abort", onAbort);
-
-		try {
-			connection = await Promise.race([pendingConnection.waitForConnection(), dockerExitPromise]);
-			connection.onMessage((message) => {
-				if (message.protocolVersion !== WORKER_PROTOCOL_VERSION) {
-					connection?.close(1002, `Unsupported worker protocol version ${message.protocolVersion}`);
-					return;
-				}
-				if (message.sessionKey !== sessionKey) {
-					connection?.close(1008, `Unexpected session key ${message.sessionKey}`);
-					return;
-				}
-				void this.handleWorkerMessage(
-					message,
-					state,
-					prompt,
-					sessionKey,
-					workspacePathInWorker,
-					sendMessage,
-					nextMessageId,
-					pendingAcks,
-					onSessionCreated,
-					onActivity,
-					(result) => {
-						settled = true;
-						executionResolve(result);
-					},
-					(error) => {
-						settled = true;
-						executionReject(error);
-					},
-				).catch((error) => {
-					settled = true;
-					executionReject(error instanceof Error ? error : new Error(String(error)));
-				});
-			});
-			connection.onClose(() => {
-				connection = undefined;
-				if (!settled) {
-					const details = [dockerStderr.trim(), dockerStdout.trim()].filter(Boolean).join("\n");
-					executionReject(new Error(details ? `Worker connection closed unexpectedly.\n${details}` : "Worker connection closed unexpectedly."));
-				}
-			});
-			connection.onError((error) => {
-				if (!settled) {
-					executionReject(error);
-				}
-			});
-
-			return await Promise.race([executionPromise, dockerExitPromise]);
-		} finally {
-			abortSignal?.removeEventListener("abort", onAbort);
-			if (abortTimer) {
-				clearTimeout(abortTimer);
-			}
-			cleanupPendingAcks(new Error("Worker session ended before acknowledgement"));
-			connection?.close();
-			pendingConnection.dispose();
-		}
-	}
-
-	private isContainerNameConflict(error: Error): boolean {
-		return error.message.includes("Conflict. The container name") && error.message.includes("is already in use by container");
-	}
-
-	private async removeStoppedConflictingContainer(containerName: string, sessionKey: string): Promise<boolean> {
-		let status: string;
-		try {
-			const result = await execFileText(
-				"docker",
-				["inspect", "--format", "{{.State.Status}}", containerName],
-				this.options.projectRoot,
-			);
-			status = result.stdout.trim().toLowerCase();
-		} catch (error) {
-			recordSessionLog(sessionKey, {
-				level: "error",
-				message: `Could not inspect conflicting worker container ${containerName}`,
-				details: {
-					type: "worker_launch_recovery",
-					containerName,
-					error: error instanceof Error ? error.message : String(error),
-				},
-			});
-			return false;
-		}
-
-		if (!STOPPED_CONTAINER_STATES.has(status)) {
-			recordSessionLog(sessionKey, {
-				level: "error",
-				message: `Conflicting worker container ${containerName} is ${status || "in an unknown state"}; refusing to remove it`,
-				details: { type: "worker_launch_recovery", containerName, status },
-			});
-			return false;
-		}
-
-		try {
-			await execFileText("docker", ["rm", containerName], this.options.projectRoot);
-			recordSessionLog(sessionKey, {
-				level: "warn",
-				message: `Removed stopped conflicting worker container ${containerName}; retrying launch`,
-				details: { type: "worker_launch_recovery", containerName, status },
-			});
-			return true;
-		} catch (error) {
-			recordSessionLog(sessionKey, {
-				level: "error",
-				message: `Could not remove stopped conflicting worker container ${containerName}`,
-				details: {
-					type: "worker_launch_recovery",
-					containerName,
-					status,
-					error: error instanceof Error ? error.message : String(error),
-				},
-			});
-			return false;
-		}
-	}
-
-	private async handleWorkerMessage(
-		message: AnyWorkerProtocolMessage,
-		state: SessionState,
-		prompt: { kind: "issue" | "comment" | "pr-review" | "issue-refinement"; text: string },
-		sessionKey: string,
-		workspacePathInWorker: string,
-		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
-		nextMessageId: () => string,
-		pendingAcks: Map<string, { resolve: () => void; reject: (error: Error) => void }>,
-		onSessionCreated: ((session: LiveExecutionSession) => void) | undefined,
-		onActivity: (() => void) | undefined,
-		onComplete: (result: ExecutionResult | RefinementResult) => void,
-		onError: (error: Error) => void,
-	): Promise<void> {
-		switch (message.type) {
-			case "hello": {
-				const launchConfig = createWorkerMessage("launch_config", sessionKey, nextMessageId(), {
-					session: {
-						owner: state.owner,
-						repo: state.repo,
-						issueNumber: state.issueNumber,
-						kind: state.kind ?? "implementation",
-						workspacePath: workspacePathInWorker,
-						title: state.title,
-						body: state.body,
-						sessionTag: state.sessionTag,
-					},
-					prompt,
-					limits: { maxRuntimeSeconds: 7200 },
-				});
-				await sendMessage(launchConfig, true);
-				onSessionCreated?.({
-					steer: async (content: string) => {
-						await sendMessage(
-							createWorkerMessage("control", sessionKey, nextMessageId(), { action: "steer", message: content }),
-							true,
-						);
-					},
-				});
-				return;
-			}
-
-			case "ack": {
-				const payload = message.payload as WorkerAckPayload;
-				const pending = pendingAcks.get(payload.ackMessageId);
-				if (pending) {
-					pendingAcks.delete(payload.ackMessageId);
-					pending.resolve();
-				}
-				return;
-			}
-
-			case "event_batch": {
-				this.persistWorkerEvents(sessionKey, message.payload as WorkerEventBatchPayload, onActivity);
-				return;
-			}
-
-			case "tool_request": {
-				await this.handleToolRequest(
-					message as WorkerProtocolMessage<"tool_request">,
-					state,
-					sessionKey,
-					sendMessage,
-					nextMessageId,
-				);
-				return;
-			}
-
-			case "heartbeat": {
-				onActivity?.();
-				return;
-			}
-
-			case "complete": {
-				const payload = message.payload as WorkerCompletePayload;
-				if (prompt.kind === "issue-refinement") {
-					const raw = payload.result as Partial<RefinementResult>;
-					const refined = parseRefinementResult(
-						typeof raw.proposedTaskBody === "string"
-							? JSON.stringify({
-									proposedTaskBody: raw.proposedTaskBody,
-									summary: raw.summary ?? "",
-									investigation: raw.investigation ?? "",
-							  })
-							: "",
-					);
-					if (!refined) {
-						onError(new Error("Worker returned an invalid refinement result."));
-						return;
-					}
-					onComplete(refined);
-					return;
-				}
-				onComplete(payload.result as ExecutionResult);
-				return;
-			}
-
-			case "error": {
-				const payload = message.payload as WorkerErrorPayload;
-				onError(new Error(payload.stack ? `${payload.message}\n${payload.stack}` : payload.message));
-				return;
-			}
-
-			default: {
-				return;
-			}
-		}
-	}
-
-	private persistWorkerEvents(sessionKey: string, payload: WorkerEventBatchPayload, onActivity?: () => void): void {
-		for (const event of payload.events) {
-			if (event.type !== "session_log") continue;
-			recordSessionLog(sessionKey, {
-				level: event.entry.level,
-				message: event.entry.message,
-				details: event.entry.details,
-			});
-			onActivity?.();
-		}
-	}
-
-	private async handleToolRequest(
-		message: WorkerProtocolMessage<"tool_request">,
-		state: SessionState,
-		sessionKey: string,
-		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
-		nextMessageId: () => string,
-	): Promise<void> {
-		const request = message.payload as WorkerToolRequestPayload;
-		// Acknowledge receipt immediately so the worker knows the request was
-		// accepted; the result follows in a separate tool_response.
-		await sendMessage(
-			createWorkerMessage("ack", sessionKey, nextMessageId(), { ackMessageId: message.messageId }),
+		return this.launcher.runWithNameConflictRetry(containerName, sessionKey, () =>
+			this.supervisor.runSession({
+				state,
+				prompt,
+				sessionKey,
+				containerName,
+				workspacePathInWorker,
+				workerTemplate,
+				abortSignal,
+				onSessionCreated,
+				onActivity,
+			}),
 		);
-
-		const gateway = this.options.githubGateway;
-		if (!gateway) {
-			await this.sendToolResponse(sendMessage, sessionKey, nextMessageId, message.messageId, {
-				requestMessageId: message.messageId,
-				ok: false,
-				error: "GitHub gateway is not enabled for this control plane",
-			});
-			return;
-		}
-
-		let response: import("../worker/github-gateway.js").GatewayToolResponse;
-		try {
-			response = await gateway.handle(state, { tool: request.tool, params: request.params });
-		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error);
-			response = { ok: false, error: msg };
-		}
-
-		const payload: WorkerToolResponsePayload = {
-			requestMessageId: message.messageId,
-			ok: response.ok,
-			...(response.data !== undefined ? { data: response.data } : {}),
-			...(response.error !== undefined ? { error: response.error } : {}),
-			...(response.scopeError ? { scopeError: true } : {}),
-		};
-
-		recordSessionLog(sessionKey, {
-			level: response.ok ? "tool" : response.scopeError ? "warn" : "error",
-			message: `gateway ${request.tool} ${response.ok ? "done" : response.scopeError ? "scope-rejected" : "failed"}`,
-			details: {
-				type: "worker_gateway_tool",
-				tool: request.tool,
-				ok: response.ok,
-				scopeError: response.scopeError ?? false,
-				error: response.error ?? null,
-			},
-		});
-
-		await this.sendToolResponse(sendMessage, sessionKey, nextMessageId, message.messageId, payload);
-	}
-
-	private async sendToolResponse(
-		sendMessage: (message: WorkerProtocolMessage, expectAck?: boolean) => Promise<void>,
-		sessionKey: string,
-		nextMessageId: () => string,
-		requestMessageId: string,
-		payload: WorkerToolResponsePayload,
-	): Promise<void> {
-		await sendMessage(
-			createWorkerMessage("tool_response", sessionKey, nextMessageId(), payload),
-		);
-	}
-
-	/**
-	 * Resolves the runtime settings snapshot used for this launch. Read fresh
-	 * on each call so live database-setting updates affect subsequent sessions.
-	 */
-	private getRuntimeSettings(): RuntimeSettings {
-		return resolveRuntimeSettings(this.options.runtimeSettings);
-	}
-
-	private async buildDockerRunArgs(containerName: string, workerTemplate = this.resolveTemplate()): Promise<string[]> {
-		const networkMode = this.options.workerDockerNetworkMode?.trim();
-		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
-		const workerWorkspacesDir = this.getWorkerWorkspacesDir();
-		const args = [
-			"run",
-			"--rm",
-			"--name",
-			containerName,
-			"--mount",
-			this.buildMountSpec(workspaceMountSource, workerWorkspacesDir),
-		];
-
-		if (networkMode) {
-			args.push("--network", networkMode);
-		}
-		if (!networkMode?.startsWith("container:")) {
-			args.push("--add-host", "host.docker.internal:host-gateway");
-		}
-
-		const modelSettings = this.getRuntimeSettings().model;
-		if (modelSettings.piAgentProvider?.trim()) {
-			args.push("-e", `PI_AGENT_PROVIDER=${modelSettings.piAgentProvider.trim()}`);
-		}
-		if (modelSettings.piAgentModel?.trim()) {
-			args.push("-e", `PI_AGENT_MODEL=${modelSettings.piAgentModel.trim()}`);
-		}
-		const initScript = process.env.YOLO_WORKER_INIT_SCRIPT?.trim();
-		if (initScript) {
-			args.push("-e", `YOLO_WORKER_INIT_SCRIPT=${initScript}`);
-		}
-		const initSkip = process.env.YOLO_WORKER_INIT_SKIP?.trim();
-		if (initSkip) {
-			args.push("-e", `YOLO_WORKER_INIT_SKIP=${initSkip}`);
-		}
-		const initTimeout = process.env.YOLO_WORKER_INIT_TIMEOUT_SECONDS?.trim();
-		if (initTimeout) {
-			args.push("-e", `YOLO_WORKER_INIT_TIMEOUT_SECONDS=${initTimeout}`);
-		}
-		const ollamaHost = this.resolveWorkerOllamaHost();
-		if (ollamaHost) {
-			args.push("-e", `OLLAMA_HOST=${ollamaHost}`);
-		}
-
-		const openaiApiKey = this.resolveWorkerOpenAiApiKey();
-		if (openaiApiKey) {
-			args.push("-e", `OPENAI_API_KEY=${openaiApiKey}`);
-		}
-
-		args.push(
-			"-e",
-			"YOLO_SESSION_KEY",
-			"-e",
-			"YOLO_SESSION_WS_URL",
-			"-e",
-			"YOLO_SOUL_PATH",
-			workerTemplate.image,
-		);
-
-		return args;
-	}
-
-	private buildMountSpec(source: string, target: string): string {
-		return `type=${path.isAbsolute(source) ? "bind" : "volume"},src=${source},dst=${target}`;
-	}
-
-	private async resolveWorkerWorkspaceMountSource(): Promise<string> {
-		if (!this.resolvedWorkerWorkspaceMountSource) {
-			this.resolvedWorkerWorkspaceMountSource = (async () => {
-				const configuredSource = this.options.workerWorkspaceMountSource.trim();
-				if (path.isAbsolute(configuredSource)) {
-					return configuredSource;
-				}
-
-				const currentContainerRef = process.env.HOSTNAME?.trim();
-				if (!currentContainerRef) {
-					return configuredSource;
-				}
-
-				try {
-					const { stdout } = await execFileText(
-						"docker",
-						["inspect", "--format", "{{json .Mounts}}", currentContainerRef],
-						this.options.projectRoot,
-					);
-					const mounts = JSON.parse(stdout) as Array<{
-						Destination?: string;
-						Type?: string;
-						Name?: string;
-						Source?: string;
-					}>;
-					const workspaceMount = mounts.find((mount) => mount.Destination === this.options.workspacesDir);
-					if (workspaceMount?.Type === "volume" && workspaceMount.Name?.trim()) {
-						return workspaceMount.Name.trim();
-					}
-					if (workspaceMount?.Type === "bind" && workspaceMount.Source?.trim()) {
-						return workspaceMount.Source.trim();
-					}
-				} catch {
-					// Fall back to the configured source when self-inspection is unavailable.
-				}
-
-				return configuredSource;
-			})();
-		}
-
-		return this.resolvedWorkerWorkspaceMountSource;
-	}
-
-	private buildWorkerSessionUrl(sessionKey: string, token: string): string {
-		const url = new URL(this.options.workerControlBaseUrl);
-		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-		url.pathname = WORKER_RPC_PATH;
-		url.search = "";
-		url.searchParams.set("sessionKey", sessionKey);
-		url.searchParams.set("token", token);
-		return url.toString();
-	}
-
-	private resolveWorkerWorkspacePath(workspacePath: string): string {
-		const relative = path.relative(this.options.workspacesDir, workspacePath);
-		if (relative.startsWith("..") || path.isAbsolute(relative)) {
-			throw new Error(`Workspace path ${workspacePath} is outside configured WORKSPACES_DIR ${this.options.workspacesDir}`);
-		}
-		return path.posix.join(this.getWorkerWorkspacesDir(), ...relative.split(path.sep));
-	}
-
-	private getWorkerWorkspacesDir(): string {
-		return this.options.workspacesDir.split(path.sep).join(path.posix.sep);
-	}
-
-	private async validateLaunch(workspacePath: string): Promise<void> {
-		await access(workspacePath);
-		await this.assertWorkspaceRemoteIsSanitized(workspacePath);
-	}
-
-	/**
-	 * Refuse to launch a worker whose mounted workspace still exposes a
-	 * credential-bearing remote.origin.url. The control plane is responsible
-	 * for sanitizing the remote before the worker starts; a token here would
-	 * let the credential-free worker push directly.
-	 */
-	private async assertWorkspaceRemoteIsSanitized(workspacePath: string): Promise<void> {
-		let url: string;
-		try {
-			const result = await execFileAsync("git", ["remote", "get-url", "origin"], { cwd: workspacePath });
-			url = String(typeof result === "string" ? result : result.stdout ?? "").trim();
-		} catch {
-			return;
-		}
-		if (url.length === 0 || !CREDENTIAL_URL_PATTERN.test(url)) {
-			return;
-		}
-		throw new Error(
-			`[worker] Refusing to launch: workspace remote origin URL contains credentials (${url}). ` +
-				"The control plane must sanitize remote.origin.url before launching a worker.",
-		);
-	}
-
-	private resolveWorkerOllamaHost(): string | undefined {
-		const explicit = this.options.workerOllamaHost?.trim();
-		if (explicit) return explicit;
-
-		const raw = process.env.OLLAMA_HOST?.trim();
-		if (!raw) return undefined;
-
-		try {
-			const url = new URL(raw);
-			if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
-				if (this.options.workerDockerNetworkMode?.trim().startsWith("container:")) {
-					return url.toString();
-				}
-				url.hostname = "host.docker.internal";
-				return url.toString();
-			}
-		} catch {
-			// Fall back to the raw value below.
-		}
-
-		return raw;
-	}
-
-	/**
-	 * Resolves the OpenAI API key to forward into worker containers. An explicit
-	 * option takes precedence; otherwise the injected runtime settings' key
-	 * (synced from database settings) is forwarded.
-	 */
-	resolveWorkerOpenAiApiKey(): string | undefined {
-		const explicit = this.options.workerOpenAiApiKey?.trim();
-		if (explicit) return explicit;
-		return this.getRuntimeSettings().model.openaiApiKey?.trim() || undefined;
-	}
-
-	/**
-	 * Public startup hook that begins building the worker image eagerly.
-	 * The returned promise resolves when the build finishes, but callers should
-	 * generally fire it and forget it so startup is not blocked. If the build
-	 * fails, startup still succeeds and the first session will fall back to
-	 * building the image itself.
-	 */
-	async prebuildWorkerImage(): Promise<void> {
-		process.stdout.write("[startup] prebuilding worker image...\n");
-		try {
-			await this.ensureWorkerImage(this.resolveTemplate(), "[startup]");
-			process.stdout.write("[startup] worker image prebuilt successfully\n");
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			process.stdout.write(`[startup] worker image prebuild failed: ${message}\n`);
-			// Clear the cached promise so the first session falls back to the
-			// same lazy build path used when no prebuild was attempted.
-			this.imageReady.clear();
-			this.baseImageReady = undefined;
-		}
-	}
-
-	private resolveTemplate(owner?: string, repo?: string): WorkerTemplate {
-		const id = owner && repo ? this.options.resolveWorkerTemplate?.(owner, repo) : undefined;
-		const requested = id ?? this.options.defaultWorkerTemplate;
-		const template = requested ? getWorkerTemplate(requested) : undefined;
-		if (template) return template;
-		if (this.options.workerImage) {
-			return {
-				id: "legacy",
-				label: "Legacy worker image",
-				image: this.options.workerImage,
-				dockerfile: "Dockerfile",
-			};
-		}
-		const fallback = getWorkerTemplate(DEFAULT_WORKER_TEMPLATE);
-		if (fallback) return fallback;
-		throw new Error(`Unknown worker template: ${requested ?? DEFAULT_WORKER_TEMPLATE}`);
-	}
-
-	private async ensureWorkerImage(workerTemplate: WorkerTemplate, sessionKey: string): Promise<void> {
-		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
-			const cached = this.imageReady.get(workerTemplate.id);
-			if (cached) {
-				await cached;
-				if (await this.dockerImageExists(workerTemplate.image)) return;
-
-				// A host-side cleanup may remove an image while this process still
-				// holds its completed build promise. Only invalidate the promise we
-				// inspected so concurrent recovery requests share one replacement.
-				if (this.imageReady.get(workerTemplate.id) === cached) {
-					this.imageReady.delete(workerTemplate.id);
-				}
-				continue;
-			}
-
-			// Rebuild once per control-plane process so deployments cannot reuse a
-			// worker image built from older source. Docker caches unchanged layers.
-			recordSessionLog(sessionKey, {
-				level: "info",
-				message: "Building worker container image; this may take a couple of minutes.",
-				details: { type: "worker_image_build", image: workerTemplate.image, template: workerTemplate.id },
-			});
-			const ready = workerTemplate.id === "legacy"
-				? execFileAsync(
-					"docker",
-					["build", "--target", "worker", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", workerTemplate.image, this.options.projectRoot],
-					{ cwd: this.options.projectRoot },
-				).then(() => undefined)
-				: this.ensureWorkerBaseImage().then(() =>
-					execFileAsync(
-						"docker",
-						["build", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", workerTemplate.image, "-f", path.join(this.options.projectRoot, workerTemplate.dockerfile), this.options.projectRoot],
-						{ cwd: this.options.projectRoot },
-					).then(() => undefined),
-				);
-			this.imageReady.set(workerTemplate.id, ready);
-			await ready;
-			return;
-		}
-
-		throw new Error(
-			`Worker image ${workerTemplate.image} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
-		);
-	}
-
-	private async ensureWorkerBaseImage(): Promise<void> {
-		for (let attempt = 1; attempt <= MAX_IMAGE_REVALIDATIONS; attempt += 1) {
-			const cached = this.baseImageReady;
-			if (cached) {
-				await cached;
-				if (await this.dockerImageExists(BASE_WORKER_IMAGE)) return;
-
-				if (this.baseImageReady === cached) {
-					this.baseImageReady = undefined;
-				}
-				continue;
-			}
-
-			const ready = execFileAsync(
-				"docker",
-				["build", "--label", `${WORKER_IMAGE_TRANSPORT_LABEL}=${WORKER_IMAGE_TRANSPORT_VERSION}`, "-t", BASE_WORKER_IMAGE, "-f", path.join(this.options.projectRoot, BASE_WORKER_DOCKERFILE), this.options.projectRoot],
-				{ cwd: this.options.projectRoot },
-			).then(() => undefined);
-			this.baseImageReady = ready;
-			await ready;
-			return;
-		}
-
-		throw new Error(
-			`Worker base image ${BASE_WORKER_IMAGE} remained unavailable after ${MAX_IMAGE_REVALIDATIONS} cache revalidation attempts.`,
-		);
-	}
-
-	private async dockerImageExists(image: string): Promise<boolean> {
-		try {
-			await execFileAsync("docker", ["image", "inspect", image], { cwd: this.options.projectRoot });
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	private buildContainerName(state: SessionState, kind?: string): string {
-		const prefix = kind === "issue-refinement" ? "yolomatic-refinement" : "yolomatic-session";
-		return `${prefix}-${state.owner}-${state.repo}-${state.issueNumber}`.replace(/[^a-zA-Z0-9_.-]/g, "-");
-	}
-
-	private createMessageIdFactory(): () => string {
-		let counter = 0;
-		return () => `msg-${++counter}`;
-	}
-
-	private appendOutput(current: string, chunk: string): string {
-		const combined = `${current}${chunk}`;
-		return combined.length > 4000 ? combined.slice(combined.length - 4000) : combined;
 	}
 }

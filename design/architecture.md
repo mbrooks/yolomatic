@@ -262,4 +262,8 @@ The executor boundary is implemented in two runtime layers:
   - reuses `PiAgentExecutor`
   - acts as a WebSocket client during execution
 
-The host-side responsibilities are currently concentrated in `DockerWorkerExecutor`; separating Docker launch mechanics from session-protocol supervision remains an internal refactor opportunity, not a change to this architecture.
+The host-side responsibilities are split across focused modules:
+
+- `src/executor/docker-worker.ts` — `DockerWorkerExecutor`, the stable execution façade implementing `ExecutionService`; it selects prompts, composes the launcher and supervisor, and delegates per session.
+- `src/executor/docker-worker/docker-worker-launcher.ts` — Docker launch mechanics: worker-image build caching, workspace validation and mount translation, docker run arguments and environment, container-name conflict recovery, and child-process lifecycle.
+- `src/executor/docker-worker/worker-session-supervisor.ts` — worker-session protocol supervision: connection establishment, protocol/session validation, pending acknowledgements, steering and abort, gateway dispatch, event persistence, and completion/error conversion.
