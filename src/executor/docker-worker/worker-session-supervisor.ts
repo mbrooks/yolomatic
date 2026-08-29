@@ -294,12 +294,19 @@ export class WorkerSessionSupervisor {
 									proposedTaskBody: raw.proposedTaskBody,
 									summary: raw.summary ?? "",
 									investigation: raw.investigation ?? "",
+									...(typeof raw.proposedTitle === "string" ? { proposedTitle: raw.proposedTitle } : {}),
 								})
 							: "",
 					);
 					if (!refined) {
 						onError(new Error("Worker returned an invalid refinement result."));
 						return;
+					}
+					// Token usage is computed by the worker's executor and survives
+					// only on the raw completion payload; without it the control plane
+					// records unavailable usage and the dashboard renders "unknown".
+					if (typeof raw.usage === "object" && raw.usage !== null) {
+						refined.usage = raw.usage;
 					}
 					onComplete(refined);
 					return;
