@@ -289,12 +289,60 @@ describe("parseRefinementResult", () => {
 		expect(result!.investigation).toBe("Read the implementation.");
 	});
 
-	it("falls back to heuristic extraction", () => {
+	it("parses an explicit Markdown refinement contract", () => {
 		const raw = "## Proposed Task\nRefined body.\n## Summary\nBetter description.\n## Investigation\nRead code.";
 		const result = parseRefinementResult(raw);
 		expect(result).not.toBeNull();
 		expect(result!.proposedTaskBody).toBe("Refined body.");
 		expect(result!.summary).toBe("Better description.");
+		expect(result!.investigation).toBe("Read code.");
+	});
+
+	it("rejects invalid fenced JSON surrounded by commentary", () => {
+		const raw = [
+			"I have completed my investigation. Here is my refined Proposed Task.",
+			"",
+			"```json",
+			JSON.stringify({
+				proposedTaskBody: "## Summary\nRefined.",
+				summary: "Clarified requirements.",
+				investation: "Misspelled required field.",
+			}),
+			"```",
+		].join("\n");
+
+		expect(parseRefinementResult(raw)).toBeNull();
+	});
+
+	it("rejects an explicit Markdown contract containing an invalid JSON envelope", () => {
+		const raw = [
+			"## Proposed Task",
+			"Refined body.",
+			"## Summary",
+			"Better description.",
+			"## Investigation",
+			"Read code.",
+			"```json",
+			'{"proposedTaskBody":"Body","summary":"Summary","investation":"Typo"}',
+			"```",
+		].join("\n");
+
+		expect(parseRefinementResult(raw)).toBeNull();
+	});
+
+	it("rejects arbitrary prose instead of an explicit Markdown contract", () => {
+		expect(parseRefinementResult("I investigated the issue and refined its description.")).toBeNull();
+	});
+
+	it("rejects incomplete or empty Markdown refinement contracts", () => {
+		for (const raw of [
+			"## Proposed Task\nBody\n## Summary\nSummary",
+			"## Proposed Task\nBody\n## Summary\n\n## Investigation\nInvestigation",
+			"## Proposed Task\n\n## Summary\nSummary\n## Investigation\nInvestigation",
+			"## Summary\nSummary\n## Proposed Task\nBody\n## Investigation\nInvestigation",
+		]) {
+			expect(parseRefinementResult(raw)).toBeNull();
+		}
 	});
 
 	it("returns null for empty input", () => {
