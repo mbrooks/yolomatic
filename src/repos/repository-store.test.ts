@@ -176,6 +176,42 @@ describe("RepositoryStore", () => {
 		expect(found!.issueNewCommentEnabled).toBeNull();
 	});
 
+	it("round-trips the per-repository build-model override", async () => {
+		const repo = await store.upsert({
+			owner: "mbrooks",
+			repo: "yolomatic",
+			piAgentBuildModel: "openai/gpt-4.1",
+		});
+		expect(repo.piAgentBuildModel).toBe("openai/gpt-4.1");
+
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.piAgentBuildModel).toBe("openai/gpt-4.1");
+	});
+
+	it("clears the build-model override when it is omitted by a later upsert", async () => {
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic", piAgentBuildModel: "ollama/qwen3:30b" });
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic", defaultBranch: "develop" });
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.piAgentBuildModel).toBeNull();
+		expect(found!.defaultBranch).toBe("develop");
+	});
+
+	it("defaults the build-model override to null when not provided", async () => {
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic" });
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.piAgentBuildModel).toBeNull();
+	});
+
+	it("persists an existing build-model override across an unrelated upsert when the field is passed", async () => {
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic", piAgentBuildModel: "openai/gpt-4.1" });
+		// PATCH-style upsert re-resolves every field; unrelated fields change but
+		// the model must survive a read-modify-write that keeps the value.
+		await store.upsert({ owner: "mbrooks", repo: "yolomatic", piAgentBuildModel: "openai/gpt-4.1", workerTemplate: "python" });
+		const found = await store.get("mbrooks", "yolomatic");
+		expect(found!.piAgentBuildModel).toBe("openai/gpt-4.1");
+		expect(found!.workerTemplate).toBe("python");
+	});
+
 	it("throws when upserting without owner or repo", async () => {
 		await expect(store.upsert({ owner: "", repo: "x" })).rejects.toThrow();
 		await expect(store.upsert({ owner: "x", repo: "" })).rejects.toThrow();

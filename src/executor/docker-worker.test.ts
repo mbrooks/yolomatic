@@ -725,6 +725,124 @@ describe("DockerWorkerExecutor", () => {
 		}
 	});
 
+	it("applies a repository build-model override to implementation, feedback, and PR-review launches but not to refinements", async () => {
+		const harness = await createHarness(514, {
+			runtimeSettings: () => ({
+				model: {
+					piAgentProvider: "ollama",
+					piAgentModel: "default-model",
+					piAgentBuildModel: "build-model",
+					piAgentRefinementModel: "refinement-model",
+				},
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
+			// Cross-provider override for mbrooks/yolomatic; resolver must be read
+			// per session, mirroring the live repository-store resolver.
+			resolveRepoBuildModel: (owner, repo) => (owner === "mbrooks" && repo === "yolomatic" ? "openai/gpt-4.1" : undefined),
+		});
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
+
+		const spawnedArgs: string[][] = [];
+		spawnMock.mockImplementation((_cmd, args, options) => {
+			spawnedArgs.push(args as string[]);
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, `ack-${sessionKey}`, { ackMessageId: message.messageId }),
+					);
+					const isRefinement = sessionKey.endsWith("-refinement");
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, `complete-${sessionKey}`, {
+							result: isRefinement
+								? {
+										proposedTaskBody: "## Summary\nRefined.",
+										summary: "Better description.",
+										investigation: "Read the code.",
+									}
+								: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			// Implementation, feedback, and PR-review launches for the overridden repo.
+			await harness.executor.execute(makeSessionState(514, harness.workspacePath));
+			await harness.executor.execute(makeSessionState(515, harness.workspacePath), "Please retry.");
+			await harness.executor.executePRReview(makeSessionState(516, harness.workspacePath), {
+				comments: [{ body: "nit", user: "reviewer", path: "a.ts", line: 1 }],
+			});
+			// Refinement for the same repo must keep the global refinement model.
+			await harness.executor.executeRefinement(makeSessionState(517, harness.workspacePath), undefined);
+
+			expect(spawnedArgs).toHaveLength(4);
+			expect(spawnedArgs[0]).toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+			expect(spawnedArgs[1]).toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+			expect(spawnedArgs[2]).toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+			// The slash-form repo override suppresses the cross-provider global provider.
+			for (const args of spawnedArgs.slice(0, 3)) {
+				expect(args.some((arg: string) => arg.startsWith("PI_AGENT_PROVIDER="))).toBe(false);
+				expect(args).not.toContain("PI_AGENT_MODEL=build-model");
+			}
+			// Refinements always run on the global refinement model and keep the global provider.
+			expect(spawnedArgs[3]).toContain("PI_AGENT_MODEL=refinement-model");
+			expect(spawnedArgs[3]).toContain("PI_AGENT_PROVIDER=ollama");
+			expect(spawnedArgs[3]).not.toContain("PI_AGENT_MODEL=openai/gpt-4.1");
+		} finally {
+			await harness.close();
+		}
+	});
+
+	it("keeps the global build model when the repository has no build-model override", async () => {
+		const harness = await createHarness(518, {
+			runtimeSettings: () => ({
+				model: { piAgentProvider: "ollama", piAgentModel: "default-model", piAgentBuildModel: "build-model" },
+				logging: { logLevel: "info", logPrompts: true, logThoughts: true, logTools: true, logResponses: true },
+			}),
+			resolveRepoBuildModel: () => undefined,
+		});
+		execFileMock.mockImplementation((_cmd, _args, _options, callback) => callback(null, currentWorkerTransport, ""));
+
+		const spawnedArgs: string[][] = [];
+		spawnMock.mockImplementation((_cmd, args, options) => {
+			spawnedArgs.push(args as string[]);
+			const child = makeChildProcess();
+			const sessionKey = new URL(options.env.YOLO_SESSION_WS_URL as string).searchParams.get("sessionKey") ?? "";
+			void connectMockWorker(
+				harness.workerRpcServer,
+				options.env.YOLO_SESSION_WS_URL as string,
+				async (connection, message) => {
+					if (message.type !== "launch_config") return;
+					await connection.send(
+						createWorkerMessage("ack", sessionKey, `ack-${sessionKey}`, { ackMessageId: message.messageId }),
+					);
+					await connection.send(
+						createWorkerMessage("complete", sessionKey, `complete-${sessionKey}`, {
+						result: { status: "complete", summary: "done", rawResponse: "YOLO_STATUS: complete\ndone" },
+						}),
+					);
+				},
+			);
+			return child;
+		});
+
+		try {
+			await harness.executor.execute(makeSessionState(518, harness.workspacePath));
+			expect(spawnedArgs).toHaveLength(1);
+			expect(spawnedArgs[0]).toContain("PI_AGENT_MODEL=build-model");
+			expect(spawnedArgs[0]).toContain("PI_AGENT_PROVIDER=ollama");
+		} finally {
+			await harness.close();
+		}
+	});
+
 	it("falls back to the default model per session type and forwards no model when nothing is configured", async () => {
 		const workerRpcServer = createFakeWorkerRpcServer();
 		const executor = new DockerWorkerExecutor({
@@ -1986,7 +2104,7 @@ describe("DockerWorkerExecutor", () => {
 async function createHarness(
 	issueNumber: number,
 	workerOptions: Partial<
-		Pick<DockerWorkerExecutorOptions, "workerImage" | "defaultWorkerTemplate" | "resolveWorkerTemplate" | "runtimeSettings">
+		Pick<DockerWorkerExecutorOptions, "workerImage" | "defaultWorkerTemplate" | "resolveWorkerTemplate" | "resolveRepoBuildModel" | "runtimeSettings">
 	> = {},
 ): Promise<{
 	executor: DockerWorkerExecutor;

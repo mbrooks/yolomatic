@@ -391,6 +391,19 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		id: 19,
+		name: "add_repositories_pi_agent_build_model",
+		up(db) {
+			// Per-repository build-model override (nullable = inherit the global
+			// pi_agent_build_model / pi_agent_model). Refinement sessions ignore
+			// this column; they always run on the global model chain.
+			const columns = db.prepare("PRAGMA table_info(repositories)").all() as Array<{ name: string }>;
+			if (!columns.some((column) => column.name === "pi_agent_build_model")) {
+				db.exec("ALTER TABLE repositories ADD COLUMN pi_agent_build_model TEXT");
+			}
+		},
+	},
 ];
 
 export function runMigrations(db: DatabaseSync): void {

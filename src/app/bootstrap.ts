@@ -25,6 +25,7 @@ import {
 	resolveRepoWorkerTemplate,
 	resolveRepoIssueNewCommentEnabled,
 	resolveRepoIssueAdminLinkInCommentsEnabled,
+	resolveRepoBuildModelOverride,
 	type RepoGitHubEventMode,
 	type Repository,
 } from "../repos/repository.js";
@@ -143,6 +144,12 @@ export interface RuntimeResolvers {
 	resolveDefaultBranch: (owner: string, repo: string) => string;
 	resolveGitHubEventMode: (owner: string, repo: string) => RepoGitHubEventMode;
 	resolveWorkerTemplate: (owner: string, repo: string) => string;
+	/**
+	 * Live per-repository build-model override: the repository's own model, or
+	 * undefined when it inherits the global default. Read per call so admin
+	 * updates apply to subsequently started sessions without a restart.
+	 */
+	resolveRepoBuildModel: (owner: string, repo: string) => string | undefined;
 	resolveAdminBaseUrl: () => string | undefined;
 	resolveIssueNewCommentEnabled: (owner: string, repo: string) => boolean;
 	resolveIssueAdminLinkInCommentsEnabled: (owner: string, repo: string) => boolean;
@@ -197,6 +204,7 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 		resolveDefaultBranch,
 		resolveGitHubEventMode,
 		resolveWorkerTemplate,
+		resolveRepoBuildModel,
 		resolveAdminBaseUrl,
 		resolveIssueNewCommentEnabled,
 		resolveIssueAdminLinkInCommentsEnabled,
@@ -234,6 +242,7 @@ export const defaultRuntimeFactory: RuntimeFactory = (ctx) => {
 		workerOllamaHost: config.workerOllamaHost,
 		soulPath: config.soulPath,
 		githubGateway,
+		resolveRepoBuildModel,
 		runtimeSettings: runtimeSettingsProvider,
 	});
 	const eventStore = new GitHubEventStore(path.join(config.memoryDir, "bot-state.sqlite"));
@@ -385,6 +394,13 @@ export function buildRuntimeGraph(
 			repositoryStore.getSync(owner, repo),
 			settingsStore.getBoolean("issue_new_comment_enabled", true),
 		);
+	// Build-model resolver mirrors the live-read contract above: the repository
+	// table is consulted per worker launch so a build-model override takes
+	// effect for subsequent sessions without restarting the control plane.
+	// (Issue refinement launches ignore this resolver and always use the
+	// global model chain — the launcher skips the override for refinements.)
+	const resolveRepoBuildModel = (owner: string, repo: string) =>
+		resolveRepoBuildModelOverride(repositoryStore.getSync(owner, repo));
 
 	const services = factory({
 		config,
@@ -400,6 +416,7 @@ export function buildRuntimeGraph(
 			resolveAdminBaseUrl,
 			resolveIssueNewCommentEnabled,
 			resolveIssueAdminLinkInCommentsEnabled,
+			resolveRepoBuildModel,
 		},
 		findManaged,
 	});

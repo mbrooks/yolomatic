@@ -9,7 +9,7 @@ import {
 	type RuntimeSettings,
 	type RuntimeSettingsProvider,
 } from "../../runtime-settings.js";
-import { resolveLaunchModel, type WorkerPromptKind } from "../model-selection.js";
+import { resolveLaunchModel, resolveLaunchProvider, type WorkerPromptKind } from "../model-selection.js";
 import {
 	BASE_WORKER_DOCKERFILE,
 	BASE_WORKER_IMAGE,
@@ -60,6 +60,12 @@ export interface DockerWorkerLauncherOptions {
 	soulPath: string;
 	/** Runtime settings provider (or static snapshot) supplying model env vars. */
 	runtimeSettings?: RuntimeSettingsProvider | (() => RuntimeSettings);
+	/**
+	 * Live per-repository build-model override: returns the repository's own
+	 * override (bare id or `provider/model`), or undefined to inherit the
+	 * global model. Read fresh at launch time (no-restart contract).
+	 */
+	resolveRepoBuildModel?: (owner: string, repo: string) => string | undefined;
 }
 
 export interface DockerWorkerLaunchPlan {
@@ -338,6 +344,7 @@ export class DockerWorkerLauncher {
 		containerName: string,
 		workerTemplate: WorkerTemplate,
 		promptKind?: WorkerPromptKind,
+		repo?: { owner: string; repo: string },
 	): Promise<string[]> {
 		const networkMode = this.options.workerDockerNetworkMode?.trim();
 		const workspaceMountSource = await this.resolveWorkerWorkspaceMountSource();
@@ -359,10 +366,18 @@ export class DockerWorkerLauncher {
 		}
 
 		const modelSettings = this.getRuntimeSettings().model;
-		if (modelSettings.piAgentProvider?.trim()) {
-			args.push("-e", `PI_AGENT_PROVIDER=${modelSettings.piAgentProvider.trim()}`);
+		// Read the repository override fresh per launch so admin updates apply
+		// without a restart. Refinement launches never consult it: refinements
+		// always run on the global model.
+		const repoBuildModel =
+			repo && promptKind !== "issue-refinement"
+				? this.options.resolveRepoBuildModel?.(repo.owner, repo.repo)?.trim() || undefined
+				: undefined;
+		const launchProvider = resolveLaunchProvider(modelSettings.piAgentProvider, repoBuildModel);
+		if (launchProvider) {
+			args.push("-e", `PI_AGENT_PROVIDER=${launchProvider}`);
 		}
-		const launchModel = resolveLaunchModel(modelSettings, promptKind);
+		const launchModel = resolveLaunchModel(modelSettings, promptKind, repoBuildModel);
 		if (launchModel) {
 			args.push("-e", `PI_AGENT_MODEL=${launchModel}`);
 		}
@@ -455,10 +470,12 @@ export class DockerWorkerLauncher {
 		workerTemplate: WorkerTemplate;
 		/** Prompt kind of the launching session; selects the forwarded model. */
 		promptKind?: WorkerPromptKind;
+		/** Repository of the launching session; selects the per-repo build model. */
+		repo?: { owner: string; repo: string };
 	}): Promise<DockerWorkerLaunchPlan> {
 		return {
 			containerName: params.containerName,
-			args: await this.buildDockerRunArgs(params.containerName, params.workerTemplate, params.promptKind),
+			args: await this.buildDockerRunArgs(params.containerName, params.workerTemplate, params.promptKind, params.repo),
 			env: {
 				...process.env,
 				YOLO_SESSION_KEY: params.sessionKey,

@@ -34,6 +34,13 @@ export interface DockerWorkerExecutorOptions {
 	/** Scoped GitHub gateway used to serve worker tool_request calls. */
 	githubGateway?: WorkerGitHubGateway;
 	/**
+	 * Live per-repository build-model override: returns the repository's own
+	 * override (bare id or `provider/model`), or undefined to inherit the
+	 * global model. Called at launch time so admin updates take effect without
+	 * a restart.
+	 */
+	resolveRepoBuildModel?: (owner: string, repo: string) => string | undefined;
+	/**
 	 * Runtime settings provider (or static snapshot) supplying the model
 	 * provider/model and OpenAI API key forwarded into worker containers.
 	 */
@@ -51,6 +58,7 @@ export class DockerWorkerExecutor implements ExecutionService {
 			workerImage: options.workerImage,
 			defaultWorkerTemplate: options.defaultWorkerTemplate,
 			resolveWorkerTemplate: options.resolveWorkerTemplate,
+			resolveRepoBuildModel: options.resolveRepoBuildModel,
 			workerWorkspaceMountSource: options.workerWorkspaceMountSource,
 			workerDockerNetworkMode: options.workerDockerNetworkMode,
 			workerOllamaHost: options.workerOllamaHost,

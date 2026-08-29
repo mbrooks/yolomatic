@@ -105,6 +105,21 @@ describe("migrations", () => {
 		db.close();
 	});
 
+	it("adds the nullable per-repository build-model override column", () => {
+		const db = new DatabaseSync(dbPath);
+		runMigrations(db);
+
+		const columns = db.prepare("PRAGMA table_info(repositories)").all() as Array<{ name: string }>;
+		expect(columns.some((column) => column.name === "pi_agent_build_model")).toBe(true);
+
+		// Re-running migrations must stay idempotent and record migration 19 once.
+		runMigrations(db);
+		runMigrations(db);
+		const rows = db.prepare("SELECT id FROM _migrations WHERE id = 19").all() as Array<{ id: number }>;
+		expect(rows).toHaveLength(1);
+		db.close();
+	});
+
 	it("is idempotent on subsequent runs", () => {
 		const db = new DatabaseSync(dbPath);
 		runMigrations(db);

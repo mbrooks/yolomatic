@@ -21,6 +21,13 @@ export interface Repository {
 	workerTemplate?: string | null;
 	issueNewCommentEnabled?: boolean | null;
 	issueAdminLinkInCommentsEnabled?: boolean | null;
+	/**
+	 * Per-repository build-model override (`PI_AGENT_MODEL` for build sessions).
+	 * Null inherits the global model; a slash-form value (provider/model) may
+	 * target a different provider than the global one. Issue refinement
+	 * sessions never consult this value — they always run the global model.
+	 */
+	piAgentBuildModel?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -35,6 +42,7 @@ export type RepositoryInput = {
 	workerTemplate?: string | null;
 	issueNewCommentEnabled?: boolean | null;
 	issueAdminLinkInCommentsEnabled?: boolean | null;
+	piAgentBuildModel?: string | null;
 };
 
 export function repoModeIncludesWebhook(mode: RepoGitHubEventMode): boolean {
@@ -65,6 +73,18 @@ export function resolveRepoDefaultBranch(
 	globalDefaultBranch: string,
 ): string {
 	return repository?.defaultBranch ?? globalDefaultBranch;
+}
+
+/**
+ * Resolve a repository's build-model override, or `undefined` when unset or
+ * blank so the caller inherits the global model. A slash-form value
+ * (`provider/model`) may select a model from a provider other than the
+ * instance's global provider.
+ */
+export function resolveRepoBuildModelOverride(
+	repository: Pick<Repository, "piAgentBuildModel"> | null | undefined,
+): string | undefined {
+	return repository?.piAgentBuildModel?.trim() || undefined;
 }
 
 /** Resolve a repository's worker template, falling back to the server default. */

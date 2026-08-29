@@ -30,6 +30,7 @@ function rowToRepository(row: Record<string, unknown>): Repository {
 			row.issue_admin_link_in_comments_enabled == null
 				? null
 				: String(row.issue_admin_link_in_comments_enabled) === "true",
+		piAgentBuildModel: row.pi_agent_build_model == null ? null : String(row.pi_agent_build_model),
 		createdAt: String(row.created_at),
 		updatedAt: String(row.updated_at),
 	};
@@ -50,8 +51,8 @@ export class RepositoryStore {
 		runMigrations(this.db);
 
 		this.upsertStmt = this.db.prepare(
-			`INSERT INTO repositories (id, owner, repo, full_name, visibility, github_event_mode, default_branch, worker_template, issue_new_comment_enabled, issue_admin_link_in_comments_enabled, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO repositories (id, owner, repo, full_name, visibility, github_event_mode, default_branch, worker_template, issue_new_comment_enabled, issue_admin_link_in_comments_enabled, pi_agent_build_model, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(owner, repo) DO UPDATE SET
 			 full_name=excluded.full_name,
 			 visibility=excluded.visibility,
@@ -60,6 +61,7 @@ export class RepositoryStore {
 			 worker_template=excluded.worker_template,
 			 issue_new_comment_enabled=excluded.issue_new_comment_enabled,
 			 issue_admin_link_in_comments_enabled=excluded.issue_admin_link_in_comments_enabled,
+			 pi_agent_build_model=excluded.pi_agent_build_model,
 			 updated_at=excluded.updated_at`,
 		);
 		this.getStmt = this.db.prepare(
@@ -124,6 +126,7 @@ export class RepositoryStore {
 			input.issueAdminLinkInCommentsEnabled === undefined || input.issueAdminLinkInCommentsEnabled === null
 				? null
 				: input.issueAdminLinkInCommentsEnabled ? "true" : "false",
+			input.piAgentBuildModel ?? null,
 			now,
 			now,
 		);

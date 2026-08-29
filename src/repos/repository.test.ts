@@ -5,6 +5,7 @@ import {
 	repoKey,
 	repoModeIncludesPolling,
 	repoModeIncludesWebhook,
+	resolveRepoBuildModelOverride,
 	resolveRepoDefaultBranch,
 	resolveRepoGitHubEventMode,
 	resolveRepoIssueAdminLinkInCommentsEnabled,
@@ -144,6 +145,32 @@ describe("repository helpers", () => {
 		it("inherits the global value when no repository is provided", () => {
 			expect(resolveRepoIssueAdminLinkInCommentsEnabled(null, true)).toBe(true);
 			expect(resolveRepoIssueAdminLinkInCommentsEnabled(undefined, false)).toBe(false);
+		});
+	});
+
+	describe("resolveRepoBuildModelOverride", () => {
+		it("returns the per-repository build model when configured", () => {
+			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "openai/gpt-4.1" })).toBe("openai/gpt-4.1");
+		});
+
+		it("trims the stored value", () => {
+			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "  ollama/qwen3:30b  " })).toBe(
+				"ollama/qwen3:30b",
+			);
+		});
+
+		it("returns undefined when the override is null so the global model applies", () => {
+			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: null })).toBeUndefined();
+		});
+
+		it("returns undefined when no repository is provided", () => {
+			expect(resolveRepoBuildModelOverride(null)).toBeUndefined();
+			expect(resolveRepoBuildModelOverride(undefined)).toBeUndefined();
+		});
+
+		it("treats a blank stored value as unset", () => {
+			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "   " })).toBeUndefined();
+			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "" })).toBeUndefined();
 		});
 	});
 
