@@ -46,6 +46,7 @@ export interface AppConfig {
 	memoryDir: string;
 	cleanupRetentionDays: number | undefined;
 	staleThresholdMs: number;
+	idleWorkingFailMs: number;
 	maxWorktrees: number;
 	evictionStrategy: "fifo" | "lru";
 	piAgentModel: string | undefined;
@@ -101,6 +102,7 @@ export function getConfig(store: SettingsStore): AppConfig {
 			return Number.isNaN(parsed) || parsed <= 0 ? undefined : parsed;
 		})(),
 		staleThresholdMs: store.getNumber("stale_threshold_ms", 14400000),
+		idleWorkingFailMs: store.getNumber("idle_working_fail_ms", 3600000),
 		maxWorktrees: Math.max(1, store.getNumber("max_worktrees", 10)),
 		evictionStrategy: store.getString("eviction_strategy", "lru").toLowerCase() === "fifo" ? "fifo" : "lru",
 		piAgentModel: store.get("pi_agent_model"),

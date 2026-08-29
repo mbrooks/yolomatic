@@ -43,6 +43,7 @@ describe("getConfig", () => {
 		delete process.env.YOLO_WORKER_CONTROL_BASE_URL;
 		delete process.env.YOLO_WORKER_DOCKER_NETWORK_MODE;
 		delete process.env.OPENAI_API_KEY;
+		delete process.env.IDLE_WORKING_FAIL_MS;
 	});
 
 	afterEach(() => {
@@ -147,6 +148,26 @@ describe("getConfig", () => {
 
 		const config = getConfig(createStore());
 		expect(config.selfReportEnabled).toBe(false);
+	});
+
+	it("defaults idleWorkingFailMs to one hour", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+
+		const config = getConfig(createStore());
+		expect(config.idleWorkingFailMs).toBe(3600000);
+	});
+
+	it("reads idle_working_fail_ms from settings when set", () => {
+		process.env.WEBHOOK_SECRET = "secret";
+		process.env.GITHUB_TOKEN = "token";
+		process.env.GITHUB_USERNAME = "user";
+		const store = createStore();
+		store.set("idle_working_fail_ms", "7200000");
+
+		const config = getConfig(store);
+		expect(config.idleWorkingFailMs).toBe(7200000);
 	});
 
 	it("returns undefined for invalid cleanup retention", () => {

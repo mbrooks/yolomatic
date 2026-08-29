@@ -43,6 +43,14 @@ import { AdminSessionAuth } from "../adapters/http/admin-auth.js";
 import { DEFAULT_WORKER_TEMPLATE } from "../worker/templates.js";
 import { getConfig } from "../config.js";
 import { getRuntimeSettings, type RuntimeSettingsProvider } from "../runtime-settings.js";
+import { FailIdleWorkingSessions } from "./commands/fail-idle-working-sessions.js";
+
+/**
+ * Cadence for the recurring idle-working sweep. A few minutes is sufficient:
+ * a stalled task is failed within a bounded time of crossing the idle
+ * threshold, without requiring a restart.
+ */
+export const IDLE_WORKING_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 export const noOpHandlers: WebhookHandlers = {
 	async handleGitHubEvent() {},
@@ -547,6 +555,20 @@ export async function startRuntime(
 		const message = error instanceof Error ? error.message : String(error);
 		process.stdout.write(`[startup] resume error: ${message}\n`);
 	}
+
+	// Recurring idle-working sweep: sessions stuck in "working" with no
+	// activity for longer than the configured idle timeout (default 1h) are
+	// failed automatically. Armed after the boot-time stale/resume block so
+	// early ticks cannot race the resume path; each tick re-checks in-flight
+	// registration so actively executing tasks are never failed.
+	const idleSweepInterval = setInterval(() => {
+		const sweep = new FailIdleWorkingSessions(graph.sessionManager, graph.handlers);
+		void sweep.execute(config.idleWorkingFailMs).catch((error) => {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stdout.write(`[idle-sweep] error: ${message}\n`);
+		});
+	}, IDLE_WORKING_SWEEP_INTERVAL_MS);
+	idleSweepInterval.unref?.();
 
 	if (config.cleanupRetentionDays) {
 		process.stdout.write(`[cleanup] auto-cleanup enabled: ${config.cleanupRetentionDays} days\n`);

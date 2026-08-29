@@ -31,6 +31,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 		memoryDir: "/tmp/memory",
 		cleanupRetentionDays: undefined,
 		staleThresholdMs: 14400000,
+	idleWorkingFailMs: 3600000,
 		maxWorktrees: 10,
 		evictionStrategy: "lru",
 		piAgentModel: undefined,
