@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	composeRepoBuildModelOverride,
 	normalizeRepoBooleanOverride,
 	normalizeRepoGitHubEventMode,
+	parseRepoBuildModelOverride,
 	repoKey,
 	repoModeIncludesPolling,
 	repoModeIncludesWebhook,
@@ -171,6 +173,68 @@ describe("repository helpers", () => {
 		it("treats a blank stored value as unset", () => {
 			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "   " })).toBeUndefined();
 			expect(resolveRepoBuildModelOverride({ piAgentBuildModel: "" })).toBeUndefined();
+		});
+	});
+
+	describe("parseRepoBuildModelOverride", () => {
+		it("treats blank values as inherit-all with no provider", () => {
+			expect(parseRepoBuildModelOverride("")).toEqual({ provider: "", model: "" });
+			expect(parseRepoBuildModelOverride("   ")).toEqual({ provider: "", model: "" });
+			expect(parseRepoBuildModelOverride(null)).toEqual({ provider: "", model: "" });
+			expect(parseRepoBuildModelOverride(undefined)).toEqual({ provider: "", model: "" });
+		});
+
+		it("keeps a bare model id whole with no provider", () => {
+			expect(parseRepoBuildModelOverride("kimi-k2.7-code:cloud")).toEqual({
+				provider: "",
+				model: "kimi-k2.7-code:cloud",
+			});
+		});
+
+		it("decomposes a slash-form override with a supported provider", () => {
+			expect(parseRepoBuildModelOverride("openai/gpt-4.1")).toEqual({ provider: "openai", model: "gpt-4.1" });
+			expect(parseRepoBuildModelOverride("ollama/qwen3:30b")).toEqual({ provider: "ollama", model: "qwen3:30b" });
+		});
+
+		it("trims before decomposing", () => {
+			expect(parseRepoBuildModelOverride("  ollama/kimi-k2.7-code:cloud  ")).toEqual({
+				provider: "ollama",
+				model: "kimi-k2.7-code:cloud",
+			});
+		});
+
+		it("keeps namespaced ids that lack a supported provider prefix whole", () => {
+			// A bare Ollama identifier may itself contain slashes (e.g. a
+			// namespaced model). Only the supported ollama/openai prefixes are
+			// decomposed; everything else stays a whole model id resolved within
+			// the global provider.
+			expect(parseRepoBuildModelOverride("qwen/qwen3:30b")).toEqual({
+				provider: "",
+				model: "qwen/qwen3:30b",
+			});
+		});
+
+		it("returns an empty model part for a provider-only value", () => {
+			expect(parseRepoBuildModelOverride("openai/")).toEqual({ provider: "openai", model: "" });
+		});
+	});
+
+	describe("composeRepoBuildModelOverride", () => {
+		it("composes an inherit-all value when both parts are blank", () => {
+			expect(composeRepoBuildModelOverride("", "")).toBe("");
+			expect(composeRepoBuildModelOverride("ollama", "   ")).toBe("");
+		});
+
+		it("composes a bare model id when no provider is selected", () => {
+			expect(composeRepoBuildModelOverride("", " kimi-k2.7-code:cloud ")).toBe("kimi-k2.7-code:cloud");
+		});
+
+		it("composes the slash form when a provider is selected", () => {
+			expect(composeRepoBuildModelOverride("openai", "gpt-4.1")).toBe("openai/gpt-4.1");
+		});
+
+		it("never composes a leading slash for a whitespace provider", () => {
+			expect(composeRepoBuildModelOverride("   ", "gpt-4.1")).toBe("gpt-4.1");
 		});
 	});
 

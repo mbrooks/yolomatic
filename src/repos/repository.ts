@@ -87,6 +87,54 @@ export function resolveRepoBuildModelOverride(
 	return repository?.piAgentBuildModel?.trim() || undefined;
 }
 
+/** Provider ids the repository build-model selector understands. */
+export const BUILD_MODEL_PROVIDERS = ["ollama", "openai"] as const;
+
+export type BuildModelProvider = (typeof BUILD_MODEL_PROVIDERS)[number];
+
+/** Decomposed parts of a per-repo build-model override for the provider-aware dropdown UI. */
+export interface ParsedRepoBuildModel {
+	/** Selected provider; empty means inherit the global provider (bare model form). */
+	provider: BuildModelProvider | "";
+	/** Model identifier without the provider prefix; empty means inherit the global model. */
+	model: string;
+}
+
+/**
+ * Split a stored build-model override into its provider and model parts for
+ * the repository settings dropdowns.
+ *
+ * Only the supported `ollama/` and `openai/` prefixes are decomposed into a
+ * provider selection; every other value (a bare id, or a namespaced Ollama
+ * identifier like `qwen/qwen3:30b`) stays a whole model id resolved within
+ * the global provider, mirroring how `resolveConfiguredModel` first matches
+ * registered models before falling back to slash parsing.
+ */
+export function parseRepoBuildModelOverride(value: string | null | undefined): ParsedRepoBuildModel {
+	const trimmed = value?.trim() ?? "";
+	for (const provider of BUILD_MODEL_PROVIDERS) {
+		if (trimmed.startsWith(`${provider}/`)) {
+			return { provider, model: trimmed.slice(provider.length + 1).trim() };
+		}
+	}
+	return { provider: "", model: trimmed };
+}
+
+/**
+ * Compose the persisted build-model override from the selected provider and
+ * model: blank parts inherit the global build model (`""`), a model without a
+ * provider composes the bare id form (resolved within the global provider),
+ * and an explicit provider composes the `provider/model` slash form. A
+ * provider pick without a model is not representable in the stored value, so
+ * it composes an inherit-all value.
+ */
+export function composeRepoBuildModelOverride(provider: string, model: string): string {
+	const trimmedModel = model.trim();
+	if (!trimmedModel) return "";
+	const trimmedProvider = provider.trim();
+	return trimmedProvider ? `${trimmedProvider}/${trimmedModel}` : trimmedModel;
+}
+
 /** Resolve a repository's worker template, falling back to the server default. */
 export function resolveRepoWorkerTemplate(
 	repository: Pick<Repository, "workerTemplate"> | null | undefined,

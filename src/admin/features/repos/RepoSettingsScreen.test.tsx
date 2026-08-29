@@ -15,9 +15,32 @@ function jsonResponse(body: unknown) {
 	});
 }
 
+/** The pi_agent_build_model view the backend serves (override swappable per test). */
+let buildModelOverride: string | null = null;
+let buildModelPullResponses: Array<{ ok: boolean; error?: string }> = [];
+const patchBodies: Array<Record<string, string>> = [];
+const pullCalls: string[] = [];
+
+function buildModelSettingView() {
+	return {
+		key: "pi_agent_build_model",
+		value: buildModelOverride ?? "kimi-k2.7-code:cloud",
+		default: "kimi-k2.7-code:cloud",
+		override: buildModelOverride,
+		inherited: !buildModelOverride,
+		requiresRestart: false,
+		description: "Build model used for this repository's implementation sessions.",
+		providerDefault: "ollama",
+	};
+}
+
 describe("RepoSettingsScreen", () => {
 	beforeEach(() => {
 		fetchSpy.mockReset();
+		buildModelOverride = null;
+		buildModelPullResponses = [];
+		patchBodies.length = 0;
+		pullCalls.length = 0;
 		Object.defineProperty(window, "confirm", {
 			value: vi.fn(() => true),
 			writable: true,
@@ -85,11 +108,25 @@ describe("RepoSettingsScreen", () => {
 						options: ["true", "false"],
 						optionLabels: { true: "Enabled", false: "Disabled" },
 					},
+					buildModelSettingView(),
 					],
 				});
 			}
 			if (url === "/api/repos/mbrooks/yolomatic/settings" && init?.method === "PATCH") {
-				return jsonResponse({ updated: ["github_event_mode"], requiresRestart: ["github_event_mode"] });
+				patchBodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+				const body = JSON.parse(String(init.body)) as Record<string, string>;
+				const requirementsRestart = ["github_event_mode"].filter((key) => key in body);
+				return jsonResponse({ updated: Object.keys(body), requiresRestart: requirementsRestart });
+			}
+			if (url === "/api/llm/models?provider=ollama") {
+				return jsonResponse({ models: ["llama2", "kimi-k2.7-code:cloud"] });
+			}
+			if (url === "/api/llm/models?provider=openai") {
+				return jsonResponse({ models: ["gpt-5.2"] });
+			}
+			if (url === "/api/ollama/pull" && init?.method === "POST") {
+				pullCalls.push((JSON.parse(String(init.body)) as { model: string }).model);
+				return jsonResponse(buildModelPullResponses.shift() ?? { ok: false, error: "pull model manifest: file does not exist" });
 			}
 			if (url === "/api/repos/mbrooks/yolomatic" && init?.method === "DELETE") {
 				return jsonResponse({ removed: true });
@@ -210,5 +247,172 @@ describe("RepoSettingsScreen", () => {
 			expect(screen.getByText("Remove failed")).toBeDefined();
 		});
 		confirmSpy.mockRestore();
+	});
+
+	it("renders a provider selector and model dropdown for pi_agent_build_model instead of a text input", async () => {
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		// The model entry is a dropdown (the row's <label> targets a <select>), not a text input.
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		expect(modelSelect.tagName).toBe("SELECT");
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		expect(Array.from(modelSelect.options).some((option) => option.value === "private")).toBe(true);
+		// The inherit entry is selectable and labeled with the global build model.
+		const options = Array.from(modelSelect.options);
+		expect(options[0].disabled).toBe(false);
+		expect(options[0].textContent).toBe("Use global default (kimi-k2.7-code:cloud)");
+		expect(modelSelect.value).toBe("");
+
+		// A provider selector sits next to the model dropdown.
+		const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+		expect(providerSelect.tagName).toBe("SELECT");
+		expect(Array.from(providerSelect.options, (option) => option.value)).toEqual(["", "ollama", "openai"]);
+		expect(providerSelect.value).toBe("");
+		expect(Array.from(providerSelect.options)[0].textContent).toBe("Use global default (ollama)");
+	});
+
+	it("decomposes a stored provider/model override into the provider select and custom model input", async () => {
+		buildModelOverride = "openai/gpt-4.1";
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+		expect(providerSelect.value).toBe("openai");
+
+		// The model list is fetched for the override's provider.
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "gpt-5.2")).toBe(true),
+		);
+		// gpt-4.1 is not an OpenAI catalog entry, so it renders as a custom identifier.
+		const input = screen.getByLabelText("pi_agent_build_model (custom identifier)") as HTMLInputElement;
+		expect(input.value).toBe("gpt-4.1");
+	});
+
+	it("composes the provider/model value when a provider and listed model are selected", async () => {
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+		fireEvent.change(providerSelect, { target: { value: "openai" } });
+
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "gpt-5.2")).toBe(true),
+		);
+		fireEvent.change(modelSelect, { target: { value: "gpt-5.2" } });
+
+		fireEvent.click(screen.getByText("Save Changes"));
+		await waitFor(() => expect(patchBodies).toHaveLength(1));
+		expect(patchBodies[0].pi_agent_build_model).toBe("openai/gpt-5.2");
+		// A listed OpenAI model needs no Ollama pull.
+		expect(pullCalls).toHaveLength(0);
+	});
+
+	it("blocks saving when a custom Ollama identifier fails to pull", async () => {
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		fireEvent.change(modelSelect, { target: { value: "private" } });
+		const input = screen.getByLabelText("pi_agent_build_model (custom identifier)") as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "bad-build-model" } });
+		fireEvent.click(screen.getByText("Save Changes"));
+
+		await waitFor(() => expect(pullCalls).toContain("bad-build-model"));
+		await waitFor(() => {
+			const banner = screen.getByText(/Check the model identifier you entered and retry/);
+			expect(banner.textContent).toContain("bad-build-model");
+		});
+		expect(patchBodies).toHaveLength(0);
+	});
+
+	it("saves a custom Ollama identifier whose pull succeeds", async () => {
+		buildModelPullResponses = [{ ok: true }];
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		fireEvent.change(modelSelect, { target: { value: "private" } });
+		const input = screen.getByLabelText("pi_agent_build_model (custom identifier)") as HTMLInputElement;
+		fireEvent.change(input, { target: { value: "good-build-model" } });
+		fireEvent.blur(input);
+		await waitFor(() => expect(pullCalls).toContain("good-build-model"));
+
+		fireEvent.click(screen.getByText("Save Changes"));
+		await waitFor(() => expect(patchBodies).toHaveLength(1));
+		expect(patchBodies[0].pi_agent_build_model).toBe("good-build-model");
+	});
+
+	it("validates the decomposed model part of an Ollama override, never the composed provider/model string", async () => {
+		buildModelOverride = "ollama/bad:tag";
+		buildModelPullResponses = [
+			{ ok: false, error: "pull model manifest: file does not exist" },
+			{ ok: true },
+		];
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		// The stored id is not a listed model, so it renders as a custom identifier.
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		await waitFor(() =>
+			expect(Array.from(modelSelect.options).some((option) => option.value === "llama2")).toBe(true),
+		);
+		const input = screen.getByLabelText("pi_agent_build_model (custom identifier)") as HTMLInputElement;
+		expect(input.value).toBe("bad:tag");
+		fireEvent.change(input, { target: { value: "also-bad:tag" } });
+		fireEvent.blur(input);
+
+		await waitFor(() => expect(pullCalls).toContain("also-bad:tag"));
+		await waitFor(() => expect(screen.getByText(/Check the model identifier you entered and retry/)).not.toBeNull());
+		expect(patchBodies).toHaveLength(0);
+
+		// Correcting the identifier pulls the bare id and saves the composed override.
+		fireEvent.change(input, { target: { value: "good:tag" } });
+		fireEvent.blur(input);
+		// The successful blur pull clears the blocked-save banner; wait for the
+		// settled outcome before saving so the save gate does not re-pull.
+		await waitFor(() => expect(screen.queryByText(/Check the model identifier you entered and retry/)).toBeNull());
+		fireEvent.click(screen.getByText("Save Changes"));
+
+		await waitFor(() => expect(patchBodies).toHaveLength(1));
+		expect(patchBodies[0].pi_agent_build_model).toBe("ollama/good:tag");
+		expect(pullCalls).not.toContain("ollama/good:tag");
+	});
+
+	it("clears the override back to inherit when the inherit entry is selected", async () => {
+		buildModelOverride = "openai/gpt-4.1";
+		render(<RepoSettingsScreen owner="mbrooks" repo="yolomatic" onBack={vi.fn()} onSelectTab={vi.fn()} />);
+		await waitFor(() => {
+			expect(screen.getByText("Repository Settings")).toBeDefined();
+		});
+
+		const modelSelect = screen.getByLabelText(/pi_agent_build_model/) as HTMLSelectElement;
+		fireEvent.change(modelSelect, { target: { value: "" } });
+
+		fireEvent.click(screen.getByText("Save Changes"));
+		await waitFor(() => expect(patchBodies).toHaveLength(1));
+		expect(patchBodies[0].pi_agent_build_model).toBe("");
 	});
 });
