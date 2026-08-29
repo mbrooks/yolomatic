@@ -76,6 +76,17 @@ export class LlmLogger {
 		}
 	}
 
+	/**
+	 * Logs the model run summary (model id, provider, API, reasoning effort,
+	 * context window, and max output tokens) under the `model` category. Gated
+	 * by the log level only; there is no dedicated category flag.
+	 */
+	logModel(message: string): void {
+		if (this.isLevelSuppressed("model")) return;
+		if (!message.trim()) return;
+		this.log("model", message);
+	}
+
 	logError(error: Error, context?: string): void {
 		this.log("error", `${context ?? "Unknown error"}: ${error.message}`);
 	}
