@@ -727,6 +727,68 @@ describe("WorkerSessionSupervisor", () => {
 		});
 	});
 
+	it("preserves worker-reported token usage on refinement completion", async () => {
+		const harness = createHarness(629);
+		const { sessionKey, params } = makeRunParams(629, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: "## Proposed Task\nDo it.",
+			summary: "Refined summary",
+			investigation: "Read the code.",
+			usage: { available: true, input: 380912, output: 6470, cacheRead: 0, cacheWrite: 0, totalTokens: 387382, cost: 0 },
+		} as RefinementResult);
+
+		await workerConnection.send(helloMessage(sessionKey));
+
+		// The control plane records this usage on the refinement attempt and the
+		// dashboard metrics; a dropped usage renders permanent "unknown" tokens.
+		await expect(sessionPromise).resolves.toMatchObject({
+			usage: { available: true, input: 380912, output: 6470, cacheRead: 0, cacheWrite: 0, totalTokens: 387382, cost: 0 },
+		});
+	});
+
+	it("preserves a worker-proposed title on refinement completion", async () => {
+		const harness = createHarness(630);
+		const { sessionKey, params } = makeRunParams(630, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: "## Proposed Task\nDo it.",
+			summary: "Refined summary",
+			investigation: "Read the code.",
+			proposedTitle: "Refined title",
+		} as RefinementResult);
+
+		await workerConnection.send(helloMessage(sessionKey));
+
+		await expect(sessionPromise).resolves.toMatchObject({ proposedTitle: "Refined title" });
+	});
+
+	it("drops malformed token usage on refinement completion without failing validation", async () => {
+		const harness = createHarness(631);
+		const { sessionKey, params } = makeRunParams(631, "issue-refinement");
+
+		const sessionPromise = harness.supervisor.runSession(params);
+		const workerConnection = await connectWorker(harness);
+		autoCompletingWorker(workerConnection, sessionKey, {
+			proposedTaskBody: "## Proposed Task\nDo it.",
+			summary: "Refined summary",
+			investigation: "Read the code.",
+			usage: "not-a-usage-object",
+		} as unknown as RefinementResult);
+
+		await workerConnection.send(helloMessage(sessionKey));
+
+		await expect(sessionPromise).resolves.toEqual({
+			proposedTaskBody: "## Proposed Task\nDo it.",
+			summary: "Refined summary",
+			investigation: "Read the code.",
+		});
+	});
+
 	it("rejects with an invalid refinement result when refinement completion fails validation", async () => {
 		const harness = createHarness(610);
 		const { sessionKey, params } = makeRunParams(610, "issue-refinement");
