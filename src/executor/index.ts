@@ -229,7 +229,10 @@ export class PiAgentExecutor implements ExecutionService {
 			model: configuredModel,
 		});
 		onSessionCreated?.({
-			steer: (message: string) => session.steer(message),
+			// pi >= 1.x resolves AgentSession.steer with a queued-input disposition;
+			// the LiveExecutionSession port keeps its legacy `Promise<void>` shape,
+			// so drop the disposition instead of leaking it to callers.
+			steer: (message: string) => session.steer(message).then(() => undefined),
 		});
 
 		if (configuredModel) {

@@ -21,30 +21,30 @@
     "guardrail:test": "npm run preflight && NODE_ENV=development npm test && npm run test:coverage && npm run build && node ./dist/guardrails.js"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.4",
+    "@earendil-works/pi-coding-agent": "^1.5.2",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@octokit/rest": "^22.0.1",
-    "dotenv": "^17.4.2",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "scheduler": "^0.27.0",
-    "ws": "^8.21.3"
+    "dotenv": "^18.0.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "scheduler": "^0.28.0",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.5",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^26.4.0",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
-    "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "^4.1.11",
-    "happy-dom": "^20.11.15",
-    "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.12",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.3.0",
+    "@vitest/coverage-v8": "^5.1.1",
+    "happy-dom": "^21.0.4",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }
