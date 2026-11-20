@@ -96,7 +96,9 @@ describe("PiAgentExecutor", () => {
 		const mockSession = {
 			subscribe: vi.fn(() => unsubscribe),
 			prompt: vi.fn(),
-			steer: vi.fn(),
+			// pi >= 1.x resolves `AgentSession.steer` with a queued-input
+			// disposition string instead of `void`.
+			steer: vi.fn(async () => "steered"),
 			messages: [
 				{ role: "assistant", content },
 			],
@@ -535,7 +537,10 @@ describe("PiAgentExecutor", () => {
 		expect(result.status).toBe("complete");
 		expect(mockSession.prompt).toHaveBeenCalledWith("custom prompt");
 		expect(onSessionCreated).toHaveBeenCalledWith(expect.objectContaining({ steer: expect.any(Function) }));
-		await onSessionCreated.mock.calls[0][0].steer("please retry");
+		// LiveExecutionSession.steer conforms to `Promise<void>` even though
+		// pi >= 1.x resolves AgentSession.steer with a disposition string.
+		const disposition = await onSessionCreated.mock.calls[0][0].steer("please retry");
+		expect(disposition).toBeUndefined();
 		expect(mockSession.steer).toHaveBeenCalledWith("please retry");
 		expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model: configuredModel }));
 	});

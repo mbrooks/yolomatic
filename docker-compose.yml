@@ -30,7 +30,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
   ollama:
-    image: alpine/ollama:0.20.5
+    image: alpine/ollama:0.40.16
     container_name: yolomatic-ollama
     network_mode: "service:yolomatic"
     restart: unless-stopped

@@ -18,7 +18,7 @@ function createStore(): SettingsStore {
 	return store;
 }
 
-describe.sequential("getWorkspaceConfig", () => {
+describe("getWorkspaceConfig", () => {
 	const originalEnv = process.env;
 
 	beforeEach(() => {

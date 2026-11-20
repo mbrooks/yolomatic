@@ -82,7 +82,7 @@ function mockResponse(): http.ServerResponse & { body: unknown; statusCode: numb
 	return res;
 }
 
-describe.sequential("handleAdminRoute", () => {
+describe("handleAdminRoute", () => {
 	let store: SettingsStore;
 	let deps: Parameters<typeof handleAdminRoute>[2];
 	let githubService: {
@@ -2084,7 +2084,7 @@ describe.sequential("handleAdminRoute", () => {
 	});
 });
 
-describe.sequential("handleAdminRoute — Basic Auth route scoping", () => {
+describe("handleAdminRoute — Basic Auth route scoping", () => {
 	let userStore: UserStore;
 	let realDeps: Parameters<typeof handleAdminRoute>[2];
 
